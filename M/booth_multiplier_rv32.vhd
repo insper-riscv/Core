@@ -32,7 +32,7 @@ entity booth_multiplier_rv32 is
         multiplier   : in  std_logic_vector(31 downto 0);  -- rs2
         result_lo    : out std_logic_vector(31 downto 0);   -- MUL  result
         result_hi    : out std_logic_vector(31 downto 0);   -- MULH result
-        done         : out std_logic;
+        done         : buffer std_logic;
         busy         : out std_logic
     );
 end entity booth_multiplier_rv32;
@@ -54,9 +54,16 @@ architecture rtl of booth_multiplier_rv32 is
     signal M        : signed(32 downto 0);   -- 33-bit sign-extended multiplicand
 
     -- Iteration counter
-    signal count : unsigned(5 downto 0);  -- counts 0..31 (32 iterations)
+    signal count    : unsigned(5 downto 0);  -- counts 0..31 (32 iterations)
+    signal busy_reg      : std_logic;
+    signal start_inhibit : std_logic := '0';
 
 begin
+
+    -- busy: combinacional quando start=1 em S_IDLE (eager)
+    -- Garante que muldiv_busy sobe no mesmo ciclo que ex_startMul,
+    -- evitando necessidade de stall especial para o ciclo K.
+    busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
 
     process(clk)
         variable A_next : signed(32 downto 0);
@@ -71,12 +78,16 @@ begin
                 M        <= (others => '0');
                 count    <= (others => '0');
                 done     <= '0';
-                busy     <= '0';
+                busy_reg <= '0';
             else
                 case state is
 
                     when S_IDLE =>
                         done <= '0';
+                        -- Clear inhibit when start falls
+                        if start = '0' then
+                            start_inhibit <= '0';
+                        end if;
                         if start = '1' then
                             -- Initialize registers
                             A        <= (others => '0');
@@ -86,7 +97,7 @@ begin
                             M <= resize(signed(multiplicand), 33);
                             count <= (others => '0');
                             state <= S_COMPUTE;
-                            busy  <= '1';
+                            busy_reg  <= '1';
                         end if;
 
                     when S_COMPUTE =>
@@ -123,9 +134,10 @@ begin
 
                     when S_DONE =>
                         -- Output the 64-bit product: {A[31:0], Q[31:0]}
-                        done  <= '1';
-                        busy  <= '0';
-                        state <= S_IDLE;
+                        done          <= '1';
+                        busy_reg      <= '0';
+                        start_inhibit <= '1';  -- previne reinicio quando start ainda esta alto
+                        state         <= S_IDLE;
 
                 end case;
             end if;

@@ -46,7 +46,7 @@ entity non_restoring_divider_rv32 is
         divisor     : in  std_logic_vector(31 downto 0);  -- rs2
         quotient    : out std_logic_vector(31 downto 0);  -- DIV/DIVU result
         remainder   : out std_logic_vector(31 downto 0);  -- REM/REMU result
-        done        : out std_logic;
+        done        : buffer std_logic;
         busy        : out std_logic;
         div_by_zero : out std_logic;
         overflow    : out std_logic
@@ -82,7 +82,14 @@ architecture rtl of non_restoring_divider_rv32 is
     constant ALL_ONES : std_logic_vector(31 downto 0) := x"FFFFFFFF";
     constant INT_MIN  : std_logic_vector(31 downto 0) := x"80000000";
 
+    signal busy_reg      : std_logic := '0';
+    signal start_inhibit : std_logic := '0';
+
 begin
+
+    -- busy eager: combinacional quando start=1 em S_IDLE
+    -- Garante que muldiv_busy sobe no mesmo ciclo que ex_startMul no pipeline.
+    busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
 
     -------------------------------------------------------------------------
     -- Special case detection (combinational)
@@ -116,7 +123,7 @@ begin
                 divisor_neg  <= '0';
                 op_unsigned  <= '0';
                 done         <= '0';
-                busy         <= '0';
+                busy_reg     <= '0';
                 q_result     <= (others => '0');
                 r_result     <= (others => '0');
             else
@@ -134,7 +141,7 @@ begin
                             -- Check special cases
                             if detect_div_by_zero = '1' or detect_overflow = '1' then
                                 state <= S_SPECIAL;
-                                busy  <= '1';
+                                busy_reg <= '1';
 
                                 if is_unsigned = '1' then
                                     dividend_neg <= '0';
@@ -144,7 +151,7 @@ begin
                                     divisor_neg  <= divisor(31);
                                 end if;
                             else
-                                busy <= '1';
+                                busy_reg <= '1';
 
                                 -----------------------------------------------
                                 -- Compute absolute values / pass-through
@@ -267,8 +274,9 @@ begin
                     -- DONE: assert done, return to idle
                     -----------------------------------------------------------
                     when S_DONE =>
-                        done  <= '1';
-                        busy  <= '0';
+                        done          <= '1';
+                        start_inhibit <= '1';
+                        busy_reg <= '0';
                         state <= S_IDLE;
 
                 end case;

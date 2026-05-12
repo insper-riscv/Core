@@ -83,7 +83,8 @@ architecture rtl of rv32im_pipeline_core is
   -- =========================================================================
   -- Stall do muldiv (combinacional = sempre '0' nesta implementacao)
   -- =========================================================================
-  signal muldiv_busy : std_logic;
+  signal muldiv_busy   : std_logic;
+  signal muldiv_stall  : std_logic;  -- == muldiv_busy (Booth eager: sobe no mesmo ciclo que start)
 
   -- =========================================================================
   -- Estagio IF: pc_fetch
@@ -265,6 +266,12 @@ begin
   end process;
 
   startMul_raw <= cu_isMulDiv and (not isMulDiv_d);
+
+  -- Com o Booth "eager busy" (busy sobe combinacionalmente quando start=1 em S_IDLE),
+  -- o muldiv_stall e simplesmente muldiv_busy. Nao precisa de ex_startMul nem
+  -- ex_isMulDiv, evitando loops de feedback e deadlocks.
+  muldiv_stall <= muldiv_busy;
+
   idex_in_valid <= ifid_valid and (not id_bubble_sel);
 
   -- =========================================================================
@@ -371,7 +378,7 @@ begin
       ifid_opcode    => ifid_instr(6 downto 0),
       idex_rd        => ex_rd_idx,
       idex_reRAM     => ex_reRAM,
-      muldiv_busy    => muldiv_busy,
+      muldiv_busy    => muldiv_stall,
       if_pc_write_en => if_pc_write_en,
       ifid_write_en  => ifid_write_en,
       id_bubble_sel  => id_bubble_sel
@@ -402,7 +409,7 @@ begin
     port map (
       clk    => clk,
       reset  => reset,
-      en     => not muldiv_busy,
+      en     => not muldiv_stall,
       flush  => flush_id_ex,
 
       in_valid   => idex_in_valid,
@@ -566,7 +573,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => not muldiv_busy,
+      en    => not muldiv_stall,
       flush => '0',
 
       in_valid           => ex_valid,
@@ -623,7 +630,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => not muldiv_busy,
+      en    => not muldiv_stall,
       flush => '0',
 
       in_valid           => exmem_valid,
