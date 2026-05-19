@@ -46,7 +46,7 @@ entity non_restoring_divider_rv32 is
         divisor     : in  std_logic_vector(31 downto 0);  -- rs2
         quotient    : out std_logic_vector(31 downto 0);  -- DIV/DIVU result
         remainder   : out std_logic_vector(31 downto 0);  -- REM/REMU result
-        done        : buffer std_logic;
+        done        : out std_logic;
         busy        : out std_logic;
         div_by_zero : out std_logic;
         overflow    : out std_logic
@@ -57,7 +57,7 @@ architecture rtl of non_restoring_divider_rv32 is
 
     -- FSM states
     type state_t is (S_IDLE, S_SPECIAL, S_COMPUTE, S_CORRECT, S_ADJUST_SIGN, S_DONE);
-    signal state : state_t;
+    signal state : state_t := S_IDLE;
 
     -- Internal working registers (always operate on absolute/unsigned values)
     signal A     : signed(32 downto 0);   -- 33-bit partial remainder (extra sign bit)

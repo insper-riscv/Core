@@ -65,6 +65,13 @@ architecture arch_name of multdiv is
   signal div_busy  : std_logic;
   signal div_done  : std_logic;
   signal divu_busy : std_logic;
+
+  -- Sinais intermediarios para port maps (VHDL-93)
+  signal start_mul  : std_logic;
+  signal start_div  : std_logic;
+  signal start_divu : std_logic;
+  signal not_isMult : std_logic;
+  signal not_isUnsigned : std_logic;
   signal divu_done : std_logic;
 
   signal done_int  : std_logic;
@@ -83,6 +90,13 @@ begin
   -- Decodifica opCode ATUAL (para roteamento de start e busy)
   isMult     <= '1' when opCode(2) = '0' else '0';
   isUnsigned <= '1' when (opCode = "101" or opCode = "111") else '0';
+
+  -- Sinais intermediarios para port maps (VHDL-93 nao aceita expressoes diretas)
+  not_isMult     <= not isMult;
+  not_isUnsigned <= not isUnsigned;
+  start_mul  <= start and isMult;
+  start_div  <= start and not_isMult and not_isUnsigned;
+  start_divu <= start and not_isMult and isUnsigned;
 
   -- Decodifica opCode TRAVADO (para done_int e saida_capt - estavel durante calculo)
   -- CORRETO: usa o decoderM para mapear op_latched -> operacao
@@ -126,7 +140,7 @@ begin
       port map(
         clk    => clk,
         rst    => rst,
-        start  => start and isMult,
+        start  => start_mul,
         dataa  => outA,
         datab  => outB,
         result => resultadoMult,
@@ -138,7 +152,7 @@ begin
       port map(
         clk      => clk,
         rst      => rst,
-        start    => start and (not isMult) and (not isUnsigned),
+        start    => start_div,
         numer    => valorA,
         denom    => valorB,
         quotient => resultDiv,
@@ -151,7 +165,7 @@ begin
       port map(
         clk      => clk,
         rst      => rst,
-        start    => start and (not isMult) and isUnsigned,
+        start    => start_divu,
         numer    => valorA,
         denom    => valorB,
         quotient => resultDivU,

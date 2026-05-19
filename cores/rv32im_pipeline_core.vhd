@@ -86,6 +86,13 @@ architecture rtl of rv32im_pipeline_core is
   signal muldiv_busy   : std_logic;
   signal muldiv_done   : std_logic;
   signal muldiv_stall  : std_logic;  -- busy OR done (cobre ciclo em que saida_capt atualiza)
+  signal muldiv_stall_n : std_logic;  -- NOT muldiv_stall (para port maps VHDL-93)
+
+  -- Aliases para visibilidade nos testbenches cocotb
+  signal alu_out_idexmem  : word_t;
+  signal pc_if_out        : word_t;
+  signal extenderRAM_out  : word_t;
+  signal ram_out          : std_logic_vector(31 downto 0);
 
   -- =========================================================================
   -- Estagio IF: pc_fetch
@@ -242,6 +249,12 @@ architecture rtl of rv32im_pipeline_core is
 
 begin
 
+  -- Aliases de observabilidade para testbenches cocotb
+  alu_out_idexmem <= exmem_alu_out;
+  pc_if_out       <= if_pc;
+  extenderRAM_out <= wb_ram_extended;
+  ram_out         <= ram_rdata;
+
   -- =========================================================================
   -- Logica combinacional de controle de PC e flush
   -- =========================================================================
@@ -272,7 +285,8 @@ begin
   -- No ciclo em que done_int=1, busy ja caiu para 0 (Booth foi para S_DONE no ciclo anterior).
   -- Sem este OR done, reg_EX_MEM capturaria saida_capt VELHO nesse ciclo.
   -- Com "OR done", o stall continua por 1 ciclo extra ate saida_capt propagar.
-  muldiv_stall <= muldiv_busy or muldiv_done;
+  muldiv_stall   <= muldiv_busy or muldiv_done;
+  muldiv_stall_n <= not (muldiv_busy or muldiv_done);
 
   idex_in_valid <= ifid_valid and (not id_bubble_sel);
 
@@ -411,7 +425,7 @@ begin
     port map (
       clk    => clk,
       reset  => reset,
-      en     => not muldiv_stall,
+      en     => muldiv_stall_n,
       flush  => flush_id_ex,
 
       in_valid   => idex_in_valid,
@@ -575,7 +589,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => not muldiv_stall,
+      en    => muldiv_stall_n,
       flush => '0',
 
       in_valid           => ex_valid,
@@ -632,7 +646,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => not muldiv_stall,
+      en    => muldiv_stall_n,
       flush => '0',
 
       in_valid           => exmem_valid,

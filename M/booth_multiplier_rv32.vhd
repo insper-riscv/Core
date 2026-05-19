@@ -32,7 +32,7 @@ entity booth_multiplier_rv32 is
         multiplier   : in  std_logic_vector(31 downto 0);  -- rs2
         result_lo    : out std_logic_vector(31 downto 0);   -- MUL  result
         result_hi    : out std_logic_vector(31 downto 0);   -- MULH result
-        done         : buffer std_logic;
+        done         : out std_logic;
         busy         : out std_logic
     );
 end entity booth_multiplier_rv32;
@@ -41,7 +41,7 @@ architecture rtl of booth_multiplier_rv32 is
 
     -- FSM states
     type state_t is (S_IDLE, S_COMPUTE, S_DONE);
-    signal state : state_t;
+    signal state : state_t := S_IDLE;
 
     -- Internal registers
     -- Accumulator (A) : upper partial product, 33 bits (extra sign bit)
@@ -55,7 +55,7 @@ architecture rtl of booth_multiplier_rv32 is
 
     -- Iteration counter
     signal count    : unsigned(5 downto 0);  -- counts 0..31 (32 iterations)
-    signal busy_reg      : std_logic;
+    signal busy_reg      : std_logic := '0';
     signal start_inhibit : std_logic := '0';
 
 begin
@@ -108,14 +108,13 @@ begin
                         --   "00","11" -> no operation
                         A_next := A;
 
-                        case std_logic_vector'(Q(0) & Q_minus1) is
-                            when "01" =>
-                                A_next := A + M;
-                            when "10" =>
-                                A_next := A - M;
-                            when others =>
-                                A_next := A;
-                        end case;
+                        if Q(0) = '0' and Q_minus1 = '1' then
+                            A_next := A + M;
+                        elsif Q(0) = '1' and Q_minus1 = '0' then
+                            A_next := A - M;
+                        else
+                            A_next := A;
+                        end if;
 
                         -- Arithmetic right shift {A_next, Q, Q_minus1} by 1
                         concat := A_next & Q & Q_minus1;

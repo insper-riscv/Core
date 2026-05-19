@@ -3,7 +3,7 @@ import sys
 import json
 import argparse
 from pathlib import Path
-from cocotb.runner import get_runner, VHDL
+from cocotb.runner import get_runner
 
 def run_cocotb_test(toplevel: str, sources: list, test_module: str, parameters: dict = None):
     tests_root = Path(__file__).resolve().parents[1]
@@ -54,7 +54,6 @@ def run_cocotb_test(toplevel: str, sources: list, test_module: str, parameters: 
         hdl_toplevel=toplevel,
         always=True,
         build_dir=build_dir,
-        build_args=[VHDL("--std=08")],
         parameters=parameters or {}
     )
 
@@ -67,7 +66,6 @@ def run_cocotb_test(toplevel: str, sources: list, test_module: str, parameters: 
         test_module=test_module,
         build_dir=build_dir,
         plusargs=plusargs,
-        test_args=["--std=08"],
     )
 
     print(f"Waves: {wave_file} (gerado)")
