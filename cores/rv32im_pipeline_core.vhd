@@ -530,7 +530,7 @@ begin
     );
 
   -- =========================================================================
-  -- EX stage: MulDiv (LPM combinacional, busy sempre '0')
+  -- EX stage: MulDiv
   -- =========================================================================
   u_muldiv : entity work.multdiv
     port map (
