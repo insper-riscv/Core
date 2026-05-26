@@ -507,4 +507,50 @@
             "ROM_FILE": "tests/python/unittests/instructions/codes/test_load_use.hex"
         }
     }
+    ,
+    "MEXT": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "src/rv32i_ctrl_consts.vhd",
+            "src/rv32im_pipeline_types.vhd",
+            "src/genericRegister.vhd",
+            "src/genericAdder.vhd",
+            "src/genericAdderU.vhd",
+            "src/genericMux2x1.vhd",
+            "src/genericMux3x1.vhd",
+            "src/FlipFlop.vhd",
+            "src/ALU.vhd",
+            "src/RegFile.vhd",
+            "src/RAM_simulation.vhd",
+            "src/ROM_simulation.vhd",
+            "src/InstructionDecoder.vhd",
+            "src/ExtenderImm.vhd",
+            "src/ExtenderRAM.vhd",
+            "src/StoreManager.vhd",
+            "src/clk_gen_3way.vhd",
+            "src/control_unit.vhd",
+            "src/bubble_mux.vhd",
+            "src/forwarding_unit.vhd",
+            "src/hazard_detection_unit.vhd",
+            "src/extendSigned.vhd",
+            "src/decoderM.vhd",
+            "src/booth_multiplier_rv32.vhd",
+            "src/non_restoring_divider_rv32.vhd",
+            "src/mult.vhd",
+            "src/div.vhd",
+            "src/divu.vhd",
+            "src/multdiv.vhd",
+            "src/pc_fetch.vhd",
+            "src/reg_IF_ID.vhd",
+            "src/reg_ID_EX.vhd",
+            "src/reg_EX_MEM.vhd",
+            "src/reg_MEM_WB.vhd",
+            "src/rv32im_pipeline_core.vhd",
+            "src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.mext",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_mext.hex"
+        }
+    }
 }
