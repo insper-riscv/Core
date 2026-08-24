@@ -1,0 +1,554 @@
+{
+    "bancoRegistradores": {
+        "toplevel": "regfile",
+        "sources": [
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/RegFile.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.bancoRegistradores"
+    },
+    "ALU": {
+        "toplevel": "alu",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/ALU.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ALU"
+    },
+    "InstructionDecoder": {
+        "toplevel": "instructiondecoder",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.instructionDecoder"
+    },
+    "RAM": {
+        "toplevel": "ram_simulation",
+        "sources": [
+            "../RV32IM/src/RAM_simulation.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.RAM"
+    },
+    "ExtenderRAM": {
+        "toplevel": "extenderram",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ExtenderRAM"
+    },
+    "ExtenderImm": {
+        "toplevel": "extenderimm",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/ExtenderImm.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ExtenderImm"
+    },
+    "StoreManager": {
+        "toplevel": "storemanager",
+        "sources": [
+            "../RV32IM/src/StoreManager.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.StoreManager"
+    },
+    "ROM": {
+        "toplevel": "rom_simulation",
+        "sources": [
+            "../RV32IM/src/ROM_simulation.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ROM",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/entities/data/testROM.hex"
+        }
+    },
+    "clk_gen_3way": {
+        "toplevel": "clk_gen_3way",
+        "sources": [
+            "../RV32IM/src/clk_gen_3way.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ClkGen3Way"
+    },
+    "one": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.one",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/one.hex"
+        }
+    },
+    "two": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.two",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/two.hex"
+        }
+    },
+    "three": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.three",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/three.hex"
+        }
+    },
+    "four": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.four",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/four.hex"
+        }
+    },
+    "five": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.five",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/five.hex"
+        }
+    },
+    "six": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.six",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/six.hex"
+        }
+    },
+    "ControlUnit": {
+        "toplevel": "control_unit",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/control_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.control_unit"
+    },
+    "HazardDetectionUnit": {
+        "toplevel": "hazard_detection_unit",
+        "sources": [
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.HazardDetectionUnit"
+    },
+    "ForwardingUnit": {
+        "toplevel": "forwarding_unit",
+        "sources": [
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/forwarding_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ForwardingUnit"
+    },
+    "BubbleMux": {
+        "toplevel": "bubble_mux",
+        "sources": [
+            "../RV32IM/src/bubble_mux.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.BubbleMux"
+    },
+    "MUL": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.mul",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_mul.hex"
+        }
+    },
+    "FWD": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.fwd",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_fwd.hex"
+        }
+    },
+    "LOAD_USE": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.load_use",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_load_use.hex"
+        }
+    },
+    "MEXT": {
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../RV32IM/src/rv32i_ctrl_consts.vhd",
+            "../RV32IM/src/rv32im_pipeline_types.vhd",
+            "../RV32IM/src/genericRegister.vhd",
+            "../RV32IM/src/genericAdder.vhd",
+            "../RV32IM/src/genericAdderU.vhd",
+            "../RV32IM/src/genericMux2x1.vhd",
+            "../RV32IM/src/genericMux3x1.vhd",
+            "../RV32IM/src/FlipFlop.vhd",
+            "../RV32IM/src/ALU.vhd",
+            "../RV32IM/src/RegFile.vhd",
+            "../RV32IM/src/RAM_simulation.vhd",
+            "../RV32IM/src/ROM_simulation.vhd",
+            "../RV32IM/src/InstructionDecoder.vhd",
+            "../RV32IM/src/ExtenderImm.vhd",
+            "../RV32IM/src/ExtenderRAM.vhd",
+            "../RV32IM/src/StoreManager.vhd",
+            "../RV32IM/src/clk_gen_3way.vhd",
+            "../RV32IM/src/control_unit.vhd",
+            "../RV32IM/src/bubble_mux.vhd",
+            "../RV32IM/src/forwarding_unit.vhd",
+            "../RV32IM/src/hazard_detection_unit.vhd",
+            "../RV32IM/src/extendSigned.vhd",
+            "../RV32IM/src/decoderM.vhd",
+            "../RV32IM/src/booth_multiplier_rv32.vhd",
+            "../RV32IM/src/non_restoring_divider_rv32.vhd",
+            "../RV32IM/src/mult.vhd",
+            "../RV32IM/src/div.vhd",
+            "../RV32IM/src/divu.vhd",
+            "../RV32IM/src/multdiv.vhd",
+            "../RV32IM/src/pc_fetch.vhd",
+            "../RV32IM/src/reg_IF_ID.vhd",
+            "../RV32IM/src/reg_ID_EX.vhd",
+            "../RV32IM/src/reg_EX_MEM.vhd",
+            "../RV32IM/src/reg_MEM_WB.vhd",
+            "../RV32IM/src/rv32im_pipeline_core.vhd",
+            "../RV32IM/src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.mext",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_mext.hex"
+        }
+    }
+}
