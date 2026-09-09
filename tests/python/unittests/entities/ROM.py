@@ -1,7 +1,6 @@
 from pathlib import Path
 import cocotb
 from cocotb.triggers import Timer
-from cocotb.result import TestFailure
 
 # ---------- Helpers ----------
 def parse_hex(hex_path: Path, depth=64):
@@ -76,7 +75,7 @@ async def rom_leitura_sincrona_basica(dut):
     val_after_re0 = await read_rom_sync(dut, new_idx, do_re=False)
 
     if val_after_re0 != last_val:
-        raise TestFailure(
+        raise AssertionError(
             f"Com re=0 esperava manter último valor {last_val:#010x}, "
             f"mas a saída mudou para {val_after_re0:#010x}"
         )
