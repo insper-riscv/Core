@@ -1,108 +1,105 @@
-# `tests/python`: Test Guide (Cocotb + GHDL)
+# `tests/python`: per-entity VHDL unit tests (cocotb + GHDL)
 
-Here are the **simulation tests** written in **Python** using **Cocotb** and the **runner** that compiles/runs everything with **GHDL**. This is also where the **waveforms** for **GTKWave** are stored.
+Cocotb testbenches that exercise individual VHDL entities (`ALU`,
+`RegFile`, `ROM_simulation`, control/hazard/forwarding units, etc.)
+directly, one file per entity. This is a separate, older suite from
+the `asm`/`c` tests the rest of this repo uses: it doesn't go through
+`riscv-tools`' compiler/linker/`config.yaml` at all, it just elaborates
+a handful of `.vhd` sources per test and drives the entity's ports
+straight from Python.
 
-## What’s here
+## Structure
 
 ```
 tests/python/
-├── cocotb/           # Python tests (one file per VHDL module)
-│   └── ...           # e.g.: bancoRegistradores.py, examples/and_gate.py, etc.
-├── utils/
-│   └── runner.py     # script that compiles VHDL + runs tests
-├── tests.json        # catalog: registry of tests that can be executed
-└── sim_build/
-    └── <toplevel>/   # simulation outputs (results.xml, waves.ghw, etc.)
+├── runner.py                    # catalog loader + cocotb/GHDL driver
+├── tests.json                   # catalog: name -> {toplevel, sources, test_module, ...}
+├── unittests/
+│   ├── entities/                # one file per VHDL entity (ALU.py, RAM.py, ...)
+│   │   └── data/                # fixture files an entity test's generics point at (e.g. testROM.hex)
+│   └── instructions/            # raw hand-assembled instruction-sequence tests (see "Known issue" below)
+│       └── codes/                # the .hex images those tests load
+└── sim_build/                   # generated: <group>/<name>/{waves.ghw, ...} per test
 ```
-
-* **`cocotb/`**: each `.py` contains one or more `@cocotb.test()`.
-* **`tests.json`**: registers *test name* → (*VHDL toplevel*, *VHDL files*, *Python module*).
-* **`sim_build/<toplevel>/`**: simulation output; this is where `waves.ghw` is generated.
-
-
-## Creating a new test
-
-### 1) Write the testbench in `cocotb/`
-
-Create `tests/python/cocotb/my_module.py`:
-
-```python
-# tests/python/cocotb/my_module.py
-import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer
-
-@cocotb.test()
-async def basic(dut):
-    ...
-```
-
-### 2) Register it in `tests.json`
-
-Open `tests/python/tests.json` and add a block:
-
-```json
-{
-  "my_module": {
-    "toplevel": "myentity",                 // VHDL entity (exact name, lowercase!)
-    "sources": [
-      "src/DependencyA.vhd",
-      "src/DependencyB.vhd",
-      "src/MyEntity.vhd"
-    ],
-    "test_module": "tests.python.cocotb.my_module"          
-  }
-}
-```
-
-**Fields:**
-
-* `toplevel`: the name of the **VHDL entity** you want to simulate.
-* `sources`: **all** required `.vhd` files (the entity + dependencies).
-
-  > Use paths **relative to the repository root** (e.g.: `src/...`).
-* `test_module`: Python path to the file, relative to the project root, separated by dots (e.g.: `tests.python.cocotb.my_module`).
 
 ## Running
 
-Run with the virtual environment active, from the **root of the repo**:
+```bash
+uv run python tests/python/runner.py            # every entry in tests.json (skips "skip": true ones)
+uv run python tests/python/runner.py ALU        # one entry, by its tests.json key
+```
 
-* **All tests** in the catalog:
+`SIM` picks the simulator GHDL/cocotb uses (defaults to `ghdl`, matching
+the rest of this repo's `sim` suite). This is the same command
+`.github/workflows/sim.yml` runs in CI.
 
-  ```bash
-  python3 tests/python/utils/runner.py
-  # or
-  python3 tests/python/utils/runner.py all
-  ```
+## The catalog (`tests.json`)
 
-* **A specific test**:
+Each entry is a test name (used as the CLI argument above) mapping to:
 
-  ```bash
-  python3 tests/python/utils/runner.py my_module
-  ```
+| Field | Meaning |
+| :--- | :--- |
+| `toplevel` | The VHDL entity to elaborate (lowercase, matching the `.vhd`'s own entity name) |
+| `sources` | Every `.vhd` file the entity needs, as paths relative to this repo's parent (`RV32IM`), e.g. `../src/ALU.vhd` |
+| `test_module` | Dotted Python path to the test file, e.g. `tests.python.unittests.entities.ALU` |
+| `parameters` | Optional: VHDL generics to pass (e.g. `ROM_FILE` for an entity that loads a memory image) |
+| `skip` / `skip_reason` | Optional: excluded from the `all` sweep with the reason printed, but still runs if invoked by name explicitly |
 
-Output (per test):  
-`tests/python/sim_build/<toplevel>/results.xml` + `waves.ghw` (waveforms).
+`runner.py` infers the output group (`entities`/`instructions`/`misc`)
+from whether `test_module` contains `.entities.` or `.instructions.`,
+and uses that to name the test's `sim_build/` subfolder.
 
-Example of a test log (Register File):
-![Test log example](docs/exemplo_log_teste.png)
+## Writing a new entity test
 
+1. Create `tests/python/unittests/entities/MyEntity.py`:
+
+   ```python
+   import cocotb
+   from cocotb.triggers import Timer
+
+   @cocotb.test()
+   async def test_basic(dut):
+       dut.my_input.value = 1
+       await Timer(1, units="ns")
+       assert int(dut.my_output.value) == 1
+   ```
+
+   Assertions are plain `assert`; any exception raised inside a
+   `@cocotb.test()` marks it FAIL under cocotb 2.0, no special
+   exception class needed.
+
+2. Add it to `tests.json`:
+
+   ```json
+   "MyEntity": {
+       "toplevel": "myentity",
+       "sources": ["../src/MyEntity.vhd"],
+       "test_module": "tests.python.unittests.entities.MyEntity"
+   }
+   ```
+
+3. Run it on its own first: `uv run python tests/python/runner.py MyEntity`.
+
+## Known issue: the 10 `instructions` tests are all skipped
+
+The `instructions` group (`one`, `two`, `three`, `four`, `five`, `six`,
+`MUL`, `FWD`, `LOAD_USE`, `MEXT`) predates the BOOT_ROM+FLASH memory
+redesign and assumes code starts executing at address `0` with no boot
+delay, which is no longer how the core resets. Fixing this needs a real
+rewrite (a `BOOT_ROM_FILE` generic, `.hex` images re-padded to
+`FLASH_BASE`, and corrected cycle counts), not a parameter tweak, so
+these 10 entries carry `"skip": true` for now; see
+[PER_ENTITY_TESTS_CI_BREAKAGE.md](../../docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md)
+for the full investigation. The 13 `entities` tests are unaffected and
+run normally.
 
 ## Viewing waveforms (GTKWave)
 
-Each run generates `waves.ghw` in `sim_build/<toplevel>/`:
+Every run writes `waves.ghw` into that test's `sim_build/<group>/<name>/`:
 
 ```bash
-gtkwave tests/python/sim_build/<entity>/waves.ghw
+gtkwave tests/python/sim_build/entities/ALU/waves.ghw
 ```
-
-Tips:
-
-* Add signals from the DUT (e.g.: `clk`, `escreveC`, addresses, data, and outputs).
-* Save a `.sav` layout in the same directory to reuse your signal selection.
-
-Example of test waveforms (bancoRegistradores):
-![Example test waves](docs/todos_testes.png)
 
 ---
 
