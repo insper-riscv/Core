@@ -1,4 +1,4 @@
-# `tests/python` — Test Guide (Cocotb + GHDL)
+# `tests/python`: Test Guide (Cocotb + GHDL)
 
 Here are the **simulation tests** written in **Python** using **Cocotb** and the **runner** that compiles/runs everything with **GHDL**. This is also where the **waveforms** for **GTKWave** are stored.
 
