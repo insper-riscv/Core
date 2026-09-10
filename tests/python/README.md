@@ -103,3 +103,7 @@ Tips:
 
 Example of test waveforms (bancoRegistradores):
 ![Example test waves](docs/todos_testes.png)
+
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
