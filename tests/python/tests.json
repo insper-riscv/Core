@@ -5,7 +5,7 @@
             "common/genericRegister.vhd",
             "common/RegFile.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.bancoRegistradores"
+        "test_module": "tests.python.unittests.common.bancoRegistradores"
     },
     "ALU": {
         "toplevel": "alu",
@@ -13,7 +13,7 @@
             "common/rv32i_ctrl_consts.vhd",
             "I/ALU.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.ALU"
+        "test_module": "tests.python.unittests.I.ALU"
     },
     "InstructionDecoder": {
         "toplevel": "instructiondecoder",
@@ -21,7 +21,7 @@
             "common/rv32i_ctrl_consts.vhd",
             "common/InstructionDecoder.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.instructionDecoder"
+        "test_module": "tests.python.unittests.common.instructionDecoder"
     },
     "ExtenderRAM": {
         "toplevel": "extenderram",
@@ -29,7 +29,7 @@
             "common/rv32i_ctrl_consts.vhd",
             "I/ExtenderRAM.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.ExtenderRAM"
+        "test_module": "tests.python.unittests.I.ExtenderRAM"
     },
     "ExtenderImm": {
         "toplevel": "extenderimm",
@@ -37,14 +37,14 @@
             "common/rv32i_ctrl_consts.vhd",
             "I/ExtenderImm.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.ExtenderImm"
+        "test_module": "tests.python.unittests.I.ExtenderImm"
     },
     "StoreManager": {
         "toplevel": "storemanager",
         "sources": [
             "I/StoreManager.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.StoreManager"
+        "test_module": "tests.python.unittests.I.StoreManager"
     },
     "ControlUnit": {
         "toplevel": "control_unit",
@@ -52,18 +52,22 @@
             "common/rv32i_ctrl_consts.vhd",
             "common/control_unit.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.control_unit"
+        "test_module": "tests.python.unittests.common.control_unit"
     },
-    "ControlUnit_noM": {
+    "ControlUnit_M_nop": {
         "toplevel": "control_unit",
         "sources": [
             "common/rv32i_ctrl_consts.vhd",
             "common/control_unit.vhd"
         ],
-        "parameters": {
-            "HAS_M": false
-        },
-        "test_module": "tests.python.unittests.entities.control_unit_no_m"
+        "test_module": "tests.python.unittests.common.control_unit_m_is_nop"
+    },
+    "MDecode": {
+        "toplevel": "m_decode",
+        "sources": [
+            "M/m_decode.vhd"
+        ],
+        "test_module": "tests.python.unittests.M.m_decode"
     },
     "HazardDetectionUnit": {
         "toplevel": "hazard_detection_unit",
@@ -71,7 +75,7 @@
             "common/rv32im_pipeline_types.vhd",
             "common/hazard_detection_unit.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.HazardDetectionUnit"
+        "test_module": "tests.python.unittests.common.HazardDetectionUnit"
     },
     "ForwardingUnit": {
         "toplevel": "forwarding_unit",
@@ -79,13 +83,13 @@
             "common/rv32im_pipeline_types.vhd",
             "common/forwarding_unit.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.ForwardingUnit"
+        "test_module": "tests.python.unittests.common.ForwardingUnit"
     },
     "BubbleMux": {
         "toplevel": "bubble_mux",
         "sources": [
             "common/bubble_mux.vhd"
         ],
-        "test_module": "tests.python.unittests.entities.BubbleMux"
+        "test_module": "tests.python.unittests.common.BubbleMux"
     }
 }

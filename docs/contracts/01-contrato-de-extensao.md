@@ -98,13 +98,25 @@ decodificador comum não reivindica o opcode e o pipeline a deixa passar sem
 efeito (sem escrita de registrador, sem parada).
 
 **Como está implementado** (`profiles/rv32i.yaml`, `profiles/rv32im.yaml`): um
-único topo, `cores/rv32im_pipeline_core.vhd`, com o generic `HAS_M`. Com
-`HAS_M => false`, o `control_unit` trata `funct7 = "0000001"` como NOP
-(todos os sinais de controle em zero) e a unidade `multdiv` não é instanciada
-(`generate`, ligada por componente para que os arquivos de `M/` não precisem
-existir na análise). O perfil `rv32i` lista só `common/`, `I/` e o topo.
-`make profiles` constrói cada perfil sozinho; `ControlUnit_noM` em
-`tests/python/tests.json` prova o NOP.
+único topo, `cores/rv32im_pipeline_core.vhd`, com o generic `HAS_M`.
+
+- **Decodificação.** O `control_unit` (`common/`) é só da base: R-type com
+  `funct7` diferente de `0000000` e `0100000` é NOP. A extensão M reivindica
+  `funct7 = 0000001` no seu próprio decodificador, `M/m_decode.vhd`, que sobe só
+  `isMulDiv`, `weReg` e `selPCRS1`. O topo combina os pacotes por **OU**
+  (`cu_weReg = base_weReg or m_weReg`): cada extensão dirige só os campos que
+  sobem, o resto é zero.
+- **Sem M** (`HAS_M => false`): o pacote do M é zero, a unidade `multdiv` não é
+  instanciada e uma instrução M é NOP. `m_decode` e `multdiv` entram por
+  declaração de componente, para que o rv32i construa sem os arquivos de `M/`
+  (o GHDL exige a entidade na análise de uma instância direta, mesmo num
+  `generate` falso).
+- **Start** de um pulso por instrução, gerado em EX (`mul_start_pulse`); o caminho
+  antigo por borda em ID foi removido, junto com as portas de demonstração do
+  `multdiv` (`SW`, `LEDR`) e os generics sem uso.
+- **Verificação:** `make profiles` constrói cada perfil sozinho; `MDecode`,
+  `ControlUnit_M_nop` e `ControlUnit` em `tests/python/tests.json` provam a
+  reivindicação, o NOP e que `funct3_out` segue a instrução.
 
 ## Critério de aceite de uma extensão
 - Testes por entidade da extensão passam sozinhos, sem o pipeline.

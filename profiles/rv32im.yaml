@@ -25,6 +25,7 @@ sources:
   - common/hazard_detection_unit.vhd
   - common/extendSigned.vhd
   - M/decoderM.vhd
+  - M/m_decode.vhd
   - M/booth_multiplier_rv32.vhd
   - M/non_restoring_divider_rv32.vhd
   - M/mult.vhd

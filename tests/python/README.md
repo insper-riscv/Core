@@ -14,8 +14,10 @@ memories (whole-core instruction tests) live in the
 tests/python/
 ├── runner.py                    # catalog loader + cocotb/GHDL driver
 ├── tests.json                   # catalog: name -> {toplevel, sources, test_module, ...}
-├── unittests/entities/          # one file per VHDL entity
-│   └── data/                    # fixtures an entity test reads (e.g. riscv_opcodes.csv)
+├── unittests/
+│   ├── common/                  # entities of common/ (one file per entity) + data/ (fixtures, e.g. riscv_opcodes.csv)
+│   ├── I/                       # entities of I/
+│   └── M/                       # entities of M/
 └── sim_build/                   # generated: <group>/<name>/{waves.ghw, ...} per test
 ```
 
@@ -40,4 +42,5 @@ Each entry is a test name mapping to:
 | `skip` | optional: `true` leaves the entry out of a full run |
 | `parameters` | optional: generics passed to the simulator |
 
-A new entity test is a file in `unittests/entities/` and an entry here.
+A new entity test is a file in `unittests/<common|I|M>/`, next to the folder of the
+entity's source, and an entry here.

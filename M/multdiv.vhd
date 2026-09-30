@@ -11,18 +11,12 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity multdiv is
-  generic (
-    DATA_WIDTH  : natural :=  8;
-    ADDR_WIDTH  : natural :=  8
-  );
   port (
-    SW      : in  std_logic_vector(9 downto 0) := (others => '0');
     clk     : in  std_logic;
     opCode  : in  std_logic_vector(2 downto 0);
     valorA  : in  std_logic_vector(31 downto 0);
     valorB  : in  std_logic_vector(31 downto 0);
 
-    LEDR    : out std_logic_vector(9 downto 0);
     saida   : out std_logic_vector(31 downto 0);
 
     rst     : in  std_logic := '0';
@@ -232,12 +226,5 @@ begin
   end process;
 
   saida <= saida_capt;
-
-  LEDR(7 downto 0) <= resultDiv(31 downto 24) when SW(9) = '1' else
-                      resultDiv(23 downto 16) when SW(8) = '1' else
-                      resultDiv(15 downto 8)  when SW(7) = '1' else
-                      resultDiv(7 downto 0)   when SW(6) = '1' else
-                      (others => '0');
-  LEDR(9 downto 8) <= (others => '0');
 
 end architecture;

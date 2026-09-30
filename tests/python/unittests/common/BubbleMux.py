@@ -10,13 +10,11 @@ async def test_passthrough(dut):
     dut.weRAM_i.value    = 1
     dut.reRAM_i.value    = 1
     dut.eRAM_i.value     = 1
-    dut.startMul_i.value = 1
     await Timer(1, units="ns")
     assert int(dut.weReg_o.value)    == 1
     assert int(dut.weRAM_o.value)    == 1
     assert int(dut.reRAM_o.value)    == 1
     assert int(dut.eRAM_o.value)     == 1
-    assert int(dut.startMul_o.value) == 1
     dut._log.info("test_passthrough: OK")
 
 
@@ -29,13 +27,11 @@ async def test_bubble_zeros_all(dut):
     dut.weRAM_i.value    = 1
     dut.reRAM_i.value    = 1
     dut.eRAM_i.value     = 1
-    dut.startMul_i.value = 1
     await Timer(1, units="ns")
     assert int(dut.weReg_o.value)    == 0
     assert int(dut.weRAM_o.value)    == 0
     assert int(dut.reRAM_o.value)    == 0
     assert int(dut.eRAM_o.value)     == 0
-    assert int(dut.startMul_o.value) == 0
     dut._log.info("test_bubble_zeros_all: OK")
 
 
@@ -46,7 +42,6 @@ async def test_toggle_sel(dut):
     dut.weRAM_i.value    = 1
     dut.reRAM_i.value    = 1
     dut.eRAM_i.value     = 1
-    dut.startMul_i.value = 1
     for sel in [0, 1, 0, 1]:
         dut.sel_bubble.value = sel
         await Timer(1, units="ns")

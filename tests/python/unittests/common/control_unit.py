@@ -171,35 +171,21 @@ async def test_control_unit(dut):
 
 
 @cocotb.test()
-async def test_control_unit_muldiv(dut):
+async def test_control_unit_m_is_not_decoded_here(dut):
     """
-    Testa as 8 instrucoes da extensao M (R-type com funct7=0000001).
-    isMulDiv deve estar '1' e weReg='1'.
+    O control_unit e' so' da base: as 8 instrucoes da extensao M (R-type com
+    funct7=0000001) nao sobem weReg aqui (quem as reivindica e' M/m_decode),
+    mas funct3_out segue a instrucao, porque a unidade M usa funct3 como
+    operacao.
     """
-    m_instructions = [
-        ("MUL",    0b000),
-        ("MULH",   0b001),
-        ("MULHSU", 0b010),
-        ("MULHU",  0b011),
-        ("DIV",    0b100),
-        ("DIVU",   0b101),
-        ("REM",    0b110),
-        ("REMU",   0b111),
-    ]
-
-    for name, funct3 in m_instructions:
-        instr = build_instruction(opcode=0b0110011, funct3=funct3, funct7=0b0000001)
-        dut.instruction.value = instr
+    for funct3 in range(8):
+        dut.instruction.value = build_instruction(
+            opcode=0b0110011, funct3=funct3, funct7=0b0000001
+        )
         await Timer(1, units="ns")
 
-        got_isMulDiv = int(dut.isMulDiv.value)
-        got_weReg    = int(dut.weReg.value)
-        got_funct3   = int(dut.funct3_out.value)
-
-        assert got_isMulDiv == 1, f"{name}: isMulDiv esperado 1, got {got_isMulDiv}"
-        assert got_weReg == 1,    f"{name}: weReg esperado 1, got {got_weReg}"
+        assert int(dut.weReg.value) == 0, f"funct3={funct3:03b}: weReg deveria ser 0"
+        got_funct3 = int(dut.funct3_out.value)
         assert got_funct3 == funct3, (
-            f"{name}: funct3_out got={got_funct3:03b} exp={funct3:03b}"
+            f"funct3_out got={got_funct3:03b} exp={funct3:03b}"
         )
-
-        dut._log.info(f"{name}: isMulDiv=1 weReg=1 funct3={funct3:03b} OK")

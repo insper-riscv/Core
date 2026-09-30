@@ -1,9 +1,13 @@
-"""control_unit built without the M extension (HAS_M => false): M is a NOP."""
+"""The base control_unit does not know the M extension: an M instruction is a NOP.
+
+The M extension claims it in M/m_decode (tested in m_decode.py); without it (the
+rv32i profile) the instruction passes with no effect.
+"""
 
 import cocotb
 from cocotb.triggers import Timer
 
-from tests.python.unittests.entities.control_unit import build_instruction
+from tests.python.unittests.common.control_unit import build_instruction
 
 OP_R = 0b0110011
 CONTROL_OUTPUTS = (
@@ -15,7 +19,6 @@ CONTROL_OUTPUTS = (
     "selMuxRS2Imm",
     "selPCRS1",
     "opALU",
-    "isMulDiv",
     "weRAM",
     "reRAM",
     "eRAM",
@@ -40,4 +43,3 @@ async def test_base_r_type_still_decodes(dut):
         dut.instruction.value = build_instruction(OP_R, 0b000, funct7)
         await Timer(1, unit="ns")
         assert int(dut.weReg.value) == 1
-        assert int(dut.isMulDiv.value) == 0

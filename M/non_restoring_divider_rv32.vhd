@@ -88,7 +88,7 @@ architecture rtl of non_restoring_divider_rv32 is
 begin
 
     -- busy eager: combinacional quando start=1 em S_IDLE
-    -- Garante que muldiv_busy sobe no mesmo ciclo que ex_startMul no pipeline.
+    -- Garante que muldiv_busy sobe no mesmo ciclo que o start (gerado em EX) no pipeline.
     busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
 
     -------------------------------------------------------------------------

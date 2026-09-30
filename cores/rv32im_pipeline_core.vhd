@@ -96,19 +96,22 @@ architecture rtl of rv32im_pipeline_core is
   -- A componente (e nao "entity work.multdiv") para o perfil rv32i: o GHDL
   -- exige a entidade ja' na analise de uma instancia direta, mesmo num
   -- generate falso, e o rv32i nao tem os arquivos de M/. A ligacao com
-  -- work.multdiv e' feita na elaboracao, so' quando HAS_M e' true.
-  component multdiv is
-    generic (
-      DATA_WIDTH : natural := 8;
-      ADDR_WIDTH : natural := 8
-    );
+  -- work.multdiv e work.m_decode e' feita na elaboracao, so' quando HAS_M e' true.
+  component m_decode is
     port (
-      SW     : in  std_logic_vector(9 downto 0) := (others => '0');
+      instruction : in  std_logic_vector(31 downto 0);
+      isMulDiv    : out std_logic;
+      weReg       : out std_logic;
+      selPCRS1    : out std_logic
+    );
+  end component;
+
+  component multdiv is
+    port (
       clk    : in  std_logic;
       opCode : in  std_logic_vector(2 downto 0);
       valorA : in  std_logic_vector(31 downto 0);
       valorB : in  std_logic_vector(31 downto 0);
-      LEDR   : out std_logic_vector(9 downto 0);
       saida  : out std_logic_vector(31 downto 0);
       rst    : in  std_logic := '0';
       start  : in  std_logic := '0';
@@ -207,9 +210,13 @@ architecture rtl of rv32im_pipeline_core is
   signal cu_opExImm         : opeximm_t;
   signal cu_selMuxALUPc4RAM : wbsel_t;
   signal cu_weReg           : std_logic;
+  signal base_weReg         : std_logic;  -- control_unit (base ISA)
+  signal m_weReg            : std_logic;  -- extensao M (M/m_decode)
   signal cu_opExRAM         : opexram_t;
   signal cu_selMuxRS2Imm    : std_logic;
   signal cu_selPCRS1        : std_logic;
+  signal base_selPCRS1      : std_logic;
+  signal m_selPCRS1         : std_logic;
   signal cu_opALU           : opalu_t;
   signal cu_isMulDiv        : std_logic;
   signal cu_weRAM           : std_logic;
@@ -218,14 +225,10 @@ architecture rtl of rv32im_pipeline_core is
   signal cu_opCode          : std_logic_vector(6 downto 0);
   signal cu_funct3          : std_logic_vector(2 downto 0);
 
-  signal isMulDiv_d   : std_logic := '0';
-  signal startMul_raw : std_logic;
-
   -- =========================================================================
   -- Bubble Mux
   -- =========================================================================
   signal bm_weReg           : std_logic;
-  signal bm_startMul        : std_logic;
   signal bm_weRAM           : std_logic;
   signal bm_reRAM           : std_logic;
   signal bm_eRAM            : std_logic;
@@ -253,7 +256,6 @@ architecture rtl of rv32im_pipeline_core is
   signal ex_isMulDiv        : std_logic;
   signal mul_started_q      : std_logic := '0';  -- a instrucao M em EX ja recebeu seu start
   signal mul_start_pulse    : std_logic;         -- start da unidade MulDiv, 1 ciclo por instrucao
-  signal ex_startMul        : std_logic;
   signal ex_weRAM           : std_logic;
   signal ex_reRAM           : std_logic;
   signal ex_eRAM            : std_logic;
@@ -344,22 +346,6 @@ begin
   flush_if_id <= ex_branch_taken or ex_jalr_taken;
   flush_id_ex <= ex_branch_taken or ex_jalr_taken;
 
-  -- =========================================================================
-  -- Edge detect de isMulDiv para gerar startMul (pulso de 1 ciclo)
-  -- =========================================================================
-  process(clk)
-  begin
-    if rising_edge(clk) then
-      if reset = '1' then
-        isMulDiv_d <= '0';
-      elsif ifid_write_en = '1' then
-        isMulDiv_d <= cu_isMulDiv;
-      end if;
-    end if;
-  end process;
-
-  startMul_raw <= cu_isMulDiv and (not isMulDiv_d);
-
   -- BUG TIMING (resolvido): saida_capt no multdiv eh atualizado na borda quando done_int=1.
   -- No ciclo em que done_int=1, busy ja caiu para 0 (Booth foi para S_DONE no ciclo anterior).
   -- Sem este OR done, reg_EX_MEM capturaria saida_capt VELHO nesse ciclo.
@@ -448,24 +434,45 @@ begin
   -- ID stage: Control Unit
   -- =========================================================================
   u_control_unit : entity work.control_unit
-    generic map (HAS_M => HAS_M)
     port map (
       instruction     => ifid_instr,
       selMuxPc4ALU    => cu_selMuxPc4ALU,
       opExImm         => cu_opExImm,
       selMuxALUPc4RAM => cu_selMuxALUPc4RAM,
-      weReg           => cu_weReg,
+      weReg           => base_weReg,
       opExRAM         => cu_opExRAM,
       selMuxRS2Imm    => cu_selMuxRS2Imm,
-      selPCRS1        => cu_selPCRS1,
+      selPCRS1        => base_selPCRS1,
       opALU           => cu_opALU,
-      isMulDiv        => cu_isMulDiv,
       weRAM           => cu_weRAM,
       reRAM           => cu_reRAM,
       eRAM            => cu_eRAM,
       opCode          => cu_opCode,
       funct3_out      => cu_funct3
     );
+
+  -- =========================================================================
+  -- ID stage: decodificacao das extensoes (docs/contracts/01, 1.1)
+  -- Cada extensao dirige so' os campos que sobem; o pacote de controle final e'
+  -- o OU do da base com o das extensoes do perfil. Sem M (rv32i), o pacote do
+  -- M e' zero e uma instrucao M e' um NOP.
+  -- =========================================================================
+  gen_m_decode : if HAS_M generate
+    u_m_decode : m_decode
+      port map (
+        instruction => ifid_instr,
+        isMulDiv    => cu_isMulDiv,
+        weReg       => m_weReg,
+        selPCRS1    => m_selPCRS1
+      );
+  else generate
+    cu_isMulDiv <= '0';
+    m_weReg     <= '0';
+    m_selPCRS1  <= '0';
+  end generate gen_m_decode;
+
+  cu_weReg    <= base_weReg    or m_weReg;
+  cu_selPCRS1 <= base_selPCRS1 or m_selPCRS1;
 
   -- =========================================================================
   -- ID stage: ExtenderImm
@@ -521,12 +528,10 @@ begin
       weRAM_i           => cu_weRAM,
       reRAM_i           => cu_reRAM,
       eRAM_i            => cu_eRAM,
-      startMul_i        => startMul_raw,
       weReg_o           => bm_weReg,
       weRAM_o           => bm_weRAM,
       reRAM_o           => bm_reRAM,
-      eRAM_o            => bm_eRAM,
-      startMul_o        => bm_startMul
+      eRAM_o            => bm_eRAM
     );
 
   -- =========================================================================
@@ -557,7 +562,6 @@ begin
       in_selPCRS1        => cu_selPCRS1,
       in_opALU           => cu_opALU,
       in_isMulDiv        => cu_isMulDiv,
-      in_startMul        => bm_startMul,
       in_weRAM           => bm_weRAM,
       in_reRAM           => bm_reRAM,
       in_eRAM            => bm_eRAM,
@@ -581,7 +585,6 @@ begin
       idex_selPCRS1        => ex_selPCRS1,
       idex_opALU           => ex_opALU,
       idex_isMulDiv        => ex_isMulDiv,
-      idex_startMul        => ex_startMul,
       idex_weRAM           => ex_weRAM,
       idex_reRAM           => ex_reRAM,
       idex_eRAM            => ex_eRAM,
@@ -645,16 +648,9 @@ begin
   -- no primeiro ciclo em que a instrucao esta em EX. Ele nao volta a subir
   -- enquanto a instrucao espera a unidade terminar (o pipeline fica parado:
   -- muldiv_stall_n = '0') e so eh liberado de novo quando ela sai de EX.
-  --
-  -- Antes, o start vinha de ex_startMul, gerado em ID por startMul_raw
-  -- (cu_isMulDiv and not isMulDiv_d), ou seja, so na borda de subida de "a
-  -- instrucao em ID eh M". Com duas instrucoes M seguidas (div e rem de
-  -- n / 10 e n % 10, dois mul) a segunda tinha isMulDiv_d = '1', entrava em
-  -- EX sem start e devolvia o resultado da primeira. Tirar so a borda nao
-  -- resolve: ID/EX fica congelado durante a operacao com o start em '1', e a
-  -- unidade nao veria uma nova subida.
-  --
-  -- startMul_raw, isMulDiv_d e ex_startMul deixam de alimentar a unidade.
+  -- (Um start gerado em ID por deteccao de borda de isMulDiv nao serve: com
+  -- duas instrucoes M seguidas a segunda entrava em EX sem start; ver
+  -- docs/contracts/01, "start".)
   -- =========================================================================
   mul_start_pulse <= ex_isMulDiv and ex_valid and (not mul_started_q);
 
@@ -674,12 +670,10 @@ begin
   gen_m : if HAS_M generate
     u_muldiv : multdiv
       port map (
-        SW     => (others => '0'),
         clk    => clk,
         opCode => ex_funct3,
         valorA => ex_fwd_rs1_val,
         valorB => ex_fwd_rs2_val,
-        LEDR   => open,
         saida  => ex_muldiv_result,
         rst    => reset,
         start  => mul_start_pulse,
