@@ -39,6 +39,11 @@ use work.rv32i_ctrl_consts.all;
 use work.rv32im_pipeline_types.all;
 
 entity rv32im_pipeline_core is
+  generic (
+    -- rv32im (true): instancia a unidade M. rv32i (false): sem a unidade M
+    -- (os arquivos de M/ nao precisam existir); uma instrucao M vira NOP.
+    HAS_M : boolean := true
+  );
   port (
     clk   : in  std_logic;
     reset : in  std_logic;
@@ -87,6 +92,30 @@ entity rv32im_pipeline_core is
 end entity rv32im_pipeline_core;
 
 architecture rtl of rv32im_pipeline_core is
+
+  -- A componente (e nao "entity work.multdiv") para o perfil rv32i: o GHDL
+  -- exige a entidade ja' na analise de uma instancia direta, mesmo num
+  -- generate falso, e o rv32i nao tem os arquivos de M/. A ligacao com
+  -- work.multdiv e' feita na elaboracao, so' quando HAS_M e' true.
+  component multdiv is
+    generic (
+      DATA_WIDTH : natural := 8;
+      ADDR_WIDTH : natural := 8
+    );
+    port (
+      SW     : in  std_logic_vector(9 downto 0) := (others => '0');
+      clk    : in  std_logic;
+      opCode : in  std_logic_vector(2 downto 0);
+      valorA : in  std_logic_vector(31 downto 0);
+      valorB : in  std_logic_vector(31 downto 0);
+      LEDR   : out std_logic_vector(9 downto 0);
+      saida  : out std_logic_vector(31 downto 0);
+      rst    : in  std_logic := '0';
+      start  : in  std_logic := '0';
+      busy   : out std_logic;
+      done   : out std_logic
+    );
+  end component;
 
   -- =========================================================================
   -- Sinais de controle de hazard (gerados pela HDU)
@@ -419,6 +448,7 @@ begin
   -- ID stage: Control Unit
   -- =========================================================================
   u_control_unit : entity work.control_unit
+    generic map (HAS_M => HAS_M)
     port map (
       instruction     => ifid_instr,
       selMuxPc4ALU    => cu_selMuxPc4ALU,
@@ -641,20 +671,27 @@ begin
     end if;
   end process;
 
-  u_muldiv : entity work.multdiv
-    port map (
-      SW     => (others => '0'),
-      clk    => clk,
-      opCode => ex_funct3,
-      valorA => ex_fwd_rs1_val,
-      valorB => ex_fwd_rs2_val,
-      LEDR   => open,
-      saida  => ex_muldiv_result,
-      rst    => reset,
-      start  => mul_start_pulse,
-      busy   => muldiv_busy,
-      done   => muldiv_done
-    );
+  gen_m : if HAS_M generate
+    u_muldiv : multdiv
+      port map (
+        SW     => (others => '0'),
+        clk    => clk,
+        opCode => ex_funct3,
+        valorA => ex_fwd_rs1_val,
+        valorB => ex_fwd_rs2_val,
+        LEDR   => open,
+        saida  => ex_muldiv_result,
+        rst    => reset,
+        start  => mul_start_pulse,
+        busy   => muldiv_busy,
+        done   => muldiv_done
+      );
+  else generate
+    -- Sem unidade M: nunca ocupada, resultado nunca usado (isMulDiv = '0').
+    muldiv_busy      <= '0';
+    muldiv_done      <= '0';
+    ex_muldiv_result <= (others => '0');
+  end generate gen_m;
 
   -- =========================================================================
   -- EX stage: Mux isMulDiv e mux selMuxPc4ALU

@@ -31,6 +31,9 @@ jobs:
       - name: VHDL syntax check (GHDL, dependency order)
         run: make check
 
+      - name: Each profile builds on its own (rv32i without M/, rv32im)
+        run: make profiles
+
       - name: Per-entity cocotb tests
         run: make test
 

@@ -1,0 +1,43 @@
+"""control_unit built without the M extension (HAS_M => false): M is a NOP."""
+
+import cocotb
+from cocotb.triggers import Timer
+
+from tests.python.unittests.entities.control_unit import build_instruction
+
+OP_R = 0b0110011
+CONTROL_OUTPUTS = (
+    "selMuxPc4ALU",
+    "opExImm",
+    "selMuxALUPc4RAM",
+    "weReg",
+    "opExRAM",
+    "selMuxRS2Imm",
+    "selPCRS1",
+    "opALU",
+    "isMulDiv",
+    "weRAM",
+    "reRAM",
+    "eRAM",
+)
+
+
+@cocotb.test()
+async def test_m_instructions_are_nops(dut):
+    """Every funct3 of funct7 = 0000001 leaves all control outputs at zero."""
+    for funct3 in range(8):
+        dut.instruction.value = build_instruction(OP_R, funct3, 0b0000001)
+        await Timer(1, unit="ns")
+        for name in CONTROL_OUTPUTS:
+            got = int(getattr(dut, name).value)
+            assert got == 0, f"M funct3={funct3}: {name}={got}, expected NOP (0)"
+
+
+@cocotb.test()
+async def test_base_r_type_still_decodes(dut):
+    """add and sub (funct7 = 0000000 / 0100000) still write a register."""
+    for funct7 in (0b0000000, 0b0100000):
+        dut.instruction.value = build_instruction(OP_R, 0b000, funct7)
+        await Timer(1, unit="ns")
+        assert int(dut.weReg.value) == 1
+        assert int(dut.isMulDiv.value) == 0
