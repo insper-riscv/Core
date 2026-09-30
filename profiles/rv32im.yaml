@@ -1,0 +1,38 @@
+# Sources of the rv32im profile (I + M), in GHDL dependency order.
+# Paths are relative to the root of this repository.
+profile: rv32im
+extensions: [I, M]
+top: rv32im_pipeline_core
+sources:
+  - common/rv32i_ctrl_consts.vhd
+  - common/rv32im_pipeline_types.vhd
+  - common/genericRegister.vhd
+  - common/genericAdder.vhd
+  - common/genericAdderU.vhd
+  - common/genericMux2x1.vhd
+  - common/genericMux3x1.vhd
+  - common/FlipFlop.vhd
+  - I/ALU.vhd
+  - common/RegFile.vhd
+  - common/InstructionDecoder.vhd
+  - I/ExtenderImm.vhd
+  - I/ExtenderRAM.vhd
+  - I/StoreManager.vhd
+  - common/control_unit.vhd
+  - common/bubble_mux.vhd
+  - common/forwarding_unit.vhd
+  - common/hazard_detection_unit.vhd
+  - common/extendSigned.vhd
+  - M/decoderM.vhd
+  - M/booth_multiplier_rv32.vhd
+  - M/non_restoring_divider_rv32.vhd
+  - M/mult.vhd
+  - M/div.vhd
+  - M/divu.vhd
+  - M/multdiv.vhd
+  - common/pc_fetch.vhd
+  - common/reg_IF_ID.vhd
+  - common/reg_ID_EX.vhd
+  - common/reg_EX_MEM.vhd
+  - common/reg_MEM_WB.vhd
+  - cores/rv32im_pipeline_core.vhd

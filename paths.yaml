@@ -1,0 +1,7 @@
+# Every file path this repository's configuration references, checked by
+#   uv run riscv-tools --root . check-paths --manifest paths.yaml
+# Run it before and after moving any file.
+references:
+  - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
+  - {name: per-entity tests.json, file: tests/python/tests.json, yaml: "*.sources", base: .}
+  - {name: entry points, paths: [tests/python/runner.py, docs/contracts]}
