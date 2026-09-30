@@ -97,6 +97,15 @@ instrução de uma extensão que o perfil não tem **é um NOP** (decidido): o
 decodificador comum não reivindica o opcode e o pipeline a deixa passar sem
 efeito (sem escrita de registrador, sem parada).
 
+**Como está implementado** (`profiles/rv32i.yaml`, `profiles/rv32im.yaml`): um
+único topo, `cores/rv32im_pipeline_core.vhd`, com o generic `HAS_M`. Com
+`HAS_M => false`, o `control_unit` trata `funct7 = "0000001"` como NOP
+(todos os sinais de controle em zero) e a unidade `multdiv` não é instanciada
+(`generate`, ligada por componente para que os arquivos de `M/` não precisem
+existir na análise). O perfil `rv32i` lista só `common/`, `I/` e o topo.
+`make profiles` constrói cada perfil sozinho; `ControlUnit_noM` em
+`tests/python/tests.json` prova o NOP.
+
 ## Critério de aceite de uma extensão
 - Testes por entidade da extensão passam sozinhos, sem o pipeline.
 - `mul;mul`/`div;rem` consecutivos com operandos distintos passam (regressão

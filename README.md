@@ -13,7 +13,7 @@ repositories of [insper-riscv](https://github.com/insper-riscv).
 | `I/` | the base integer extension: ALU, immediate and load/store extenders, store manager |
 | `M/` | multiply/divide: `decoderM`, `multdiv`, `mult`, `div`, `divu`, the Booth multiplier and the non-restoring divider |
 | `cores/` | the top that instantiates the extensions of a profile (`rv32im_pipeline_core`) |
-| `profiles/` | the sources of each supported profile, in dependency order (`rv32im.yaml`) |
+| `profiles/` | the sources of each supported profile, in dependency order (`rv32i.yaml`, `rv32im.yaml`); `rv32i` is the same top with `HAS_M => false` and no `M/` files |
 | `tests/python/` | per-entity cocotb tests and the catalog (`tests.json`) that drives them |
 | `tests/FPGA/entities/` | a Quartus project that exercises the register file on a board |
 | `docs/` | pipeline and decoder documentation; `docs/contracts/` holds the extension contract and the bus and memory interface |
@@ -28,6 +28,7 @@ cd Core
 uv sync
 make check   # GHDL syntax check of every source, in dependency order
 make test    # per-entity cocotb tests (TEST=ALU for one)
+make profiles # each profile (rv32i, rv32im) builds on its own
 make paths   # every path the configuration lists exists
 ```
 

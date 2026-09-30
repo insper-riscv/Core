@@ -54,6 +54,17 @@
         ],
         "test_module": "tests.python.unittests.entities.control_unit"
     },
+    "ControlUnit_noM": {
+        "toplevel": "control_unit",
+        "sources": [
+            "common/rv32i_ctrl_consts.vhd",
+            "common/control_unit.vhd"
+        ],
+        "parameters": {
+            "HAS_M": false
+        },
+        "test_module": "tests.python.unittests.entities.control_unit_no_m"
+    },
     "HazardDetectionUnit": {
         "toplevel": "hazard_detection_unit",
         "sources": [

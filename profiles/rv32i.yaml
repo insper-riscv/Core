@@ -1,9 +1,10 @@
-# Sources of the rv32im profile (I + M), in GHDL dependency order.
-# Paths are relative to the root of this repository.
-profile: rv32im
-extensions: [I, M]
+# Sources of the rv32i profile (I only), in GHDL dependency order.
+# Same top as rv32im, built with the generic HAS_M => false: no M/ files, and
+# an M instruction is a NOP. Paths are relative to the root of this repository.
+profile: rv32i
+extensions: [I]
 top: rv32im_pipeline_core
-generics: {HAS_M: true}
+generics: {HAS_M: false}
 sources:
   - common/rv32i_ctrl_consts.vhd
   - common/rv32im_pipeline_types.vhd
@@ -24,13 +25,6 @@ sources:
   - common/forwarding_unit.vhd
   - common/hazard_detection_unit.vhd
   - common/extendSigned.vhd
-  - M/decoderM.vhd
-  - M/booth_multiplier_rv32.vhd
-  - M/non_restoring_divider_rv32.vhd
-  - M/mult.vhd
-  - M/div.vhd
-  - M/divu.vhd
-  - M/multdiv.vhd
   - common/pc_fetch.vhd
   - common/reg_IF_ID.vhd
   - common/reg_ID_EX.vhd

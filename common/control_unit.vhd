@@ -41,6 +41,12 @@ use ieee.numeric_std.all;
 use work.rv32i_ctrl_consts.all;
 
 entity control_unit is
+  generic (
+    -- Perfil com a extensao M (rv32im) ou sem ela (rv32i). Sem M, uma
+    -- instrucao da extensao (R-type, funct7 = "0000001") e' um NOP: nenhum
+    -- sinal de controle sobe, nada e' escrito (ver docs/contracts).
+    HAS_M : boolean := true
+  );
   port (
     -- Instrucao completa vinda do reg_IF_ID
     instruction     : in  std_logic_vector(31 downto 0);
@@ -248,7 +254,11 @@ begin
       -- R-type: RV32I + RV32M (funct7 = "0000001")
       -- -----------------------------------------------------------------------
       when "0110011" =>
-        if funct7_i = "0000001" then
+        if funct7_i = "0000001" and not HAS_M then
+          -- Perfil sem a extensao M: NOP (os defaults acima, nada sobe).
+          null;
+
+        elsif funct7_i = "0000001" then
           -- Extensao M: MUL / MULH / MULHSU / MULHU / DIV / DIVU / REM / REMU
           isMulDiv        <= '1';
           selMuxPc4ALU    <= '0';
