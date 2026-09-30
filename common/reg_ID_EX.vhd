@@ -31,7 +31,6 @@ entity reg_ID_EX is
     in_selPCRS1        : in  std_logic;
     in_opALU           : in  opalu_t;
     in_isMulDiv        : in  std_logic;
-    in_startMul        : in  std_logic;
     in_weRAM           : in  std_logic;
     in_reRAM           : in  std_logic;
     in_eRAM            : in  std_logic;
@@ -58,7 +57,6 @@ entity reg_ID_EX is
     idex_selPCRS1        : out std_logic;
     idex_opALU           : out opalu_t;
     idex_isMulDiv        : out std_logic;
-    idex_startMul        : out std_logic;
     idex_weRAM           : out std_logic;
     idex_reRAM           : out std_logic;
     idex_eRAM            : out std_logic;
@@ -87,7 +85,6 @@ architecture rtl of reg_ID_EX is
   signal r_selPCRS1        : std_logic := '0';
   signal r_opALU           : opalu_t   := (others => '0');
   signal r_isMulDiv        : std_logic := '0';
-  signal r_startMul        : std_logic := '0';
   signal r_weRAM           : std_logic := '0';
   signal r_reRAM           : std_logic := '0';
   signal r_eRAM            : std_logic := '0';
@@ -118,7 +115,6 @@ begin
         r_selPCRS1        <= '0';
         r_opALU           <= (others => '0');
         r_isMulDiv        <= '0';
-        r_startMul        <= '0';
         r_weRAM           <= '0';
         r_reRAM           <= '0';
         r_eRAM            <= '0';
@@ -146,7 +142,6 @@ begin
         r_selPCRS1        <= '0';
         r_opALU           <= (others => '0');
         r_isMulDiv        <= '0';
-        r_startMul        <= '0';
         r_weRAM           <= '0';
         r_reRAM           <= '0';
         r_eRAM            <= '0';
@@ -173,7 +168,6 @@ begin
         r_selPCRS1        <= in_selPCRS1;
         r_opALU           <= in_opALU;
         r_isMulDiv        <= in_isMulDiv;
-        r_startMul        <= in_startMul;
         r_weRAM           <= in_weRAM;
         r_reRAM           <= in_reRAM;
         r_eRAM            <= in_eRAM;
@@ -203,7 +197,6 @@ begin
   idex_selPCRS1        <= r_selPCRS1;
   idex_opALU           <= r_opALU;
   idex_isMulDiv        <= r_isMulDiv;
-  idex_startMul        <= r_startMul;
   idex_weRAM           <= r_weRAM;
   idex_reRAM           <= r_reRAM;
   idex_eRAM            <= r_eRAM;

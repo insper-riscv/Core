@@ -61,7 +61,7 @@ architecture rtl of booth_multiplier_rv32 is
 begin
 
     -- busy: combinacional quando start=1 em S_IDLE (eager)
-    -- Garante que muldiv_busy sobe no mesmo ciclo que ex_startMul,
+    -- Garante que muldiv_busy sobe no mesmo ciclo que o start (gerado em EX),
     -- evitando necessidade de stall especial para o ciclo K.
     busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
 

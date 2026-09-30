@@ -11,7 +11,6 @@
 --   weRAM    -- escrita na RAM (store)
 --   reRAM    -- leitura da RAM (load)
 --   eRAM     -- enable da RAM
---   startMul -- pulso de inicio do multdiv
 --
 -- Quando sel_bubble = '0': saidas = entradas (passagem normal)
 -- Quando sel_bubble = '1': saidas = "00000" (NOP sem efeito colateral)
@@ -32,13 +31,11 @@ entity bubble_mux is
     weRAM_i    : in  std_logic;
     reRAM_i    : in  std_logic;
     eRAM_i     : in  std_logic;
-    startMul_i : in  std_logic;
 
     weReg_o    : out std_logic;
     weRAM_o    : out std_logic;
     reRAM_o    : out std_logic;
-    eRAM_o     : out std_logic;
-    startMul_o : out std_logic
+    eRAM_o     : out std_logic
   );
 end entity bubble_mux;
 
@@ -49,6 +46,5 @@ begin
   weRAM_o    <= weRAM_i    when sel_bubble = '0' else '0';
   reRAM_o    <= reRAM_i    when sel_bubble = '0' else '0';
   eRAM_o     <= eRAM_i     when sel_bubble = '0' else '0';
-  startMul_o <= startMul_i when sel_bubble = '0' else '0';
 
 end architecture rtl;

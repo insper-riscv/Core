@@ -14,7 +14,7 @@ repositories of [insper-riscv](https://github.com/insper-riscv).
 | `M/` | multiply/divide: `decoderM`, `multdiv`, `mult`, `div`, `divu`, the Booth multiplier and the non-restoring divider |
 | `cores/` | the top that instantiates the extensions of a profile (`rv32im_pipeline_core`) |
 | `profiles/` | the sources of each supported profile, in dependency order (`rv32i.yaml`, `rv32im.yaml`); `rv32i` is the same top with `HAS_M => false` and no `M/` files |
-| `tests/python/` | per-entity cocotb tests and the catalog (`tests.json`) that drives them |
+| `tests/python/` | per-entity cocotb tests (`unittests/common`, `I`, `M`, mirroring the source folders) and the catalog (`tests.json`) that drives them |
 | `tests/FPGA/entities/` | a Quartus project that exercises the register file on a board |
 | `docs/` | pipeline and decoder documentation; `docs/contracts/` holds the extension contract and the bus and memory interface |
 

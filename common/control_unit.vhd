@@ -16,7 +16,7 @@
 --   4. Mantém TODOS os sinais de saida do InstructionDecoder com
 --      os MESMOS nomes, para compatibilidade com o core existente:
 --        selMuxPc4ALU, opExImm, selMuxALUPc4RAM, weReg, opExRAM,
---        selMuxRS2Imm, selPCRS1, opALU, isMulDiv, weRAM, reRAM, eRAM
+--        selMuxRS2Imm, selPCRS1, opALU, weRAM, reRAM, eRAM
 --
 -- Uso no top-level do pipeline (substituicao direta):
 --   -- Antes (core multi-cycle):
@@ -41,12 +41,6 @@ use ieee.numeric_std.all;
 use work.rv32i_ctrl_consts.all;
 
 entity control_unit is
-  generic (
-    -- Perfil com a extensao M (rv32im) ou sem ela (rv32i). Sem M, uma
-    -- instrucao da extensao (R-type, funct7 = "0000001") e' um NOP: nenhum
-    -- sinal de controle sobe, nada e' escrito (ver docs/contracts).
-    HAS_M : boolean := true
-  );
   port (
     -- Instrucao completa vinda do reg_IF_ID
     instruction     : in  std_logic_vector(31 downto 0);
@@ -62,7 +56,6 @@ entity control_unit is
     selMuxRS2Imm    : out std_logic;
     selPCRS1        : out std_logic;
     opALU           : out std_logic_vector(4 downto 0);
-    isMulDiv        : out std_logic;
     weRAM           : out std_logic;
     reRAM           : out std_logic;
     eRAM            : out std_logic;
@@ -115,7 +108,6 @@ begin
     selMuxRS2Imm    <= '0';
     selPCRS1        <= '0';
     opALU           <= (others => '0');
-    isMulDiv        <= '0';
     weRAM           <= '0';
     reRAM           <= '0';
     eRAM            <= '0';
@@ -251,27 +243,14 @@ begin
         end case;
 
       -- -----------------------------------------------------------------------
-      -- R-type: RV32I + RV32M (funct7 = "0000001")
+      -- R-type do RV32I
       -- -----------------------------------------------------------------------
       when "0110011" =>
-        if funct7_i = "0000001" and not HAS_M then
-          -- Perfil sem a extensao M: NOP (os defaults acima, nada sobe).
+        if funct7_i /= "0000000" and funct7_i /= "0100000" then
+          -- funct7 que a base nao define: NOP. Uma extensao que o perfil tem
+          -- reivindica a instrucao no seu proprio decodificador (M/m_decode);
+          -- sem ela, a instrucao passa sem efeito (docs/contracts/01, 1.5).
           null;
-
-        elsif funct7_i = "0000001" then
-          -- Extensao M: MUL / MULH / MULHSU / MULHU / DIV / DIVU / REM / REMU
-          isMulDiv        <= '1';
-          selMuxPc4ALU    <= '0';
-          opExImm         <= (others => '0');
-          selMuxALUPc4RAM <= "00";
-          weReg           <= '1';
-          opExRAM         <= "000";
-          selMuxRS2Imm    <= '0';
-          selPCRS1        <= '1';
-          weRAM           <= '0';
-          reRAM           <= '0';
-          eRAM            <= '0';
-          -- opALU nao e usado quando isMulDiv='1', mas deixa default
 
         else
           -- RV32I R-type normal

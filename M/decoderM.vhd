@@ -3,11 +3,6 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity decoderM is
-  generic   (
-    DATA_WIDTH  : natural :=  8;
-    ADDR_WIDTH  : natural :=  8
-  );
-
   port   (
     -- Input ports
     instru  : in std_logic_vector(2 downto 0);
