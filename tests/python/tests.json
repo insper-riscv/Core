@@ -1,0 +1,574 @@
+{
+    "bancoRegistradores": {
+        "toplevel": "regfile",
+        "sources": [
+            "../src/genericRegister.vhd",
+            "../src/RegFile.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.bancoRegistradores"
+    },
+    "ALU": {
+        "toplevel": "alu",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/ALU.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ALU"
+    },
+    "InstructionDecoder": {
+        "toplevel": "instructiondecoder",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/InstructionDecoder.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.instructionDecoder"
+    },
+    "RAM": {
+        "toplevel": "ram_simulation",
+        "sources": [
+            "../src/RAM_simulation.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.RAM"
+    },
+    "ExtenderRAM": {
+        "toplevel": "extenderram",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/ExtenderRAM.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ExtenderRAM"
+    },
+    "ExtenderImm": {
+        "toplevel": "extenderimm",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/ExtenderImm.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ExtenderImm"
+    },
+    "StoreManager": {
+        "toplevel": "storemanager",
+        "sources": [
+            "../src/StoreManager.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.StoreManager"
+    },
+    "ROM": {
+        "toplevel": "rom_simulation",
+        "sources": [
+            "../src/ROM_simulation.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ROM",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/entities/data/testROM.hex"
+        }
+    },
+    "clk_gen_3way": {
+        "toplevel": "clk_gen_3way",
+        "sources": [
+            "../src/clk_gen_3way.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ClkGen3Way"
+    },
+    "one": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.one",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/one.hex"
+        }
+    },
+    "two": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.two",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/two.hex"
+        }
+    },
+    "three": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.three",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/three.hex"
+        }
+    },
+    "four": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.four",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/four.hex"
+        }
+    },
+    "five": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.five",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/five.hex"
+        }
+    },
+    "six": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.six",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/build/six.hex"
+        }
+    },
+    "ControlUnit": {
+        "toplevel": "control_unit",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/control_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.control_unit"
+    },
+    "HazardDetectionUnit": {
+        "toplevel": "hazard_detection_unit",
+        "sources": [
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/hazard_detection_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.HazardDetectionUnit"
+    },
+    "ForwardingUnit": {
+        "toplevel": "forwarding_unit",
+        "sources": [
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/forwarding_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.ForwardingUnit"
+    },
+    "BubbleMux": {
+        "toplevel": "bubble_mux",
+        "sources": [
+            "../src/bubble_mux.vhd"
+        ],
+        "test_module": "tests.python.unittests.entities.BubbleMux"
+    },
+    "MUL": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.mul",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_mul.hex"
+        }
+    },
+    "FWD": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.fwd",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_fwd.hex"
+        }
+    },
+    "LOAD_USE": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.load_use",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_load_use.hex"
+        }
+    },
+    "MEXT": {
+        "skip": true,
+        "skip_reason": "Raw hand-assembled instruction sequences written for the OLD architecture (reset ran directly from address 0). Since the BOOT_ROM+FLASH split (see Tests/docs/MEMORY_ARCHITECTURE.md), rv32i3stage_core_sim_test always boots through BOOT_ROM first (this test module needs its own BOOT_ROM_FILE generic, which it never supplied) before reaching FLASH at FLASH_BASE, not address 0 -- so even fixing that alone is not enough: this test module's own hardcoded PC values / cycle counts (e.g. pcs = [i*4 ...] assuming code starts executing at PC=0 with no boot delay) would still be wrong. Needs a real rewrite (new PC/cycle assumptions + re-padding the .hex to FLASH_BASE), not a quick parameter fix -- see docs/bugs/PER_ENTITY_TESTS_CI_BREAKAGE.md.",
+        "toplevel": "rv32i3stage_core_sim_test",
+        "sources": [
+            "../src/rv32i_ctrl_consts.vhd",
+            "../src/rv32im_pipeline_types.vhd",
+            "../src/genericRegister.vhd",
+            "../src/genericAdder.vhd",
+            "../src/genericAdderU.vhd",
+            "../src/genericMux2x1.vhd",
+            "../src/genericMux3x1.vhd",
+            "../src/FlipFlop.vhd",
+            "../src/ALU.vhd",
+            "../src/RegFile.vhd",
+            "../src/RAM_simulation.vhd",
+            "../src/ROM_simulation.vhd",
+            "../src/InstructionDecoder.vhd",
+            "../src/ExtenderImm.vhd",
+            "../src/ExtenderRAM.vhd",
+            "../src/StoreManager.vhd",
+            "../src/clk_gen_3way.vhd",
+            "../src/control_unit.vhd",
+            "../src/bubble_mux.vhd",
+            "../src/forwarding_unit.vhd",
+            "../src/hazard_detection_unit.vhd",
+            "../src/extendSigned.vhd",
+            "../src/decoderM.vhd",
+            "../src/booth_multiplier_rv32.vhd",
+            "../src/non_restoring_divider_rv32.vhd",
+            "../src/mult.vhd",
+            "../src/div.vhd",
+            "../src/divu.vhd",
+            "../src/multdiv.vhd",
+            "../src/pc_fetch.vhd",
+            "../src/reg_IF_ID.vhd",
+            "../src/reg_ID_EX.vhd",
+            "../src/reg_EX_MEM.vhd",
+            "../src/reg_MEM_WB.vhd",
+            "../src/rv32im_pipeline_core.vhd",
+            "../src/rv32i3stage_core_sim_test.vhd"
+        ],
+        "test_module": "tests.python.unittests.instructions.mext",
+        "parameters": {
+            "ROM_FILE": "tests/python/unittests/instructions/codes/test_mext.hex"
+        }
+    }
+}
