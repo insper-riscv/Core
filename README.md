@@ -16,7 +16,7 @@ repositories of [insper-riscv](https://github.com/insper-riscv).
 | `profiles/` | the sources of each supported profile, in dependency order (`rv32i.yaml`, `rv32im.yaml`); `rv32i` is the same top with `HAS_M => false` and no `M/` files |
 | `tests/python/` | per-entity cocotb tests (`unittests/common`, `I`, `M`, mirroring the source folders) and the catalog (`tests.json`) that drives them |
 | `tests/FPGA/entities/` | a Quartus project that exercises the register file on a board |
-| `docs/` | pipeline and decoder documentation; `docs/contracts/` holds the extension contract and the bus and memory interface |
+| `docs/` | [ARCHITECTURE.md](docs/ARCHITECTURE.md) (the pipeline, its hazards, the M extension), pipeline and decoder documentation; `docs/contracts/` holds the extension contract and the bus and memory interface |
 
 Zifencei and Zicsr will get their own folders when they are implemented.
 
