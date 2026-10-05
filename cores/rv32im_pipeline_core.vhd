@@ -87,7 +87,26 @@ entity rv32im_pipeline_core is
     ram_en      : out std_logic;
     ram_wren    : out std_logic;
     ram_rden    : out std_logic;
-    ram_byteena : out std_logic_vector(3 downto 0)
+    ram_byteena : out std_logic_vector(3 downto 0);
+
+    -- Porta externa de dado, de latencia variavel: todo endereco a partir de
+    -- SDRAM_BASE_BYTES (a SDRAM e as janelas de periferico; quem responde e'
+    -- decidido fora do core pelo endereco). So' dado (a busca de instrucao
+    -- nao a alcanca). O acesso fica no
+    -- barramento enquanto o estagio MEM esta parado; sdram_ready = '0'
+    -- para o pipeline (mesmo mecanismo do stall do muldiv) e '1' libera. Com
+    -- os defaults (ready = '1') uma plataforma sem SDRAM nao muda. O dado
+    -- lido (sdram_rdata) tem que ficar estavel enquanto a leitura estiver em
+    -- WB; mem_advance diz em que ciclo o pipeline anda, para o bloco da
+    -- SDRAM saber quando o acesso foi consumido.
+    sdram_addr    : out std_logic_vector(31 downto 0);
+    sdram_wdata   : out std_logic_vector(31 downto 0);
+    sdram_byteena : out std_logic_vector(3 downto 0);
+    sdram_rden    : out std_logic;
+    sdram_wren    : out std_logic;
+    sdram_rdata   : in  std_logic_vector(31 downto 0) := (others => '0');
+    sdram_ready   : in  std_logic := '1';
+    mem_advance   : out std_logic
   );
 end entity rv32im_pipeline_core;
 
@@ -147,6 +166,10 @@ architecture rtl of rv32im_pipeline_core is
   signal muldiv_stall  : std_logic;  -- busy OR done (cobre ciclo em que saida_capt atualiza)
   signal muldiv_stall_n : std_logic;  -- NOT muldiv_stall (para port maps VHDL-93)
 
+  -- Stall do pipeline inteiro: muldiv ocupado OU acesso a SDRAM pendente.
+  signal pipe_stall : std_logic;
+  signal pipe_run   : std_logic;  -- NOT pipe_stall
+
   -- Aliases para visibilidade nos testbenches cocotb
   signal alu_out_idexmem  : word_t;
   signal pc_if_out        : word_t;
@@ -180,7 +203,16 @@ architecture rtl of rv32im_pipeline_core is
   constant RAM_BASE_BYTES : unsigned(31 downto 0) := to_unsigned(16#00008000#, 32);
   signal is_flash_data    : std_logic;  -- decodificado no estagio MEM (exmem_alu_out)
   signal is_flash_data_wb : std_logic;  -- mesmo decode, 1 ciclo depois, para o mux de WB
-  signal mem_read_data    : std_logic_vector(31 downto 0);  -- FLASH(porta 2) ou RAM, o que o WB consome
+  signal mem_read_data    : std_logic_vector(31 downto 0);  -- FLASH(porta 2), SDRAM ou RAM, o que o WB consome
+
+  -- Porta externa: dado, todo endereco a partir de SDRAM_BASE_BYTES (fora de
+  -- FLASH e RAM internas). Precisa bater com platform.yaml da plataforma.
+  constant SDRAM_BASE_BYTES : unsigned(31 downto 0) := to_unsigned(16#40000000#, 32);
+  signal is_sdram        : std_logic;  -- decodificado no estagio MEM (exmem_alu_out)
+  signal is_sdram_wb     : std_logic;  -- mesmo decode, 1 ciclo depois, para o mux de WB
+  signal is_ram_internal : std_logic;  -- nem FLASH nem SDRAM
+  signal sdram_access    : std_logic;  -- o estagio MEM tem um acesso valido a SDRAM
+  signal sdram_wait      : std_logic;  -- ...que ainda nao terminou
 
   -- =========================================================================
   -- Registrador IF/ID
@@ -343,8 +375,12 @@ begin
             "01" when ex_branch_taken = '1' else
             "00";
 
-  flush_if_id <= ex_branch_taken or ex_jalr_taken;
-  flush_id_ex <= ex_branch_taken or ex_jalr_taken;
+  -- O flush so' vale quando o pipeline anda: com um desvio tomado em EX e o
+  -- MEM parado esperando a SDRAM, um flush agora apagaria o proprio desvio
+  -- (ID/EX) antes de ele chegar a MEM, e o PC nao e' redirecionado enquanto
+  -- if_pc_write_en = '0'.
+  flush_if_id <= (ex_branch_taken or ex_jalr_taken) and pipe_run;
+  flush_id_ex <= (ex_branch_taken or ex_jalr_taken) and pipe_run;
 
   -- BUG TIMING (resolvido): saida_capt no multdiv eh atualizado na borda quando done_int=1.
   -- No ciclo em que done_int=1, busy ja caiu para 0 (Booth foi para S_DONE no ciclo anterior).
@@ -352,6 +388,10 @@ begin
   -- Com "OR done", o stall continua por 1 ciclo extra ate saida_capt propagar.
   muldiv_stall   <= muldiv_busy or muldiv_done;
   muldiv_stall_n <= not (muldiv_busy or muldiv_done);
+
+  pipe_stall  <= muldiv_stall or sdram_wait;
+  pipe_run    <= not (muldiv_stall or sdram_wait);
+  mem_advance <= not (muldiv_stall or sdram_wait);
 
   idex_in_valid <= ifid_valid and (not id_bubble_sel);
 
@@ -512,7 +552,7 @@ begin
       ifid_opcode    => ifid_instr(6 downto 0),
       idex_rd        => ex_rd_idx,
       idex_reRAM     => ex_reRAM,
-      muldiv_busy    => muldiv_stall,
+      muldiv_busy    => pipe_stall,
       if_pc_write_en => if_pc_write_en,
       ifid_write_en  => ifid_write_en,
       id_bubble_sel  => id_bubble_sel
@@ -541,7 +581,7 @@ begin
     port map (
       clk    => clk,
       reset  => reset,
-      en     => muldiv_stall_n,
+      en     => pipe_run,
       flush  => flush_id_ex,
 
       in_valid   => idex_in_valid,
@@ -729,7 +769,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => muldiv_stall_n,
+      en    => pipe_run,
       flush => '0',
 
       in_valid           => ex_valid,
@@ -788,12 +828,24 @@ begin
   flash_addr2 <= exmem_alu_out;
   flash_rden2 <= exmem_reRAM and exmem_valid and is_flash_data;
 
+  is_sdram        <= '1' when unsigned(exmem_alu_out) >= SDRAM_BASE_BYTES else '0';
+  is_ram_internal <= (not is_flash_data) and (not is_sdram);
+
   ram_addr    <= exmem_alu_out;
   ram_wdata   <= exmem_store_data;
-  ram_en      <= exmem_eRAM  and exmem_valid and (not is_flash_data);
-  ram_wren    <= exmem_weRAM and exmem_valid and (not is_flash_data);
-  ram_rden    <= exmem_reRAM and exmem_valid and (not is_flash_data);
+  ram_en      <= exmem_eRAM  and exmem_valid and is_ram_internal;
+  ram_wren    <= exmem_weRAM and exmem_valid and is_ram_internal;
+  ram_rden    <= exmem_reRAM and exmem_valid and is_ram_internal;
   ram_byteena <= exmem_byteena;
+
+  -- SDRAM: o acesso fica estavel no barramento (EX/MEM parado) ate sdram_ready.
+  sdram_access  <= exmem_valid and exmem_eRAM and is_sdram;
+  sdram_wait    <= sdram_access and (not sdram_ready);
+  sdram_addr    <= exmem_alu_out;
+  sdram_wdata   <= exmem_store_data;
+  sdram_byteena <= exmem_byteena;
+  sdram_wren    <= exmem_weRAM and sdram_access;
+  sdram_rden    <= exmem_reRAM and sdram_access;
 
   -- =========================================================================
   -- Registrador MEM/WB
@@ -804,7 +856,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => muldiv_stall_n,
+      en    => pipe_run,
       flush => '0',
 
       in_valid           => exmem_valid,
@@ -835,7 +887,10 @@ begin
   -- e o byte offset (alu_out[1:0]).
   -- =========================================================================
   is_flash_data_wb <= '1' when unsigned(memwb_alu_out) < RAM_BASE_BYTES else '0';
-  mem_read_data    <= flash_data2 when is_flash_data_wb = '1' else ram_rdata;
+  is_sdram_wb      <= '1' when unsigned(memwb_alu_out) >= SDRAM_BASE_BYTES else '0';
+  mem_read_data    <= flash_data2 when is_flash_data_wb = '1' else
+                      sdram_rdata when is_sdram_wb = '1' else
+                      ram_rdata;
 
   u_extender_ram : entity work.ExtenderRAM
     port map (

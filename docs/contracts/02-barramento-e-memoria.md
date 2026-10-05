@@ -81,9 +81,10 @@ O que isso mostra:
 | `en`, `wren`, `rden` | out | acesso, escrita, leitura (como `ram_en/wren/rden`) |
 | `rdata(31:0)` | in | dado lido (latência 1, como hoje) |
 
-Acréscimo único, **opcional e só para memória externa futura**: `ready`
-(`'1'` sempre nas memórias atuais). Com `ready = '0'` o pipeline para na MEM
-pelo mesmo mecanismo do `muldiv_stall`. Sem memória externa, não entra.
+Acréscimo único, **opcional e só para memória externa**: `ready`
+(`'1'` sempre nas memórias internas). Com `ready = '0'` o pipeline para na MEM
+pelo mesmo mecanismo do `muldiv_stall`. Sem memória externa, não entra. A
+primeira memória externa é a SDRAM (seção 2.5).
 
 Convenções que o L2IP deixava implícitas e passam a escritas:
 - **Janela por periférico:** `bit31 = 1`, `addr(30:28)` = id (`1` LEDs, `2` GPIO,
@@ -114,7 +115,35 @@ Mesmo lado escravo em todas:
 | :--- | :--- |
 | Modelo de simulação (arrays VHDL) | sempre `'1'` |
 | IP do Quartus (`altsyncram`) | sempre `'1'` (simula no GHDL via `altera_mf`) |
-| Externa (futura) | pelo controlador, vários ciclos |
+| Externa (SDRAM) | pelo controlador, vários ciclos |
+
+### 2.5 Memória de latência variável (SDRAM)
+
+Todo endereço de dado a partir de `0x40000000` sai por uma porta externa própria
+do core, no mesmo padrão das portas da FLASH, em vez de passar pelo barramento
+da RAM interna. O core não distingue quem responde: a SDRAM (64 MB a partir de
+`0x40000000`, que numa plataforma sem RAM interna é a RAM) e as janelas de
+periférico (`bit31 = 1`, seção 2.1) usam a mesma porta, e o bloco de fora
+escolhe pelo endereço, devolvendo `ready` e dado do escolhido. Só dado: a busca
+de instrução não alcança essa região. Os nomes das portas começam com `sdram`
+e valem para toda a região externa:
+
+| Porta | Dir. (core) | Significado |
+| :--- | :--- | :--- |
+| `sdram_addr`, `sdram_wdata`, `sdram_byteena` | out | endereço, dado e bytes válidos do acesso em MEM |
+| `sdram_rden`, `sdram_wren` | out | leitura ou escrita pedida |
+| `sdram_rdata` | in | dado lido |
+| `sdram_ready` | in | `'0'` para o pipeline; vale `'1'` quando não há memória externa na plataforma |
+| `mem_advance` | out | `'1'` no ciclo em que o pipeline anda |
+
+Regras do handshake:
+
+1. O acesso fica estável no barramento, com o EX/MEM parado, até `sdram_ready = '1'`.
+2. `sdram_ready` fica em `'1'` como nível, até `mem_advance = '1'`. Um pulso de um ciclo não serve: se o muldiv também estiver parando, o pulso se perde e o acesso se repetiria.
+3. `sdram_rdata` só muda na borda em que o pipeline anda, porque o load que está em WB ainda lê o valor anterior.
+4. Um desvio tomado em EX não faz flush enquanto o pipeline está parado: o flush só vale quando o pipeline anda.
+
+Sem memória externa na plataforma as portas ficam em aberto e o comportamento é o das memórias internas.
 
 ## Mudanças por repositório
 - **Core**: trocar as portas soltas pela porta mestre + `if_*`; remover as
