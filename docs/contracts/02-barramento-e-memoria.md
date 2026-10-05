@@ -119,16 +119,21 @@ Mesmo lado escravo em todas:
 
 ### 2.5 Memória de latência variável (SDRAM)
 
-A SDRAM ocupa os 64 MB a partir de `0x40000000`, só como dado. Ela usa portas
-próprias no core, no mesmo padrão das portas da FLASH, em vez de passar pelo
-barramento da RAM interna:
+Todo endereço de dado a partir de `0x40000000` sai por uma porta externa própria
+do core, no mesmo padrão das portas da FLASH, em vez de passar pelo barramento
+da RAM interna. O core não distingue quem responde: a SDRAM (64 MB a partir de
+`0x40000000`, que numa plataforma sem RAM interna é a RAM) e as janelas de
+periférico (`bit31 = 1`, seção 2.1) usam a mesma porta, e o bloco de fora
+escolhe pelo endereço, devolvendo `ready` e dado do escolhido. Só dado: a busca
+de instrução não alcança essa região. Os nomes das portas começam com `sdram`
+e valem para toda a região externa:
 
 | Porta | Dir. (core) | Significado |
 | :--- | :--- | :--- |
 | `sdram_addr`, `sdram_wdata`, `sdram_byteena` | out | endereço, dado e bytes válidos do acesso em MEM |
 | `sdram_rden`, `sdram_wren` | out | leitura ou escrita pedida |
 | `sdram_rdata` | in | dado lido |
-| `sdram_ready` | in | `'0'` para o pipeline; vale `'1'` quando não há SDRAM na plataforma |
+| `sdram_ready` | in | `'0'` para o pipeline; vale `'1'` quando não há memória externa na plataforma |
 | `mem_advance` | out | `'1'` no ciclo em que o pipeline anda |
 
 Regras do handshake:
@@ -138,7 +143,7 @@ Regras do handshake:
 3. `sdram_rdata` só muda na borda em que o pipeline anda, porque o load que está em WB ainda lê o valor anterior.
 4. Um desvio tomado em EX não faz flush enquanto o pipeline está parado: o flush só vale quando o pipeline anda.
 
-Sem SDRAM na plataforma as portas ficam em aberto e o comportamento é o das memórias internas.
+Sem memória externa na plataforma as portas ficam em aberto e o comportamento é o das memórias internas.
 
 ## Mudanças por repositório
 - **Core**: trocar as portas soltas pela porta mestre + `if_*`; remover as

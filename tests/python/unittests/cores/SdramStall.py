@@ -107,6 +107,10 @@ PROGRAM = [
     sw(10, 7, 16),               # RAM[0x8010] = 0x1111
     lbu(11, 1, 1),               # x11 = 0x11
     sw(11, 7, 20),               # RAM[0x8014] = 0x11
+    lui(13, 0xC0000),            # x13 = 0xC0000000: the peripheral window, same port
+    sw(2, 13, 0),                # [0xC0000000] = 0x11
+    lw(14, 13, 0),               # x14 = 0x11
+    sw(14, 7, 24),               # RAM[0x8018] = 0x11
     addi(12, 0, 1),
     sw(12, 7, 0x7C),             # RAM[0x807C] = 1: the program finished
     jal_self(),
@@ -119,6 +123,7 @@ EXPECTED_RAM = {
     0x800C: 0x01,
     0x8010: 0x1111,
     0x8014: 0x11,
+    0x8018: 0x11,
     0x807C: 0x01,
 }
 EXPECTED_SDRAM = {0x40000000: 0x1111, 0x40000004: 0x22, 0x40000008: 0xAA}
@@ -234,7 +239,7 @@ def _check(ram, sdram, accesses):
     for addr, want in EXPECTED_SDRAM.items():
         assert sdram.get(addr) == want, f"SDRAM[0x{addr:08X}] = {sdram.get(addr)}, expected 0x{want:X}"
     assert 0x800C in ram and ram[0x800C] == 1, "the instruction after the taken branch executed"
-    assert accesses == 8, f"{accesses} SDRAM accesses, expected 8"
+    assert accesses == 10, f"{accesses} external accesses, expected 10"
 
 
 @cocotb.test()

@@ -89,8 +89,10 @@ entity rv32im_pipeline_core is
     ram_rden    : out std_logic;
     ram_byteena : out std_logic_vector(3 downto 0);
 
-    -- Memoria de latencia variavel (SDRAM): regiao SDRAM_BASE_BYTES .. +64M,
-    -- so' dado (a busca de instrucao nao a alcanca). O acesso fica no
+    -- Porta externa de dado, de latencia variavel: todo endereco a partir de
+    -- SDRAM_BASE_BYTES (a SDRAM e as janelas de periferico; quem responde e'
+    -- decidido fora do core pelo endereco). So' dado (a busca de instrucao
+    -- nao a alcanca). O acesso fica no
     -- barramento enquanto o estagio MEM esta parado; sdram_ready = '0'
     -- para o pipeline (mesmo mecanismo do stall do muldiv) e '1' libera. Com
     -- os defaults (ready = '1') uma plataforma sem SDRAM nao muda. O dado
@@ -203,10 +205,9 @@ architecture rtl of rv32im_pipeline_core is
   signal is_flash_data_wb : std_logic;  -- mesmo decode, 1 ciclo depois, para o mux de WB
   signal mem_read_data    : std_logic_vector(31 downto 0);  -- FLASH(porta 2), SDRAM ou RAM, o que o WB consome
 
-  -- SDRAM: dado, 64 MB a partir de SDRAM_BASE_BYTES (fora de FLASH e RAM
-  -- internas). Precisa bater com platform.yaml (regiao SDRAM) da plataforma.
+  -- Porta externa: dado, todo endereco a partir de SDRAM_BASE_BYTES (fora de
+  -- FLASH e RAM internas). Precisa bater com platform.yaml da plataforma.
   constant SDRAM_BASE_BYTES : unsigned(31 downto 0) := to_unsigned(16#40000000#, 32);
-  constant SDRAM_END_BYTES  : unsigned(31 downto 0) := to_unsigned(16#44000000#, 32);
   signal is_sdram        : std_logic;  -- decodificado no estagio MEM (exmem_alu_out)
   signal is_sdram_wb     : std_logic;  -- mesmo decode, 1 ciclo depois, para o mux de WB
   signal is_ram_internal : std_logic;  -- nem FLASH nem SDRAM
@@ -827,8 +828,7 @@ begin
   flash_addr2 <= exmem_alu_out;
   flash_rden2 <= exmem_reRAM and exmem_valid and is_flash_data;
 
-  is_sdram        <= '1' when unsigned(exmem_alu_out) >= SDRAM_BASE_BYTES
-                          and unsigned(exmem_alu_out) < SDRAM_END_BYTES else '0';
+  is_sdram        <= '1' when unsigned(exmem_alu_out) >= SDRAM_BASE_BYTES else '0';
   is_ram_internal <= (not is_flash_data) and (not is_sdram);
 
   ram_addr    <= exmem_alu_out;
@@ -887,8 +887,7 @@ begin
   -- e o byte offset (alu_out[1:0]).
   -- =========================================================================
   is_flash_data_wb <= '1' when unsigned(memwb_alu_out) < RAM_BASE_BYTES else '0';
-  is_sdram_wb      <= '1' when unsigned(memwb_alu_out) >= SDRAM_BASE_BYTES
-                           and unsigned(memwb_alu_out) < SDRAM_END_BYTES else '0';
+  is_sdram_wb      <= '1' when unsigned(memwb_alu_out) >= SDRAM_BASE_BYTES else '0';
   mem_read_data    <= flash_data2 when is_flash_data_wb = '1' else
                       sdram_rdata when is_sdram_wb = '1' else
                       ram_rdata;
