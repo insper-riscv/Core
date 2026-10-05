@@ -93,9 +93,13 @@ PROGRAM = [
     sw(6, 7, 0),                 # RAM[0x8000] = 0x33
     sw(4, 7, 4),                 # RAM[0x8004] = 0x11
     lw(8, 1, 8),                 # x8 = SDRAM[8] (preloaded 0xAA)
-    beq(0, 0, 8),                # taken while the load above is still in MEM
+    beq(0, 0, 16),               # taken while the load above is still in MEM
     addi(9, 0, 0x7F),            # skipped: must never execute
-    addi(9, 9, 1),               # x9 = 1
+    addi(9, 9, 0x7F),            # skipped
+    addi(9, 9, 0x7F),            # skipped (the PC is already past the first two
+                                 # when the branch is in EX, so a lost redirect
+                                 # would run these instead of reaching the target)
+    addi(9, 9, 1),               # target: x9 = 1
     sw(8, 7, 8),                 # RAM[0x8008] = 0xAA
     sw(9, 7, 12),                # RAM[0x800C] = 1
     sb(2, 1, 1),                 # SDRAM byte 1 of word 0 = 0x11 (byteena)
