@@ -42,7 +42,10 @@ entity rv32im_pipeline_core is
   generic (
     -- rv32im (true): instancia a unidade M. rv32i (false): sem a unidade M
     -- (os arquivos de M/ nao precisam existir); uma instrucao M vira NOP.
-    HAS_M : boolean := true
+    HAS_M : boolean := true;
+    -- Zicsr: instancia o banco de CSRs do modo maquina; sem ele (false) as
+    -- instrucoes CSR sao NOP, como qualquer opcode desconhecido.
+    HAS_ZICSR : boolean := false
   );
   port (
     clk   : in  std_logic;
@@ -122,6 +125,29 @@ architecture rtl of rv32im_pipeline_core is
       isMulDiv    : out std_logic;
       weReg       : out std_logic;
       selPCRS1    : out std_logic
+    );
+  end component;
+
+  component csr_decode is
+    port (
+      instruction : in  std_logic_vector(31 downto 0);
+      isCsr       : out std_logic;
+      weReg       : out std_logic;
+      useImmI     : out std_logic
+    );
+  end component;
+
+  component csr_file is
+    port (
+      clk      : in  std_logic;
+      reset    : in  std_logic;
+      commit   : in  std_logic;
+      addr     : in  std_logic_vector(11 downto 0);
+      op       : in  std_logic_vector(2 downto 0);
+      wdata    : in  std_logic_vector(31 downto 0);
+      src_zero : in  std_logic;
+      rdata    : out std_logic_vector(31 downto 0);
+      illegal  : out std_logic
     );
   end component;
 
@@ -240,6 +266,7 @@ architecture rtl of rv32im_pipeline_core is
   -- =========================================================================
   signal cu_selMuxPc4ALU    : std_logic;
   signal cu_opExImm         : opeximm_t;
+  signal id_opExImm         : std_logic_vector(2 downto 0);  -- opExImm final (base ou Zicsr)
   signal cu_selMuxALUPc4RAM : wbsel_t;
   signal cu_weReg           : std_logic;
   signal base_weReg         : std_logic;  -- control_unit (base ISA)
@@ -249,6 +276,9 @@ architecture rtl of rv32im_pipeline_core is
   signal cu_selPCRS1        : std_logic;
   signal base_selPCRS1      : std_logic;
   signal m_selPCRS1         : std_logic;
+  signal cu_isCsr           : std_logic;  -- Zicsr (Zicsr/csr_decode)
+  signal csr_weReg          : std_logic;
+  signal csr_useImmI        : std_logic;
   signal cu_opALU           : opalu_t;
   signal cu_isMulDiv        : std_logic;
   signal cu_weRAM           : std_logic;
@@ -314,6 +344,16 @@ architecture rtl of rv32im_pipeline_core is
   signal ex_muldiv_result   : word_t;
   signal ex_alu_mux_result  : word_t;
   signal ex_final_result    : word_t;
+
+  -- =========================================================================
+  -- Estagio EX: Zicsr
+  -- =========================================================================
+  signal ex_isCsr       : std_logic;  -- a instrucao em EX e' um acesso a CSR
+  signal csr_commit     : std_logic;  -- vale ex_valid e pipe_run
+  signal csr_wdata      : word_t;
+  signal csr_src_zero   : std_logic;  -- campo rs1 (ou zimm) igual a zero
+  signal csr_rdata      : word_t;
+  signal csr_illegal    : std_logic;
 
   -- =========================================================================
   -- Estagio EX: StoreManager
@@ -511,8 +551,26 @@ begin
     m_selPCRS1  <= '0';
   end generate gen_m_decode;
 
-  cu_weReg    <= base_weReg    or m_weReg;
+  gen_csr_decode : if HAS_ZICSR generate
+    u_csr_decode : csr_decode
+      port map (
+        instruction => ifid_instr,
+        isCsr       => cu_isCsr,
+        weReg       => csr_weReg,
+        useImmI     => csr_useImmI
+      );
+  else generate
+    cu_isCsr    <= '0';
+    csr_weReg   <= '0';
+    csr_useImmI <= '0';
+  end generate gen_csr_decode;
+
+  cu_weReg    <= base_weReg    or m_weReg or csr_weReg;
   cu_selPCRS1 <= base_selPCRS1 or m_selPCRS1;
+
+  -- A instrucao CSR carrega o endereco do CSR em instruction[31:20], o mesmo
+  -- campo do imediato do tipo I.
+  id_opExImm <= OPEXIMM_I when csr_useImmI = '1' else std_logic_vector(cu_opExImm);
 
   -- =========================================================================
   -- ID stage: ExtenderImm
@@ -520,7 +578,7 @@ begin
   u_extender_imm : entity work.ExtenderImm
     port map (
       Inst31downto7 => ifid_instr(31 downto 7),
-      opExImm       => std_logic_vector(cu_opExImm),
+      opExImm       => id_opExImm,
       signalOut     => id_imm
     );
 
@@ -730,8 +788,50 @@ begin
   -- =========================================================================
   -- EX stage: Mux isMulDiv e mux selMuxPc4ALU
   -- =========================================================================
-  ex_alu_mux_result <= ex_muldiv_result when ex_isMulDiv     = '1' else ex_alu_result;
+  ex_alu_mux_result <= ex_muldiv_result when ex_isMulDiv     = '1' else
+                       csr_rdata        when ex_isCsr        = '1' else
+                       ex_alu_result;
   ex_final_result   <= ex_pc4           when ex_selMuxPc4ALU = '1' else ex_alu_mux_result;
+
+  -- =========================================================================
+  -- EX stage: Zicsr
+  --
+  -- O valor antigo do CSR sai pelo mesmo mux do resultado da ALU, entao o
+  -- forwarding existente o serve. A escrita so' acontece quando a instrucao e'
+  -- valida e o pipeline anda (csr_commit): parada em EX ela nao repete o efeito.
+  -- O dado de escrita e' rs1 (com forwarding) ou, nas versoes com imediato
+  -- (funct3[2] = 1), o campo rs1 como numero sem sinal de 5 bits (zimm).
+  -- =========================================================================
+  gen_csr : if HAS_ZICSR generate
+    ex_isCsr <= '1' when ex_opCode = "1110011"
+                     and ex_funct3 /= "000" and ex_funct3 /= "100"
+                else '0';
+
+    csr_commit   <= ex_isCsr and ex_valid and pipe_run;
+    csr_src_zero <= '1' when ex_rs1_idx = "00000" else '0';
+    csr_wdata  <= ex_fwd_rs1_val when ex_funct3(2) = '0'
+                  else (31 downto 5 => '0') & ex_rs1_idx;
+
+    u_csr_file : csr_file
+      port map (
+        clk      => clk,
+        reset    => reset,
+        commit   => csr_commit,
+        addr     => ex_imm(11 downto 0),
+        op       => ex_funct3,
+        wdata    => csr_wdata,
+        src_zero => csr_src_zero,
+        rdata    => csr_rdata,
+        illegal  => csr_illegal
+      );
+  else generate
+    ex_isCsr    <= '0';
+    csr_commit  <= '0';
+    csr_src_zero <= '0';
+    csr_wdata   <= (others => '0');
+    csr_rdata   <= (others => '0');
+    csr_illegal <= '0';
+  end generate gen_csr;
 
   -- =========================================================================
   -- EX stage: Alvos de desvio

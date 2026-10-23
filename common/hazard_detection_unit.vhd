@@ -119,7 +119,8 @@ begin
                ifid_opcode = "0000011" or  -- load
                ifid_opcode = "0100011" or  -- store
                ifid_opcode = "1100011" or  -- branch
-               ifid_opcode = "1100111"))   -- JALR
+               ifid_opcode = "1100111" or  -- JALR
+               ifid_opcode = "1110011"))   -- SYSTEM/CSR (conservador: o zimm so' vira falso positivo)
     else '0';
 
   ifid_uses_rs2 <=

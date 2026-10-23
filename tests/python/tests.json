@@ -138,5 +138,19 @@
         "test_args": [
             "--std=08"
         ]
+    },
+    "CsrDecode": {
+        "toplevel": "csr_decode",
+        "sources": [
+            "Zicsr/csr_decode.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.csr_decode"
+    },
+    "CsrFile": {
+        "toplevel": "csr_file",
+        "sources": [
+            "Zicsr/csr_file.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.csr_file"
     }
 }
