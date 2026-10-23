@@ -81,7 +81,7 @@ editando o pipeline por dentro:
 1. **Parar** o pipeline (`busy`): o pipeline comum congela IF/ID/EX/MEM,
    como o `muldiv_stall` faz hoje; a extensão não gera `stall` próprio.
 2. **Flush** (`flush_req` + `redirect_pc`): usado por Zifencei e por trap.
-3. **Exceção** (`exc_valid` + `exc_cause`): reservado para Zicsr; o M e o I
+3. **Exceção** (`exc_valid` + `exc_cause`): reservado para Zicsr (seção 1.6); o M e o I
    não geram exceção (nem divisão por zero: o RISC-V devolve valor definido).
 
 ### 1.4 Resultado e forwarding
@@ -117,6 +117,39 @@ efeito (sem escrita de registrador, sem parada).
 - **Verificação:** `make profiles` constrói cada perfil sozinho; `MDecode`,
   `ControlUnit_M_nop` e `ControlUnit` em `tests/python/tests.json` provam a
   reivindicação, o NOP e que `funct3_out` segue a instrução.
+
+### 1.6 Zicsr
+Zicsr é a primeira extensão cuja unidade de execução guarda estado
+arquitetural. O perfil `rv32im_zicsr` (`profiles/rv32im_zicsr.yaml`) liga o
+generic `HAS_ZICSR`; sem ele (`false`) uma instrução CSR é NOP, como qualquer
+opcode de extensão ausente.
+
+| Ponto do contrato | Zicsr |
+| :--- | :--- |
+| Decodificação | `Zicsr/csr_decode.vhd` reivindica o opcode `1110011` com `funct3` diferente de `000` e `100`; sobe `isCsr`, `weReg` e `useImmI` (o endereço do CSR, `instruction[31:20]`, chega a EX pelo extensor de imediato do tipo I) |
+| Unidade de execução | `Zicsr/csr_file.vhd`, combinacional: `rdata` é o valor antigo do CSR, sem `busy` nem `done`, então o pipeline não para |
+| Resultado | `rdata` entra no mux de resultado de EX junto com a ALU e o `multdiv`; o forwarding existente o serve |
+| Escrita | só na borda em que `commit = ex_valid and pipe_run`; uma instrução parada em EX não repete o efeito |
+| Operando | `rs1` já com forwarding, ou o campo `rs1` como número sem sinal de 5 bits nas formas com imediato |
+| Hazard de dado | a unidade de detecção de hazards trata a classe SYSTEM como leitora de `rs1`, para que um `lw` imediatamente antes de um CSR segure o pipeline um ciclo |
+| Exceção | `illegal` sai do banco de CSRs para a unidade de traps (CSR inexistente, ou escrita efetiva em CSR somente leitura) |
+
+Regras de escrita (`op` é o `funct3` da instrução): `csrrw` e `csrrwi` sempre
+escrevem; `csrrs`, `csrrc` e as formas com imediato só escrevem quando o campo
+`rs1` (ou o `zimm`) é diferente de zero.
+
+CSRs implementados, todos do modo máquina:
+
+| Endereço | Nome | Acesso | Reset | Máscara |
+| :--- | :--- | :--- | :--- | :--- |
+| `0x300` | `mstatus` | leitura e escrita | `0x00001800` | só MIE (bit 3) e MPIE (bit 7) escrevem; MPP (bits 12 e 11) lê `11` |
+| `0x301` | `misa` | somente leitura | `0x40001100` | RV32 com I e M |
+| `0x304`, `0x344` | `mie`, `mip` | `mie` lê e escreve, `mip` só lê | 0 | todos os bits fixos em zero |
+| `0x305` | `mtvec` | leitura e escrita | 0 | bits 1 e 0 fixos em zero (modo direto) |
+| `0x310` | `mstatush` | leitura e escrita | 0 | todos os bits fixos em zero |
+| `0x340`, `0x343`, `0x342` | `mscratch`, `mtval`, `mcause` | leitura e escrita | 0 | 32 bits |
+| `0x341` | `mepc` | leitura e escrita | 0 | bits 1 e 0 fixos em zero |
+| `0xF11` a `0xF15` | `mvendorid`, `marchid`, `mimpid`, `mhartid`, `mconfigptr` | somente leitura | 0 | lidos como zero |
 
 ## Critério de aceite de uma extensão
 - Testes por entidade da extensão passam sozinhos, sem o pipeline.
