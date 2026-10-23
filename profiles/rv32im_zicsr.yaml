@@ -34,6 +34,7 @@ sources:
   - M/multdiv.vhd
   - Zicsr/csr_decode.vhd
   - Zicsr/csr_file.vhd
+  - Zicsr/trap_unit.vhd
   - common/pc_fetch.vhd
   - common/reg_IF_ID.vhd
   - common/reg_ID_EX.vhd

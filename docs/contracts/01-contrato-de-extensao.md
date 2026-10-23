@@ -133,10 +133,26 @@ opcode de extensão ausente.
 | Operando | `rs1` já com forwarding, ou o campo `rs1` como número sem sinal de 5 bits nas formas com imediato |
 | Hazard de dado | a unidade de detecção de hazards trata a classe SYSTEM como leitora de `rs1`, para que um `lw` imediatamente antes de um CSR segure o pipeline um ciclo |
 | Exceção | `illegal` sai do banco de CSRs para a unidade de traps (CSR inexistente, ou escrita efetiva em CSR somente leitura) |
+| Trap e `mret` | `Zicsr/trap_unit.vhd`, combinacional, detecta em EX a exceção da instrução (tabela abaixo) e o `mret`; `take` e `mret_take` só sobem com a instrução válida e o pipeline andando |
+| Redirecionamento | Com `take` ou `mret_take` o seletor do PC vale `11` e o PC recebe `mtvec` ou `mepc`; essa origem escreve o PC mesmo com o congelamento de load-use, e esvazia IF/ID e ID/EX |
+| Instrução que traps | O registrador EX/MEM recebe flush em `take`: a instrução vira bolha e não escreve registrador nem memória |
 
 Regras de escrita (`op` é o `funct3` da instrução): `csrrw` e `csrrwi` sempre
 escrevem; `csrrs`, `csrrc` e as formas com imediato só escrevem quando o campo
 `rs1` (ou o `zimm`) é diferente de zero.
+
+Exceções, no máximo uma por instrução:
+
+| `mcause` | Exceção | `mtval` |
+| ---: | :--- | :--- |
+| 0 | alvo de desvio ou salto tomado com os bits 1 e 0 diferentes de zero | o alvo |
+| 2 | classe SYSTEM não suportada (inclui `funct3 = 100` e `sret`), CSR inexistente ou escrita efetiva em CSR somente leitura | 0 |
+| 3 | `ebreak` | 0 |
+| 4 | `lw` com endereço fora de múltiplo de 4; `lh` e `lhu` com o bit 0 setado | endereço efetivo |
+| 6 | `sw` fora de múltiplo de 4; `sh` com o bit 0 setado | endereço efetivo |
+| 11 | `ecall` | 0 |
+
+`mepc` recebe o PC da instrução. O trap também salva `MIE` em `MPIE` e zera `MIE`; `mret` (`0x30200073`) restaura `MIE` a partir de `MPIE`, põe `MPIE` em 1 e salta para `mepc`. O `wfi` é um NOP; um opcode desconhecido segue sendo NOP.
 
 CSRs implementados, todos do modo máquina:
 

@@ -1,4 +1,4 @@
-"""csr_decode: Zicsr claims SYSTEM with funct3 other than 000 and 100."""
+"""csr_decode: Zicsr claims the SYSTEM class; funct3 other than 000 and 100 are CSR accesses."""
 
 import cocotb
 from cocotb.triggers import Timer
@@ -26,14 +26,24 @@ async def test_claims_every_csr_instruction(dut):
 
 
 @cocotb.test()
-async def test_leaves_everything_else_alone(dut):
-    """ECALL, EBREAK, MRET, WFI (funct3 = 000), the reserved funct3 = 100 and other opcodes."""
+async def test_other_system_instructions_only_fetch_the_csr_field(dut):
+    """ECALL, EBREAK, MRET, WFI (funct3 = 000) and the reserved funct3 = 100 raise only useImmI."""
     cases = [
         _instr(OP_SYSTEM, 0b000, csr=0x000, rd=0, rs1=0),  # ecall
         _instr(OP_SYSTEM, 0b000, csr=0x001, rd=0, rs1=0),  # ebreak
         _instr(OP_SYSTEM, 0b000, csr=0x302, rd=0, rs1=0),  # mret
         _instr(OP_SYSTEM, 0b000, csr=0x105, rd=0, rs1=0),  # wfi
         _instr(OP_SYSTEM, 0b100),
+    ]
+    for instr in cases:
+        got = await _outputs(dut, instr)
+        assert got == (0, 0, 1), f"{instr:#010x}: {got}"
+
+
+@cocotb.test()
+async def test_leaves_everything_else_alone(dut):
+    """Other opcodes: all outputs zero."""
+    cases = [
         _instr(0b0110011, 0b001),  # sll
         _instr(0b0010011, 0b001),  # slli
         _instr(0b0001111, 0b001),  # fence.i

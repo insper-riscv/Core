@@ -14,6 +14,11 @@
 -- wdata). src_zero = '1' quando o campo rs1 (ou zimm) e' zero: RS e RC nao
 -- escrevem nesse caso.
 --
+-- Tomada de trap (trap_take): mepc, mcause e mtval recebem os valores de entrada,
+-- MPIE recebe MIE e MIE vai a zero. MRET (mret_take): MIE recebe MPIE e MPIE
+-- vai a 1. Ambos tem prioridade sobre uma escrita CSR da mesma borda (que nao
+-- existe: o trap e' da propria instrucao de EX).
+--
 -- CSRs: mstatus, misa, mie, mtvec, mscratch, mepc, mcause, mtval, mip,
 -- mstatush, mvendorid, marchid, mimpid, mhartid, mconfigptr. Um endereco que
 -- nao esta na lista, ou uma escrita efetiva em CSR somente leitura (bits 11 e
@@ -36,7 +41,19 @@ entity csr_file is
     src_zero : in  std_logic;
 
     rdata    : out std_logic_vector(31 downto 0);
-    illegal  : out std_logic
+    illegal  : out std_logic;
+
+    -- Trap e MRET (docs/contracts/01, 1.6). take e mret_take valem no ciclo em
+    -- que a instrucao de EX e' valida e o pipeline anda, como commit.
+    trap_take  : in  std_logic := '0';
+    trap_cause : in  std_logic_vector(31 downto 0) := (others => '0');
+    trap_pc    : in  std_logic_vector(31 downto 0) := (others => '0');
+    trap_tval  : in  std_logic_vector(31 downto 0) := (others => '0');
+    mret_take  : in  std_logic := '0';
+
+    -- Destinos de redirecionamento do PC.
+    mtvec_o  : out std_logic_vector(31 downto 0);
+    mepc_o   : out std_logic_vector(31 downto 0)
   );
 end entity csr_file;
 
@@ -101,7 +118,9 @@ begin
     end case;
   end process;
 
-  rdata <= old_value;
+  rdata  <= old_value;
+  mtvec_o <= mtvec;
+  mepc_o  <= mepc;
 
   with op(1 downto 0) select
     new_value <= wdata                       when "01",
@@ -123,6 +142,15 @@ begin
         mepc         <= (others => '0');
         mcause       <= (others => '0');
         mtval        <= (others => '0');
+      elsif trap_take = '1' then
+        mepc         <= trap_pc(31 downto 2) & "00";
+        mcause       <= trap_cause;
+        mtval        <= trap_tval;
+        mstatus_mpie <= mstatus_mie;
+        mstatus_mie  <= '0';
+      elsif mret_take = '1' then
+        mstatus_mie  <= mstatus_mpie;
+        mstatus_mpie <= '1';
       elsif commit = '1' and write_effect = '1' and known = '1' and read_only = '0' then
         case addr is
           when ADDR_MSTATUS =>

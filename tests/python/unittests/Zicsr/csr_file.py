@@ -17,6 +17,11 @@ async def _reset(dut):
     dut.op.value = RS
     dut.wdata.value = 0
     dut.src_zero.value = 1
+    dut.trap_take.value = 0
+    dut.trap_cause.value = 0
+    dut.trap_pc.value = 0
+    dut.trap_tval.value = 0
+    dut.mret_take.value = 0
     dut.reset.value = 1
     for _ in range(2):
         await RisingEdge(dut.clk)
@@ -131,3 +136,57 @@ async def test_unknown_csr_is_illegal(dut):
     await _reset(dut)
     for addr in (0x000, 0x100, 0x302, 0x303, 0x306, 0x320, 0x7A0, 0xB00, 0xC00, 0xF10, 0xFFF):
         assert (await access(dut, addr, RS, 0, src_zero=1))[1] == 1, f"{addr:#x}"
+
+
+async def take_trap(dut, cause, pc, tval):
+    dut.trap_cause.value = cause
+    dut.trap_pc.value = pc
+    dut.trap_tval.value = tval
+    dut.trap_take.value = 1
+    await RisingEdge(dut.clk)
+    dut.trap_take.value = 0
+    await Timer(1, unit="ns")
+
+
+async def take_mret(dut):
+    dut.mret_take.value = 1
+    await RisingEdge(dut.clk)
+    dut.mret_take.value = 0
+    await Timer(1, unit="ns")
+
+
+@cocotb.test()
+async def test_trap_records_the_exception_and_closes_the_interrupt_enable(dut):
+    await _reset(dut)
+    await access(dut, MTVEC, RW, 0x00000200)
+    await access(dut, MSTATUS, RS, 0x8)  # MIE = 1
+    assert await read(dut, MSTATUS) == 0x1808
+    await take_trap(dut, cause=11, pc=0x00001234, tval=0x77)
+    assert await read(dut, MEPC) == 0x1234
+    assert await read(dut, MCAUSE) == 11
+    assert await read(dut, MTVAL) == 0x77
+    assert await read(dut, MSTATUS) == 0x1880  # MPIE = old MIE, MIE = 0, MPP = 11
+    assert int(dut.mtvec_o.value) == 0x200
+    assert int(dut.mepc_o.value) == 0x1234
+
+
+@cocotb.test()
+async def test_mret_restores_the_interrupt_enable(dut):
+    await _reset(dut)
+    await access(dut, MSTATUS, RS, 0x8)
+    await take_trap(dut, cause=3, pc=0x40, tval=0)
+    await take_mret(dut)
+    assert await read(dut, MSTATUS) == 0x1888  # MIE = old MPIE, MPIE = 1
+    # trap with MIE clear: MPIE becomes 0, and MRET brings MIE back to 0
+    await access(dut, MSTATUS, RC, 0x8)
+    await take_trap(dut, cause=2, pc=0x44, tval=0)
+    assert await read(dut, MSTATUS) == 0x1800
+    await take_mret(dut)
+    assert await read(dut, MSTATUS) == 0x1880
+
+
+@cocotb.test()
+async def test_trap_aligns_mepc(dut):
+    await _reset(dut)
+    await take_trap(dut, cause=0, pc=0x1003, tval=0x1002)
+    assert await read(dut, MEPC) == 0x1000
