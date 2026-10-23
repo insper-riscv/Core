@@ -69,6 +69,13 @@
         ],
         "test_module": "tests.python.unittests.M.m_decode"
     },
+    "NonRestoringDivider": {
+        "toplevel": "non_restoring_divider_rv32",
+        "sources": [
+            "M/non_restoring_divider_rv32.vhd"
+        ],
+        "test_module": "tests.python.unittests.M.non_restoring_divider"
+    },
     "HazardDetectionUnit": {
         "toplevel": "hazard_detection_unit",
         "sources": [
