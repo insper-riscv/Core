@@ -137,6 +137,26 @@ architecture rtl of rv32im_pipeline_core is
     );
   end component;
 
+  component trap_unit is
+    port (
+      ex_valid    : in  std_logic;
+      run         : in  std_logic;
+      opcode      : in  std_logic_vector(6 downto 0);
+      funct3      : in  std_logic_vector(2 downto 0);
+      rd_idx      : in  std_logic_vector(4 downto 0);
+      rs1_idx     : in  std_logic_vector(4 downto 0);
+      imm12       : in  std_logic_vector(11 downto 0);
+      ea          : in  std_logic_vector(31 downto 0);
+      cf_taken    : in  std_logic;
+      cf_target   : in  std_logic_vector(31 downto 0);
+      csr_illegal : in  std_logic;
+      take        : out std_logic;
+      mret_take   : out std_logic;
+      cause       : out std_logic_vector(31 downto 0);
+      tval        : out std_logic_vector(31 downto 0)
+    );
+  end component;
+
   component csr_file is
     port (
       clk      : in  std_logic;
@@ -147,7 +167,14 @@ architecture rtl of rv32im_pipeline_core is
       wdata    : in  std_logic_vector(31 downto 0);
       src_zero : in  std_logic;
       rdata    : out std_logic_vector(31 downto 0);
-      illegal  : out std_logic
+      illegal  : out std_logic;
+      trap_take  : in  std_logic;
+      trap_cause : in  std_logic_vector(31 downto 0);
+      trap_pc    : in  std_logic_vector(31 downto 0);
+      trap_tval  : in  std_logic_vector(31 downto 0);
+      mret_take  : in  std_logic;
+      mtvec_o    : out std_logic_vector(31 downto 0);
+      mepc_o     : out std_logic_vector(31 downto 0)
     );
   end component;
 
@@ -354,6 +381,15 @@ architecture rtl of rv32im_pipeline_core is
   signal csr_src_zero   : std_logic;  -- campo rs1 (ou zimm) igual a zero
   signal csr_rdata      : word_t;
   signal csr_illegal    : std_logic;
+  signal trap_take      : std_logic;  -- excecao da instrucao de EX, com o pipeline andando
+  signal mret_take      : std_logic;  -- MRET em EX, com o pipeline andando
+  signal trap_cause     : word_t;
+  signal trap_tval      : word_t;
+  signal csr_mtvec      : word_t;
+  signal csr_mepc       : word_t;
+  signal redirect_pc    : word_t;     -- destino de trap (mtvec) ou de MRET (mepc)
+  signal ex_cf_taken    : std_logic;
+  signal ex_cf_target   : word_t;
 
   -- =========================================================================
   -- Estagio EX: StoreManager
@@ -411,7 +447,8 @@ begin
   -- =========================================================================
   -- Logica combinacional de controle de PC e flush
   -- =========================================================================
-  pc_src <= "10" when ex_jalr_taken   = '1' else
+  pc_src <= "11" when trap_take = '1' or mret_take = '1' else
+            "10" when ex_jalr_taken   = '1' else
             "01" when ex_branch_taken = '1' else
             "00";
 
@@ -419,8 +456,13 @@ begin
   -- MEM parado esperando a SDRAM, um flush agora apagaria o proprio desvio
   -- (ID/EX) antes de ele chegar a MEM, e o PC nao e' redirecionado enquanto
   -- if_pc_write_en = '0'.
-  flush_if_id <= (ex_branch_taken or ex_jalr_taken) and pipe_run;
-  flush_id_ex <= (ex_branch_taken or ex_jalr_taken) and pipe_run;
+  --
+  -- trap_take e mret_take ja' incluem pipe_run (a excecao so' e' tomada no ciclo
+  -- em que o pipeline anda) e esvaziam IF/ID e ID/EX da mesma forma.
+  flush_if_id <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take;
+  flush_id_ex <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take;
+
+  redirect_pc <= csr_mepc when mret_take = '1' else csr_mtvec;
 
   -- BUG TIMING (resolvido): saida_capt no multdiv eh atualizado na borda quando done_int=1.
   -- No ciclo em que done_int=1, busy ja caiu para 0 (Booth foi para S_DONE no ciclo anterior).
@@ -455,6 +497,7 @@ begin
       pc_src         => pc_src,
       branch_target  => ex_branch_target,
       jalr_target    => ex_jalr_target,
+      redirect_pc    => redirect_pc,
       pc_out         => if_pc,
       pc4_out        => if_pc4,
       rom_addr       => if_addr,
@@ -822,9 +865,46 @@ begin
         wdata    => csr_wdata,
         src_zero => csr_src_zero,
         rdata    => csr_rdata,
-        illegal  => csr_illegal
+        illegal  => csr_illegal,
+        trap_take  => trap_take,
+        trap_cause => trap_cause,
+        trap_pc    => ex_pc,
+        trap_tval  => trap_tval,
+        mret_take  => mret_take,
+        mtvec_o    => csr_mtvec,
+        mepc_o     => csr_mepc
+      );
+
+    ex_cf_taken  <= ex_branch_taken or ex_jalr_taken;
+    ex_cf_target <= ex_jalr_target when ex_jalr_taken = '1' else ex_branch_target;
+
+    u_trap_unit : trap_unit
+      port map (
+        ex_valid    => ex_valid,
+        run         => pipe_run,
+        opcode      => ex_opCode,
+        funct3      => ex_funct3,
+        rd_idx      => ex_rd_idx,
+        rs1_idx     => ex_rs1_idx,
+        imm12       => ex_imm(11 downto 0),
+        ea          => ex_alu_result,
+        cf_taken    => ex_cf_taken,
+        cf_target   => ex_cf_target,
+        csr_illegal => csr_illegal,
+        take        => trap_take,
+        mret_take   => mret_take,
+        cause       => trap_cause,
+        tval        => trap_tval
       );
   else generate
+    trap_take   <= '0';
+    mret_take   <= '0';
+    trap_cause  <= (others => '0');
+    trap_tval   <= (others => '0');
+    csr_mtvec   <= (others => '0');
+    csr_mepc    <= (others => '0');
+    ex_cf_taken  <= '0';
+    ex_cf_target <= (others => '0');
     ex_isCsr    <= '0';
     csr_commit  <= '0';
     csr_src_zero <= '0';
@@ -870,7 +950,8 @@ begin
       clk   => clk,
       reset => reset,
       en    => pipe_run,
-      flush => '0',
+      -- A instrucao que gera a excecao vira bolha: nao escreve registrador nem memoria.
+      flush => trap_take,
 
       in_valid           => ex_valid,
       in_pc4             => ex_pc4,

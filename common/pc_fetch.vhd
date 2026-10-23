@@ -43,6 +43,11 @@ entity pc_fetch is
     branch_target     : in  word_t;   -- PC_ID + imm  (branches / JAL)
     jalr_target       : in  word_t;   -- (rs1 + imm) AND 0xFFFFFFFE
 
+    -- Destino de trap ou de MRET (pc_src = "11"). Esta origem escreve o PC mesmo
+    -- com if_pc_write_en = '0' (congelamento por load-use): o redirecionamento
+    -- tem prioridade sobre o congelamento.
+    redirect_pc       : in  word_t := (others => '0');
+
     -- Saidas para o registrador IF/ID
     pc_out            : out word_t;   -- PC da instrucao atual
     pc4_out           : out word_t;   -- PC + 4
@@ -82,7 +87,7 @@ begin
     pc4_wire      when "00",
     branch_target when "01",
     jalr_target   when "10",
-    pc4_wire      when others;
+    redirect_pc   when others;
 
   -- -------------------------------------------------------------------------
   -- Registrador de PC com enable e reset sincrono
@@ -92,7 +97,7 @@ begin
     if rising_edge(clk) then
       if reset = '1' then
         pc_reg <= (others => '0');
-      elsif if_pc_write_en = '1' then
+      elsif if_pc_write_en = '1' or pc_src = "11" then
         pc_reg <= pc_next;
       end if;
       -- if_pc_write_en = '0': pc_reg mantem valor (stall)

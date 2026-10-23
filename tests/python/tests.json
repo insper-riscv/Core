@@ -152,5 +152,12 @@
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_file"
+    },
+    "TrapUnit": {
+        "toplevel": "trap_unit",
+        "sources": [
+            "Zicsr/trap_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.trap_unit"
     }
 }
