@@ -60,9 +60,11 @@ architecture rtl of non_restoring_divider_rv32 is
     signal state : state_t := S_IDLE;
 
     -- Internal working registers (always operate on absolute/unsigned values)
-    signal A     : signed(32 downto 0);   -- 33-bit partial remainder (extra sign bit)
+    -- 34-bit partial remainder: the unsigned divisor can use all 32 bits, so the shifted
+    -- remainder needs 33 bits of magnitude and one more for the sign.
+    signal A     : signed(33 downto 0);
     signal Q     : unsigned(31 downto 0); -- quotient being built
-    signal M     : signed(32 downto 0);   -- 33-bit divisor (always positive here)
+    signal M     : signed(33 downto 0);   -- 34-bit divisor (always positive here)
     signal count : unsigned(5 downto 0);  -- iteration counter 0..31
 
     -- Sign tracking for signed mode
@@ -107,8 +109,8 @@ begin
     -- Main sequential process
     -------------------------------------------------------------------------
     process(clk)
-        variable A_shifted : signed(32 downto 0);
-        variable A_next    : signed(32 downto 0);
+        variable A_shifted : signed(33 downto 0);
+        variable A_next    : signed(33 downto 0);
         variable abs_dividend_v : unsigned(31 downto 0);
         variable abs_divisor_v  : unsigned(31 downto 0);
     begin
@@ -188,7 +190,7 @@ begin
                                 -- Initialize datapath
                                 A     <= (others => '0');
                                 Q     <= abs_dividend_v;
-                                M     <= signed('0' & std_logic_vector(abs_divisor_v));
+                                M     <= signed("00" & std_logic_vector(abs_divisor_v));
                                 count <= (others => '0');
                                 state <= S_COMPUTE;
                             end if;
@@ -216,7 +218,7 @@ begin
                     -----------------------------------------------------------
                     when S_COMPUTE =>
                         -- Step 1: Left shift {A, Q} by 1
-                        A_shifted := A(31 downto 0) & Q(31);
+                        A_shifted := A(32 downto 0) & Q(31);
 
                         -- Step 2: A = A +/- M based on sign of shifted A
                         if A_shifted >= 0 then
