@@ -43,8 +43,8 @@ sources:
   - M/divu.vhd
   - M/multdiv.vhd
   - common/pc_fetch.vhd
-  - common/reg_IF_ID.vhd
-  - common/reg_ID_EX.vhd
-  - common/reg_EX_MEM.vhd
-  - common/reg_MEM_WB.vhd
+  - common/reg_if_id.vhd
+  - common/reg_id_ex.vhd
+  - common/reg_ex_mem.vhd
+  - common/reg_mem_wb.vhd
   - cores/rv32im_pipeline_core.vhd

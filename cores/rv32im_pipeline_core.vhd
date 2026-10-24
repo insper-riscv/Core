@@ -45,7 +45,7 @@ entity rv32im_pipeline_core is
   generic (
     -- rv32im (true): instancia a unidade M. rv32i (false): sem a unidade M
     -- (os arquivos de M/ nao precisam existir); uma instrucao M vira NOP.
-    HAS_M : boolean := true;
+    HAS_M : boolean := false;
     -- Zicsr: instancia o banco de CSRs do modo maquina; sem ele (false) as
     -- instrucoes CSR sao NOP, como qualquer opcode desconhecido.
     HAS_ZICSR : boolean := false;
@@ -608,20 +608,20 @@ begin
   -- =========================================================================
   -- Registrador IF/ID
   -- =========================================================================
-  u_reg_if_id : entity work.reg_IF_ID
+  u_reg_if_id : entity work.reg_if_id
     port map (
-      clk           => clk,
-      reset         => reset,
-      ifid_write_en => ifid_write_en,
-      flush         => flush_if_id,
-      in_pc         => if_pc,
-      in_pc4        => if_pc4,
-      in_instr      => if_instr_mux,
-      in_ok         => not if_wait,
-      ifid_valid    => ifid_valid,
-      ifid_pc       => ifid_pc,
-      ifid_pc4      => ifid_pc4,
-      ifid_instr    => ifid_instr
+      i_clk   => clk,
+      i_rst   => reset,
+      i_en    => ifid_write_en,
+      i_flush => flush_if_id,
+      i_valid => not if_wait,
+      i_pc    => if_pc,
+      i_pc4   => if_pc4,
+      i_inst  => if_instr_mux,
+      o_valid => ifid_valid,
+      o_pc    => ifid_pc,
+      o_pc4   => ifid_pc4,
+      o_inst  => ifid_instr
     );
 
   -- =========================================================================
@@ -749,59 +749,56 @@ begin
   -- =========================================================================
   -- Registrador ID/EX
   -- =========================================================================
-  u_reg_id_ex : entity work.reg_ID_EX
+  u_reg_id_ex : entity work.reg_id_ex
     port map (
-      clk    => clk,
-      reset  => reset,
-      en     => pipe_run,
-      flush  => flush_id_ex,
-
-      in_valid   => idex_in_valid,
-      in_pc      => ifid_pc,
-      in_pc4     => ifid_pc4,
-      in_rs1_idx => id_rs1_idx,
-      in_rs2_idx => id_rs2_idx,
-      in_rd_idx  => id_rd_idx,
-      in_rs1_val => id_rs1_val,
-      in_rs2_val => id_rs2_val,
-      in_imm     => id_imm,
-
-      in_selMuxPc4ALU    => cu_selMuxPc4ALU,
-      in_selMuxALUPc4RAM => cu_selMuxALUPc4RAM,
-      in_weReg           => bm_weReg,
-      in_opExRAM         => cu_opExRAM,
-      in_selMuxRS2Imm    => cu_selMuxRS2Imm,
-      in_selPCRS1        => cu_selPCRS1,
-      in_opALU           => cu_opALU,
-      in_isMulDiv        => cu_isMulDiv,
-      in_weRAM           => bm_weRAM,
-      in_reRAM           => bm_reRAM,
-      in_eRAM            => bm_eRAM,
-      in_opCode          => cu_opCode,
-      in_funct3          => cu_funct3,
-
-      idex_valid           => ex_valid,
-      idex_pc              => ex_pc,
-      idex_pc4             => ex_pc4,
-      idex_rs1_idx         => ex_rs1_idx,
-      idex_rs2_idx         => ex_rs2_idx,
-      idex_rd_idx          => ex_rd_idx,
-      idex_rs1_val         => ex_rs1_val,
-      idex_rs2_val         => ex_rs2_val,
-      idex_imm             => ex_imm,
-      idex_selMuxPc4ALU    => ex_selMuxPc4ALU,
-      idex_selMuxALUPc4RAM => ex_selMuxALUPc4RAM,
-      idex_weReg           => ex_weReg,
-      idex_opExRAM         => ex_opExRAM,
-      idex_selMuxRS2Imm    => ex_selMuxRS2Imm,
-      idex_selPCRS1        => ex_selPCRS1,
-      idex_opALU           => ex_opALU,
-      idex_isMulDiv        => ex_isMulDiv,
-      idex_weRAM           => ex_weRAM,
-      idex_reRAM           => ex_reRAM,
-      idex_eRAM            => ex_eRAM,
-      idex_opCode          => ex_opCode,
-      idex_funct3          => ex_funct3
+      i_clk         => clk,
+      i_rst         => reset,
+      i_en          => pipe_run,
+      i_flush       => flush_id_ex,
+      i_valid       => idex_in_valid,
+      i_pc          => ifid_pc,
+      i_pc4         => ifid_pc4,
+      i_rs1         => id_rs1_idx,
+      i_rs2         => id_rs2_idx,
+      i_rd          => id_rd_idx,
+      i_rs1_val     => id_rs1_val,
+      i_rs2_val     => id_rs2_val,
+      i_imm         => id_imm,
+      i_sel_pc4_alu => cu_selMuxPc4ALU,
+      i_wb_sel      => cu_selMuxALUPc4RAM,
+      i_we_reg      => bm_weReg,
+      i_ext_ram_op  => cu_opExRAM,
+      i_sel_rs2_imm => cu_selMuxRS2Imm,
+      i_sel_pc_rs1  => cu_selPCRS1,
+      i_alu_op      => cu_opALU,
+      i_is_muldiv   => cu_isMulDiv,
+      i_we_ram      => bm_weRAM,
+      i_re_ram      => bm_reRAM,
+      i_en_ram      => bm_eRAM,
+      i_opcode      => cu_opCode,
+      i_funct3      => cu_funct3,
+      o_valid       => ex_valid,
+      o_pc          => ex_pc,
+      o_pc4         => ex_pc4,
+      o_rs1         => ex_rs1_idx,
+      o_rs2         => ex_rs2_idx,
+      o_rd          => ex_rd_idx,
+      o_rs1_val     => ex_rs1_val,
+      o_rs2_val     => ex_rs2_val,
+      o_imm         => ex_imm,
+      o_sel_pc4_alu => ex_selMuxPc4ALU,
+      o_wb_sel      => ex_selMuxALUPc4RAM,
+      o_we_reg      => ex_weReg,
+      o_ext_ram_op  => ex_opExRAM,
+      o_sel_rs2_imm => ex_selMuxRS2Imm,
+      o_sel_pc_rs1  => ex_selPCRS1,
+      o_alu_op      => ex_opALU,
+      o_is_muldiv   => ex_isMulDiv,
+      o_we_ram      => ex_weRAM,
+      o_re_ram      => ex_reRAM,
+      o_en_ram      => ex_eRAM,
+      o_opcode      => ex_opCode,
+      o_funct3      => ex_funct3
     );
 
   -- =========================================================================
@@ -1037,40 +1034,38 @@ begin
   -- =========================================================================
   -- Registrador EX/MEM
   -- =========================================================================
-  u_reg_ex_mem : entity work.reg_EX_MEM
+  u_reg_ex_mem : entity work.reg_ex_mem
     port map (
-      clk   => clk,
-      reset => reset,
-      en    => base_run,
+      i_clk        => clk,
+      i_rst        => reset,
+      i_en         => base_run,
       -- A instrucao que gera a excecao vira bolha: nao escreve registrador nem memoria. Com a
       -- FENCE.I esperando o flush, EX/MEM recebe bolhas (so' quando a instrucao de MEM anda).
-      flush => trap_take or (fencei_busy and base_run),
-
-      in_valid           => ex_valid,
-      in_pc4             => ex_pc4,
-      in_alu_out         => ex_final_result,
-      in_store_data      => ex_store_data,
-      in_byteena         => ex_store_byteena,
-      in_rd_idx          => ex_rd_idx,
-      in_weReg           => ex_weReg,
-      in_weRAM           => ex_weRAM,
-      in_reRAM           => ex_reRAM,
-      in_eRAM            => ex_eRAM,
-      in_opExRAM         => ex_opExRAM,
-      in_selMuxALUPc4RAM => ex_selMuxALUPc4RAM,
-
-      exmem_valid           => exmem_valid,
-      exmem_pc4             => exmem_pc4,
-      exmem_alu_out         => exmem_alu_out,
-      exmem_store_data      => exmem_store_data,
-      exmem_byteena         => exmem_byteena,
-      exmem_rd_idx          => exmem_rd_idx,
-      exmem_weReg           => exmem_weReg,
-      exmem_weRAM           => exmem_weRAM,
-      exmem_reRAM           => exmem_reRAM,
-      exmem_eRAM            => exmem_eRAM,
-      exmem_opExRAM         => exmem_opExRAM,
-      exmem_selMuxALUPc4RAM => exmem_selMuxALUPc4RAM
+      i_flush      => trap_take or (fencei_busy and base_run),
+      i_valid      => ex_valid,
+      i_pc4        => ex_pc4,
+      i_alu_out    => ex_final_result,
+      i_store_data => ex_store_data,
+      i_byte_mask  => ex_store_byteena,
+      i_rd         => ex_rd_idx,
+      i_we_reg     => ex_weReg,
+      i_we_ram     => ex_weRAM,
+      i_re_ram     => ex_reRAM,
+      i_en_ram     => ex_eRAM,
+      i_ext_ram_op => ex_opExRAM,
+      i_wb_sel     => ex_selMuxALUPc4RAM,
+      o_valid      => exmem_valid,
+      o_pc4        => exmem_pc4,
+      o_alu_out    => exmem_alu_out,
+      o_store_data => exmem_store_data,
+      o_byte_mask  => exmem_byteena,
+      o_rd         => exmem_rd_idx,
+      o_we_reg     => exmem_weReg,
+      o_we_ram     => exmem_weRAM,
+      o_re_ram     => exmem_reRAM,
+      o_en_ram     => exmem_eRAM,
+      o_ext_ram_op => exmem_opExRAM,
+      o_wb_sel     => exmem_selMuxALUPc4RAM
     );
 
   -- =========================================================================
@@ -1126,28 +1121,26 @@ begin
   -- NAO captura ram_rdata: a RAM e registrada e o dado chega naturalmente
   -- no ciclo WB atraves de ram_rdata.
   -- =========================================================================
-  u_reg_mem_wb : entity work.reg_MEM_WB
+  u_reg_mem_wb : entity work.reg_mem_wb
     port map (
-      clk   => clk,
-      reset => reset,
-      en    => base_run,
-      flush => '0',
-
-      in_valid           => exmem_valid,
-      in_pc4             => exmem_pc4,
-      in_alu_out         => exmem_alu_out,
-      in_rd_idx          => exmem_rd_idx,
-      in_weReg           => exmem_weReg,
-      in_opExRAM         => exmem_opExRAM,
-      in_selMuxALUPc4RAM => exmem_selMuxALUPc4RAM,
-
-      memwb_valid           => memwb_valid,
-      memwb_pc4             => memwb_pc4,
-      memwb_alu_out         => memwb_alu_out,
-      memwb_rd_idx          => memwb_rd_idx,
-      memwb_weReg           => memwb_weReg,
-      memwb_opExRAM         => memwb_opExRAM,
-      memwb_selMuxALUPc4RAM => memwb_selMuxALUPc4RAM
+      i_clk        => clk,
+      i_rst        => reset,
+      i_en         => base_run,
+      i_flush      => '0',
+      i_valid      => exmem_valid,
+      i_pc4        => exmem_pc4,
+      i_alu_out    => exmem_alu_out,
+      i_rd         => exmem_rd_idx,
+      i_we_reg     => exmem_weReg,
+      i_ext_ram_op => exmem_opExRAM,
+      i_wb_sel     => exmem_selMuxALUPc4RAM,
+      o_valid      => memwb_valid,
+      o_pc4        => memwb_pc4,
+      o_alu_out    => memwb_alu_out,
+      o_rd         => memwb_rd_idx,
+      o_we_reg     => memwb_weReg,
+      o_ext_ram_op => memwb_opExRAM,
+      o_wb_sel     => memwb_selMuxALUPc4RAM
     );
 
   -- =========================================================================
