@@ -548,17 +548,17 @@ begin
   -- =========================================================================
   u_pc_fetch : entity work.pc_fetch
     port map (
-      clk            => clk,
-      reset          => reset,
-      if_pc_write_en => pc_write_en,
-      pc_src         => pc_src,
-      branch_target  => ex_branch_target,
-      jalr_target    => ex_jalr_target,
-      redirect_pc    => redirect_pc,
-      pc_out         => if_pc,
-      pc4_out        => if_pc4,
-      rom_addr       => if_addr,
-      rom_rden       => if_rden
+      i_clk           => clk,
+      i_rst           => reset,
+      i_pc_we         => pc_write_en,
+      i_pc_src        => pc_src,
+      i_branch_target => ex_branch_target,
+      i_jalr_target   => ex_jalr_target,
+      i_redirect_pc   => redirect_pc,
+      o_pc            => if_pc,
+      o_pc4           => if_pc4,
+      o_rom_addr      => if_addr,
+      o_rom_re        => if_rden
     );
 
   -- BOOT_ROM x FLASH: decode + mux (ver comentario junto do sinal, acima).
@@ -718,16 +718,16 @@ begin
   -- =========================================================================
   u_hdu : entity work.hazard_detection_unit
     port map (
-      ifid_valid     => ifid_valid,
-      ifid_rs1       => ifid_rs1,
-      ifid_rs2       => ifid_rs2,
-      ifid_opcode    => ifid_instr(6 downto 0),
-      idex_rd        => ex_rd_idx,
-      idex_reRAM     => ex_reRAM,
-      muldiv_busy    => pipe_stall,
-      if_pc_write_en => if_pc_write_en,
-      ifid_write_en  => ifid_write_en,
-      id_bubble_sel  => id_bubble_sel
+      i_ifid_valid  => ifid_valid,
+      i_ifid_rs1    => ifid_rs1,
+      i_ifid_rs2    => ifid_rs2,
+      i_ifid_opcode => ifid_instr(6 downto 0),
+      i_idex_rd     => ex_rd_idx,
+      i_idex_re_ram => ex_reRAM,
+      i_muldiv_busy => pipe_stall,
+      o_pc_we       => if_pc_write_en,
+      o_ifid_we     => ifid_write_en,
+      o_bubble_sel  => id_bubble_sel
     );
 
   -- =========================================================================

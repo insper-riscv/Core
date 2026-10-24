@@ -35,6 +35,9 @@ package pipeline_types is
 
   -- Seletor de fonte para escrita no estágio WB (2 bits).
   subtype wb_sel_t     is std_logic_vector(1 downto 0);
+
+  -- Seletor de fonte do próximo valor de PC no estágio IF (2 bits).
+  subtype pc_src_t     is std_logic_vector(1 downto 0);
   
   -- Máscara de habilitação de escrita por byte (4 bits).
   subtype byte_mask_t  is std_logic_vector(3 downto 0);

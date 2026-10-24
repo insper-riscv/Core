@@ -14,6 +14,7 @@ sources:
   - common/ext_imm_consts.vhd
   - common/ext_ram_consts.vhd
   - common/wb_sel_consts.vhd
+  - common/pc_src_consts.vhd
   - common/generic_register.vhd
   - common/adder.vhd
   - common/adder_u.vhd
@@ -26,7 +27,6 @@ sources:
   - common/mux_tree.vhd
   - common/tristate_mux.vhd
   - common/reg_file.vhd
-  - common/InstructionDecoder.vhd
   - I/ExtenderImm.vhd
   - I/ExtenderRAM.vhd
   - I/StoreManager.vhd
