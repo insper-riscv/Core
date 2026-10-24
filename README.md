@@ -2,7 +2,7 @@
 
 🌐 [Português](README.md) · [English](README.en.md)
 
-Processador RISC-V RV32 em VHDL-2008 organizado como um pipeline em ordem de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (`I`, `M`, `Zicsr` e `Zifencei`) sob a entidade de topo (`cpu`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
+Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (`I`, `M`, `Zicsr` e `Zifencei`) sob a entidade de topo (`cpu`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
 
 ## 1. Documentação
 
