@@ -41,10 +41,16 @@ def program(fence):
     ]
 
 
-async def run(dut, fence, latency=2):
+async def run(dut, fence, latency=2, flush_latency=None):
+    """Run the program. With flush_latency the data cache is write-back: a store stays dirty in
+    the cache and reaches the backing memory only when the core asks for a flush and the model
+    answers dc_done flush_latency cycles later."""
     boot = {4 * i: w for i, w in enumerate(BOOT)}
     backing = {CODE_BASE + 4 * i: w for i, w in enumerate(program(fence))}
     lines = {}                                # the cache: line address -> four words
+    dirty = {}                                # stores that the data cache holds (write-back)
+    flush_countdown = None
+    flushes = 0
     ram = {}
     inval_pulses = 0
 
@@ -53,6 +59,7 @@ async def run(dut, fence, latency=2):
         getattr(dut, sig).value = 0
     dut.ic_ready.value = 0
     dut.sdram_ready.value = 1
+    dut.dc_done.value = 0
     cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
     for _ in range(3):
         await RisingEdge(dut.clk)
@@ -70,10 +77,6 @@ async def run(dut, fence, latency=2):
         word = boot.get(addr, 0)
         dut.boot_rom_data.value = word
         dut.flash_data.value = word
-
-        if int(dut.ic_inval.value):
-            lines.clear()
-            inval_pulses += 1
 
         if int(dut.ic_sel.value) == 1:
             line = addr & ~0xF
@@ -94,9 +97,29 @@ async def run(dut, fence, latency=2):
             last_addr = None
             dut.ic_ready.value = 1
 
-        if int(dut.sdram_wren.value):
+        dut.dc_done.value = 0
+        if flush_latency is not None:
+            if int(dut.dc_flush.value):
+                flushes += 1
+                flush_countdown = flush_latency
+            elif flush_countdown is not None:
+                if flush_countdown == 0:
+                    backing.update(dirty)
+                    dirty.clear()
+                    dut.dc_done.value = 1
+                    flush_countdown = None
+                else:
+                    flush_countdown -= 1
+        await Timer(1, unit="ns")            # the answer of the data cache reaches the core
+        if int(dut.ic_inval.value):
+            lines.clear()
+            inval_pulses += 1
+
+        if int(dut.sdram_wren.value) and int(dut.mem_advance.value):
             a = int(dut.sdram_addr.value) & ~3
-            backing[a] = _bytes_merge(backing.get(a, 0), int(dut.sdram_wdata.value), int(dut.sdram_byteena.value))
+            target = dirty if flush_latency is not None else backing
+            base = target.get(a, backing.get(a, 0))
+            target[a] = _bytes_merge(base, int(dut.sdram_wdata.value), int(dut.sdram_byteena.value))
         if int(dut.ram_en.value) and int(dut.ram_rden.value):
             read_pending = ram.get(int(dut.ram_addr.value) & ~3, 0)
         if int(dut.ram_en.value) and int(dut.ram_wren.value):
@@ -104,12 +127,12 @@ async def run(dut, fence, latency=2):
             ram[a] = _bytes_merge(ram.get(a, 0), int(dut.ram_wdata.value), int(dut.ram_byteena.value))
         if ram.get(0x807C) == 1:
             break
-    return ram, inval_pulses
+    return ram, (inval_pulses, flushes)
 
 
 @cocotb.test()
 async def test_fence_i_makes_the_new_instruction_run(dut):
-    ram, pulses = await run(dut, FENCE_I)
+    ram, (pulses, _) = await run(dut, FENCE_I)
     assert ram.get(0x8004) == 1, "the first run of the target"
     assert ram.get(0x8000) == 2, f"the rewritten instruction did not run: x9 = {ram.get(0x8000)}"
     assert pulses == 1, f"{pulses} invalidate pulses for one FENCE.I"
@@ -118,7 +141,7 @@ async def test_fence_i_makes_the_new_instruction_run(dut):
 @cocotb.test()
 async def test_without_fence_i_the_cache_is_stale(dut):
     """The model catches the missing fence: a NOP in its place leaves the old instruction in the cache."""
-    ram, pulses = await run(dut, NOP)
+    ram, (pulses, _) = await run(dut, NOP)
     assert ram.get(0x8000) == 1
     assert pulses == 0
 

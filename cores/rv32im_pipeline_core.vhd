@@ -48,7 +48,9 @@ entity rv32im_pipeline_core is
     HAS_ZICSR : boolean := false;
     -- Zifencei: FENCE.I invalida a cache de instrucoes (ic_inval) e refaz a busca da
     -- instrucao seguinte; sem ele (false) a instrucao e' um NOP.
-    HAS_ZIFENCEI : boolean := false
+    HAS_ZIFENCEI : boolean := false;
+    -- Zifencei com cache de dados: FENCE.I pede o flush dela (dc_flush) e espera dc_done
+    HAS_DCACHE : boolean := false
   );
   port (
     clk   : in  std_logic;
@@ -124,7 +126,11 @@ entity rv32im_pipeline_core is
     ic_data  : in  std_logic_vector(31 downto 0) := (others => '0');
     ic_ready : in  std_logic := '1';
     ic_sel   : out std_logic;
-    ic_inval : out std_logic
+    ic_inval : out std_logic;
+
+    -- Cache de dados (so' com HAS_DCACHE): dc_flush e' um pulso, dc_done o pulso de fim do flush
+    dc_flush : out std_logic;
+    dc_done  : in  std_logic := '0'
   );
 end entity rv32im_pipeline_core;
 
@@ -144,12 +150,20 @@ architecture rtl of rv32im_pipeline_core is
   end component;
 
   component fencei_unit is
+    generic (
+      HAS_DCACHE : boolean := false
+    );
     port (
-      ex_valid : in  std_logic;
-      run      : in  std_logic;
-      opcode   : in  std_logic_vector(6 downto 0);
-      funct3   : in  std_logic_vector(2 downto 0);
-      take     : out std_logic
+      clk       : in  std_logic;
+      reset     : in  std_logic;
+      ex_valid  : in  std_logic;
+      run       : in  std_logic;
+      opcode    : in  std_logic_vector(6 downto 0);
+      funct3    : in  std_logic_vector(2 downto 0);
+      dc_done   : in  std_logic;
+      flush_req : out std_logic;
+      busy      : out std_logic;
+      take      : out std_logic
     );
   end component;
 
@@ -281,6 +295,8 @@ architecture rtl of rv32im_pipeline_core is
   signal if_wait        : std_logic;
   signal pc_write_en    : std_logic;
   signal fencei_take    : std_logic;  -- FENCE.I em EX, com o pipeline andando
+  signal fencei_busy    : std_logic;  -- FENCE.I espera o flush da cache de dados
+  signal base_run       : std_logic;  -- o pipeline anda, sem contar fencei_busy
 
   -- FLASH x RAM: decodificacao de endereco de dado (estagio MEM/WB) --
   -- ver comentario junto do mux, na secao do estagio MEM. RAM_BASE_BYTES
@@ -505,9 +521,13 @@ begin
   muldiv_stall   <= muldiv_busy or muldiv_done;
   muldiv_stall_n <= not (muldiv_busy or muldiv_done);
 
-  pipe_stall  <= muldiv_stall or sdram_wait;
-  pipe_run    <= not (muldiv_stall or sdram_wait);
-  mem_advance <= not (muldiv_stall or sdram_wait);
+  -- base_run: nada em MEM/EX esta' esperando (muldiv, SDRAM). fencei_busy segura so' o inicio do
+  -- pipeline (PC, IF/ID, ID/EX, a propria FENCE.I em EX): EX/MEM recebe bolhas e MEM/WB continua,
+  -- para a instrucao mais velha que esta' em MEM terminar e a cache de dados poder fazer o flush.
+  base_run    <= not (muldiv_stall or sdram_wait);
+  pipe_stall  <= muldiv_stall or sdram_wait or fencei_busy;
+  pipe_run    <= base_run and (not fencei_busy);
+  mem_advance <= base_run;
 
   idex_in_valid <= ifid_valid and (not id_bubble_sel);
 
@@ -895,15 +915,23 @@ begin
   -- =========================================================================
   gen_fencei : if HAS_ZIFENCEI generate
     u_fencei : fencei_unit
+      generic map (HAS_DCACHE => HAS_DCACHE)
       port map (
-        ex_valid => ex_valid,
-        run      => pipe_run,
-        opcode   => ex_opCode,
-        funct3   => ex_funct3,
-        take     => fencei_take
+        clk       => clk,
+        reset     => reset,
+        ex_valid  => ex_valid,
+        run       => base_run,
+        opcode    => ex_opCode,
+        funct3    => ex_funct3,
+        dc_done   => dc_done,
+        flush_req => dc_flush,
+        busy      => fencei_busy,
+        take      => fencei_take
       );
   else generate
     fencei_take <= '0';
+    fencei_busy <= '0';
+    dc_flush    <= '0';
   end generate gen_fencei;
 
   gen_csr : if HAS_ZICSR generate
@@ -1010,9 +1038,10 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => pipe_run,
-      -- A instrucao que gera a excecao vira bolha: nao escreve registrador nem memoria.
-      flush => trap_take,
+      en    => base_run,
+      -- A instrucao que gera a excecao vira bolha: nao escreve registrador nem memoria. Com a
+      -- FENCE.I esperando o flush, EX/MEM recebe bolhas (so' quando a instrucao de MEM anda).
+      flush => trap_take or (fencei_busy and base_run),
 
       in_valid           => ex_valid,
       in_pc4             => ex_pc4,
@@ -1098,7 +1127,7 @@ begin
     port map (
       clk   => clk,
       reset => reset,
-      en    => pipe_run,
+      en    => base_run,
       flush => '0',
 
       in_valid           => exmem_valid,
