@@ -2,10 +2,12 @@
 
 🌐 [Português](README.md) · [English](README.en.md)
 
-Processador RISC-V RV32 em VHDL-2008 organizado como um pipeline em ordem de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (`I`, `M`, `Zicsr` e `Zifencei`) sob uma única entidade de topo (`cpu`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
+Processador RISC-V RV32 em VHDL-2008 organizado como um pipeline em ordem de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (`I`, `M`, `Zicsr` e `Zifencei`) sob a entidade de topo (`cpu`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
 
 ## 1. Documentação
 
+- [AUTHORS.md](AUTHORS.md): autores com commits no repositório, com nome e conta do GitHub.
+- [CONTRIBUTING.md](CONTRIBUTING.md): regras obrigatórias de contribuição, norma VHDL-2008 (`--std=08`), convenção de nomenclatura, prefixos `i_`/`o_`, cabeçalhos, docstrings e regras de documentação.
 - [README.md](docs/pt-br/README.md): formatos das instruções de 32 bits do RISC-V, tabela de geração de imediatos e progressão incremental do caminho de dados para as 37 instruções da base RV32I.
 - [ARCHITECTURE.md](docs/pt-br/ARCHITECTURE.md): microarquitetura do pipeline de 5 estágios, responsabilidades por estágio, caminhos de forwarding, detecção de hazard load-use, stall, flush e suporte às extensões `M`, `Zicsr` e `Zifencei`.
 - [PIPELINE_ARCHITECTURE_GUIDE.md](docs/pt-br/PIPELINE_ARCHITECTURE_GUIDE.md): referência detalhada dos sinais de interconexão entre os estágios, barreiras síncronas (`IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB`), equações de stall e flush e resolução de desvios.
