@@ -63,8 +63,13 @@ begin
 	is_fencei <= '1' when (i_ex_valid = '1' and i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
 
 	gen_dc : if has_dcache generate
+
 		o_flush_req <= '1' when (is_fencei = '1' and i_run = '1' and waiting = '0') else '0';
-		o_busy      <= '1' when ((is_fencei = '1' and i_run = '1' and waiting = '0') or (waiting = '1' and i_dc_done = '0')) else '0';
+
+		o_busy      <= '1' when ((is_fencei = '1' and i_run = '1' and waiting = '0') or 
+								(waiting = '1' and i_dc_done = '0')) 
+							else '0';
+
 		o_take      <= '1' when (waiting = '1' and i_dc_done = '1' and is_fencei = '1') else '0';
 
 		waiting_nxt <= '1' when (is_fencei = '1' and i_run = '1' and waiting = '0') else
@@ -79,6 +84,7 @@ begin
 				i_clk    => i_clk,
 				i_rst    => i_rst
 			);
+
 	else generate
 		o_flush_req <= '0';
 		o_busy      <= '0';
