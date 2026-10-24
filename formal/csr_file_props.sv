@@ -14,6 +14,8 @@ module props (input clk);
     .i_trap_cause(trap_cause), .i_trap_pc(trap_pc), .i_trap_tval(trap_tval), .i_mret_take(mret_take),
     .o_mtvec(mtvec_o), .o_mepc(mepc_o));
 
+  // The registers have no initial value: the first clock is a reset, as on the board.
+  initial assume (reset);
   always @(*) assume (op[1:0] != 2'b00);
 `ifdef MSTATUS_MODE
   // The read port stays on mstatus, so rdata is the mstatus value of every cycle.
@@ -45,11 +47,16 @@ module props (input clk);
     if (addr == 12'h304 || addr == 12'h344 || addr == 12'h310 ||
         addr == 12'hF11 || addr == 12'hF12 || addr == 12'hF13 || addr == 12'hF14 || addr == 12'hF15)
       assert (rdata == 32'h0);
-    if (addr == 12'h305 || addr == 12'h341) assert (rdata[1:0] == 2'b00);
-    assert (mtvec_o[1:0] == 2'b00 && mepc_o[1:0] == 2'b00);
+    // what the registers hold is defined after the first clock edge, the reset
+    if (f_past) begin
+      if (addr == 12'h305 || addr == 12'h341) assert (rdata[1:0] == 2'b00);
+      assert (mtvec_o[1:0] == 2'b00 && mepc_o[1:0] == 2'b00);
+    end
   end
 
-  always @(posedge clk) if (f_past) begin
+  // The registers clear asynchronously: while reset is high a read gives the reset value,
+  // so the properties about what the registers hold apply to the clocks without reset.
+  always @(posedge clk) if (f_past && !reset) begin
     // 2. Without commit, trap, MRET or reset no CSR changes.
     if (!p_event && addr == p_addr) assert (rdata == p_rdata);
 
