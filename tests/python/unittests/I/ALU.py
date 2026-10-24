@@ -38,13 +38,13 @@ def to_signed(val, width=32):
 
 
 async def apply_and_check(dut, op_name, a, b, expected_data, expected_branch):
-    dut.op.value = int(OPCODES[op_name], 2)
-    dut.dA.value = to_bits(a)
-    dut.dB.value = to_bits(b)
+    dut.i_op.value = int(OPCODES[op_name], 2)
+    dut.i_a.value = to_bits(a)
+    dut.i_b.value = to_bits(b)
     await Timer(1, units="ns")
 
-    got_data = int(dut.dataOut.value)
-    got_branch = int(dut.branch.value)
+    got_data = int(dut.o_d.value)
+    got_branch = int(dut.o_branch.value)
 
     assert got_data == to_bits(expected_data), (
         f"{op_name}: dA={a}, dB={b}, "

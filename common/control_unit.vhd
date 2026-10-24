@@ -1,452 +1,301 @@
 -- =============================================================================
--- control_unit.vhd
--- Control Unit do pipeline RV32IM 5 estagios
+-- Unidade de Controle principal do pipeline RV32IM de 5 estágios
 --
--- SUBSTITUI completamente o InstructionDecoder.vhd.
--- O InstructionDecoder pode ser REMOVIDO do projeto.
+-- Decodifica combinacionalmente a instrução de 32 bits (i_inst) vinda do
+-- registrador de estágio IF/ID utilizando aliases para os campos opcode,
+-- funct3 e funct7 e as constantes semânticas da arquitetura.
 --
--- Diferencas em relacao ao InstructionDecoder:
---   1. Entrada e a instrucao completa de 32 bits (instruction),
---      nao tres campos separados. Os campos opcode/funct3/funct7
---      sao extraidos internamente.
---   2. Expoe opCode e funct3_out explicitamente nas portas de saida,
---      necessarios para a Hazard Detection Unit e para propagar
---      pelo registrador ID/EX ate o StoreManager no estagio MEM.
---   3. Expoe funct3_out tambem para o multdiv (operacao M).
---   4. Mantém TODOS os sinais de saida do InstructionDecoder com
---      os MESMOS nomes, para compatibilidade com o core existente:
---        selMuxPc4ALU, opExImm, selMuxALUPc4RAM, weReg, opExRAM,
---        selMuxRS2Imm, selPCRS1, opALU, weRAM, reRAM, eRAM
---
--- Uso no top-level do pipeline (substituicao direta):
---   -- Antes (core multi-cycle):
---   InstructionDecoder port map(
---       opcode => ROM_out(6 downto 0),
---       funct3 => ROM_out(14 downto 12),
---       funct7 => ROM_out(31 downto 25), ...);
---
---   -- Depois (pipeline):
---   ControlUnit : entity work.control_unit
---       port map(
---           instruction => ifid_instr,   -- saida do reg_IF_ID
---           selMuxPc4ALU => ...,
---           opCode       => idex_opcode, -- NOVO: para HDU e StoreManager
---           funct3_out   => idex_funct3, -- NOVO: para multdiv e StoreManager
---           ...);
+-- Instruções fora do conjunto base RV32I (como a extensão M com funct7 =
+-- FUNCT7_MULDIV ou instruções CSR/Zifencei) produzem um NOP sem efeitos
+-- colaterais nesta unidade, sendo reivindicadas pelos seus decodificadores
+-- dedicados (m_decode, csr_decode, fencei_unit) no topo do pipeline.
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-use work.rv32i_ctrl_consts.all;
+use work.pipeline_types.all;
+use work.opcode_consts.all;
+use work.funct3_consts.all;
+use work.funct7_consts.all;
+use work.alu_consts.all;
+use work.ext_imm_consts.all;
+use work.ext_ram_consts.all;
+use work.wb_sel_consts.all;
 
 entity control_unit is
-  port (
-    -- Instrucao completa vinda do reg_IF_ID
-    instruction     : in  std_logic_vector(31 downto 0);
 
-    -- -------------------------------------------------------------------------
-    -- Saidas identicas ao InstructionDecoder (mesmos nomes, mesma semantica)
-    -- -------------------------------------------------------------------------
-    selMuxPc4ALU    : out std_logic;
-    opExImm         : out std_logic_vector(2 downto 0);
-    selMuxALUPc4RAM : out std_logic_vector(1 downto 0);
-    weReg           : out std_logic;
-    opExRAM         : out std_logic_vector(2 downto 0);
-    selMuxRS2Imm    : out std_logic;
-    selPCRS1        : out std_logic;
-    opALU           : out std_logic_vector(4 downto 0);
-    weRAM           : out std_logic;
-    reRAM           : out std_logic;
-    eRAM            : out std_logic;
+	port (
+		-- Instrução completa de 32 bits vinda do registrador de pipeline IF/ID.
+		i_inst        : in  word_t;
+		-- Indica salto incondicional (JAL / JALR) para a lógica de desvio no estágio EX.
+		o_sel_pc4_alu : out std_logic;
+		-- Seletor do formato de imediato para o extensor de imediato (ext_imm_op_t).
+		o_ext_imm_op  : out ext_imm_op_t;
+		-- Seletor da fonte de escrita no estágio WB (ALU, PC+4, RAM ou CSR).
+		o_wb_sel      : out wb_sel_t;
+		-- Habilita a escrita no banco de registradores no estágio WB.
+		o_we_reg      : out std_logic;
+		-- Seletor do modo de extensão de leitura da memória de dados (LW, LH, LHU, LB, LBU).
+		o_ext_ram_op  : out ext_ram_op_t;
+		-- Seleciona o operando B da ULA ('0' = rs2, '1' = imediato estendido).
+		o_sel_rs2_imm : out std_logic;
+		-- Seleciona o operando A da ULA ('0' = PC, '1' = rs1).
+		o_sel_pc_rs1  : out std_logic;
+		-- Código de operação de 5 bits da ULA.
+		o_alu_op      : out alu_op_t;
+		-- Habilita a escrita na memória de dados no estágio MEM.
+		o_we_ram      : out std_logic;
+		-- Habilita a leitura da memória de dados no estágio MEM.
+		o_re_ram      : out std_logic;
+		-- Habilita o acesso à memória de dados no estágio MEM.
+		o_en_ram      : out std_logic;
+		-- Campo opcode extraído da instrução (bits [6:0]) para a HDU e estágios seguintes.
+		o_opcode      : out opcode_t;
+		-- Campo funct3 extraído da instrução (bits [14:12]) para multdiv e StoreManager.
+		o_funct3      : out funct3_t
+	);
 
-    -- -------------------------------------------------------------------------
-    -- Saidas NOVAS para o pipeline
-    -- -------------------------------------------------------------------------
-    -- opCode: necessario para a Hazard Detection Unit detectar loads ("0000011")
-    --         e para propagar pelo ID/EX ate o StoreManager no estagio MEM.
-    opCode          : out std_logic_vector(6 downto 0);
-
-    -- funct3_out: necessario para o multdiv (operacao M) e para o StoreManager
-    --             (LB/LH/LW/SB/SH/SW). Propagado pelo ID/EX.
-    funct3_out      : out std_logic_vector(2 downto 0)
-  );
 end entity control_unit;
 
-architecture behaviour of control_unit is
+architecture rtl of control_unit is
 
-  -- Campos extraidos da instrucao (combinacional, sem registrador)
-  signal opcode_i : std_logic_vector(6 downto 0);
-  signal funct3_i : std_logic_vector(2 downto 0);
-  signal funct7_i : std_logic_vector(6 downto 0);
+	-- Campo opcode da instrução (bits [6:0]).
+	alias opcode : opcode_t is i_inst(6 downto 0);
+	-- Campo funct3 da instrução (bits [14:12]).
+	alias funct3 : funct3_t is i_inst(14 downto 12);
+	-- Campo funct7 da instrução (bits [31:25]).
+	alias funct7 : funct7_t is i_inst(31 downto 25);
 
 begin
 
-  -- -------------------------------------------------------------------------
-  -- Extracao dos campos da instrucao (combinacional)
-  -- -------------------------------------------------------------------------
-  opcode_i <= instruction(6  downto 0);
-  funct3_i <= instruction(14 downto 12);
-  funct7_i <= instruction(31 downto 25);
+	-- Repassa diretamente os campos extraídos por alias para as saídas do pipeline.
+	o_opcode <= opcode;
+	o_funct3 <= funct3;
 
-  -- Repassa os campos extraidos para as saidas do pipeline
-  opCode     <= opcode_i;
-  funct3_out <= funct3_i;
+	-- ===========================================================================
+	-- Decodificação combinacional das instruções RV32I base
+	-- ===========================================================================
+	process(i_inst)
+	begin
+		-- Valores padrão seguros (NOP sem escrita em registrador nem acesso à memória).
+		o_sel_pc4_alu <= '0';
+		o_ext_imm_op  <= EXT_IMM_U;
+		o_wb_sel      <= WB_SEL_ALU;
+		o_we_reg      <= '0';
+		o_ext_ram_op  <= EXT_RAM_LW;
+		o_sel_rs2_imm <= '0';
+		o_sel_pc_rs1  <= '0';
+		o_alu_op      <= ALU_PASS_B;
+		o_we_ram      <= '0';
+		o_re_ram      <= '0';
+		o_en_ram      <= '0';
 
-  -- -------------------------------------------------------------------------
-  -- Decodificador principal
-  -- Logica identica ao InstructionDecoder.vhd original.
-  -- -------------------------------------------------------------------------
-  process(opcode_i, funct3_i, funct7_i)
-  begin
-    -- Defaults (mesmos do InstructionDecoder)
-    selMuxPc4ALU    <= '0';
-    opExImm         <= (others => '0');
-    selMuxALUPc4RAM <= (others => '0');
-    weReg           <= '0';
-    opExRAM         <= (others => '0');
-    selMuxRS2Imm    <= '0';
-    selPCRS1        <= '0';
-    opALU           <= (others => '0');
-    weRAM           <= '0';
-    reRAM           <= '0';
-    eRAM            <= '0';
+		case opcode is
 
-    case opcode_i is
+			-- -----------------------------------------------------------------------
+			-- Instruções aritméticas/lógicas com imediato e shifts (I-type ALU)
+			-- -----------------------------------------------------------------------
+			when OPCODE_OP_IMM =>
+				case funct3 is
+					when FUNCT3_SLLI =>
+						if funct7 = FUNCT7_SLLI then
+							o_ext_imm_op  <= EXT_IMM_I_SHAMT;
+							o_we_reg      <= '1';
+							o_sel_rs2_imm <= '1';
+							o_sel_pc_rs1  <= '1';
+							o_alu_op      <= ALU_SLL;
+						end if;
 
-      -- -----------------------------------------------------------------------
-      -- I-type ALU (imediatos e shifts)
-      -- -----------------------------------------------------------------------
-      when "0010011" =>
-        case funct3_i is
-          when "001" =>   -- SLLI
-            if funct7_i = "0000000" then
-              selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
-              selMuxALUPc4RAM <= "00";
-              weReg           <= '1';
-              opExRAM         <= "000";
-              selMuxRS2Imm    <= '1';
-              selPCRS1        <= '1';
-              opALU           <= OPALU_SLL;
-              weRAM           <= '0';
-              reRAM           <= '0';
-              eRAM            <= '0';
-            end if;
+					when FUNCT3_SRLI_SRAI =>
+						if funct7 = FUNCT7_SRLI then
+							o_ext_imm_op  <= EXT_IMM_I_SHAMT;
+							o_we_reg      <= '1';
+							o_sel_rs2_imm <= '1';
+							o_sel_pc_rs1  <= '1';
+							o_alu_op      <= ALU_SRL;
+						elsif funct7 = FUNCT7_SRAI then
+							o_ext_imm_op  <= EXT_IMM_I_SHAMT;
+							o_we_reg      <= '1';
+							o_sel_rs2_imm <= '1';
+							o_sel_pc_rs1  <= '1';
+							o_alu_op      <= ALU_SRA;
+						end if;
 
-          when "101" =>   -- SRLI / SRAI
-            if funct7_i = "0000000" then
-              selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
-              selMuxALUPc4RAM <= "00";
-              weReg           <= '1';
-              opExRAM         <= "000";
-              selMuxRS2Imm    <= '1';
-              selPCRS1        <= '1';
-              opALU           <= OPALU_SRL;
-              weRAM           <= '0';
-              reRAM           <= '0';
-              eRAM            <= '0';
-            elsif funct7_i = "0100000" then
-              selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
-              selMuxALUPc4RAM <= "00";
-              weReg           <= '1';
-              opExRAM         <= "000";
-              selMuxRS2Imm    <= '1';
-              selPCRS1        <= '1';
-              opALU           <= OPALU_SRA;
-              weRAM           <= '0';
-              reRAM           <= '0';
-              eRAM            <= '0';
-            end if;
+					when FUNCT3_ADDI =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_ADD;
 
-          when "000" =>   -- ADDI
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_ADD;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when FUNCT3_XORI =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_XOR;
 
-          when "100" =>   -- XORI
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_XOR;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when FUNCT3_ORI =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_OR;
 
-          when "110" =>   -- ORI
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_OR;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when FUNCT3_ANDI =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_AND;
 
-          when "111" =>   -- ANDI
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_AND;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when FUNCT3_SLTI =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_SLT;
 
-          when "010" =>   -- SLTI
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_SLT;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when FUNCT3_SLTIU =>
+						o_ext_imm_op  <= EXT_IMM_I;
+						o_we_reg      <= '1';
+						o_sel_rs2_imm <= '1';
+						o_sel_pc_rs1  <= '1';
+						o_alu_op      <= ALU_SLTU;
 
-          when "011" =>   -- SLTIU
-            selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
-            selMuxALUPc4RAM <= "00";
-            weReg           <= '1';
-            opExRAM         <= "000";
-            selMuxRS2Imm    <= '1';
-            selPCRS1        <= '1';
-            opALU           <= OPALU_SLTU;
-            weRAM           <= '0';
-            reRAM           <= '0';
-            eRAM            <= '0';
+					when others =>
+						null;
+				end case;
 
-          when others => null;
-        end case;
+			-- -----------------------------------------------------------------------
+			-- Instruções registrador-registrador do RV32I base (R-type)
+			-- -----------------------------------------------------------------------
+			when OPCODE_OP =>
+				if funct7 = FUNCT7_DEFAULT or funct7 = FUNCT7_ALT then
+					o_we_reg     <= '1';
+					o_sel_pc_rs1 <= '1';
 
-      -- -----------------------------------------------------------------------
-      -- R-type do RV32I
-      -- -----------------------------------------------------------------------
-      when "0110011" =>
-        if funct7_i /= "0000000" and funct7_i /= "0100000" then
-          -- funct7 que a base nao define: NOP. Uma extensao que o perfil tem
-          -- reivindica a instrucao no seu proprio decodificador (M/m_decode);
-          -- sem ela, a instrucao passa sem efeito (docs/contracts/01, 1.5).
-          null;
+					case funct3 is
+						when FUNCT3_ADD_SUB =>
+							if funct7 = FUNCT7_SUB then
+								o_alu_op <= ALU_SUB;
+							else
+								o_alu_op <= ALU_ADD;
+							end if;
 
-        else
-          -- RV32I R-type normal
-          case funct3_i is
-            when "000" =>
-              if funct7_i = "0000000" then
-                opALU <= OPALU_ADD;
-              elsif funct7_i = "0100000" then
-                opALU <= OPALU_SUB;
-              end if;
-              selMuxPc4ALU    <= '0';
-              opExImm         <= (others => '0');
-              selMuxALUPc4RAM <= "00";
-              weReg           <= '1';
-              opExRAM         <= "000";
-              selMuxRS2Imm    <= '0';
-              selPCRS1        <= '1';
-              weRAM           <= '0';
-              reRAM           <= '0';
-              eRAM            <= '0';
+						when FUNCT3_SLL  => o_alu_op <= ALU_SLL;
+						when FUNCT3_SLT  => o_alu_op <= ALU_SLT;
+						when FUNCT3_SLTU => o_alu_op <= ALU_SLTU;
+						when FUNCT3_XOR  => o_alu_op <= ALU_XOR;
 
-            when "100" =>
-              opALU    <= OPALU_XOR;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+						when FUNCT3_SRL_SRA =>
+							if funct7 = FUNCT7_SRA then
+								o_alu_op <= ALU_SRA;
+							else
+								o_alu_op <= ALU_SRL;
+							end if;
 
-            when "110" =>
-              opALU    <= OPALU_OR;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+						when FUNCT3_OR   => o_alu_op <= ALU_OR;
+						when FUNCT3_AND  => o_alu_op <= ALU_AND;
+						when others      => null;
+					end case;
+				end if;
 
-            when "111" =>
-              opALU    <= OPALU_AND;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+			-- -----------------------------------------------------------------------
+			-- Desvios condicionais (B-type)
+			-- -----------------------------------------------------------------------
+			when OPCODE_BRANCH =>
+				o_ext_imm_op <= EXT_IMM_B;
+				o_sel_pc_rs1 <= '1';
 
-            when "001" =>
-              opALU    <= OPALU_SLL;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+				case funct3 is
+					when FUNCT3_BEQ  => o_alu_op <= ALU_BEQ;
+					when FUNCT3_BNE  => o_alu_op <= ALU_BNE;
+					when FUNCT3_BLT  => o_alu_op <= ALU_BLT;
+					when FUNCT3_BGE  => o_alu_op <= ALU_BGE;
+					when FUNCT3_BLTU => o_alu_op <= ALU_BLTU;
+					when FUNCT3_BGEU => o_alu_op <= ALU_BGEU;
+					when others      => o_alu_op <= ALU_PASS_B;
+				end case;
 
-            when "101" =>
-              if funct7_i = "0000000" then
-                opALU <= OPALU_SRL;
-              elsif funct7_i = "0100000" then
-                opALU <= OPALU_SRA;
-              end if;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+			-- -----------------------------------------------------------------------
+			-- Leitura de memória de dados (I-type Load)
+			-- -----------------------------------------------------------------------
+			when OPCODE_LOAD =>
+				o_ext_imm_op  <= EXT_IMM_I;
+				o_wb_sel      <= WB_SEL_RAM;
+				o_we_reg      <= '1';
+				o_sel_rs2_imm <= '1';
+				o_sel_pc_rs1  <= '1';
+				o_alu_op      <= ALU_ADD;
+				o_re_ram      <= '1';
+				o_en_ram      <= '1';
 
-            when "010" =>
-              opALU    <= OPALU_SLT;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+				case funct3 is
+					when FUNCT3_LW  => o_ext_ram_op <= EXT_RAM_LW;
+					when FUNCT3_LH  => o_ext_ram_op <= EXT_RAM_LH;
+					when FUNCT3_LHU => o_ext_ram_op <= EXT_RAM_LHU;
+					when FUNCT3_LB  => o_ext_ram_op <= EXT_RAM_LB;
+					when FUNCT3_LBU => o_ext_ram_op <= EXT_RAM_LBU;
+					when others     => o_ext_ram_op <= EXT_RAM_LW;
+				end case;
 
-            when "011" =>
-              opALU    <= OPALU_SLTU;
-              weReg    <= '1';
-              selPCRS1 <= '1';
+			-- -----------------------------------------------------------------------
+			-- Escrita em memória de dados (S-type Store)
+			-- -----------------------------------------------------------------------
+			when OPCODE_STORE =>
+				o_ext_imm_op  <= EXT_IMM_S;
+				o_sel_rs2_imm <= '1';
+				o_sel_pc_rs1  <= '1';
+				o_alu_op      <= ALU_ADD;
+				o_we_ram      <= '1';
+				o_en_ram      <= '1';
 
-            when others => null;
-          end case;
-        end if;
+			-- -----------------------------------------------------------------------
+			-- Carregamento de imediato superior (U-type LUI)
+			-- -----------------------------------------------------------------------
+			when OPCODE_LUI =>
+				o_ext_imm_op  <= EXT_IMM_U;
+				o_we_reg      <= '1';
+				o_sel_rs2_imm <= '1';
+				o_alu_op      <= ALU_PASS_B;
 
-      -- -----------------------------------------------------------------------
-      -- Branch (B-type)
-      -- -----------------------------------------------------------------------
-      when "1100011" =>
-        selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_B;
-        selMuxALUPc4RAM <= "00";
-        weReg           <= '0';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '0';
-        selPCRS1        <= '1';
-        weRAM           <= '0';
-        reRAM           <= '0';
-        eRAM            <= '0';
+			-- -----------------------------------------------------------------------
+			-- Adição de imediato superior ao PC (U-type AUIPC)
+			-- -----------------------------------------------------------------------
+			when OPCODE_AUIPC =>
+				o_ext_imm_op  <= EXT_IMM_U;
+				o_we_reg      <= '1';
+				o_sel_rs2_imm <= '1';
+				o_alu_op      <= ALU_ADD;
 
-        case funct3_i is
-          when "000"  => opALU <= OPALU_BEQ;
-          when "001"  => opALU <= OPALU_BNE;
-          when "100"  => opALU <= OPALU_BLT;
-          when "101"  => opALU <= OPALU_BGE;
-          when "110"  => opALU <= OPALU_BLTU;
-          when "111"  => opALU <= OPALU_BGEU;
-          when others => opALU <= (others => '0');
-        end case;
+			-- -----------------------------------------------------------------------
+			-- Salto incondicional relativo ao PC (J-type JAL)
+			-- -----------------------------------------------------------------------
+			when OPCODE_JAL =>
+				o_sel_pc4_alu <= '1';
+				o_ext_imm_op  <= EXT_IMM_J;
+				o_wb_sel      <= WB_SEL_PC4;
+				o_we_reg      <= '1';
+				o_sel_rs2_imm <= '1';
+				o_alu_op      <= ALU_ADD;
 
-      -- -----------------------------------------------------------------------
-      -- Load (I-type loads)
-      -- -----------------------------------------------------------------------
-      when "0000011" =>
-        selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_I;
-        selMuxALUPc4RAM <= "10";
-        weReg           <= '1';
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '1';
-        opALU           <= OPALU_ADD;
-        weRAM           <= '0';
-        reRAM           <= '1';
-        eRAM            <= '1';
+			-- -----------------------------------------------------------------------
+			-- Salto incondicional indireto via registrador (I-type JALR)
+			-- -----------------------------------------------------------------------
+			when OPCODE_JALR =>
+				o_sel_pc4_alu <= '1';
+				o_ext_imm_op  <= EXT_IMM_I;
+				o_wb_sel      <= WB_SEL_PC4;
+				o_we_reg      <= '1';
+				o_sel_rs2_imm <= '1';
+				o_sel_pc_rs1  <= '1';
+				o_alu_op      <= ALU_JALR;
 
-        case funct3_i is
-          when "010"  => opExRAM <= "000";         -- LW
-          when "001"  => opExRAM <= OPEXRAM_LH;    -- LH
-          when "101"  => opExRAM <= OPEXRAM_LHU;   -- LHU
-          when "000"  => opExRAM <= OPEXRAM_LB;    -- LB
-          when "100"  => opExRAM <= OPEXRAM_LBU;   -- LBU
-          when others => opExRAM <= "000";
-        end case;
+			when others =>
+				null;
 
-      -- -----------------------------------------------------------------------
-      -- Store (S-type)
-      -- -----------------------------------------------------------------------
-      when "0100011" =>
-        selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_S;
-        selMuxALUPc4RAM <= "00";
-        weReg           <= '0';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '1';
-        opALU           <= OPALU_ADD;
-        weRAM           <= '1';
-        reRAM           <= '0';
-        eRAM            <= '1';
+		end case;
+	end process;
 
-      -- -----------------------------------------------------------------------
-      -- LUI
-      -- -----------------------------------------------------------------------
-      when "0110111" =>
-        selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_U;
-        selMuxALUPc4RAM <= "00";
-        weReg           <= '1';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '0';
-        opALU           <= OPALU_PASS_B;
-        weRAM           <= '0';
-        reRAM           <= '0';
-        eRAM            <= '0';
-
-      -- -----------------------------------------------------------------------
-      -- AUIPC
-      -- -----------------------------------------------------------------------
-      when "0010111" =>
-        selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_U;
-        selMuxALUPc4RAM <= "00";
-        weReg           <= '1';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '0';
-        opALU           <= OPALU_ADD;
-        weRAM           <= '0';
-        reRAM           <= '0';
-        eRAM            <= '0';
-
-      -- -----------------------------------------------------------------------
-      -- JAL
-      -- -----------------------------------------------------------------------
-      when "1101111" =>
-        selMuxPc4ALU    <= '1';
-        opExImm         <= OPEXIMM_J;
-        selMuxALUPc4RAM <= "01";
-        weReg           <= '1';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '0';
-        opALU           <= OPALU_ADD;
-        weRAM           <= '0';
-        reRAM           <= '0';
-        eRAM            <= '0';
-
-      -- -----------------------------------------------------------------------
-      -- JALR
-      -- -----------------------------------------------------------------------
-      when "1100111" =>
-        selMuxPc4ALU    <= '1';
-        opExImm         <= OPEXIMM_I;
-        selMuxALUPc4RAM <= "01";
-        weReg           <= '1';
-        opExRAM         <= "000";
-        selMuxRS2Imm    <= '1';
-        selPCRS1        <= '1';
-        opALU           <= OPALU_JALR;
-        weRAM           <= '0';
-        reRAM           <= '0';
-        eRAM            <= '0';
-
-      when others => null;
-
-    end case;
-  end process;
-
-end architecture behaviour;
+end architecture rtl;

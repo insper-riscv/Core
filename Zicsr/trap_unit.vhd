@@ -1,116 +1,156 @@
 -- =============================================================================
--- trap_unit.vhd
--- Deteccao de excecoes sincronas do modo maquina e de MRET, na instrucao de EX
--- (docs/contracts/01, 1.6).
+-- Unidade de detecção de exceções síncronas e retorno de trap (MRET)
 --
--- Puramente combinacional. A instrucao de EX gera no maximo uma excecao:
+-- Avalia combinacionalmente a instrução presente no estágio EX e sinaliza, no
+-- máximo, uma exceção síncrona do modo máquina (o_take = '1') ou o retorno de
+-- exceção (o_mret_take = '1') quando a instrução é válida (i_ex_valid = '1') e
+-- o pipeline avança (i_run = '1'):
 --
---   causa  excecao                              mtval
---     0    alvo de desvio ou salto desalinhado  o alvo
---     2    instrucao ilegal (SYSTEM nao suportada, CSR inexistente ou escrita em
---          CSR somente leitura)                 0
---     3    ebreak                               0
---     4    load desalinhado                     endereco efetivo
---     6    store desalinhado                    endereco efetivo
---    11    ecall                                0
---
--- take e mret_take so' sobem no ciclo em que a instrucao e' valida e o pipeline
--- anda (run): uma instrucao parada em EX nao repete o efeito. O WFI e' um NOP.
--- O PC (mepc) e' o da instrucao em EX.
+--   Código (o_cause) | Exceção                                 | Valor em o_tval
+--   -----------------+-----------------------------------------+------------------
+--          0         | Alvo de desvio ou salto desalinhado     | i_cf_target
+--          2         | Instrução ilegal (SYSTEM/CSR inválida)  | 0x00000000
+--          3         | Breakpoint (EBREAK)                     | 0x00000000
+--          4         | Endereço de Load desalinhado            | i_ea
+--          6         | Endereço de Store desalinhado           | i_ea
+--         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.pipeline_types.all;
+use work.opcode_consts.all;
+use work.funct3_consts.all;
 
 entity trap_unit is
-  port (
-    ex_valid : in  std_logic;
-    run      : in  std_logic;
-
-    opcode   : in  std_logic_vector(6 downto 0);
-    funct3   : in  std_logic_vector(2 downto 0);
-    rd_idx   : in  std_logic_vector(4 downto 0);
-    rs1_idx  : in  std_logic_vector(4 downto 0);
-    imm12    : in  std_logic_vector(11 downto 0);  -- instruction[31:20]
-
-    -- endereco efetivo de load e store (resultado da ALU)
-    ea           : in  std_logic_vector(31 downto 0);
-    -- desvio ou salto tomado e o alvo (desvio condicional, JAL ou JALR)
-    cf_taken     : in  std_logic;
-    cf_target    : in  std_logic_vector(31 downto 0);
-    csr_illegal  : in  std_logic;
-
-    take       : out std_logic;
-    mret_take  : out std_logic;
-    cause      : out std_logic_vector(31 downto 0);
-    tval       : out std_logic_vector(31 downto 0)
-  );
+	port (
+		-- Indica que há uma instrução válida no estágio EX.
+		i_ex_valid    : in  std_logic;
+		-- Indica que o pipeline está avançando neste ciclo.
+		i_run         : in  std_logic;
+		-- Campo opcode (bits [6:0]) da instrução no estágio EX.
+		i_opcode      : in  opcode_t;
+		-- Campo funct3 (bits [14:12]) da instrução no estágio EX.
+		i_funct3      : in  funct3_t;
+		-- Endereço do registrador destino rd (bits [11:7]) no estágio EX.
+		i_rd_idx      : in  reg_t;
+		-- Endereço do registrador fonte rs1 (bits [19:15]) no estágio EX.
+		i_rs1_idx     : in  reg_t;
+		-- Campo imediato de 12 bits (bits [31:20] da instrução) no estágio EX.
+		i_imm12       : in  std_logic_vector(11 downto 0);
+		-- Endereço efetivo de memória calculado pela ULA no estágio EX.
+		i_ea          : in  word_t;
+		-- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
+		i_cf_taken    : in  std_logic;
+		-- Endereço alvo do desvio ou salto tomado no estágio EX.
+		i_cf_target   : in  word_t;
+		-- Indica acesso ilegal a registrador CSR sinalizado pelo csr_file.
+		i_csr_illegal : in  std_logic;
+		-- Pulso que comanda a tomada de trap síncrono no ciclo atual.
+		o_take        : out std_logic;
+		-- Pulso que comanda o retorno de trap (instrução MRET) no ciclo atual.
+		o_mret_take   : out std_logic;
+		-- Código da causa da exceção síncrona detectada (para gravação em mcause).
+		o_cause       : out word_t;
+		-- Valor adicional associado à exceção (endereço faltante ou zero, para gravação em mtval).
+		o_tval        : out word_t
+	);
 end entity trap_unit;
 
 architecture rtl of trap_unit is
 
-  constant OP_SYSTEM : std_logic_vector(6 downto 0) := "1110011";
-  constant OP_LOAD   : std_logic_vector(6 downto 0) := "0000011";
-  constant OP_STORE  : std_logic_vector(6 downto 0) := "0100011";
+	-- Campo funct12 da instrução ECALL (0x000).
+	constant IMM12_ECALL          : std_logic_vector(11 downto 0) := x"000";
+	-- Campo funct12 da instrução EBREAK (0x001).
+	constant IMM12_EBREAK         : std_logic_vector(11 downto 0) := x"001";
+	-- Campo funct12 da instrução WFI (0x105).
+	constant IMM12_WFI            : std_logic_vector(11 downto 0) := x"105";
+	-- Campo funct12 da instrução MRET (0x302).
+	constant IMM12_MRET           : std_logic_vector(11 downto 0) := x"302";
 
-  signal is_system : std_logic;
-  signal is_csr    : std_logic;
-  signal no_regs   : std_logic;  -- rd = x0, rs1 = x0 e funct3 = 000
-  signal is_ecall  : std_logic;
-  signal is_ebreak : std_logic;
-  signal is_mret   : std_logic;
-  signal is_wfi    : std_logic;
+	-- Código mcause para endereço de instrução desalinhado (0).
+	constant CAUSE_MISALIGNED_PC  : word_t := x"00000000";
+	-- Código mcause para instrução ilegal (2).
+	constant CAUSE_ILLEGAL_INSTR  : word_t := x"00000002";
+	-- Código mcause para breakpoint EBREAK (3).
+	constant CAUSE_BREAKPOINT     : word_t := x"00000003";
+	-- Código mcause para endereço de load desalinhado (4).
+	constant CAUSE_MISALIGNED_LD  : word_t := x"00000004";
+	-- Código mcause para endereço de store desalinhado (6).
+	constant CAUSE_MISALIGNED_ST  : word_t := x"00000006";
+	-- Código mcause para chamada de ambiente do modo M - ECALL (11).
+	constant CAUSE_MACHINE_ECALL  : word_t := x"0000000B";
 
-  signal sys_illegal : std_logic;
-  signal ld_misal    : std_logic;
-  signal st_misal    : std_logic;
-  signal cf_misal    : std_logic;
+	-- Indica que a instrução pertence à classe SYSTEM (opcode 1110011).
+	signal is_system   : std_logic;
+	-- Indica que a instrução SYSTEM é uma operação de acesso a CSR.
+	signal is_csr      : std_logic;
+	-- Indica que funct3 = "000", rd = x0 e rs1 = x0 (formato exigido por ECALL/EBREAK/MRET/WFI).
+	signal no_regs     : std_logic;
+	-- Indica decodificação da instrução ECALL.
+	signal is_ecall    : std_logic;
+	-- Indica decodificação da instrução EBREAK.
+	signal is_ebreak   : std_logic;
+	-- Indica decodificação da instrução MRET.
+	signal is_mret     : std_logic;
+	-- Indica decodificação da instrução WFI.
+	signal is_wfi      : std_logic;
 
-  signal exc : std_logic;
+	-- Indica instrução da classe SYSTEM com codificação não suportada/ilegal.
+	signal sys_illegal : std_logic;
+	-- Indica instrução de leitura de memória (LOAD) com endereço desalinhado.
+	signal ld_misal    : std_logic;
+	-- Indica instrução de escrita em memória (STORE) com endereço desalinhado.
+	signal st_misal    : std_logic;
+	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
+	signal cf_misal    : std_logic;
+
+	-- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
+	signal has_exc     : std_logic;
 
 begin
 
-  is_system <= '1' when opcode = OP_SYSTEM else '0';
-  is_csr    <= '1' when is_system = '1' and funct3 /= "000" and funct3 /= "100" else '0';
-  no_regs   <= '1' when funct3 = "000" and rd_idx = "00000" and rs1_idx = "00000" else '0';
+	is_system <= '1' when i_opcode = OPCODE_SYSTEM else '0';
+	is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= "100") else '0';
+	no_regs   <= '1' when (i_funct3 = FUNCT3_PRIV and i_rd_idx = REG_ZERO and i_rs1_idx = REG_ZERO) else '0';
 
-  is_ecall  <= '1' when is_system = '1' and no_regs = '1' and imm12 = x"000" else '0';
-  is_ebreak <= '1' when is_system = '1' and no_regs = '1' and imm12 = x"001" else '0';
-  is_mret   <= '1' when is_system = '1' and no_regs = '1' and imm12 = x"302" else '0';
-  is_wfi    <= '1' when is_system = '1' and no_regs = '1' and imm12 = x"105" else '0';
+	is_ecall  <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_ECALL)  else '0';
+	is_ebreak <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_EBREAK) else '0';
+	is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)   else '0';
+	is_wfi    <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_WFI)    else '0';
 
-  sys_illegal <= '1' when is_system = '1' and is_csr = '0'
-                       and is_ecall = '0' and is_ebreak = '0'
-                       and is_mret = '0' and is_wfi = '0'
-                 else '0';
+	sys_illegal <= '1' when (is_system = '1' and is_csr = '0' and
+	                         is_ecall = '0' and is_ebreak = '0' and
+	                         is_mret = '0' and is_wfi = '0')
+	                   else '0';
 
-  ld_misal <= '1' when opcode = OP_LOAD and
-                       ((funct3(1 downto 0) = "10" and ea(1 downto 0) /= "00") or
-                        (funct3(1 downto 0) = "01" and ea(0) = '1'))
-              else '0';
+	ld_misal <= '1' when (i_opcode = OPCODE_LOAD and
+	                      ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= "00") or
+	                       ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
+	                else '0';
 
-  st_misal <= '1' when opcode = OP_STORE and
-                       ((funct3 = "010" and ea(1 downto 0) /= "00") or
-                        (funct3 = "001" and ea(0) = '1'))
-              else '0';
+	st_misal <= '1' when (i_opcode = OPCODE_STORE and
+	                      ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= "00") or
+	                       (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
+	                else '0';
 
-  cf_misal <= '1' when cf_taken = '1' and cf_target(1 downto 0) /= "00" else '0';
+	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
 
-  exc <= cf_misal or sys_illegal or (is_csr and csr_illegal) or is_ebreak
-         or ld_misal or st_misal or is_ecall;
+	has_exc <= cf_misal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
+	           ld_misal or st_misal or is_ecall;
 
-  take      <= exc and ex_valid and run;
-  mret_take <= is_mret and ex_valid and run;
+	o_take      <= has_exc and i_ex_valid and i_run;
+	o_mret_take <= is_mret and i_ex_valid and i_run;
 
-  cause <= x"00000000" when cf_misal = '1' else
-           x"00000002" when sys_illegal = '1' or (is_csr = '1' and csr_illegal = '1') else
-           x"00000003" when is_ebreak = '1' else
-           x"00000004" when ld_misal = '1' else
-           x"00000006" when st_misal = '1' else
-           x"0000000B";
+	o_cause <= CAUSE_MISALIGNED_PC when cf_misal = '1' else
+	           CAUSE_ILLEGAL_INSTR when (sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
+	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
+	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
+	           CAUSE_MISALIGNED_ST when st_misal = '1' else
+	           CAUSE_MACHINE_ECALL;
 
-  tval <= cf_target when cf_misal = '1' else
-          ea        when ld_misal = '1' or st_misal = '1' else
-          x"00000000";
+	o_tval  <= i_cf_target when cf_misal = '1' else
+	           i_ea        when (ld_misal = '1' or st_misal = '1') else
+	           (others => '0');
 
 end architecture rtl;

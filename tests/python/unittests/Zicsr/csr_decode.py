@@ -4,7 +4,7 @@ import cocotb
 from cocotb.triggers import Timer
 
 OP_SYSTEM = 0b1110011
-OUTPUTS = ("isCsr", "weReg", "useImmI")
+OUTPUTS = ("o_is_csr", "o_we_reg", "o_use_imm_i")
 
 
 def _instr(opcode, funct3, csr=0x300, rd=1, rs1=2):
@@ -12,7 +12,7 @@ def _instr(opcode, funct3, csr=0x300, rd=1, rs1=2):
 
 
 async def _outputs(dut, instr):
-    dut.instruction.value = instr
+    dut.i_instr.value = instr
     await Timer(1, unit="ns")
     return tuple(int(getattr(dut, n).value) for n in OUTPUTS)
 

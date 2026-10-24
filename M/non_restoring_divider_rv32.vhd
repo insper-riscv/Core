@@ -1,300 +1,252 @@
---------------------------------------------------------------------------------
--- Non-Restoring Division Algorithm - RISC-V RV32M Compatible
---------------------------------------------------------------------------------
--- Suporta as 4 instruções de divisão do RV32M:
---   is_unsigned = '0' : DIV  / REM  (operandos signed, truncamento p/ zero)
---   is_unsigned = '1' : DIVU / REMU (operandos unsigned)
+-- =============================================================================
+-- Divisor sequencial não-restaurador de 32 bits (Extensão RV32M)
 --
--- Casos especiais (RISC-V ISA Spec):
---   SIGNED (is_unsigned='0'):
---     - Divisão por zero : quotient = -1 (0xFFFFFFFF), remainder = dividend
---     - Overflow (-2^31 / -1): quotient = -2^31, remainder = 0
---     - Sinal do resto segue o sinal do dividendo
---   UNSIGNED (is_unsigned='1'):
---     - Divisão por zero : quotient = 0xFFFFFFFF (2^32-1), remainder = dividend
---     - Não existe caso de overflow
+-- Suporta as 4 instruções de divisão inteira da especificação RISC-V RV32M:
+--   - i_is_unsigned = '0': DIV e REM (divisão inteira com sinal, truncada em direção a zero)
+--   - i_is_unsigned = '1': DIVU e REMU (divisão inteira sem sinal)
 --
--- Interface:
---   clk         : Clock
---   rst         : Synchronous reset (active high)
---   start       : Pulse high for 1 cycle to begin division
---   is_unsigned : '0' = signed (DIV/REM), '1' = unsigned (DIVU/REMU)
---   dividend    : 32-bit input (rs1)
---   divisor     : 32-bit input (rs2)
---   quotient    : 32-bit result (DIV/DIVU result)
---   remainder   : 32-bit result (REM/REMU result)
---   done        : Asserted when result is valid
---   busy        : Asserted while computation is in progress
---   div_by_zero : Asserted if divisor was zero
---   overflow    : Asserted if signed overflow occurred (only for signed mode)
+-- Casos especiais definidos pela especificação RISC-V:
+--   - Divisão por zero (signed e unsigned): o_quotient = 0xFFFFFFFF, o_remainder = i_dividend
+--   - Overflow com sinal (-2^31 / -1):      o_quotient = 0x80000000, o_remainder = 0x00000000
 --
--- Latency: 34 clock cycles (1 init + 32 iterations + 1 correction)
---          2 cycles for special cases (div-by-zero, overflow)
---------------------------------------------------------------------------------
+-- Latência: 34 ciclos para casos normais (1 init + 32 iterações + 1 correção + 1 ajuste de sinal)
+--           e 2 ciclos para casos especiais (divisão por zero ou overflow).
+-- =============================================================================
 
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.pipeline_types.all;
 
 entity non_restoring_divider_rv32 is
-    port (
-        clk         : in  std_logic;
-        rst         : in  std_logic;
-        start       : in  std_logic;
-        is_unsigned : in  std_logic;                      -- '0'=DIV/REM, '1'=DIVU/REMU
-        dividend    : in  std_logic_vector(31 downto 0);  -- rs1
-        divisor     : in  std_logic_vector(31 downto 0);  -- rs2
-        quotient    : out std_logic_vector(31 downto 0);  -- DIV/DIVU result
-        remainder   : out std_logic_vector(31 downto 0);  -- REM/REMU result
-        done        : out std_logic;
-        busy        : out std_logic;
-        div_by_zero : out std_logic;
-        overflow    : out std_logic
-    );
+	port (
+		-- Sinal de clock do sistema.
+		i_clk         : in  std_logic;
+		-- Sinal de reset síncrono ativo em '1'.
+		i_rst         : in  std_logic;
+		-- Pulso de início da divisão no estágio EX.
+		i_start       : in  std_logic;
+		-- Modo de sinal da operação ('0' = DIV/REM com sinal, '1' = DIVU/REMU sem sinal).
+		i_is_unsigned : in  std_logic;
+		-- Dividendo de 32 bits (operando A / rs1).
+		i_dividend    : in  word_t;
+		-- Divisor de 32 bits (operando B / rs2).
+		i_divisor     : in  word_t;
+		-- Quociente de 32 bits calculado (resultado de DIV / DIVU).
+		o_quotient    : out word_t;
+		-- Resto de 32 bits calculado (resultado de REM / REMU).
+		o_remainder   : out word_t;
+		-- Pulso de 1 ciclo indicando que quociente e resto estão prontos.
+		o_done        : out std_logic;
+		-- Indica que o divisor está ocupado processando uma operação.
+		o_busy        : out std_logic;
+		-- Sinaliza que o divisor de entrada é igual a zero.
+		o_div_by_zero : out std_logic;
+		-- Sinaliza ocorrência de overflow na divisão com sinal (-2^31 / -1).
+		o_overflow    : out std_logic
+	);
 end entity non_restoring_divider_rv32;
 
 architecture rtl of non_restoring_divider_rv32 is
 
-    -- FSM states
-    type state_t is (S_IDLE, S_SPECIAL, S_COMPUTE, S_CORRECT, S_ADJUST_SIGN, S_DONE);
-    signal state : state_t := S_IDLE;
+	-- Estados da máquina de estados finitos do divisor não-restaurador.
+	type state_t is (S_IDLE, S_SPECIAL, S_COMPUTE, S_CORRECT, S_ADJUST_SIGN, S_DONE);
+	-- Estado atual da máquina de estados do divisor.
+	signal state              : state_t := S_IDLE;
 
-    -- Internal working registers (always operate on absolute/unsigned values)
-    -- 34-bit partial remainder: the unsigned divisor can use all 32 bits, so the shifted
-    -- remainder needs 33 bits of magnitude and one more for the sign.
-    signal A     : signed(33 downto 0);
-    signal Q     : unsigned(31 downto 0); -- quotient being built
-    signal M     : signed(33 downto 0);   -- 34-bit divisor (always positive here)
-    signal count : unsigned(5 downto 0);  -- iteration counter 0..31
+	-- Resto parcial de 34 bits (33 bits de magnitude + 1 bit de sinal).
+	signal rem_reg            : signed(33 downto 0);
+	-- Registrador de deslocamento de 32 bits que acumula os bits do quociente.
+	signal quot_reg           : unsigned(31 downto 0);
+	-- Divisor absoluto estendido para 34 bits positivos.
+	signal div_reg            : signed(33 downto 0);
+	-- Contador de iterações (0 a 31).
+	signal iter_count         : unsigned(5 downto 0);
 
-    -- Sign tracking for signed mode
-    signal dividend_neg : std_logic;  -- original dividend was negative
-    signal divisor_neg  : std_logic;  -- original divisor was negative
-    signal op_unsigned  : std_logic;  -- latched copy of is_unsigned
+	-- Armazena se o dividendo original era negativo no modo com sinal.
+	signal dividend_neg       : std_logic;
+	-- Armazena se o divisor original era negativo no modo com sinal.
+	signal divisor_neg        : std_logic;
+	-- Cópia registrada do modo sem sinal (i_is_unsigned) no início da operação.
+	signal op_unsigned        : std_logic;
 
-    -- Special case detection
-    signal detect_div_by_zero : std_logic;
-    signal detect_overflow    : std_logic;
+	-- Detecção combinacional de divisão por zero.
+	signal detect_div_by_zero : std_logic;
+	-- Detecção combinacional de overflow na divisão com sinal (-2^31 / -1).
+	signal detect_overflow    : std_logic;
 
-    -- Internal result registers
-    signal q_result : std_logic_vector(31 downto 0);
-    signal r_result : std_logic_vector(31 downto 0);
+	-- Registrador de saída do quociente final.
+	signal q_result           : word_t;
+	-- Registrador de saída do resto final.
+	signal r_result           : word_t;
 
-    -- Constants
-    constant ALL_ONES : std_logic_vector(31 downto 0) := x"FFFFFFFF";
-    constant INT_MIN  : std_logic_vector(31 downto 0) := x"80000000";
+	-- Constante de 32 bits com todos os bits em '1' (-1 em complemento de dois, 0xFFFFFFFF).
+	constant ALL_ONES         : word_t := x"FFFFFFFF";
+	-- Menor inteiro negativo representável em 32 bits com sinal (-2^31, 0x80000000).
+	constant INT_MIN          : word_t := x"80000000";
 
-    signal busy_reg      : std_logic := '0';
-    signal start_inhibit : std_logic := '0';
+	-- Registrador interno de ocupação durante o cálculo.
+	signal busy_reg           : std_logic := '0';
+	-- Inibidor que impede reinício imediato enquanto i_start permanecer em '1'.
+	signal start_inhibit      : std_logic := '0';
 
 begin
 
-    -- busy eager: combinacional quando start=1 em S_IDLE
-    -- Garante que muldiv_busy sobe no mesmo ciclo que o start (gerado em EX) no pipeline.
-    busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
+	-- Sinal o_busy sobe combinacionalmente no mesmo ciclo de i_start em S_IDLE (eager stall).
+	o_busy <= '1' when (state = S_IDLE and i_start = '1' and start_inhibit = '0') else busy_reg;
 
-    -------------------------------------------------------------------------
-    -- Special case detection (combinational)
-    -------------------------------------------------------------------------
-    detect_div_by_zero <= '1' when unsigned(divisor) = 0 else '0';
+	detect_div_by_zero <= '1' when unsigned(i_divisor) = 0 else '0';
 
-    -- Signed overflow: only possible in signed mode, when dividend = -2^31
-    -- and divisor = -1. In unsigned mode this is just a normal division.
-    detect_overflow <= '1' when is_unsigned = '0'
-                                and dividend = INT_MIN
-                                and divisor  = ALL_ONES
-                       else '0';
+	detect_overflow <= '1' when (i_is_unsigned = '0' and i_dividend = INT_MIN and i_divisor = ALL_ONES) else '0';
 
-    -------------------------------------------------------------------------
-    -- Main sequential process
-    -------------------------------------------------------------------------
-    process(clk)
-        variable A_shifted : signed(33 downto 0);
-        variable A_next    : signed(33 downto 0);
-        variable abs_dividend_v : unsigned(31 downto 0);
-        variable abs_divisor_v  : unsigned(31 downto 0);
-    begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                state        <= S_IDLE;
-                A            <= (others => '0');
-                Q            <= (others => '0');
-                M            <= (others => '0');
-                count        <= (others => '0');
-                dividend_neg <= '0';
-                divisor_neg  <= '0';
-                op_unsigned  <= '0';
-                done         <= '0';
-                busy_reg     <= '0';
-                q_result     <= (others => '0');
-                r_result     <= (others => '0');
-            else
-                case state is
+	process(i_clk)
+		variable rem_shifted    : signed(33 downto 0);
+		variable rem_next       : signed(33 downto 0);
+		variable abs_dividend_v : unsigned(31 downto 0);
+		variable abs_divisor_v  : unsigned(31 downto 0);
+	begin
+		if rising_edge(i_clk) then
+			if i_rst = '1' then
+				state        <= S_IDLE;
+				rem_reg      <= (others => '0');
+				quot_reg     <= (others => '0');
+				div_reg      <= (others => '0');
+				iter_count   <= (others => '0');
+				dividend_neg <= '0';
+				divisor_neg  <= '0';
+				op_unsigned  <= '0';
+				o_done       <= '0';
+				busy_reg     <= '0';
+				q_result     <= (others => '0');
+				r_result     <= (others => '0');
+			else
+				case state is
 
-                    -----------------------------------------------------------
-                    -- IDLE: aguarda start
-                    -----------------------------------------------------------
-                    when S_IDLE =>
-                        done <= '0';
-                        -- Clear inhibit when start falls
-                        if start = '0' then
-                            start_inhibit <= '0';
-                        end if;
-                        -- Only start new operation if inhibit is clear
-                        if start = '1' and start_inhibit = '0' then
-                            -- Latch mode
-                            op_unsigned <= is_unsigned;
+					when S_IDLE =>
+						o_done <= '0';
+						if i_start = '0' then
+							start_inhibit <= '0';
+						end if;
+						if i_start = '1' and start_inhibit = '0' then
+							op_unsigned <= i_is_unsigned;
 
-                            -- Check special cases
-                            if detect_div_by_zero = '1' or detect_overflow = '1' then
-                                state <= S_SPECIAL;
-                                busy_reg <= '1';
+							if detect_div_by_zero = '1' or detect_overflow = '1' then
+								state    <= S_SPECIAL;
+								busy_reg <= '1';
 
-                                if is_unsigned = '1' then
-                                    dividend_neg <= '0';
-                                    divisor_neg  <= '0';
-                                else
-                                    dividend_neg <= dividend(31);
-                                    divisor_neg  <= divisor(31);
-                                end if;
-                            else
-                                busy_reg <= '1';
+								if i_is_unsigned = '1' then
+									dividend_neg <= '0';
+									divisor_neg  <= '0';
+								else
+									dividend_neg <= i_dividend(31);
+									divisor_neg  <= i_divisor(31);
+								end if;
+							else
+								busy_reg <= '1';
 
-                                -----------------------------------------------
-                                -- Compute absolute values / pass-through
-                                -----------------------------------------------
-                                if is_unsigned = '1' then
-                                    -- Unsigned: use values directly
-                                    dividend_neg <= '0';
-                                    divisor_neg  <= '0';
-                                    abs_dividend_v := unsigned(dividend);
-                                    abs_divisor_v  := unsigned(divisor);
-                                else
-                                    -- Signed: record signs, take absolute values
-                                    dividend_neg <= dividend(31);
-                                    divisor_neg  <= divisor(31);
+								if i_is_unsigned = '1' then
+									dividend_neg   <= '0';
+									divisor_neg    <= '0';
+									abs_dividend_v := unsigned(i_dividend);
+									abs_divisor_v  := unsigned(i_divisor);
+								else
+									dividend_neg <= i_dividend(31);
+									divisor_neg  <= i_divisor(31);
 
-                                    if signed(dividend) < 0 then
-                                        abs_dividend_v := unsigned(-signed(dividend));
-                                    else
-                                        abs_dividend_v := unsigned(dividend);
-                                    end if;
+									if signed(i_dividend) < 0 then
+										abs_dividend_v := unsigned(-signed(i_dividend));
+									else
+										abs_dividend_v := unsigned(i_dividend);
+									end if;
 
-                                    if signed(divisor) < 0 then
-                                        abs_divisor_v := unsigned(-signed(divisor));
-                                    else
-                                        abs_divisor_v := unsigned(divisor);
-                                    end if;
-                                end if;
+									if signed(i_divisor) < 0 then
+										abs_divisor_v := unsigned(-signed(i_divisor));
+									else
+										abs_divisor_v := unsigned(i_divisor);
+									end if;
+								end if;
 
-                                -- Initialize datapath
-                                A     <= (others => '0');
-                                Q     <= abs_dividend_v;
-                                M     <= signed("00" & std_logic_vector(abs_divisor_v));
-                                count <= (others => '0');
-                                state <= S_COMPUTE;
-                            end if;
-                        end if;
+								rem_reg    <= (others => '0');
+								quot_reg   <= abs_dividend_v;
+								div_reg    <= signed("00" & std_logic_vector(abs_divisor_v));
+								iter_count <= (others => '0');
+								state      <= S_COMPUTE;
+							end if;
+						end if;
 
-                    -----------------------------------------------------------
-                    -- SPECIAL: handle div-by-zero and signed overflow
-                    -----------------------------------------------------------
-                    when S_SPECIAL =>
-                        if detect_div_by_zero = '1' then
-                            -- RISC-V spec: both signed and unsigned
-                            -- quotient = all 1s, remainder = dividend
-                            q_result <= ALL_ONES;
-                            r_result <= dividend;
-                        else
-                            -- Signed overflow: -2^31 / -1
-                            -- quotient = -2^31 (wraps), remainder = 0
-                            q_result <= INT_MIN;
-                            r_result <= (others => '0');
-                        end if;
-                        state <= S_DONE;
+					when S_SPECIAL =>
+						if detect_div_by_zero = '1' then
+							q_result <= ALL_ONES;
+							r_result <= i_dividend;
+						else
+							q_result <= INT_MIN;
+							r_result <= (others => '0');
+						end if;
+						state <= S_DONE;
 
-                    -----------------------------------------------------------
-                    -- COMPUTE: 32 iterations of non-restoring division
-                    -----------------------------------------------------------
-                    when S_COMPUTE =>
-                        -- Step 1: Left shift {A, Q} by 1
-                        A_shifted := A(32 downto 0) & Q(31);
+					when S_COMPUTE =>
+						rem_shifted := rem_reg(32 downto 0) & quot_reg(31);
 
-                        -- Step 2: A = A +/- M based on sign of shifted A
-                        if A_shifted >= 0 then
-                            A_next := A_shifted - M;
-                        else
-                            A_next := A_shifted + M;
-                        end if;
+						if rem_shifted >= 0 then
+							rem_next := rem_shifted - div_reg;
+						else
+							rem_next := rem_shifted + div_reg;
+						end if;
 
-                        A <= A_next;
+						rem_reg <= rem_next;
 
-                        -- Shift Q left, set LSB from result sign
-                        if A_next >= 0 then
-                            Q <= Q(30 downto 0) & '1';
-                        else
-                            Q <= Q(30 downto 0) & '0';
-                        end if;
+						if rem_next >= 0 then
+							quot_reg <= quot_reg(30 downto 0) & '1';
+						else
+							quot_reg <= quot_reg(30 downto 0) & '0';
+						end if;
 
-                        if count = to_unsigned(31, 6) then
-                            state <= S_CORRECT;
-                        else
-                            count <= count + 1;
-                        end if;
+						if iter_count = to_unsigned(31, 6) then
+							state <= S_CORRECT;
+						else
+							iter_count <= iter_count + 1;
+						end if;
 
-                    -----------------------------------------------------------
-                    -- CORRECT: restore remainder if negative
-                    -----------------------------------------------------------
-                    when S_CORRECT =>
-                        if A < 0 then
-                            A <= A + M;
-                        end if;
-                        state <= S_ADJUST_SIGN;
+					when S_CORRECT =>
+						if rem_reg < 0 then
+							rem_reg <= rem_reg + div_reg;
+						end if;
+						state <= S_ADJUST_SIGN;
 
-                    -----------------------------------------------------------
-                    -- ADJUST_SIGN: apply sign correction (signed mode only)
-                    -----------------------------------------------------------
-                    when S_ADJUST_SIGN =>
-                        if op_unsigned = '1' then
-                            -- Unsigned: resultado direto, sem ajuste de sinal
-                            q_result <= std_logic_vector(Q);
-                            r_result <= std_logic_vector(A(31 downto 0));
-                        else
-                            -- Signed: quotient sign = dividend_sign XOR divisor_sign
-                            if (dividend_neg xor divisor_neg) = '1' then
-                                q_result <= std_logic_vector(-signed(Q));
-                            else
-                                q_result <= std_logic_vector(Q);
-                            end if;
+					when S_ADJUST_SIGN =>
+						if op_unsigned = '1' then
+							q_result <= std_logic_vector(quot_reg);
+							r_result <= std_logic_vector(rem_reg(31 downto 0));
+						else
+							if (dividend_neg xor divisor_neg) = '1' then
+								q_result <= std_logic_vector(-signed(quot_reg));
+							else
+								q_result <= std_logic_vector(quot_reg);
+							end if;
 
-                            -- Signed: remainder sign = dividend sign
-                            if dividend_neg = '1' then
-                                r_result <= std_logic_vector(-A(31 downto 0));
-                            else
-                                r_result <= std_logic_vector(A(31 downto 0));
-                            end if;
-                        end if;
+							if dividend_neg = '1' then
+								r_result <= std_logic_vector(-rem_reg(31 downto 0));
+							else
+								r_result <= std_logic_vector(rem_reg(31 downto 0));
+							end if;
+						end if;
 
-                        state <= S_DONE;
+						state <= S_DONE;
 
-                    -----------------------------------------------------------
-                    -- DONE: assert done, return to idle
-                    -----------------------------------------------------------
-                    when S_DONE =>
-                        done          <= '1';
-                        start_inhibit <= '1';
-                        busy_reg <= '0';
-                        state <= S_IDLE;
+					when S_DONE =>
+						o_done        <= '1';
+						start_inhibit <= '1';
+						busy_reg      <= '0';
+						state         <= S_IDLE;
 
-                end case;
-            end if;
-        end if;
-    end process;
+				end case;
+			end if;
+		end if;
+	end process;
 
-    -- Output assignments
-    quotient    <= q_result;
-    remainder   <= r_result;
-    div_by_zero <= detect_div_by_zero;
-    overflow    <= detect_overflow;
+	o_quotient    <= q_result;
+	o_remainder   <= r_result;
+	o_div_by_zero <= detect_div_by_zero;
+	o_overflow    <= detect_overflow;
 
 end architecture rtl;

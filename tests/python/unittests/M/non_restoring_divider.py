@@ -32,34 +32,34 @@ def expected(dividend, divisor, unsigned):
 
 async def divide(dut, dividend, divisor, unsigned):
     """Run one division and return (quotient, remainder) when done rises."""
-    dut.dividend.value = dividend
-    dut.divisor.value = divisor
-    dut.is_unsigned.value = int(unsigned)
-    dut.start.value = 1
-    await RisingEdge(dut.clk)
-    dut.start.value = 0
+    dut.i_dividend.value = dividend
+    dut.i_divisor.value = divisor
+    dut.i_is_unsigned.value = int(unsigned)
+    dut.i_start.value = 1
+    await RisingEdge(dut.i_clk)
+    dut.i_start.value = 0
     for _ in range(TIMEOUT_CYCLES):
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-        if int(dut.done.value):
-            result = int(dut.quotient.value), int(dut.remainder.value)
+        if int(dut.o_done.value):
+            result = int(dut.o_quotient.value), int(dut.o_remainder.value)
             # one idle cycle with start low releases the unit for the next division
-            await RisingEdge(dut.clk)
+            await RisingEdge(dut.i_clk)
             return result
     raise AssertionError(f"no done after {TIMEOUT_CYCLES} cycles")
 
 
 async def _reset(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    dut.rst.value = 1
-    dut.start.value = 0
-    dut.is_unsigned.value = 0
-    dut.dividend.value = 0
-    dut.divisor.value = 1
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
+    dut.i_rst.value = 1
+    dut.i_start.value = 0
+    dut.i_is_unsigned.value = 0
+    dut.i_dividend.value = 0
+    dut.i_divisor.value = 1
     for _ in range(3):
-        await RisingEdge(dut.clk)
-    dut.rst.value = 0
-    await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
+    dut.i_rst.value = 0
+    await RisingEdge(dut.i_clk)
 
 
 async def _check(dut, pairs, unsigned):

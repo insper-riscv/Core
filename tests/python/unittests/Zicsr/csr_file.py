@@ -11,35 +11,35 @@ MVENDORID, MARCHID, MIMPID, MHARTID, MCONFIGPTR = 0xF11, 0xF12, 0xF13, 0xF14, 0x
 
 
 async def _reset(dut):
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
-    dut.commit.value = 0
-    dut.addr.value = MSCRATCH
-    dut.op.value = RS
-    dut.wdata.value = 0
-    dut.src_zero.value = 1
-    dut.trap_take.value = 0
-    dut.trap_cause.value = 0
-    dut.trap_pc.value = 0
-    dut.trap_tval.value = 0
-    dut.mret_take.value = 0
-    dut.reset.value = 1
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
+    dut.i_commit.value = 0
+    dut.i_addr.value = MSCRATCH
+    dut.i_op.value = RS
+    dut.i_wdata.value = 0
+    dut.i_src_zero.value = 1
+    dut.i_trap_take.value = 0
+    dut.i_trap_cause.value = 0
+    dut.i_trap_pc.value = 0
+    dut.i_trap_tval.value = 0
+    dut.i_mret_take.value = 0
+    dut.i_rst.value = 1
     for _ in range(2):
-        await RisingEdge(dut.clk)
-    dut.reset.value = 0
-    await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
+    dut.i_rst.value = 0
+    await RisingEdge(dut.i_clk)
 
 
 async def access(dut, addr, op, wdata=0, src_zero=None, commit=1):
     """One CSR instruction: returns (old value, illegal) seen before the write lands."""
-    dut.addr.value = addr
-    dut.op.value = op
-    dut.wdata.value = wdata
-    dut.src_zero.value = int(wdata == 0) if src_zero is None else src_zero
-    dut.commit.value = commit
+    dut.i_addr.value = addr
+    dut.i_op.value = op
+    dut.i_wdata.value = wdata
+    dut.i_src_zero.value = int(wdata == 0) if src_zero is None else src_zero
+    dut.i_commit.value = commit
     await Timer(1, unit="ns")
-    seen = int(dut.rdata.value), int(dut.illegal.value)
-    await RisingEdge(dut.clk)
-    dut.commit.value = 0
+    seen = int(dut.o_rdata.value), int(dut.o_illegal.value)
+    await RisingEdge(dut.i_clk)
+    dut.i_commit.value = 0
     await Timer(1, unit="ns")
     return seen
 
@@ -139,19 +139,19 @@ async def test_unknown_csr_is_illegal(dut):
 
 
 async def take_trap(dut, cause, pc, tval):
-    dut.trap_cause.value = cause
-    dut.trap_pc.value = pc
-    dut.trap_tval.value = tval
-    dut.trap_take.value = 1
-    await RisingEdge(dut.clk)
-    dut.trap_take.value = 0
+    dut.i_trap_cause.value = cause
+    dut.i_trap_pc.value = pc
+    dut.i_trap_tval.value = tval
+    dut.i_trap_take.value = 1
+    await RisingEdge(dut.i_clk)
+    dut.i_trap_take.value = 0
     await Timer(1, unit="ns")
 
 
 async def take_mret(dut):
-    dut.mret_take.value = 1
-    await RisingEdge(dut.clk)
-    dut.mret_take.value = 0
+    dut.i_mret_take.value = 1
+    await RisingEdge(dut.i_clk)
+    dut.i_mret_take.value = 0
     await Timer(1, unit="ns")
 
 
@@ -166,8 +166,8 @@ async def test_trap_records_the_exception_and_closes_the_interrupt_enable(dut):
     assert await read(dut, MCAUSE) == 11
     assert await read(dut, MTVAL) == 0x77
     assert await read(dut, MSTATUS) == 0x1880  # MPIE = old MIE, MIE = 0, MPP = 11
-    assert int(dut.mtvec_o.value) == 0x200
-    assert int(dut.mepc_o.value) == 0x1234
+    assert int(dut.o_mtvec.value) == 0x200
+    assert int(dut.o_mepc.value) == 0x1234
 
 
 @cocotb.test()

@@ -17,7 +17,13 @@ expect() {
 # netlist <vhdl> <entity> <name>: the Verilog netlist GHDL synthesizes for the entity.
 netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
-  ghdl -a --std=08 --workdir="$work" "$1"
+  ghdl -a --std=08 --workdir="$work" \
+    "$root/common/pipeline_types.vhd" \
+    "$root/common/opcode_consts.vhd" \
+    "$root/common/funct3_consts.vhd" \
+    "$root/common/flip_flop.vhd" \
+    "$root/common/generic_register.vhd" \
+    "$1"
   ghdl --synth --std=08 --workdir="$work" --out=verilog "$2" > "$3.v"
 }
 
@@ -62,11 +68,11 @@ mutant() {  # <file> <props> <entity> <defines> <name> <sed expression>
   netlist "$copy" "$3" "mut_$5"
   expect "mutant $5 is caught" FAIL "$(prove "mut_$5.v" "$2" bmc 8 "$4" "mut_$5")"
 }
-mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mstatus_mie  <= '0';/mstatus_mie  <= mstatus_mie;/"
-mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/mstatus_mpie <= '1';/mstatus_mpie <= '0';/"
-mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/mepc     <= new_value(31 downto 2) \& \"00\";/mepc     <= new_value;/"
-mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause       <= trap_cause;/mcause       <= mcause;/"
-mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/(funct3(1 downto 0) = \"01\" and ea(0) = '1'))/(funct3(1 downto 0) = \"01\" and ea(1) = '1'))/"
-mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when is_system = '1' and no_regs = '1' and imm12 = x\"302\"/is_mret   <= '1' when is_system = '1' and no_regs = '1'/"
+mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0'          when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
+mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1'         when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
+mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_value(31 downto 2) \& \"00\";/new_value;/"
+mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
+mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
+mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

@@ -9,10 +9,10 @@ module props (input clk);
   wire [31:0] rdata, mtvec_o, mepc_o;
   wire illegal;
 
-  csr_file dut (.clk(clk), .reset(reset), .commit(commit), .addr(addr), .op(op), .wdata(wdata),
-    .src_zero(src_zero), .rdata(rdata), .illegal(illegal), .trap_take(trap_take),
-    .trap_cause(trap_cause), .trap_pc(trap_pc), .trap_tval(trap_tval), .mret_take(mret_take),
-    .mtvec_o(mtvec_o), .mepc_o(mepc_o));
+  csr_file dut (.i_clk(clk), .i_rst(reset), .i_commit(commit), .i_addr(addr), .i_op(op), .i_wdata(wdata),
+    .i_src_zero(src_zero), .o_rdata(rdata), .o_illegal(illegal), .i_trap_take(trap_take),
+    .i_trap_cause(trap_cause), .i_trap_pc(trap_pc), .i_trap_tval(trap_tval), .i_mret_take(mret_take),
+    .o_mtvec(mtvec_o), .o_mepc(mepc_o));
 
   always @(*) assume (op[1:0] != 2'b00);
 `ifdef MSTATUS_MODE

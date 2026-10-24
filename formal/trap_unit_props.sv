@@ -8,9 +8,9 @@ module props (input clk);
   (* anyseq *) wire [31:0] ea, cf_target;
   wire take, mret_take; wire [31:0] cause, tval;
 
-  trap_unit dut (.ex_valid(ex_valid), .run(run), .opcode(opcode), .funct3(funct3), .rd_idx(rd_idx),
-    .rs1_idx(rs1_idx), .imm12(imm12), .ea(ea), .cf_taken(cf_taken), .cf_target(cf_target),
-    .csr_illegal(csr_illegal), .take(take), .mret_take(mret_take), .cause(cause), .tval(tval));
+  trap_unit dut (.i_ex_valid(ex_valid), .i_run(run), .i_opcode(opcode), .i_funct3(funct3), .i_rd_idx(rd_idx),
+    .i_rs1_idx(rs1_idx), .i_imm12(imm12), .i_ea(ea), .i_cf_taken(cf_taken), .i_cf_target(cf_target),
+    .i_csr_illegal(csr_illegal), .o_take(take), .o_mret_take(mret_take), .o_cause(cause), .o_tval(tval));
 
   localparam SYSTEM = 7'b1110011, LOAD = 7'b0000011, STORE = 7'b0100011;
   wire no_regs = funct3 == 3'b000 && rd_idx == 5'd0 && rs1_idx == 5'd0;
