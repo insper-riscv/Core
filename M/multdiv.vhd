@@ -12,6 +12,11 @@
 -- que uma instrução válida da extensão M entra no estágio EX (i_valid = '1' e
 -- i_is_muldiv = '1') e mantém o_stall = '1' durante toda a execução e no ciclo
 -- de captura do resultado final (u_result_reg).
+--
+-- O stall é o OU do pulso de início (combinacional, para parar a instrução já no
+-- primeiro ciclo) com um flip-flop que guarda o sinal de ocupado do ciclo anterior.
+-- Esse flip-flop cobre os ciclos de cálculo e o de término, e assim o pulso de
+-- término não entra na lógica de stall do pipeline (docs/pt-br/timing/STALL_REGISTRADO_DO_MULTDIV.md).
 -- =============================================================================
 
 library ieee;
@@ -57,6 +62,10 @@ architecture rtl of multdiv is
 	signal start_pulse    : std_logic;
 	-- Sinal interno de stall (ativo enquanto busy = '1' ou done = '1').
 	signal stall_int      : std_logic;
+	-- Cópia registrada de busy_int: vale '1' do ciclo seguinte ao início até o ciclo de término (inclusive).
+	signal active_q       : std_logic;
+	-- Parte do stall que sobe no mesmo ciclo do início (eager stall), antes de active_q subir.
+	signal eager_stall    : std_logic;
 
 	-- Indica se o funct3 atual na entrada seleciona uma multiplicação (bit 2 = '0').
 	signal is_mult        : std_logic;
@@ -166,7 +175,20 @@ begin
 
 	busy_int  <= mult_busy or div_busy;
 	done_int  <= mult_done or div_done;
-	stall_int <= busy_int or done_int;
+
+	-- O stall é o início combinacional (um ciclo) seguido de um flip-flop que cobre os ciclos de
+	-- cálculo e o de término. Assim o pulso de término não atravessa a lógica de stall do pipeline.
+	eager_stall <= start_pulse;
+	stall_int   <= eager_stall or active_q;
+
+	u_active_ff : entity work.flip_flop
+		port map (
+			i_d      => busy_int,
+			o_d      => active_q,
+			i_enable => '1',
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
 
 	o_busy    <= busy_int;
 	o_done    <= done_int;
