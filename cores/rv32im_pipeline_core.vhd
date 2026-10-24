@@ -35,7 +35,10 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.rv32i_ctrl_consts.all;
+use work.ext_imm_consts.all;
+use work.ext_ram_consts.all;
+use work.wb_sel_consts.all;
+use work.alu_consts.all;
 use work.pipeline_types.all;
 
 entity rv32im_pipeline_core is
@@ -626,20 +629,20 @@ begin
   -- =========================================================================
   u_control_unit : entity work.control_unit
     port map (
-      instruction     => ifid_instr,
-      selMuxPc4ALU    => cu_selMuxPc4ALU,
-      opExImm         => cu_opExImm,
-      selMuxALUPc4RAM => cu_selMuxALUPc4RAM,
-      weReg           => base_weReg,
-      opExRAM         => cu_opExRAM,
-      selMuxRS2Imm    => cu_selMuxRS2Imm,
-      selPCRS1        => base_selPCRS1,
-      opALU           => cu_opALU,
-      weRAM           => cu_weRAM,
-      reRAM           => cu_reRAM,
-      eRAM            => cu_eRAM,
-      opCode          => cu_opCode,
-      funct3_out      => cu_funct3
+      i_inst        => ifid_instr,
+      o_sel_pc4_alu => cu_selMuxPc4ALU,
+      o_ext_imm_op  => cu_opExImm,
+      o_wb_sel      => cu_selMuxALUPc4RAM,
+      o_we_reg      => base_weReg,
+      o_ext_ram_op  => cu_opExRAM,
+      o_sel_rs2_imm => cu_selMuxRS2Imm,
+      o_sel_pc_rs1  => base_selPCRS1,
+      o_alu_op      => cu_opALU,
+      o_we_ram      => cu_weRAM,
+      o_re_ram      => cu_reRAM,
+      o_en_ram      => cu_eRAM,
+      o_opcode      => cu_opCode,
+      o_funct3      => cu_funct3
     );
 
   -- =========================================================================
@@ -681,7 +684,7 @@ begin
 
   -- A instrucao CSR carrega o endereco do CSR em instruction[31:20], o mesmo
   -- campo do imediato do tipo I.
-  id_opExImm <= OPEXIMM_I when csr_useImmI = '1' else std_logic_vector(cu_opExImm);
+  id_opExImm <= EXT_IMM_I when csr_useImmI = '1' else std_logic_vector(cu_opExImm);
 
   -- =========================================================================
   -- ID stage: ExtenderImm

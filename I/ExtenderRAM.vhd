@@ -1,7 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.rv32i_ctrl_consts.all;
+use work.ext_ram_consts.all;
 
 entity ExtenderRAM is 
   port(
@@ -20,10 +20,10 @@ process(signalIn, opExRAM, EA)
   variable halfVal  : std_logic_vector(15 downto 0);
 begin
   case opExRAM is
-    when OPEXRAM_LW =>
+    when EXT_RAM_LW =>
       signalOut <= signalIn;
 
-    when OPEXRAM_LH =>
+    when EXT_RAM_LH =>
       if EA(1) = '0' then
         halfVal := signalIn(15 downto 0);
       else
@@ -31,7 +31,7 @@ begin
       end if;
       signalOut <= (31 downto 16 => halfVal(15)) & halfVal;
 
-    when OPEXRAM_LHU =>
+    when EXT_RAM_LHU =>
       if EA(1) = '0' then
         halfVal := signalIn(15 downto 0);
       else
@@ -39,7 +39,7 @@ begin
       end if;
       signalOut <= (31 downto 16 => '0') & halfVal;
 
-    when OPEXRAM_LB =>
+    when EXT_RAM_LB =>
       case EA is
         when "00" => byteVal := signalIn(7 downto 0);
         when "01" => byteVal := signalIn(15 downto 8);
@@ -48,7 +48,7 @@ begin
       end case;
       signalOut <= (31 downto 8 => byteVal(7)) & byteVal;
 
-    when OPEXRAM_LBU =>
+    when EXT_RAM_LBU =>
       case EA is
         when "00" => byteVal := signalIn(7 downto 0);
         when "01" => byteVal := signalIn(15 downto 8);

@@ -1,9 +1,9 @@
 -- =============================================================================
--- Constantes de código de operação da ULA (Unidade Lógica e Aritmética)
+-- Constantes de código de operação da ULA (alu_op_t)
 --
--- Define os seletores de 5 bits (ALU_*) utilizados pela entidade alu para
--- executar operações aritméticas, lógicas, deslocamentos, comparações e
--- avaliação de desvios condicionais da arquitetura RV32I.
+-- Define os seletores de 5 bits (ALU_*) utilizados pela unidade de controle e
+-- pela entidade alu para executar operações aritméticas, lógicas,
+-- deslocamentos, comparações e avaliação de desvios condicionais.
 -- =============================================================================
 
 library ieee;

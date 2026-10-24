@@ -1,7 +1,9 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.rv32i_ctrl_consts.all;
+use work.ext_imm_consts.all;
+use work.ext_ram_consts.all;
+use work.alu_consts.all;
 
 entity InstructionDecoder is
   port (
@@ -79,7 +81,7 @@ begin
     selPCRS1        <= '0';
     opALU           <= (others => '0');
     weRAM           <= '0';
-	 isMulDiv        <= '0';  -- NOVO default
+	  isMulDiv        <= '0';  -- NOVO default
     reRAM           <= '0';
     eRAM            <= '0';
 
@@ -92,13 +94,13 @@ begin
           when "001" =>  -- SLLI (funct7 = 0000000)
             if funct7 = "0000000" then
               selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
+              opExImm         <= EXT_IMM_I_SHAMT;
               selMuxALUPc4RAM <= "00";
               weReg           <= '1';
               opExRAM         <= "000";
               selMuxRS2Imm    <= '1';
               selPCRS1        <= '1';
-              opALU           <= OPALU_SLL;
+              opALU           <= ALU_SLL;
               weRAM           <= '0';
               reRAM           <= '0';
               eRAM            <= '0';
@@ -107,25 +109,25 @@ begin
           when "101" =>  -- SRLI / SRAI
             if funct7 = "0000000" then -- SRLI
               selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
+              opExImm         <= EXT_IMM_I_SHAMT;
               selMuxALUPc4RAM <= "00";
               weReg           <= '1';
               opExRAM         <= "000";
               selMuxRS2Imm    <= '1';
               selPCRS1        <= '1';
-              opALU           <= OPALU_SRL;
+              opALU           <= ALU_SRL;
               weRAM           <= '0';
               reRAM           <= '0';
               eRAM            <= '0';
             elsif funct7 = "0100000" then -- SRAI
               selMuxPc4ALU    <= '0';
-              opExImm         <= OPEXIMM_I_SHAMT;
+              opExImm         <= EXT_IMM_I_SHAMT;
               selMuxALUPc4RAM <= "00";
               weReg           <= '1';
               opExRAM         <= "000";
               selMuxRS2Imm    <= '1';
               selPCRS1        <= '1';
-              opALU           <= OPALU_SRA;
+              opALU           <= ALU_SRA;
               weRAM           <= '0';
               reRAM           <= '0';
               eRAM            <= '0';
@@ -133,78 +135,78 @@ begin
 
           when "000" =>  -- ADDI
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_ADD;
+            opALU           <= ALU_ADD;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
 
           when "100" => -- XORI
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_XOR;
+            opALU           <= ALU_XOR;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
 
           when "110" => -- ORI
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_OR;
+            opALU           <= ALU_OR;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
 
           when "111" => -- ANDI
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_AND;
+            opALU           <= ALU_AND;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
 
           when "010" => -- SLTI
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_SLT;
+            opALU           <= ALU_SLT;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
 
           when "011" => -- SLTIU
             selMuxPc4ALU    <= '0';
-            opExImm         <= OPEXIMM_I;
+            opExImm         <= EXT_IMM_I;
             selMuxALUPc4RAM <= "00";
             weReg           <= '1';
             opExRAM         <= "000";
             selMuxRS2Imm    <= '1';
             selPCRS1        <= '1';
-            opALU           <= OPALU_SLTU;
+            opALU           <= ALU_SLTU;
             weRAM           <= '0';
             reRAM           <= '0';
             eRAM            <= '0';
@@ -244,9 +246,9 @@ begin
 
             when "000" =>
               if funct7 = "0000000" then
-                opALU <= OPALU_ADD;
+                opALU <= ALU_ADD;
               elsif funct7 = "0100000" then
-                opALU <= OPALU_SUB;
+                opALU <= ALU_SUB;
               end if;
 
               selMuxPc4ALU    <= '0';
@@ -261,41 +263,41 @@ begin
               eRAM            <= '0';
 
             when "100" =>
-              opALU    <= OPALU_XOR;
+              opALU    <= ALU_XOR;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "110" =>
-              opALU    <= OPALU_OR;
+              opALU    <= ALU_OR;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "111" =>
-              opALU    <= OPALU_AND;
+              opALU    <= ALU_AND;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "001" =>
-              opALU    <= OPALU_SLL;
+              opALU    <= ALU_SLL;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "101" =>
               if funct7 = "0000000" then
-                opALU <= OPALU_SRL;
+                opALU <= ALU_SRL;
               elsif funct7 = "0100000" then
-                opALU <= OPALU_SRA;
+                opALU <= ALU_SRA;
               end if;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "010" =>
-              opALU    <= OPALU_SLT;
+              opALU    <= ALU_SLT;
               weReg    <= '1';
               selPCRS1 <= '1';
 
             when "011" =>
-              opALU    <= OPALU_SLTU;
+              opALU    <= ALU_SLTU;
               weReg    <= '1';
               selPCRS1 <= '1';
 
@@ -309,7 +311,7 @@ begin
       -- Branches (B-type)
       when "1100011" =>
         selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_B;
+        opExImm         <= EXT_IMM_B;
         selMuxALUPc4RAM <= "00";
         weReg           <= '0';
         opExRAM         <= "000";
@@ -320,47 +322,47 @@ begin
         eRAM            <= '0';
 
         case funct3 is
-          when "000" => opALU <= OPALU_BEQ;
-          when "001" => opALU <= OPALU_BNE;
-          when "100" => opALU <= OPALU_BLT;
-          when "101" => opALU <= OPALU_BGE;
-          when "110" => opALU <= OPALU_BLTU;
-          when "111" => opALU <= OPALU_BGEU;
+          when "000" => opALU <= ALU_BEQ;
+          when "001" => opALU <= ALU_BNE;
+          when "100" => opALU <= ALU_BLT;
+          when "101" => opALU <= ALU_BGE;
+          when "110" => opALU <= ALU_BLTU;
+          when "111" => opALU <= ALU_BGEU;
           when others => opALU <= (others => '0');
         end case;
 
       -- Loads (I-type loads)
       when "0000011" =>
         selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_I;
+        opExImm         <= EXT_IMM_I;
         selMuxALUPc4RAM <= "10";
         weReg           <= '1';
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '1';
-        opALU           <= OPALU_ADD;
+        opALU           <= ALU_ADD;
         weRAM           <= '0';
         reRAM           <= '1';
         eRAM            <= '1';
 
         case funct3 is
           when "010" => opExRAM <= "000"; -- LW
-          when "001" => opExRAM <= OPEXRAM_LH; -- LH
-          when "101" => opExRAM <= OPEXRAM_LHU; -- LHU
-          when "000" => opExRAM <= OPEXRAM_LB; -- LB
-          when "100" => opExRAM <= OPEXRAM_LBU; -- LBU
+          when "001" => opExRAM <= EXT_RAM_LH; -- LH
+          when "101" => opExRAM <= EXT_RAM_LHU; -- LHU
+          when "000" => opExRAM <= EXT_RAM_LB; -- LB
+          when "100" => opExRAM <= EXT_RAM_LBU; -- LBU
           when others => opExRAM <= "000";
         end case;
 
       -- Stores (S-type)
       when "0100011" =>
         selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_S;
+        opExImm         <= EXT_IMM_S;
         selMuxALUPc4RAM <= "00";
         weReg           <= '0';
         opExRAM         <= "000";
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '1';
-        opALU           <= OPALU_ADD;
+        opALU           <= ALU_ADD;
         weRAM           <= '1';
         reRAM           <= '0';
         eRAM            <= '1';
@@ -368,13 +370,13 @@ begin
       -- LUI
       when "0110111" =>
         selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_U;
+        opExImm         <= EXT_IMM_U;
         selMuxALUPc4RAM <= "00";
         weReg           <= '1';
         opExRAM         <= "000";
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '0';
-        opALU           <= OPALU_PASS_B;
+        opALU           <= ALU_PASS_B;
         weRAM           <= '0';
         reRAM           <= '0';
         eRAM            <= '0';
@@ -382,13 +384,13 @@ begin
       -- AUIPC
       when "0010111" =>
         selMuxPc4ALU    <= '0';
-        opExImm         <= OPEXIMM_U;
+        opExImm         <= EXT_IMM_U;
         selMuxALUPc4RAM <= "00";
         weReg           <= '1';
         opExRAM         <= "000";
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '0';
-        opALU           <= OPALU_ADD;
+        opALU           <= ALU_ADD;
         weRAM           <= '0';
         reRAM           <= '0';
         eRAM            <= '0';
@@ -396,13 +398,13 @@ begin
       -- JAL
       when "1101111" =>
         selMuxPc4ALU    <= '1';
-        opExImm         <= OPEXIMM_J;
+        opExImm         <= EXT_IMM_J;
         selMuxALUPc4RAM <= "01";
         weReg           <= '1';
         opExRAM         <= "000";
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '0';
-        opALU           <= OPALU_ADD;
+        opALU           <= ALU_ADD;
         weRAM           <= '0';
         reRAM           <= '0';
         eRAM            <= '0';
@@ -410,13 +412,13 @@ begin
       -- JALR
       when "1100111" =>
         selMuxPc4ALU    <= '1';
-        opExImm         <= OPEXIMM_I;
+        opExImm         <= EXT_IMM_I;
         selMuxALUPc4RAM <= "01";
         weReg           <= '1';
         opExRAM         <= "000";
         selMuxRS2Imm    <= '1';
         selPCRS1        <= '1';
-        opALU           <= OPALU_JALR;
+        opALU           <= ALU_JALR;
         weRAM           <= '0';
         reRAM           <= '0';
         eRAM            <= '0';

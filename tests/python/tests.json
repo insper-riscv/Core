@@ -22,7 +22,7 @@
         "sources": [
             "common/pipeline_types.vhd",
             "common/utils_pkg.vhd",
-            "I/alu_consts.vhd",
+            "common/alu_consts.vhd",
             "I/alu.vhd"
         ],
         "test_module": "tests.python.unittests.I.ALU"
@@ -30,7 +30,10 @@
     "InstructionDecoder": {
         "toplevel": "instructiondecoder",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
+            "common/pipeline_types.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
             "common/InstructionDecoder.vhd"
         ],
         "test_module": "tests.python.unittests.common.instructionDecoder"
@@ -38,7 +41,8 @@
     "ExtenderRAM": {
         "toplevel": "extenderram",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
+            "common/pipeline_types.vhd",
+            "common/ext_ram_consts.vhd",
             "I/ExtenderRAM.vhd"
         ],
         "test_module": "tests.python.unittests.I.ExtenderRAM"
@@ -46,7 +50,8 @@
     "ExtenderImm": {
         "toplevel": "extenderimm",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
+            "common/pipeline_types.vhd",
+            "common/ext_imm_consts.vhd",
             "I/ExtenderImm.vhd"
         ],
         "test_module": "tests.python.unittests.I.ExtenderImm"
@@ -61,7 +66,14 @@
     "ControlUnit": {
         "toplevel": "control_unit",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
             "common/control_unit.vhd"
         ],
         "test_module": "tests.python.unittests.common.control_unit"
@@ -69,7 +81,14 @@
     "ControlUnit_M_nop": {
         "toplevel": "control_unit",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
             "common/control_unit.vhd"
         ],
         "test_module": "tests.python.unittests.common.control_unit_m_is_nop"
@@ -114,8 +133,14 @@
     "CoreSdramStall": {
         "toplevel": "rv32im_pipeline_core",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
             "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
             "common/adder_u.vhd",
@@ -123,7 +148,6 @@
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
             "common/utils_pkg.vhd",
-            "I/alu_consts.vhd",
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
@@ -180,8 +204,14 @@
     "CoreFetchStall": {
         "toplevel": "rv32im_pipeline_core",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
             "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
             "common/adder_u.vhd",
@@ -189,7 +219,6 @@
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
             "common/utils_pkg.vhd",
-            "I/alu_consts.vhd",
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
@@ -225,8 +254,14 @@
     "CoreFenceI": {
         "toplevel": "rv32im_pipeline_core",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
             "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
             "common/adder_u.vhd",
@@ -234,7 +269,6 @@
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
             "common/utils_pkg.vhd",
-            "I/alu_consts.vhd",
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
@@ -272,16 +306,26 @@
     "CoreFenceIDcache": {
         "toplevel": "rv32im_pipeline_core",
         "sources": [
-            "common/rv32i_ctrl_consts.vhd",
-            "common/rv32im_pipeline_types.vhd",
-            "common/genericRegister.vhd",
-            "common/genericAdder.vhd",
-            "common/genericAdderU.vhd",
-            "common/genericMux2x1.vhd",
-            "common/genericMux3x1.vhd",
-            "common/FlipFlop.vhd",
-            "I/ALU.vhd",
-            "common/RegFile.vhd",
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
+            "common/generic_register.vhd",
+            "common/adder.vhd",
+            "common/adder_u.vhd",
+            "common/mux_2x1.vhd",
+            "common/mux_4x1.vhd",
+            "common/flip_flop.vhd",
+            "common/utils_pkg.vhd",
+            "I/alu.vhd",
+            "common/onehot_decoder.vhd",
+            "common/mux_tree.vhd",
+            "common/tristate_mux.vhd",
+            "common/reg_file.vhd",
             "common/InstructionDecoder.vhd",
             "I/ExtenderImm.vhd",
             "I/ExtenderRAM.vhd",
@@ -290,7 +334,7 @@
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
             "common/hazard_detection_unit.vhd",
-            "common/extendSigned.vhd",
+            "common/extend_signed.vhd",
             "Zifencei/fencei_unit.vhd",
             "common/pc_fetch.vhd",
             "common/reg_IF_ID.vhd",
