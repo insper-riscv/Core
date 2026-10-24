@@ -12,10 +12,8 @@ use ieee.std_logic_1164.all;
 
 package utils_pkg is
 
-  -- Elemento de palavra de largura não-constrangida.
-  subtype word_t is std_logic_vector;
-  -- Matriz não-constrangida de palavras de dados.
-  type    word_array_t is array (natural range <>) of word_t;
+  -- Matriz não-constrangida de palavras de dados (compatível com VHDL-2008).
+  type word_array_t is array (natural range <>) of std_logic_vector;
 
   -- Retorna '1' quando os vetores a e b são bit a bit iguais, e '0' caso contrário.
   function equals(a : in std_logic_vector; b : in std_logic_vector) return std_logic;

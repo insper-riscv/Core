@@ -128,7 +128,7 @@
         "test_module": "tests.python.unittests.common.BubbleMux"
     },
     "CoreSdramStall": {
-        "toplevel": "rv32im_pipeline_core",
+        "toplevel": "cpu",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -139,9 +139,9 @@
             "common/ext_ram_consts.vhd",
             "common/wb_sel_consts.vhd",
             "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
-            "common/adder_u.vhd",
             "common/mux_2x1.vhd",
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
@@ -149,7 +149,6 @@
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
-            "common/tristate_mux.vhd",
             "common/reg_file.vhd",
             "I/extender_imm.vhd",
             "I/extender_ram.vhd",
@@ -158,17 +157,21 @@
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
             "common/hazard_detection_unit.vhd",
-            "common/extend_signed.vhd",
             "common/pc_fetch.vhd",
             "common/reg_if_id.vhd",
             "common/reg_id_ex.vhd",
             "common/reg_ex_mem.vhd",
             "common/reg_mem_wb.vhd",
-            "cores/rv32im_pipeline_core.vhd"
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/cpu.vhd"
         ],
         "test_module": "tests.python.unittests.cores.SdramStall",
         "parameters": {
-            "HAS_M": false
+            "has_m": false
         },
         "build_args": [
             "--std=08"
@@ -208,7 +211,7 @@
         "test_module": "tests.python.unittests.Zicsr.trap_unit"
     },
     "CoreFetchStall": {
-        "toplevel": "rv32im_pipeline_core",
+        "toplevel": "cpu",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -219,9 +222,9 @@
             "common/ext_ram_consts.vhd",
             "common/wb_sel_consts.vhd",
             "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
-            "common/adder_u.vhd",
             "common/mux_2x1.vhd",
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
@@ -229,7 +232,6 @@
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
-            "common/tristate_mux.vhd",
             "common/reg_file.vhd",
             "I/extender_imm.vhd",
             "I/extender_ram.vhd",
@@ -238,17 +240,21 @@
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
             "common/hazard_detection_unit.vhd",
-            "common/extend_signed.vhd",
             "common/pc_fetch.vhd",
             "common/reg_if_id.vhd",
             "common/reg_id_ex.vhd",
             "common/reg_ex_mem.vhd",
             "common/reg_mem_wb.vhd",
-            "cores/rv32im_pipeline_core.vhd"
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/cpu.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FetchStall",
         "parameters": {
-            "HAS_M": false
+            "has_m": false
         },
         "build_args": [
             "--std=08"
@@ -258,7 +264,7 @@
         ]
     },
     "CoreFenceI": {
-        "toplevel": "rv32im_pipeline_core",
+        "toplevel": "cpu",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -269,9 +275,9 @@
             "common/ext_ram_consts.vhd",
             "common/wb_sel_consts.vhd",
             "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
-            "common/adder_u.vhd",
             "common/mux_2x1.vhd",
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
@@ -279,7 +285,6 @@
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
-            "common/tristate_mux.vhd",
             "common/reg_file.vhd",
             "I/extender_imm.vhd",
             "I/extender_ram.vhd",
@@ -288,19 +293,23 @@
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
             "common/hazard_detection_unit.vhd",
-            "common/extend_signed.vhd",
             "Zifencei/fencei_unit.vhd",
             "common/pc_fetch.vhd",
             "common/reg_if_id.vhd",
             "common/reg_id_ex.vhd",
             "common/reg_ex_mem.vhd",
             "common/reg_mem_wb.vhd",
-            "cores/rv32im_pipeline_core.vhd"
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/cpu.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FenceI",
         "parameters": {
-            "HAS_M": false,
-            "HAS_ZIFENCEI": true
+            "has_m": false,
+            "has_zifencei": true
         },
         "build_args": [
             "--std=08"
@@ -310,7 +319,7 @@
         ]
     },
     "CoreFenceIDcache": {
-        "toplevel": "rv32im_pipeline_core",
+        "toplevel": "cpu",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -321,9 +330,9 @@
             "common/ext_ram_consts.vhd",
             "common/wb_sel_consts.vhd",
             "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
             "common/generic_register.vhd",
             "common/adder.vhd",
-            "common/adder_u.vhd",
             "common/mux_2x1.vhd",
             "common/mux_4x1.vhd",
             "common/flip_flop.vhd",
@@ -331,7 +340,6 @@
             "I/alu.vhd",
             "common/onehot_decoder.vhd",
             "common/mux_tree.vhd",
-            "common/tristate_mux.vhd",
             "common/reg_file.vhd",
             "I/extender_imm.vhd",
             "I/extender_ram.vhd",
@@ -340,20 +348,24 @@
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
             "common/hazard_detection_unit.vhd",
-            "common/extend_signed.vhd",
             "Zifencei/fencei_unit.vhd",
             "common/pc_fetch.vhd",
             "common/reg_if_id.vhd",
             "common/reg_id_ex.vhd",
             "common/reg_ex_mem.vhd",
             "common/reg_mem_wb.vhd",
-            "cores/rv32im_pipeline_core.vhd"
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/cpu.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FenceIDcache",
         "parameters": {
-            "HAS_M": false,
-            "HAS_ZIFENCEI": true,
-            "HAS_DCACHE": true
+            "has_m": false,
+            "has_zifencei": true,
+            "has_dcache": true
         },
         "build_args": [
             "--std=08"

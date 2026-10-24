@@ -17,7 +17,5 @@ package wb_sel_consts is
 	constant WB_SEL_PC4 : wb_sel_t := "01";
 	-- Seleciona o dado lido e estendido da memória de dados (instruções de load).
 	constant WB_SEL_RAM : wb_sel_t := "10";
-	-- Seleciona o valor lido do registrador CSR (extensão Zicsr).
-	constant WB_SEL_CSR : wb_sel_t := "11";
 
 end package wb_sel_consts;

@@ -143,17 +143,17 @@ async def _run(dut, stall_for):
     ram = {}
     sdram = {0x40000008: 0xAA}
 
-    dut.reset.value = 1
-    dut.sdram_ready.value = 0
-    dut.sdram_rdata.value = 0
-    dut.boot_rom_data.value = 0
-    dut.flash_data.value = 0
-    dut.flash_data2.value = 0
-    dut.ram_rdata.value = 0
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    dut.i_rst.value = 1
+    dut.i_sdram_ready.value = 0
+    dut.i_sdram_rdata.value = 0
+    dut.i_boot_rom_data.value = 0
+    dut.i_flash_data.value = 0
+    dut.i_flash_data2.value = 0
+    dut.i_ram_rdata.value = 0
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
-        await RisingEdge(dut.clk)
-    dut.reset.value = 0
+        await RisingEdge(dut.i_clk)
+    dut.i_rst.value = 0
 
     state = "idle"          # idle, wait, done
     countdown = 0
@@ -165,51 +165,51 @@ async def _run(dut, stall_for):
     held_addr = None
 
     for _ in range(4000):
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")     # outputs of this cycle have settled
 
         # instruction memory: on the board it is clocked 120 degrees ahead of the
         # core, so the word of the address presented in a cycle is there in the
         # same cycle
-        if dut.if_addr.value.is_resolvable:
-            word = imem.get(int(dut.if_addr.value) & ~3, 0)
-            dut.boot_rom_data.value = word
-            dut.flash_data.value = word
+        if dut.o_if_addr.value.is_resolvable:
+            word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
+            dut.i_boot_rom_data.value = word
+            dut.i_flash_data.value = word
 
         # internal RAM: record the stores
-        if dut.ram_en.value.is_resolvable and int(dut.ram_en.value) and int(dut.ram_wren.value):
-            addr = int(dut.ram_addr.value) & ~3
+        if dut.o_ram_en.value.is_resolvable and int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
+            addr = int(dut.o_ram_addr.value) & ~3
             ram[addr] = _bytes_merge(
-                ram.get(addr, 0), int(dut.ram_wdata.value), int(dut.ram_byteena.value)
+                ram.get(addr, 0), int(dut.o_ram_wdata.value), int(dut.o_ram_byteena.value)
             )
 
         # SDRAM slave: the pipeline advanced on the edge that just happened
         if state == "done" and advance_seen:
-            dut.sdram_ready.value = 0
+            dut.i_sdram_ready.value = 0
             rdata_q = pending_read
-            dut.sdram_rdata.value = rdata_q
+            dut.i_sdram_rdata.value = rdata_q
             state = "idle"
             advance_seen = False
             held_addr = None
             await Timer(1, unit="ns")     # let the dropped ready reach the core
 
-        active = int(dut.sdram_rden.value) or int(dut.sdram_wren.value)
+        active = int(dut.o_sdram_rden.value) or int(dut.o_sdram_wren.value)
         if state == "idle" and active:
             access = {
-                "addr": int(dut.sdram_addr.value) & ~3,
-                "we": int(dut.sdram_wren.value),
-                "wdata": int(dut.sdram_wdata.value),
-                "be": int(dut.sdram_byteena.value),
+                "addr": int(dut.o_sdram_addr.value) & ~3,
+                "we": int(dut.o_sdram_wren.value),
+                "wdata": int(dut.o_sdram_wdata.value),
+                "be": int(dut.o_sdram_byteena.value),
             }
-            held_addr = int(dut.sdram_addr.value)
+            held_addr = int(dut.o_sdram_addr.value)
             countdown = stall_for(accesses)
             accesses += 1
             state = "wait"
 
         if state == "wait":
             assert active, "the access left the bus before it completed"
-            assert int(dut.sdram_addr.value) == held_addr, "address moved during the wait"
-            assert int(dut.mem_advance.value) == 0, "the pipeline advanced while not ready"
+            assert int(dut.o_sdram_addr.value) == held_addr, "address moved during the wait"
+            assert int(dut.o_mem_advance.value) == 0, "the pipeline advanced while not ready"
             if countdown == 0:
                 if access["we"]:
                     sdram[access["addr"]] = _bytes_merge(
@@ -217,14 +217,14 @@ async def _run(dut, stall_for):
                     )
                 else:
                     pending_read = sdram.get(access["addr"], 0)
-                dut.sdram_ready.value = 1
+                dut.i_sdram_ready.value = 1
                 state = "done"
             else:
                 countdown -= 1
 
         if state == "done":
             await Timer(1, unit="ns")
-            if int(dut.mem_advance.value):
+            if int(dut.o_mem_advance.value):
                 advance_seen = True       # takes effect on the next edge
 
         if ram.get(0x807C) == 1 and state == "idle":

@@ -75,17 +75,17 @@ async def run(dut, latency_for):
     code = {CODE_BASE + 4 * i: w for i, w in enumerate(CODE)}
     ram = {}
 
-    dut.reset.value = 1
-    dut.boot_rom_data.value = 0
-    dut.flash_data.value = 0
-    dut.flash_data2.value = 0
-    dut.ram_rdata.value = 0
-    dut.ic_data.value = 0
-    dut.ic_ready.value = 0
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    dut.i_rst.value = 1
+    dut.i_boot_rom_data.value = 0
+    dut.i_flash_data.value = 0
+    dut.i_flash_data2.value = 0
+    dut.i_ram_rdata.value = 0
+    dut.i_ic_data.value = 0
+    dut.i_ic_ready.value = 0
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
-        await RisingEdge(dut.clk)
-    dut.reset.value = 0
+        await RisingEdge(dut.i_clk)
+    dut.i_rst.value = 0
 
     read_pending = 0
     last_addr = None
@@ -93,37 +93,37 @@ async def run(dut, latency_for):
     fetches = 0
     waited_cycles = 0
     for _ in range(6000):
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-        addr = int(dut.if_addr.value) & ~3
+        addr = int(dut.o_if_addr.value) & ~3
         # the RAM has a registered read: the word of a load in MEM is there while it is in WB
-        dut.ram_rdata.value = read_pending
+        dut.i_ram_rdata.value = read_pending
 
         word = boot.get(addr, 0)
-        dut.boot_rom_data.value = word
-        dut.flash_data.value = word
+        dut.i_boot_rom_data.value = word
+        dut.i_flash_data.value = word
 
-        if int(dut.ic_sel.value) == 1:
+        if int(dut.o_ic_sel.value) == 1:
             if addr != last_addr:
                 wait = latency_for(fetches)
                 fetches += 1
                 last_addr = addr
-            dut.ic_data.value = code.get(addr, 0)
+            dut.i_ic_data.value = code.get(addr, 0)
             if wait == 0:
-                dut.ic_ready.value = 1
+                dut.i_ic_ready.value = 1
             else:
-                dut.ic_ready.value = 0
+                dut.i_ic_ready.value = 0
                 wait -= 1
                 waited_cycles += 1
         else:
             last_addr = None
-            dut.ic_ready.value = 1
+            dut.i_ic_ready.value = 1
 
-        if int(dut.ram_en.value) and int(dut.ram_rden.value):
-            read_pending = ram.get(int(dut.ram_addr.value) & ~3, 0)
-        if int(dut.ram_en.value) and int(dut.ram_wren.value):
-            a = int(dut.ram_addr.value) & ~3
-            ram[a] = _bytes_merge(ram.get(a, 0), int(dut.ram_wdata.value), int(dut.ram_byteena.value))
+        if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
+            read_pending = ram.get(int(dut.o_ram_addr.value) & ~3, 0)
+        if int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
+            a = int(dut.o_ram_addr.value) & ~3
+            ram[a] = _bytes_merge(ram.get(a, 0), int(dut.o_ram_wdata.value), int(dut.o_ram_byteena.value))
         if ram.get(0x807C) == 1:
             break
     return ram, fetches, waited_cycles

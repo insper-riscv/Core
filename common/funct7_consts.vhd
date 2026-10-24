@@ -35,31 +35,9 @@ package funct7_consts is
   ------------------------------------------------------------------
   -- OP (R-type RV32I) funct7[6:0]
   ------------------------------------------------------------------
-  -- Campo funct7 da instrução ADD.
-  constant FUNCT7_ADD     : funct7_t := "0000000";
   -- Campo funct7 da instrução SUB.
   constant FUNCT7_SUB     : funct7_t := "0100000";
-  -- Campo funct7 da instrução SLL.
-  constant FUNCT7_SLL     : funct7_t := "0000000";
-  -- Campo funct7 da instrução SLT.
-  constant FUNCT7_SLT     : funct7_t := "0000000";
-  -- Campo funct7 da instrução SLTU.
-  constant FUNCT7_SLTU    : funct7_t := "0000000";
-  -- Campo funct7 da instrução XOR.
-  constant FUNCT7_XOR     : funct7_t := "0000000";
-  -- Campo funct7 da instrução SRL.
-  constant FUNCT7_SRL     : funct7_t := "0000000";
   -- Campo funct7 da instrução SRA.
   constant FUNCT7_SRA     : funct7_t := "0100000";
-  -- Campo funct7 da instrução OR.
-  constant FUNCT7_OR      : funct7_t := "0000000";
-  -- Campo funct7 da instrução AND.
-  constant FUNCT7_AND     : funct7_t := "0000000";
-
-  ------------------------------------------------------------------
-  -- Extensao M (MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU)
-  ------------------------------------------------------------------
-  -- Campo funct7 compartilhado por todas as instruções da extensão M.
-  constant FUNCT7_M       : funct7_t := "0000001";
 
 end package funct7_consts;

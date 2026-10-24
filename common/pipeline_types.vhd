@@ -23,6 +23,8 @@ package pipeline_types is
 
   -- Índice de registrador de uso geral (x0 a x31, 5 bits).
   subtype reg_t     is std_logic_vector(4 downto 0);
+  -- Índice do registrador arquitetural x0 (sempre zero).
+  constant REG_ZERO : reg_t := "00000";
   
   -- Código de operação da ULA (5 bits).
   subtype alu_op_t  is std_logic_vector(4 downto 0);

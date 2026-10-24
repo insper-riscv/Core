@@ -8,9 +8,10 @@
 --   - Divisão e Resto (34 ciclos via non_restoring_divider_rv32):
 --     DIV, DIVU, REM e REMU.
 --
--- Registra a operação iniciada (funct3_latched) no pulso de i_start e captura o
--- resultado final (result_latched) no pulso de conclusão (done_int) usando
--- instâncias estruturais de generic_register.
+-- Gera internamente o pulso único de início (start_pulse) no primeiro ciclo em
+-- que uma instrução válida da extensão M entra no estágio EX (i_valid = '1' e
+-- i_is_muldiv = '1') e mantém o_stall = '1' durante toda a execução e no ciclo
+-- de captura do resultado final (u_result_reg).
 -- =============================================================================
 
 library ieee;
@@ -22,27 +23,40 @@ use work.funct3_consts.all;
 entity multdiv is
 	port (
 		-- Sinal de clock do sistema.
-		i_clk    : in  std_logic;
+		i_clk       : in  std_logic;
 		-- Sinal de reset ativo em '1'.
-		i_rst    : in  std_logic := '0';
-		-- Pulso de 1 ciclo que inicia a operação da extensão M no estágio EX.
-		i_start  : in  std_logic := '0';
+		i_rst       : in  std_logic := '0';
+		-- Indica que há uma instrução válida no estágio EX.
+		i_valid     : in  std_logic := '0';
+		-- Indica que a instrução no estágio EX pertence à extensão M.
+		i_is_muldiv : in  std_logic := '0';
 		-- Código funct3 que seleciona a operação (MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU).
-		i_funct3 : in  funct3_t;
+		i_funct3    : in  funct3_t;
 		-- Primeiro operando de 32 bits (rs1).
-		i_a      : in  word_t;
+		i_a         : in  word_t;
 		-- Segundo operando de 32 bits (rs2).
-		i_b      : in  word_t;
+		i_b         : in  word_t;
 		-- Resultado final de 32 bits registrado ao término da operação.
-		o_result : out word_t;
+		o_result    : out word_t;
+		-- Indica que o estágio EX deve permanecer em stall aguardando o resultado da extensão M.
+		o_stall     : out std_logic;
 		-- Indica que o multiplicador ou o divisor está em execução.
-		o_busy   : out std_logic;
+		o_busy      : out std_logic;
 		-- Pulso de 1 ciclo indicando conclusão do cálculo.
-		o_done   : out std_logic
+		o_done      : out std_logic
 	);
 end entity multdiv;
 
 architecture rtl of multdiv is
+
+	-- Estado registrado que indica que a instrução M atual no estágio EX já recebeu o pulso de partida.
+	signal started_q      : std_logic := '0';
+	-- Próximo estado do flip-flop started_q.
+	signal started_nxt    : std_logic;
+	-- Pulso de 1 ciclo que inicia o multiplicador ou divisor no primeiro ciclo da instrução M em EX.
+	signal start_pulse    : std_logic;
+	-- Sinal interno de stall (ativo enquanto busy = '1' ou done = '1').
+	signal stall_int      : std_logic;
 
 	-- Indica se o funct3 atual na entrada seleciona uma multiplicação (bit 2 = '0').
 	signal is_mult        : std_logic;
@@ -87,6 +101,8 @@ architecture rtl of multdiv is
 	signal div_busy       : std_logic;
 	-- Pulso de conclusão do divisor não-restaurador.
 	signal div_done       : std_logic;
+	-- Sinal interno de ocupação combinando multiplicador e divisor.
+	signal busy_int       : std_logic;
 	-- Pulso interno de conclusão combinando multiplicador e divisor.
 	signal done_int       : std_logic;
 
@@ -104,12 +120,25 @@ architecture rtl of multdiv is
 
 begin
 
+	-- Geração de pulso único de partida por instrução M no estágio EX.
+	start_pulse <= i_is_muldiv and i_valid and (not started_q);
+	started_nxt <= '0' when stall_int = '0' else '1';
+
+	u_started_ff : entity work.flip_flop
+		port map (
+			i_d      => started_nxt,
+			o_d      => started_q,
+			i_enable => '1',
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
 	-- Decodificação combinacional do funct3 de entrada para disparo imediato (start/busy).
 	is_mult     <= '1' when i_funct3(2) = '0' else '0';
 	is_unsigned <= '1' when (i_funct3 = FUNCT3_DIVU or i_funct3 = FUNCT3_REMU) else '0';
 
-	start_mul   <= i_start and is_mult;
-	start_div   <= i_start and (not is_mult);
+	start_mul   <= start_pulse and is_mult;
+	start_div   <= start_pulse and (not is_mult);
 
 	-- Registrador que preserva o funct3 da instrução iniciada durante todos os ciclos de cálculo.
 	u_funct3_reg : entity work.generic_register
@@ -119,7 +148,7 @@ begin
 		port map (
 			i_clk    => i_clk,
 			i_rst    => i_rst,
-			i_enable => i_start,
+			i_enable => start_pulse,
 			i_d      => i_funct3,
 			o_d      => funct3_latched
 		);
@@ -135,9 +164,13 @@ begin
 			"10" when FUNCT3_MULHSU,
 			"00" when others;
 
-	o_busy   <= mult_busy or div_busy;
-	done_int <= mult_done or div_done;
-	o_done   <= done_int;
+	busy_int  <= mult_busy or div_busy;
+	done_int  <= mult_done or div_done;
+	stall_int <= busy_int or done_int;
+
+	o_busy    <= busy_int;
+	o_done    <= done_int;
+	o_stall   <= stall_int;
 
 	-- Instância única do multiplicador de Booth radix-2 de 32 bits.
 	u_booth_multiplier : entity work.booth_multiplier_rv32
@@ -170,10 +203,7 @@ begin
 			o_overflow    => open
 		);
 
-	-- Correção da parte alta para operandos sem sinal:
-	-- Como o multiplicador de Booth opera em complemento de 2 (32x32 signed),
-	-- se um operando X tem MSB = '1' mas a instrução o trata como unsigned,
-	-- o produto signed subtraiu (2^32 * Y); somar Y na parte alta [63:32] restaura o valor unsigned.
+	-- Correção da parte alta para operandos sem sinal (MULHSU / MULHU).
 	corr_a <= i_b when (i_a(31) = '1' and signed_mode(1) = '0') else (others => '0');
 	corr_b <= i_a when (i_b(31) = '1' and signed_mode(0) = '0') else (others => '0');
 

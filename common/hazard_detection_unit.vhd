@@ -51,9 +51,6 @@ end entity hazard_detection_unit;
 
 architecture rtl of hazard_detection_unit is
 
-	-- Endereço constante do registrador zero (x0), que nunca gera conflito de dados.
-	constant REG_ZERO : reg_t := (others => '0');
-
 	-- Indica se a instrução válida no estágio ID utiliza efetivamente o operando rs1.
 	signal ifid_uses_rs1   : std_logic;
 	-- Indica se a instrução válida no estágio ID utiliza efetivamente o operando rs2.

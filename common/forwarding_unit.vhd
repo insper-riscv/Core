@@ -44,9 +44,6 @@ end entity forwarding_unit;
 
 architecture rtl of forwarding_unit is
 
-	-- Endereço constante do registrador zero (x0), que nunca sofre adiantamento.
-	constant REG_ZERO : reg_t := (others => '0');
-
 begin
 
 	-- ===========================================================================

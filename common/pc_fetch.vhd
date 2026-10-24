@@ -33,14 +33,10 @@ entity pc_fetch is
 		i_jalr_target   : in  word_t;
 		-- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
 		i_redirect_pc   : in  word_t := (others => '0');
-		-- Valor atual do PC enviado ao registrador de estágio IF/ID.
+		-- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
 		o_pc            : out word_t;
 		-- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
-		o_pc4           : out word_t;
-		-- Endereço atual de busca enviado à memória de instruções.
-		o_rom_addr      : out word_t;
-		-- Habilitação de leitura da memória de instruções (sempre ativa em '1').
-		o_rom_re        : out std_logic
+		o_pc4           : out word_t
 	);
 
 end entity pc_fetch;
@@ -51,11 +47,13 @@ architecture rtl of pc_fetch is
 	constant PC_STEP_4 : word_t := x"00000004";
 
 	-- Valor atual armazenado no registrador de Program Counter.
-	signal pc_reg   : word_t := (others => '0');
+	signal pc_reg   : word_t;
 	-- Resultado combinacional da soma PC + 4.
 	signal pc4_wire : word_t;
 	-- Próximo endereço selecionado pelo multiplexador de entrada do PC.
 	signal pc_next  : word_t;
+	-- Habilitação efetiva de atualização do registrador PC.
+	signal pc_en    : std_logic;
 
 begin
 
@@ -84,21 +82,22 @@ begin
 			o_d   => pc_next
 		);
 
-	-- Registrador de PC com habilitação de escrita e prioridade para redirecionamento.
-	process(i_clk)
-	begin
-		if rising_edge(i_clk) then
-			if i_rst = '1' then
-				pc_reg <= (others => '0');
-			elsif i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT then
-				pc_reg <= pc_next;
-			end if;
-		end if;
-	end process;
+	pc_en <= '1' when (i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT) else '0';
 
-	o_pc       <= pc_reg;
-	o_pc4      <= pc4_wire;
-	o_rom_addr <= pc_reg;
-	o_rom_re   <= '1';
+	-- Registrador estrutural de 32 bits do Program Counter.
+	u_pc_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => pc_en,
+			i_d      => pc_next,
+			o_d      => pc_reg
+		);
+
+	o_pc  <= pc_reg;
+	o_pc4 <= pc4_wire;
 
 end architecture rtl;

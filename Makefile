@@ -3,7 +3,7 @@ GHDL  := ghdl
 STD   := --std=08
 WDIR  := build/ghdl
 
-VHDL := $(shell find common I M Zicsr Zifencei cores -name '*.vhd' | sort)
+VHDL := $(shell find common I M Zicsr Zifencei core -name '*.vhd' | sort)
 
 .PHONY: check profiles test paths clean
 
@@ -21,9 +21,9 @@ profiles:
 	@for p in rv32i rv32im rv32im_zicsr rv32im_zicsr_zifencei; do \
 	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
-	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([A-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
+	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
 	  $(GHDL) -a $(STD) --workdir=$$dir $$srcs && \
-	  $(GHDL) --elab-run $(STD) --workdir=$$dir rv32im_pipeline_core $$gens --stop-time=1ns >/dev/null 2>&1 \
+	  $(GHDL) --elab-run $(STD) --workdir=$$dir cpu $$gens --stop-time=1ns >/dev/null 2>&1 \
 	  && echo "profile $$p builds ($$gens)" || { echo "profile $$p FAILED"; exit 1; }; \
 	done
 

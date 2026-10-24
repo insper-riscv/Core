@@ -54,31 +54,31 @@ async def run(dut, fence, latency=2, flush_latency=None):
     ram = {}
     inval_pulses = 0
 
-    dut.reset.value = 1
-    for sig in ("boot_rom_data", "flash_data", "flash_data2", "ram_rdata", "ic_data", "sdram_rdata"):
+    dut.i_rst.value = 1
+    for sig in ("i_boot_rom_data", "i_flash_data", "i_flash_data2", "i_ram_rdata", "i_ic_data", "i_sdram_rdata"):
         getattr(dut, sig).value = 0
-    dut.ic_ready.value = 0
-    dut.sdram_ready.value = 1
-    dut.dc_done.value = 0
-    cocotb.start_soon(Clock(dut.clk, 10, unit="ns").start())
+    dut.i_ic_ready.value = 0
+    dut.i_sdram_ready.value = 1
+    dut.i_dc_done.value = 0
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
-        await RisingEdge(dut.clk)
-    dut.reset.value = 0
+        await RisingEdge(dut.i_clk)
+    dut.i_rst.value = 0
 
     read_pending = 0
     last_addr = None
     wait = 0
     for _ in range(3000):
-        await RisingEdge(dut.clk)
+        await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-        addr = int(dut.if_addr.value) & ~3
-        dut.ram_rdata.value = read_pending
+        addr = int(dut.o_if_addr.value) & ~3
+        dut.i_ram_rdata.value = read_pending
 
         word = boot.get(addr, 0)
-        dut.boot_rom_data.value = word
-        dut.flash_data.value = word
+        dut.i_boot_rom_data.value = word
+        dut.i_flash_data.value = word
 
-        if int(dut.ic_sel.value) == 1:
+        if int(dut.o_ic_sel.value) == 1:
             line = addr & ~0xF
             if line not in lines:
                 if addr != last_addr:
@@ -89,42 +89,42 @@ async def run(dut, fence, latency=2, flush_latency=None):
                 else:
                     wait -= 1
             if line in lines:
-                dut.ic_data.value = lines[line][(addr >> 2) & 3]
-                dut.ic_ready.value = 1
+                dut.i_ic_data.value = lines[line][(addr >> 2) & 3]
+                dut.i_ic_ready.value = 1
             else:
-                dut.ic_ready.value = 0
+                dut.i_ic_ready.value = 0
         else:
             last_addr = None
-            dut.ic_ready.value = 1
+            dut.i_ic_ready.value = 1
 
-        dut.dc_done.value = 0
+        dut.i_dc_done.value = 0
         if flush_latency is not None:
-            if int(dut.dc_flush.value):
+            if int(dut.o_dc_flush.value):
                 flushes += 1
                 flush_countdown = flush_latency
             elif flush_countdown is not None:
                 if flush_countdown == 0:
                     backing.update(dirty)
                     dirty.clear()
-                    dut.dc_done.value = 1
+                    dut.i_dc_done.value = 1
                     flush_countdown = None
                 else:
                     flush_countdown -= 1
         await Timer(1, unit="ns")            # the answer of the data cache reaches the core
-        if int(dut.ic_inval.value):
+        if int(dut.o_ic_inval.value):
             lines.clear()
             inval_pulses += 1
 
-        if int(dut.sdram_wren.value) and int(dut.mem_advance.value):
-            a = int(dut.sdram_addr.value) & ~3
+        if int(dut.o_sdram_wren.value) and int(dut.o_mem_advance.value):
+            a = int(dut.o_sdram_addr.value) & ~3
             target = dirty if flush_latency is not None else backing
             base = target.get(a, backing.get(a, 0))
-            target[a] = _bytes_merge(base, int(dut.sdram_wdata.value), int(dut.sdram_byteena.value))
-        if int(dut.ram_en.value) and int(dut.ram_rden.value):
-            read_pending = ram.get(int(dut.ram_addr.value) & ~3, 0)
-        if int(dut.ram_en.value) and int(dut.ram_wren.value):
-            a = int(dut.ram_addr.value) & ~3
-            ram[a] = _bytes_merge(ram.get(a, 0), int(dut.ram_wdata.value), int(dut.ram_byteena.value))
+            target[a] = _bytes_merge(base, int(dut.o_sdram_wdata.value), int(dut.o_sdram_byteena.value))
+        if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
+            read_pending = ram.get(int(dut.o_ram_addr.value) & ~3, 0)
+        if int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
+            a = int(dut.o_ram_addr.value) & ~3
+            ram[a] = _bytes_merge(ram.get(a, 0), int(dut.o_ram_wdata.value), int(dut.o_ram_byteena.value))
         if ram.get(0x807C) == 1:
             break
     return ram, (inval_pulses, flushes)

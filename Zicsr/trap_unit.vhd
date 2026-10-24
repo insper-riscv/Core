@@ -33,9 +33,9 @@ entity trap_unit is
 		-- Campo funct3 (bits [14:12]) da instrução no estágio EX.
 		i_funct3      : in  funct3_t;
 		-- Endereço do registrador destino rd (bits [11:7]) no estágio EX.
-		i_rd_idx      : in  reg_idx_t;
+		i_rd_idx      : in  reg_t;
 		-- Endereço do registrador fonte rs1 (bits [19:15]) no estágio EX.
-		i_rs1_idx     : in  reg_idx_t;
+		i_rs1_idx     : in  reg_t;
 		-- Campo imediato de 12 bits (bits [31:20] da instrução) no estágio EX.
 		i_imm12       : in  std_logic_vector(11 downto 0);
 		-- Endereço efetivo de memória calculado pela ULA no estágio EX.
