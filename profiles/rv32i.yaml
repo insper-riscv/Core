@@ -27,9 +27,9 @@ sources:
   - common/mux_tree.vhd
   - common/tristate_mux.vhd
   - common/reg_file.vhd
-  - I/ExtenderImm.vhd
-  - I/ExtenderRAM.vhd
-  - I/StoreManager.vhd
+  - I/extender_imm.vhd
+  - I/extender_ram.vhd
+  - I/store_manager.vhd
   - common/control_unit.vhd
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd

@@ -28,27 +28,30 @@
         "test_module": "tests.python.unittests.I.ALU"
     },
     "ExtenderRAM": {
-        "toplevel": "extenderram",
+        "toplevel": "extender_ram",
         "sources": [
             "common/pipeline_types.vhd",
             "common/ext_ram_consts.vhd",
-            "I/ExtenderRAM.vhd"
+            "I/extender_ram.vhd"
         ],
         "test_module": "tests.python.unittests.I.ExtenderRAM"
     },
     "ExtenderImm": {
-        "toplevel": "extenderimm",
+        "toplevel": "extender_imm",
         "sources": [
             "common/pipeline_types.vhd",
             "common/ext_imm_consts.vhd",
-            "I/ExtenderImm.vhd"
+            "I/extender_imm.vhd"
         ],
         "test_module": "tests.python.unittests.I.ExtenderImm"
     },
     "StoreManager": {
-        "toplevel": "storemanager",
+        "toplevel": "store_manager",
         "sources": [
-            "I/StoreManager.vhd"
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "I/store_manager.vhd"
         ],
         "test_module": "tests.python.unittests.I.StoreManager"
     },
@@ -144,9 +147,9 @@
             "common/mux_tree.vhd",
             "common/tristate_mux.vhd",
             "common/reg_file.vhd",
-            "I/ExtenderImm.vhd",
-            "I/ExtenderRAM.vhd",
-            "I/StoreManager.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
             "common/control_unit.vhd",
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
@@ -215,9 +218,9 @@
             "common/mux_tree.vhd",
             "common/tristate_mux.vhd",
             "common/reg_file.vhd",
-            "I/ExtenderImm.vhd",
-            "I/ExtenderRAM.vhd",
-            "I/StoreManager.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
             "common/control_unit.vhd",
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
@@ -265,9 +268,9 @@
             "common/mux_tree.vhd",
             "common/tristate_mux.vhd",
             "common/reg_file.vhd",
-            "I/ExtenderImm.vhd",
-            "I/ExtenderRAM.vhd",
-            "I/StoreManager.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
             "common/control_unit.vhd",
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",
@@ -317,9 +320,9 @@
             "common/mux_tree.vhd",
             "common/tristate_mux.vhd",
             "common/reg_file.vhd",
-            "I/ExtenderImm.vhd",
-            "I/ExtenderRAM.vhd",
-            "I/StoreManager.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
             "common/control_unit.vhd",
             "common/bubble_mux.vhd",
             "common/forwarding_unit.vhd",

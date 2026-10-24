@@ -687,13 +687,13 @@ begin
   id_opExImm <= EXT_IMM_I when csr_useImmI = '1' else std_logic_vector(cu_opExImm);
 
   -- =========================================================================
-  -- ID stage: ExtenderImm
+  -- ID stage: extender_imm
   -- =========================================================================
-  u_extender_imm : entity work.ExtenderImm
+  u_extender_imm : entity work.extender_imm
     port map (
-      Inst31downto7 => ifid_instr(31 downto 7),
-      opExImm       => id_opExImm,
-      signalOut     => id_imm
+      i_instr => ifid_instr(31 downto 7),
+      i_op    => id_opExImm,
+      o_imm   => id_imm
     );
 
   -- =========================================================================
@@ -1019,16 +1019,16 @@ begin
   ex_jalr_taken   <=  ex_valid when ex_opCode = "1100111" else '0';
 
   -- =========================================================================
-  -- EX stage: StoreManager
+  -- EX stage: store_manager
   -- =========================================================================
-  u_store_manager : entity work.StoreManager
+  u_store_manager : entity work.store_manager
     port map (
-      opcode   => ex_opCode,
-      funct3   => ex_funct3,
-      EA       => ex_alu_result(1 downto 0),
-      rs2Val   => ex_fwd_rs2_val,
-      data_out => ex_store_data,
-      mask     => ex_store_byteena
+      i_opcode      => ex_opCode,
+      i_funct3      => ex_funct3,
+      i_byte_offset => ex_alu_result(1 downto 0),
+      i_rs2_data    => ex_fwd_rs2_val,
+      o_data        => ex_store_data,
+      o_byte_mask   => ex_store_byteena
     );
 
   -- =========================================================================
@@ -1159,12 +1159,12 @@ begin
                       sdram_rdata when is_sdram_wb = '1' else
                       ram_rdata;
 
-  u_extender_ram : entity work.ExtenderRAM
+  u_extender_ram : entity work.extender_ram
     port map (
-      signalIn  => mem_read_data,
-      opExRAM   => std_logic_vector(memwb_opExRAM),
-      EA        => memwb_alu_out(1 downto 0),
-      signalOut => wb_ram_extended
+      i_data        => mem_read_data,
+      i_op          => std_logic_vector(memwb_opExRAM),
+      i_byte_offset => memwb_alu_out(1 downto 0),
+      o_data        => wb_ram_extended
     );
 
   -- =========================================================================
