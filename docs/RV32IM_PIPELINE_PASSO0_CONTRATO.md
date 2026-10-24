@@ -66,7 +66,7 @@ Regra pratica:
 
 ## 2. Tipos base sugeridos (package)
 
-Sugestao: criar package (ex.: `src/rv32im_pipeline_types.vhd`) para evitar divergencia entre toplevels.
+Sugestao: criar package (ex.: `src/pipeline_types.vhd`) para evitar divergencia entre toplevels.
 
 ```vhdl
 subtype word_t  is std_logic_vector(31 downto 0);
@@ -87,13 +87,13 @@ Mapeamento para compatibilidade com a control unit:
 
 ### 2.1 Como usar na pratica
 
-1. O arquivo do package ja foi criado em [src/rv32im_pipeline_types.vhd](src/rv32im_pipeline_types.vhd).
+1. O arquivo do package ja foi criado em [src/pipeline_types.vhd](src/pipeline_types.vhd).
 2. Em cada top-level/registrador de pipeline, adicione:
 
 ```vhdl
 library ieee;
 use ieee.std_logic_1164.all;
-use work.rv32im_pipeline_types.all;
+use work.pipeline_types.all;
 ```
 
 3. Troque vetores "soltos" pelos tipos nomeados.

@@ -36,7 +36,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.rv32i_ctrl_consts.all;
-use work.rv32im_pipeline_types.all;
+use work.pipeline_types.all;
 
 entity rv32im_pipeline_core is
   generic (

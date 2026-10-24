@@ -79,7 +79,7 @@
     "HazardDetectionUnit": {
         "toplevel": "hazard_detection_unit",
         "sources": [
-            "common/rv32im_pipeline_types.vhd",
+            "common/pipeline_types.vhd",
             "common/hazard_detection_unit.vhd"
         ],
         "test_module": "tests.python.unittests.common.HazardDetectionUnit"
@@ -87,7 +87,7 @@
     "ForwardingUnit": {
         "toplevel": "forwarding_unit",
         "sources": [
-            "common/rv32im_pipeline_types.vhd",
+            "common/pipeline_types.vhd",
             "common/forwarding_unit.vhd"
         ],
         "test_module": "tests.python.unittests.common.ForwardingUnit"
@@ -103,7 +103,7 @@
         "toplevel": "rv32im_pipeline_core",
         "sources": [
             "common/rv32i_ctrl_consts.vhd",
-            "common/rv32im_pipeline_types.vhd",
+            "common/pipeline_types.vhd",
             "common/genericRegister.vhd",
             "common/genericAdder.vhd",
             "common/genericAdderU.vhd",
@@ -164,7 +164,7 @@
         "toplevel": "rv32im_pipeline_core",
         "sources": [
             "common/rv32i_ctrl_consts.vhd",
-            "common/rv32im_pipeline_types.vhd",
+            "common/pipeline_types.vhd",
             "common/genericRegister.vhd",
             "common/genericAdder.vhd",
             "common/genericAdderU.vhd",
@@ -204,7 +204,7 @@
         "toplevel": "rv32im_pipeline_core",
         "sources": [
             "common/rv32i_ctrl_consts.vhd",
-            "common/rv32im_pipeline_types.vhd",
+            "common/pipeline_types.vhd",
             "common/genericRegister.vhd",
             "common/genericAdder.vhd",
             "common/genericAdderU.vhd",

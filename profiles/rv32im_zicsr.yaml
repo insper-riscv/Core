@@ -6,7 +6,7 @@ top: rv32im_pipeline_core
 generics: {HAS_M: true, HAS_ZICSR: true}
 sources:
   - common/rv32i_ctrl_consts.vhd
-  - common/rv32im_pipeline_types.vhd
+  - common/pipeline_types.vhd
   - common/genericRegister.vhd
   - common/genericAdder.vhd
   - common/genericAdderU.vhd
