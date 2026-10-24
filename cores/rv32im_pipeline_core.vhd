@@ -154,19 +154,19 @@ architecture rtl of rv32im_pipeline_core is
 
   component fencei_unit is
     generic (
-      HAS_DCACHE : boolean := false
+      has_dcache : boolean := false
     );
     port (
-      clk       : in  std_logic;
-      reset     : in  std_logic;
-      ex_valid  : in  std_logic;
-      run       : in  std_logic;
-      opcode    : in  std_logic_vector(6 downto 0);
-      funct3    : in  std_logic_vector(2 downto 0);
-      dc_done   : in  std_logic;
-      flush_req : out std_logic;
-      busy      : out std_logic;
-      take      : out std_logic
+      i_clk       : in  std_logic;
+      i_rst       : in  std_logic;
+      i_ex_valid  : in  std_logic;
+      i_run       : in  std_logic;
+      i_opcode    : in  opcode_t;
+      i_funct3    : in  funct3_t;
+      i_dc_done   : in  std_logic;
+      o_flush_req : out std_logic;
+      o_busy      : out std_logic;
+      o_take      : out std_logic
     );
   end component;
 
@@ -915,18 +915,18 @@ begin
   -- =========================================================================
   gen_fencei : if HAS_ZIFENCEI generate
     u_fencei : fencei_unit
-      generic map (HAS_DCACHE => HAS_DCACHE)
+      generic map (has_dcache => HAS_DCACHE)
       port map (
-        clk       => clk,
-        reset     => reset,
-        ex_valid  => ex_valid,
-        run       => base_run,
-        opcode    => ex_opCode,
-        funct3    => ex_funct3,
-        dc_done   => dc_done,
-        flush_req => dc_flush,
-        busy      => fencei_busy,
-        take      => fencei_take
+        i_clk       => clk,
+        i_rst       => reset,
+        i_ex_valid  => ex_valid,
+        i_run       => base_run,
+        i_opcode    => ex_opCode,
+        i_funct3    => ex_funct3,
+        i_dc_done   => dc_done,
+        o_flush_req => dc_flush,
+        o_busy      => fencei_busy,
+        o_take      => fencei_take
       );
   else generate
     fencei_take <= '0';
