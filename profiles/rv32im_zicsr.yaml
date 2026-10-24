@@ -11,7 +11,7 @@ sources:
   - common/adder.vhd
   - common/adder_u.vhd
   - common/mux_2x1.vhd
-  - common/genericMux3x1.vhd
+  - common/mux_4x1.vhd
   - common/flip_flop.vhd
   - I/ALU.vhd
   - common/utils_pkg.vhd
