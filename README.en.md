@@ -6,6 +6,8 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 ## 1. Documentation
 
+- [AUTHORS.en.md](AUTHORS.en.md): authors with commits in the repository, with name and GitHub account.
+- [CONTRIBUTING.en.md](CONTRIBUTING.en.md): mandatory contribution rules, VHDL-2008 standard (`--std=08`), naming conventions, `i_`/`o_` port prefixes, file headers, docstrings, and documentation rules.
 - [README.md](docs/en/README.md): 32-bit RISC-V instruction formats, immediate generation table, and incremental datapath progression for the 37 base RV32I instructions.
 - [ARCHITECTURE.md](docs/en/ARCHITECTURE.md): 5-stage pipeline microarchitecture, per-stage responsibilities, forwarding paths, load-use hazard detection, stall, flush, and support for the `M`, `Zicsr`, and `Zifencei` extensions.
 - [PIPELINE_ARCHITECTURE_GUIDE.md](docs/en/PIPELINE_ARCHITECTURE_GUIDE.md): detailed reference of inter-stage interconnect signals, synchronous barriers (`IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB`), stall and flush equations, and branch resolution.
