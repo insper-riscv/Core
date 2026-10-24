@@ -1,47 +1,51 @@
 -- =============================================================================
--- csr_decode.vhd
--- Decodificacao da extensao Zicsr (docs/contracts/01).
+-- Decodificador de instruções da extensão Zicsr e classe SYSTEM
 --
--- Reivindica a classe SYSTEM (opcode 1110011). Com funct3 diferente de 000 e 100
--- sao os acessos a CSR (CSRRW, CSRRS, CSRRC e as versoes com imediato): sobem
--- isCsr e weReg. ECALL, EBREAK, MRET, WFI (funct3 = 000) e o funct3 reservado 100
--- sobem so' useImmI, para que o campo instruction[31:20] chegue a EX; quem os
--- executa ou os rejeita e' a unidade de traps.
---
--- Como em m_decode, a extensao so' dirige os campos que sobem: weReg (escreve
--- rd com o valor antigo do CSR) e useImmI (o endereco do CSR, instruction[31:20],
--- chega a EX pelo extensor de imediato do tipo I). O operando A nao e' usado:
--- o dado de escrita sai do rs1 com forwarding, ou do campo rs1 (zimm).
+-- Reivindica no estágio ID as instruções da classe SYSTEM (opcode = OPCODE_SYSTEM):
+--   - Acessos a CSRs (funct3 diferente de FUNCT3_PRIV e "100": CSRRW, CSRRS, CSRRC,
+--     CSRRWI, CSRRSI, CSRRCI): ativam o_is_csr = '1', o_we_reg = '1' e o_use_imm_i = '1'.
+--   - Instruções privilegiadas (ECALL, EBREAK, MRET, WFI, funct3 = FUNCT3_PRIV) ou
+--     subfunção reservada ("100"): ativam apenas o_use_imm_i = '1' para encaminhar
+--     o campo instr[31:20] até a trap_unit no estágio EX.
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.pipeline_types.all;
+use work.opcode_consts.all;
+use work.funct3_consts.all;
 
 entity csr_decode is
-  port (
-    instruction : in  std_logic_vector(31 downto 0);
-
-    -- '1' se a instrucao e' um acesso a CSR
-    isCsr       : out std_logic;
-    weReg       : out std_logic;
-    useImmI     : out std_logic
-  );
+	port (
+		-- Instrução de 32 bits presente no estágio ID.
+		i_instr     : in  word_t;
+		-- Indica que a instrução realiza leitura/escrita em registrador CSR.
+		o_is_csr    : out std_logic;
+		-- Habilita a escrita do valor antigo do CSR no registrador destino rd.
+		o_we_reg    : out std_logic;
+		-- Força o extensor de imediato a extrair o campo I-type (instr[31:20]).
+		o_use_imm_i : out std_logic
+	);
 end entity csr_decode;
 
 architecture rtl of csr_decode is
-  signal system : std_logic;
-  signal claims : std_logic;
+	-- Alias para o campo opcode (bits [6:0]) da instrução.
+	alias opcode : opcode_t is i_instr(6 downto 0);
+	-- Alias para o campo funct3 (bits [14:12]) da instrução.
+	alias funct3 : funct3_t is i_instr(14 downto 12);
+
+	-- Indica que a instrução pertence à classe SYSTEM (opcode 1110011).
+	signal is_system : std_logic;
+	-- Indica que a instrução SYSTEM é uma operação válida de acesso a CSR.
+	signal is_csr_op : std_logic;
 begin
 
-  system <= '1' when instruction(6 downto 0) = "1110011" else '0';
+	is_system <= '1' when opcode = OPCODE_SYSTEM else '0';
 
-  claims <= '1' when system = '1'
-                 and instruction(14 downto 12) /= "000"
-                 and instruction(14 downto 12) /= "100"
-            else '0';
+	is_csr_op <= '1' when (is_system = '1' and funct3 /= FUNCT3_PRIV and funct3 /= "100") else '0';
 
-  isCsr   <= claims;
-  weReg   <= claims;
-  useImmI <= system;
+	o_is_csr    <= is_csr_op;
+	o_we_reg    <= is_csr_op;
+	o_use_imm_i <= is_system;
 
 end architecture rtl;

@@ -180,6 +180,9 @@
     "CsrDecode": {
         "toplevel": "csr_decode",
         "sources": [
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
             "Zicsr/csr_decode.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_decode"
@@ -187,6 +190,9 @@
     "CsrFile": {
         "toplevel": "csr_file",
         "sources": [
+            "common/pipeline_types.vhd",
+            "common/flip_flop.vhd",
+            "common/generic_register.vhd",
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_file"
@@ -194,6 +200,9 @@
     "TrapUnit": {
         "toplevel": "trap_unit",
         "sources": [
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
             "Zicsr/trap_unit.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.trap_unit"

@@ -10,19 +10,19 @@ CAUSE_LOAD_MISALIGNED, CAUSE_STORE_MISALIGNED, CAUSE_ECALL = 4, 6, 11
 
 async def probe(dut, opcode=OP_ALU, funct3=0, rd=1, rs1=2, imm12=0, ea=0, cf_taken=0,
                 cf_target=0, csr_illegal=0, valid=1, run=1):
-    dut.ex_valid.value = valid
-    dut.run.value = run
-    dut.opcode.value = opcode
-    dut.funct3.value = funct3
-    dut.rd_idx.value = rd
-    dut.rs1_idx.value = rs1
-    dut.imm12.value = imm12
-    dut.ea.value = ea
-    dut.cf_taken.value = cf_taken
-    dut.cf_target.value = cf_target
-    dut.csr_illegal.value = csr_illegal
+    dut.i_ex_valid.value = valid
+    dut.i_run.value = run
+    dut.i_opcode.value = opcode
+    dut.i_funct3.value = funct3
+    dut.i_rd_idx.value = rd
+    dut.i_rs1_idx.value = rs1
+    dut.i_imm12.value = imm12
+    dut.i_ea.value = ea
+    dut.i_cf_taken.value = cf_taken
+    dut.i_cf_target.value = cf_target
+    dut.i_csr_illegal.value = csr_illegal
     await Timer(1, unit="ns")
-    return (int(dut.take.value), int(dut.mret_take.value), int(dut.cause.value), int(dut.tval.value))
+    return (int(dut.o_take.value), int(dut.o_mret_take.value), int(dut.o_cause.value), int(dut.o_tval.value))
 
 
 async def system(dut, imm12, funct3=0, rd=0, rs1=0, **kw):

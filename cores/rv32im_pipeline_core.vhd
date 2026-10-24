@@ -172,51 +172,51 @@ architecture rtl of rv32im_pipeline_core is
 
   component csr_decode is
     port (
-      instruction : in  std_logic_vector(31 downto 0);
-      isCsr       : out std_logic;
-      weReg       : out std_logic;
-      useImmI     : out std_logic
+      i_instr     : in  word_t;
+      o_is_csr    : out std_logic;
+      o_we_reg    : out std_logic;
+      o_use_imm_i : out std_logic
     );
   end component;
 
   component trap_unit is
     port (
-      ex_valid    : in  std_logic;
-      run         : in  std_logic;
-      opcode      : in  std_logic_vector(6 downto 0);
-      funct3      : in  std_logic_vector(2 downto 0);
-      rd_idx      : in  std_logic_vector(4 downto 0);
-      rs1_idx     : in  std_logic_vector(4 downto 0);
-      imm12       : in  std_logic_vector(11 downto 0);
-      ea          : in  std_logic_vector(31 downto 0);
-      cf_taken    : in  std_logic;
-      cf_target   : in  std_logic_vector(31 downto 0);
-      csr_illegal : in  std_logic;
-      take        : out std_logic;
-      mret_take   : out std_logic;
-      cause       : out std_logic_vector(31 downto 0);
-      tval        : out std_logic_vector(31 downto 0)
+      i_ex_valid    : in  std_logic;
+      i_run         : in  std_logic;
+      i_opcode      : in  opcode_t;
+      i_funct3      : in  funct3_t;
+      i_rd_idx      : in  reg_idx_t;
+      i_rs1_idx     : in  reg_idx_t;
+      i_imm12       : in  std_logic_vector(11 downto 0);
+      i_ea          : in  word_t;
+      i_cf_taken    : in  std_logic;
+      i_cf_target   : in  word_t;
+      i_csr_illegal : in  std_logic;
+      o_take        : out std_logic;
+      o_mret_take   : out std_logic;
+      o_cause       : out word_t;
+      o_tval        : out word_t
     );
   end component;
 
   component csr_file is
     port (
-      clk      : in  std_logic;
-      reset    : in  std_logic;
-      commit   : in  std_logic;
-      addr     : in  std_logic_vector(11 downto 0);
-      op       : in  std_logic_vector(2 downto 0);
-      wdata    : in  std_logic_vector(31 downto 0);
-      src_zero : in  std_logic;
-      rdata    : out std_logic_vector(31 downto 0);
-      illegal  : out std_logic;
-      trap_take  : in  std_logic;
-      trap_cause : in  std_logic_vector(31 downto 0);
-      trap_pc    : in  std_logic_vector(31 downto 0);
-      trap_tval  : in  std_logic_vector(31 downto 0);
-      mret_take  : in  std_logic;
-      mtvec_o    : out std_logic_vector(31 downto 0);
-      mepc_o     : out std_logic_vector(31 downto 0)
+      i_clk        : in  std_logic;
+      i_rst        : in  std_logic;
+      i_commit     : in  std_logic;
+      i_addr       : in  std_logic_vector(11 downto 0);
+      i_op         : in  funct3_t;
+      i_wdata      : in  word_t;
+      i_src_zero   : in  std_logic;
+      o_rdata      : out word_t;
+      o_illegal    : out std_logic;
+      i_trap_take  : in  std_logic;
+      i_trap_cause : in  word_t;
+      i_trap_pc    : in  word_t;
+      i_trap_tval  : in  word_t;
+      i_mret_take  : in  std_logic;
+      o_mtvec      : out word_t;
+      o_mepc       : out word_t
     );
   end component;
 
@@ -668,10 +668,10 @@ begin
   gen_csr_decode : if HAS_ZICSR generate
     u_csr_decode : csr_decode
       port map (
-        instruction => ifid_instr,
-        isCsr       => cu_isCsr,
-        weReg       => csr_weReg,
-        useImmI     => csr_useImmI
+        i_instr     => ifid_instr,
+        o_is_csr    => cu_isCsr,
+        o_we_reg    => csr_weReg,
+        o_use_imm_i => csr_useImmI
       );
   else generate
     cu_isCsr    <= '0';
@@ -946,22 +946,22 @@ begin
 
     u_csr_file : csr_file
       port map (
-        clk      => clk,
-        reset    => reset,
-        commit   => csr_commit,
-        addr     => ex_imm(11 downto 0),
-        op       => ex_funct3,
-        wdata    => csr_wdata,
-        src_zero => csr_src_zero,
-        rdata    => csr_rdata,
-        illegal  => csr_illegal,
-        trap_take  => trap_take,
-        trap_cause => trap_cause,
-        trap_pc    => ex_pc,
-        trap_tval  => trap_tval,
-        mret_take  => mret_take,
-        mtvec_o    => csr_mtvec,
-        mepc_o     => csr_mepc
+        i_clk        => clk,
+        i_rst        => reset,
+        i_commit     => csr_commit,
+        i_addr       => ex_imm(11 downto 0),
+        i_op         => ex_funct3,
+        i_wdata      => csr_wdata,
+        i_src_zero   => csr_src_zero,
+        o_rdata      => csr_rdata,
+        o_illegal    => csr_illegal,
+        i_trap_take  => trap_take,
+        i_trap_cause => trap_cause,
+        i_trap_pc    => ex_pc,
+        i_trap_tval  => trap_tval,
+        i_mret_take  => mret_take,
+        o_mtvec      => csr_mtvec,
+        o_mepc       => csr_mepc
       );
 
     ex_cf_taken  <= ex_branch_taken or ex_jalr_taken;
@@ -969,21 +969,21 @@ begin
 
     u_trap_unit : trap_unit
       port map (
-        ex_valid    => ex_valid,
-        run         => pipe_run,
-        opcode      => ex_opCode,
-        funct3      => ex_funct3,
-        rd_idx      => ex_rd_idx,
-        rs1_idx     => ex_rs1_idx,
-        imm12       => ex_imm(11 downto 0),
-        ea          => ex_alu_result,
-        cf_taken    => ex_cf_taken,
-        cf_target   => ex_cf_target,
-        csr_illegal => csr_illegal,
-        take        => trap_take,
-        mret_take   => mret_take,
-        cause       => trap_cause,
-        tval        => trap_tval
+        i_ex_valid    => ex_valid,
+        i_run         => pipe_run,
+        i_opcode      => ex_opCode,
+        i_funct3      => ex_funct3,
+        i_rd_idx      => ex_rd_idx,
+        i_rs1_idx     => ex_rs1_idx,
+        i_imm12       => ex_imm(11 downto 0),
+        i_ea          => ex_alu_result,
+        i_cf_taken    => ex_cf_taken,
+        i_cf_target   => ex_cf_target,
+        i_csr_illegal => csr_illegal,
+        o_take        => trap_take,
+        o_mret_take   => mret_take,
+        o_cause       => trap_cause,
+        o_tval        => trap_tval
       );
   else generate
     trap_take   <= '0';
