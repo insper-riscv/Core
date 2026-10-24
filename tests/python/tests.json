@@ -88,6 +88,9 @@
     "MDecode": {
         "toplevel": "m_decode",
         "sources": [
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct7_consts.vhd",
             "M/m_decode.vhd"
         ],
         "test_module": "tests.python.unittests.M.m_decode"
@@ -95,6 +98,7 @@
     "NonRestoringDivider": {
         "toplevel": "non_restoring_divider_rv32",
         "sources": [
+            "common/pipeline_types.vhd",
             "M/non_restoring_divider_rv32.vhd"
         ],
         "test_module": "tests.python.unittests.M.non_restoring_divider"

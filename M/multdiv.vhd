@@ -1,230 +1,246 @@
---------------------------------------------------------------------------------
--- multdiv.vhd  (versao pipeline - com saida_capt e op_latched)
+-- =============================================================================
+-- Unidade integrada de multiplicação e divisão inteira (Extensão RV32M)
 --
--- Diferente da versao anterior:
---   * op_latched: registra qual operacao foi iniciada (para que done_int
---     e saida sejam corretos mesmo quando opCode muda apos desstall)
---   * saida_capt: registra resultado quando done pulsa, mantém estável
---------------------------------------------------------------------------------
+-- Coordena a execução das 8 instruções da extensão M no estágio EX:
+--   - Multiplicação (33 ciclos via booth_multiplier_rv32):
+--     MUL (32 bits baixos), MULH (32 bits altos signed x signed),
+--     MULHSU (32 bits altos signed x unsigned) e MULHU (32 bits altos unsigned x unsigned).
+--   - Divisão e Resto (34 ciclos via non_restoring_divider_rv32):
+--     DIV, DIVU, REM e REMU.
+--
+-- Registra a operação iniciada (funct3_latched) no pulso de i_start e captura o
+-- resultado final (result_latched) no pulso de conclusão (done_int) usando
+-- instâncias estruturais de generic_register.
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.pipeline_types.all;
+use work.funct3_consts.all;
 
 entity multdiv is
-  port (
-    clk     : in  std_logic;
-    opCode  : in  std_logic_vector(2 downto 0);
-    valorA  : in  std_logic_vector(31 downto 0);
-    valorB  : in  std_logic_vector(31 downto 0);
+	port (
+		-- Sinal de clock do sistema.
+		i_clk    : in  std_logic;
+		-- Sinal de reset ativo em '1'.
+		i_rst    : in  std_logic := '0';
+		-- Pulso de 1 ciclo que inicia a operação da extensão M no estágio EX.
+		i_start  : in  std_logic := '0';
+		-- Código funct3 que seleciona a operação (MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU).
+		i_funct3 : in  funct3_t;
+		-- Primeiro operando de 32 bits (rs1).
+		i_a      : in  word_t;
+		-- Segundo operando de 32 bits (rs2).
+		i_b      : in  word_t;
+		-- Resultado final de 32 bits registrado ao término da operação.
+		o_result : out word_t;
+		-- Indica que o multiplicador ou o divisor está em execução.
+		o_busy   : out std_logic;
+		-- Pulso de 1 ciclo indicando conclusão do cálculo.
+		o_done   : out std_logic
+	);
+end entity multdiv;
 
-    saida   : out std_logic_vector(31 downto 0);
+architecture rtl of multdiv is
 
-    rst     : in  std_logic := '0';
-    start   : in  std_logic := '0';
-    busy    : out std_logic;
-    done    : out std_logic
-  );
-end entity;
+	-- Indica se o funct3 atual na entrada seleciona uma multiplicação (bit 2 = '0').
+	signal is_mult        : std_logic;
+	-- Indica se o funct3 atual seleciona divisão/resto sem sinal (DIVU ou REMU).
+	signal is_unsigned    : std_logic;
 
-architecture arch_name of multdiv is
+	-- Pulso de partida direcionado exclusivamente ao multiplicador de Booth.
+	signal start_mul      : std_logic;
+	-- Pulso de partida direcionado exclusivamente ao divisor não-restaurador.
+	signal start_div      : std_logic;
 
-  signal resultadoMult : std_logic_vector(65 downto 0);
-  signal resMult       : std_logic_vector(31 downto 0);
+	-- Código funct3 travado no início da operação (garante seleção estável ao concluir).
+	signal funct3_latched : funct3_t;
+	-- Indica se a operação travada é uma multiplicação.
+	signal is_mult_lat    : std_logic;
+	-- Indica se a operação travada seleciona parte alta do produto (MULH, MULHSU, MULHU).
+	signal is_mul_hi_lat  : std_logic;
+	-- Indica se a operação travada é de resto de divisão (REM, REMU).
+	signal is_rem_lat     : std_logic;
+	-- Modo de sinal dos operandos A e B ("11"=signed/signed, "10"=signed/unsigned, "00"=unsigned/unsigned).
+	signal signed_mode    : std_logic_vector(1 downto 0);
 
-  signal restoDiv   : std_logic_vector(31 downto 0);
-  signal resultDiv  : std_logic_vector(31 downto 0);
-  signal restoDivU  : std_logic_vector(31 downto 0);
-  signal resultDivU : std_logic_vector(31 downto 0);
+	-- Parte baixa (bits [31:0]) produzida pelo multiplicador de Booth.
+	signal mul_lo         : word_t;
+	-- Parte alta (bits [63:32]) produzida pelo multiplicador de Booth (interpretação signed).
+	signal mul_hi         : word_t;
+	-- Resultado selecionado da multiplicação (parte baixa ou alta corrigida).
+	signal mul_result     : word_t;
 
-  signal palavra   : std_logic_vector(4 downto 0);
-  signal signedAB  : std_logic_vector(1 downto 0);
-  signal maisMenos : std_logic;
+	-- Quociente de 32 bits produzido pelo divisor não-restaurador.
+	signal div_quotient   : word_t;
+	-- Resto de 32 bits produzido pelo divisor não-restaurador.
+	signal div_remainder  : word_t;
+	-- Resultado selecionado da divisão (quociente ou resto).
+	signal div_result     : word_t;
 
-  signal outA : std_logic_vector(32 downto 0);
-  signal outB : std_logic_vector(32 downto 0);
+	-- Sinais de estado do multiplicador de Booth.
+	signal mult_busy      : std_logic;
+	-- Pulso de conclusão do multiplicador de Booth.
+	signal mult_done      : std_logic;
+	-- Sinais de estado do divisor não-restaurador.
+	signal div_busy       : std_logic;
+	-- Pulso de conclusão do divisor não-restaurador.
+	signal div_done       : std_logic;
+	-- Pulso interno de conclusão combinando multiplicador e divisor.
+	signal done_int       : std_logic;
 
-  -- Qual unidade esta ativa (combinacional, baseado em opCode atual)
-  signal isMult     : std_logic;
-  signal isUnsigned : std_logic;
+	-- Termo de correção unsigned para o operando A quando interpretado como sem sinal (MULHU).
+	signal corr_a         : word_t;
+	-- Termo de correção unsigned para o operando B quando interpretado como sem sinal (MULHSU e MULHU).
+	signal corr_b         : word_t;
+	-- Soma intermediária da parte alta com o termo de correção A.
+	signal high_plus_a    : word_t;
+	-- Parte alta do produto corrigida para modos sem sinal (MULHSU / MULHU).
+	signal high_corrected : word_t;
 
-  -- Op travada no inicio da operacao (nao muda durante o calculo)
-  signal op_latched    : std_logic_vector(2 downto 0) := (others => '0');
-  signal isMult_lat    : std_logic;
-  signal isUnsigned_lat: std_logic;
-  signal operacao_lat  : std_logic_vector(1 downto 0);
-
-  signal mult_busy : std_logic;
-  signal mult_done : std_logic;
-  signal div_busy  : std_logic;
-  signal div_done  : std_logic;
-  signal divu_busy : std_logic;
-
-  -- Sinais intermediarios para port maps (VHDL-93)
-  signal start_mul  : std_logic;
-  signal start_div  : std_logic;
-  signal start_divu : std_logic;
-  signal not_isMult : std_logic;
-  signal not_isUnsigned : std_logic;
-  signal divu_done : std_logic;
-
-  signal done_int  : std_logic;
-
-  -- Correcao MULHU/MULHSU
-  signal high_signed    : unsigned(31 downto 0);
-  signal corrA          : unsigned(31 downto 0);
-  signal corrB          : unsigned(31 downto 0);
-  signal high_corrected : unsigned(31 downto 0);
-
-  -- Resultado registrado
-  signal saida_capt : std_logic_vector(31 downto 0) := (others => '0');
+	-- Resultado combinacional selecionado no ciclo em que done_int pulsa.
+	signal result_mux     : word_t;
 
 begin
 
-  -- Decodifica opCode ATUAL (para roteamento de start e busy)
-  isMult     <= '1' when opCode(2) = '0' else '0';
-  isUnsigned <= '1' when (opCode = "101" or opCode = "111") else '0';
+	-- Decodificação combinacional do funct3 de entrada para disparo imediato (start/busy).
+	is_mult     <= '1' when i_funct3(2) = '0' else '0';
+	is_unsigned <= '1' when (i_funct3 = FUNCT3_DIVU or i_funct3 = FUNCT3_REMU) else '0';
 
-  -- Sinais intermediarios para port maps (VHDL-93 nao aceita expressoes diretas)
-  not_isMult     <= not isMult;
-  not_isUnsigned <= not isUnsigned;
-  start_mul  <= start and isMult;
-  start_div  <= start and not_isMult and not_isUnsigned;
-  start_divu <= start and not_isMult and isUnsigned;
+	start_mul   <= i_start and is_mult;
+	start_div   <= i_start and (not is_mult);
 
-  -- Decodifica opCode TRAVADO (para done_int e saida_capt - estavel durante calculo)
-  -- O seletor deve ser derivado dos tres bits de op_latched, pois apenas
-  -- op_latched(1:0) nao distingue corretamente DIVU/REM/REMU.
-  isMult_lat     <= '1' when op_latched(2) = '0' else '0';
-  isUnsigned_lat <= '1' when (op_latched = "101" or op_latched = "111") else '0';
-  -- operacao do decoderM:
-  --   funct3=000/001/010/011 (MUL*)  -> operacao = "10"
-  --   funct3=100 (DIV)               -> operacao = "00"
-  --   funct3=101 (DIVU)              -> operacao = "00"
-  --   funct3=110 (REM)               -> operacao = "01"
-  --   funct3=111 (REMU)              -> operacao = "01"
-  operacao_lat   <= "10" when op_latched(2) = '0' else
-                    "00" when (op_latched = "100" or op_latched = "101") else
-                    "01";  -- REM/REMU (110/111)
+	-- Registrador que preserva o funct3 da instrução iniciada durante todos os ciclos de cálculo.
+	u_funct3_reg : entity work.generic_register
+		generic map (
+			data_width => 3
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => i_start,
+			i_d      => i_funct3,
+			o_d      => funct3_latched
+		);
 
-  -- Trava o opCode no inicio da operacao
-  process(clk, rst)
-  begin
-    if rst = '1' then
-      op_latched <= (others => '0');
-    elsif rising_edge(clk) then
-      if start = '1' then
-        op_latched <= opCode;
-      end if;
-    end if;
-  end process;
+	-- Decodificação baseada no funct3 registrado (estável no ciclo de término done_int).
+	is_mult_lat   <= '1' when funct3_latched(2) = '0' else '0';
+	is_mul_hi_lat <= '0' when funct3_latched = FUNCT3_MUL else '1';
+	is_rem_lat    <= '1' when (funct3_latched = FUNCT3_REM or funct3_latched = FUNCT3_REMU) else '0';
 
-  -- BUSY: OR de todas as unidades. Independe de op_latched (que tem 1 ciclo de atraso).
-  -- Importante: no primeiro ciclo da operacao, op_latched ainda eh da operacao anterior,
-  -- entao usar mux baseado em op_latched daria busy errado.
-  busy <= mult_busy or div_busy or divu_busy;
+	with funct3_latched select
+		signed_mode <=
+			"11" when FUNCT3_MUL | FUNCT3_MULH | FUNCT3_DIV | FUNCT3_REM,
+			"10" when FUNCT3_MULHSU,
+			"00" when others;
 
-  -- DONE: tambem OR. So uma unidade vai estar ativa por vez (rota via 'start').
-  -- O multdiv ja garante isso atraves de 'start and isMult' / 'start and (not isMult) and ...'
-  done_int <= mult_done or div_done or divu_done;
+	o_busy   <= mult_busy or div_busy;
+	done_int <= mult_done or div_done;
+	o_done   <= done_int;
 
-  done <= done_int;
+	-- Instância única do multiplicador de Booth radix-2 de 32 bits.
+	u_booth_multiplier : entity work.booth_multiplier_rv32
+		port map (
+			i_clk          => i_clk,
+			i_rst          => i_rst,
+			i_start        => start_mul,
+			i_multiplicand => i_a,
+			i_multiplier   => i_b,
+			o_result_lo    => mul_lo,
+			o_result_hi    => mul_hi,
+			o_done         => mult_done,
+			o_busy         => mult_busy
+		);
 
-  MUL: entity work.mult
-      port map(
-        clk    => clk,
-        rst    => rst,
-        start  => start_mul,
-        dataa  => outA,
-        datab  => outB,
-        result => resultadoMult,
-        done   => mult_done,
-        busy   => mult_busy
-        );
+	-- Instância única do divisor não-restaurador de 32 bits (atende signed e unsigned).
+	u_divider : entity work.non_restoring_divider_rv32
+		port map (
+			i_clk         => i_clk,
+			i_rst         => i_rst,
+			i_start       => start_div,
+			i_is_unsigned => is_unsigned,
+			i_dividend    => i_a,
+			i_divisor     => i_b,
+			o_quotient    => div_quotient,
+			o_remainder   => div_remainder,
+			o_done        => div_done,
+			o_busy        => div_busy,
+			o_div_by_zero => open,
+			o_overflow    => open
+		);
 
-  DIV: entity work.div
-      port map(
-        clk      => clk,
-        rst      => rst,
-        start    => start_div,
-        numer    => valorA,
-        denom    => valorB,
-        quotient => resultDiv,
-        remain   => restoDiv,
-        done     => div_done,
-        busy     => div_busy
-        );
+	-- Correção da parte alta para operandos sem sinal:
+	-- Como o multiplicador de Booth opera em complemento de 2 (32x32 signed),
+	-- se um operando X tem MSB = '1' mas a instrução o trata como unsigned,
+	-- o produto signed subtraiu (2^32 * Y); somar Y na parte alta [63:32] restaura o valor unsigned.
+	corr_a <= i_b when (i_a(31) = '1' and signed_mode(1) = '0') else (others => '0');
+	corr_b <= i_a when (i_b(31) = '1' and signed_mode(0) = '0') else (others => '0');
 
-  DIVU_inst: entity work.divu
-      port map(
-        clk      => clk,
-        rst      => rst,
-        start    => start_divu,
-        numer    => valorA,
-        denom    => valorB,
-        quotient => resultDivU,
-        remain   => restoDivU,
-        done     => divu_done,
-        busy     => divu_busy
-        );
+	u_adder_corr_a : entity work.adder
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_a => mul_hi,
+			i_b => corr_a,
+			o_d => high_plus_a
+		);
 
-  DECODER: entity work.decoderM
-      port map(
-        instru => opCode,
-        palavraControle => palavra
-        );
+	u_adder_corr_b : entity work.adder
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_a => high_plus_a,
+			i_b => corr_b,
+			o_d => high_corrected
+		);
 
-  EXTENDER: entity work.extend_signed
-      port map(
-        i_a      => valorA,
-        i_b      => valorB,
-        i_signed => signedAB,
-        o_a      => outA,
-        o_b      => outB
-        );
+	u_mux_mul_res : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => mul_lo,
+			i_d1  => high_corrected,
+			i_sel => is_mul_hi_lat,
+			o_d   => mul_result
+		);
 
-  signedAB  <= palavra(4 downto 3);
-  maisMenos <= palavra(0);
+	u_mux_div_res : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_quotient,
+			i_d1  => div_remainder,
+			i_sel => is_rem_lat,
+			o_d   => div_result
+		);
 
-  -- Correcao MULHU/MULHSU
-  high_signed <= unsigned(resultadoMult(63 downto 32));
+	u_mux_final_res : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_result,
+			i_d1  => mul_result,
+			i_sel => is_mult_lat,
+			o_d   => result_mux
+		);
 
-  corrA <= unsigned(valorB) when (valorA(31) = '1' and signedAB(1) = '0')
-           else (others => '0');
+	-- Registrador de captura do resultado final no pulso done_int.
+	u_result_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => done_int,
+			i_d      => result_mux,
+			o_d      => o_result
+		);
 
-  corrB <= unsigned(valorA) when (valorB(31) = '1' and signedAB(0) = '0')
-           else (others => '0');
-
-  high_corrected <= high_signed + corrA + corrB;
-
-  resMult <= resultadoMult(31 downto 0) when maisMenos = '0' else
-             std_logic_vector(high_corrected);
-
-  -- Captura resultado quando done pulsa usando operacao_lat (estavel)
-  process(clk, rst)
-  begin
-    if rst = '1' then
-      saida_capt <= (others => '0');
-    elsif rising_edge(clk) then
-      if done_int = '1' then
-        if isMult_lat = '1' then
-          saida_capt <= resMult;
-        elsif isUnsigned_lat = '1' then
-          if operacao_lat = "00" then
-            saida_capt <= resultDivU;
-          else
-            saida_capt <= restoDivU;
-          end if;
-        else
-          if operacao_lat = "00" then
-            saida_capt <= resultDiv;
-          else
-            saida_capt <= restoDiv;
-          end if;
-        end if;
-      end if;
-    end if;
-  end process;
-
-  saida <= saida_capt;
-
-end architecture;
+end architecture rtl;

@@ -145,10 +145,10 @@ architecture rtl of rv32im_pipeline_core is
   -- work.multdiv e work.m_decode e' feita na elaboracao, so' quando HAS_M e' true.
   component m_decode is
     port (
-      instruction : in  std_logic_vector(31 downto 0);
-      isMulDiv    : out std_logic;
-      weReg       : out std_logic;
-      selPCRS1    : out std_logic
+      i_instr      : in  word_t;
+      o_is_muldiv  : out std_logic;
+      o_we_reg     : out std_logic;
+      o_sel_pc_rs1 : out std_logic
     );
   end component;
 
@@ -222,15 +222,15 @@ architecture rtl of rv32im_pipeline_core is
 
   component multdiv is
     port (
-      clk    : in  std_logic;
-      opCode : in  std_logic_vector(2 downto 0);
-      valorA : in  std_logic_vector(31 downto 0);
-      valorB : in  std_logic_vector(31 downto 0);
-      saida  : out std_logic_vector(31 downto 0);
-      rst    : in  std_logic := '0';
-      start  : in  std_logic := '0';
-      busy   : out std_logic;
-      done   : out std_logic
+      i_clk    : in  std_logic;
+      i_rst    : in  std_logic := '0';
+      i_start  : in  std_logic := '0';
+      i_funct3 : in  funct3_t;
+      i_a      : in  word_t;
+      i_b      : in  word_t;
+      o_result : out word_t;
+      o_busy   : out std_logic;
+      o_done   : out std_logic
     );
   end component;
 
@@ -654,10 +654,10 @@ begin
   gen_m_decode : if HAS_M generate
     u_m_decode : m_decode
       port map (
-        instruction => ifid_instr,
-        isMulDiv    => cu_isMulDiv,
-        weReg       => m_weReg,
-        selPCRS1    => m_selPCRS1
+        i_instr      => ifid_instr,
+        o_is_muldiv  => cu_isMulDiv,
+        o_we_reg     => m_weReg,
+        o_sel_pc_rs1 => m_selPCRS1
       );
   else generate
     cu_isMulDiv <= '0';
@@ -879,15 +879,15 @@ begin
   gen_m : if HAS_M generate
     u_muldiv : multdiv
       port map (
-        clk    => clk,
-        opCode => ex_funct3,
-        valorA => ex_fwd_rs1_val,
-        valorB => ex_fwd_rs2_val,
-        saida  => ex_muldiv_result,
-        rst    => reset,
-        start  => mul_start_pulse,
-        busy   => muldiv_busy,
-        done   => muldiv_done
+        i_clk    => clk,
+        i_rst    => reset,
+        i_start  => mul_start_pulse,
+        i_funct3 => ex_funct3,
+        i_a      => ex_fwd_rs1_val,
+        i_b      => ex_fwd_rs2_val,
+        o_result => ex_muldiv_result,
+        o_busy   => muldiv_busy,
+        o_done   => muldiv_done
       );
   else generate
     -- Sem unidade M: nunca ocupada, resultado nunca usado (isMulDiv = '0').
