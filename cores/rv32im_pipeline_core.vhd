@@ -712,15 +712,15 @@ begin
   -- =========================================================================
   u_bubble_mux : entity work.bubble_mux
     port map (
-      sel_bubble        => id_bubble_sel,
-      weReg_i           => cu_weReg,
-      weRAM_i           => cu_weRAM,
-      reRAM_i           => cu_reRAM,
-      eRAM_i            => cu_eRAM,
-      weReg_o           => bm_weReg,
-      weRAM_o           => bm_weRAM,
-      reRAM_o           => bm_reRAM,
-      eRAM_o            => bm_eRAM
+      i_sel    => id_bubble_sel,
+      i_we_reg => cu_weReg,
+      i_we_ram => cu_weRAM,
+      i_re_ram => cu_reRAM,
+      i_en_ram => cu_eRAM,
+      o_we_reg => bm_weReg,
+      o_we_ram => bm_weRAM,
+      o_re_ram => bm_reRAM,
+      o_en_ram => bm_eRAM
     );
 
   -- =========================================================================
@@ -790,14 +790,14 @@ begin
 
   u_forwarding_unit : entity work.forwarding_unit
     port map (
-      ex_rs1_idx   => ex_rs1_idx,
-      ex_rs2_idx   => ex_rs2_idx,
-      exmem_rd_idx => exmem_rd_idx,
-      exmem_weReg  => exmem_weReg_fwd,
-      memwb_rd_idx => memwb_rd_idx,
-      memwb_weReg  => memwb_weReg_fwd,
-      forward_A    => ex_forward_a,
-      forward_B    => ex_forward_b
+      i_ex_rs1       => ex_rs1_idx,
+      i_ex_rs2       => ex_rs2_idx,
+      i_exmem_rd     => exmem_rd_idx,
+      i_exmem_we_reg => exmem_weReg_fwd,
+      i_memwb_rd     => memwb_rd_idx,
+      i_memwb_we_reg => memwb_weReg_fwd,
+      o_fwd_rs1      => ex_forward_a,
+      o_fwd_rs2      => ex_forward_b
     );
 
   -- =========================================================================

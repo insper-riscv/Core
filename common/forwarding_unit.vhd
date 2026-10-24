@@ -1,23 +1,18 @@
 -- =============================================================================
--- forwarding_unit.vhd
--- Unidade de forwarding (data hazard bypass) para o pipeline RV32IM
+-- Unidade de adiantamento de dados (forwarding / bypass) do pipeline RV32IM
 --
--- Detecta dependencias RAW entre instrucoes em voo e seleciona a fonte
--- correta para os operandos da ALU no estagio EX.
+-- Detecta dependências de dados RAW (Read After Write) entre a instrução em
+-- execução no estágio EX e as instruções anteriores nos estágios MEM e WB,
+-- selecionando a fonte mais recente para os operandos rs1 e rs2 da ULA.
 --
--- Codificacao de forward_A / forward_B:
---   "00" = sem forwarding  -> usa valor de ex_rs1_val / ex_rs2_val (ID/EX)
---   "10" = forward EX/MEM  -> usa exmem_alu_out (resultado da ALU anterior)
---   "01" = forward MEM/WB  -> usa wb_data (dado do WB, pode ser RAM ou ALU)
+-- Codificação de o_fwd_rs1 / o_fwd_rs2:
+--   "00" = sem adiantamento -> utiliza o valor lido do reg_ID_EX (banco de registradores)
+--   "10" = adiantamento EX/MEM -> utiliza o resultado calculado no estágio MEM
+--   "01" = adiantamento MEM/WB -> utiliza o dado de write-back do estágio WB
 --
 -- Prioridade: EX/MEM > MEM/WB > ID/EX
---   Necessaria quando duas instrucoes consecutivas escrevem no mesmo rd:
---   a mais recente (EX/MEM) deve ter prioridade sobre a mais antiga (MEM/WB).
---
--- Condicoes de forwarding (Patterson & Hennessy):
---   EX/MEM: exmem_weReg='1' AND exmem_rd /= x0 AND exmem_rd = ex_rsX
---   MEM/WB: memwb_weReg='1' AND memwb_rd /= x0 AND memwb_rd  = ex_rsX
---             AND NOT (condicao EX/MEM satisfeita)
+--   Quando duas instruções consecutivas escrevem no mesmo registrador rd, o
+--   resultado mais recente (EX/MEM) prevalece sobre o mais antigo (MEM/WB).
 -- =============================================================================
 
 library ieee;
@@ -25,77 +20,80 @@ use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 
 entity forwarding_unit is
-  port (
-    -- Indices dos registradores fonte da instrucao em EX (saidos do reg_ID_EX)
-    ex_rs1_idx   : in  reg_t;
-    ex_rs2_idx   : in  reg_t;
 
-    -- Instrucao em MEM: destino e write-enable (saidos do reg_EX_MEM)
-    exmem_rd_idx : in  reg_t;
-    exmem_weReg  : in  std_logic;
+	port (
+		-- Endereço do registrador fonte rs1 da instrução no estágio EX (vindo do reg_ID_EX).
+		i_ex_rs1       : in  reg_t;
+		-- Endereço do registrador fonte rs2 da instrução no estágio EX (vindo do reg_ID_EX).
+		i_ex_rs2       : in  reg_t;
+		-- Endereço do registrador destino rd da instrução no estágio MEM (vindo do reg_EX_MEM).
+		i_exmem_rd     : in  reg_t;
+		-- Habilitação de escrita no banco de registradores da instrução no estágio MEM.
+		i_exmem_we_reg : in  std_logic;
+		-- Endereço do registrador destino rd da instrução no estágio WB (vindo do reg_MEM_WB).
+		i_memwb_rd     : in  reg_t;
+		-- Habilitação de escrita no banco de registradores da instrução no estágio WB.
+		i_memwb_we_reg : in  std_logic;
+		-- Seletor do multiplexador de adiantamento para o operando rs1 no estágio EX.
+		o_fwd_rs1      : out std_logic_vector(1 downto 0);
+		-- Seletor do multiplexador de adiantamento para o operando rs2 no estágio EX.
+		o_fwd_rs2      : out std_logic_vector(1 downto 0)
+	);
 
-    -- Instrucao em WB: destino e write-enable (saidos do reg_MEM_WB / wb_*)
-    memwb_rd_idx : in  reg_t;
-    memwb_weReg  : in  std_logic;
-
-    -- Selecoes de forwarding para os muxes 3:1 que alimentam a ALU
-    forward_A    : out std_logic_vector(1 downto 0);  -- mux do operando A (rs1)
-    forward_B    : out std_logic_vector(1 downto 0)   -- mux do operando B (rs2)
-  );
 end entity forwarding_unit;
 
 architecture rtl of forwarding_unit is
-  -- Constante auxiliar para comparacao com o registrador zero (x0)
-  constant REG_ZERO : reg_t := (others => '0');
+
+	-- Endereço constante do registrador zero (x0), que nunca sofre adiantamento.
+	constant REG_ZERO : reg_t := (others => '0');
+
 begin
 
-  -- ===========================================================================
-  -- Forward A: operando rs1
-  -- ===========================================================================
-  process(ex_rs1_idx, exmem_rd_idx, exmem_weReg, memwb_rd_idx, memwb_weReg)
-  begin
-    if    exmem_weReg = '1'
-      and exmem_rd_idx /= REG_ZERO
-      and exmem_rd_idx  = ex_rs1_idx
-    then
-      -- Hazard EX/MEM: instrucao anterior esta em MEM, seu resultado ainda
-      -- nao foi escrito no RegFile mas ja esta disponivel em exmem_alu_out.
-      forward_A <= "10";
+	-- ===========================================================================
+	-- Adiantamento para o operando rs1
+	-- ===========================================================================
+	process(i_ex_rs1, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg)
+	begin
+		if    i_exmem_we_reg = '1'
+		  and i_exmem_rd /= REG_ZERO
+		  and i_exmem_rd  = i_ex_rs1
+		then
+			-- Hazard EX/MEM: instrução imediatamente anterior escreve em rs1.
+			o_fwd_rs1 <= "10";
 
-    elsif memwb_weReg = '1'
-      and memwb_rd_idx /= REG_ZERO
-      and memwb_rd_idx  = ex_rs1_idx
-    then
-      -- Hazard MEM/WB: instrucao duas posicoes atras esta em WB.
-      -- O resultado esta disponivel em wb_data (ALU ou RAM).
-      forward_A <= "01";
+		elsif i_memwb_we_reg = '1'
+		  and i_memwb_rd /= REG_ZERO
+		  and i_memwb_rd  = i_ex_rs1
+		then
+			-- Hazard MEM/WB: instrução duas posições à frente escreve em rs1.
+			o_fwd_rs1 <= "01";
 
-    else
-      -- Sem hazard: valor lido do RegFile no estagio ID e valido.
-      forward_A <= "00";
-    end if;
-  end process;
+		else
+			-- Sem conflito de dados: valor lido no estágio ID é válido.
+			o_fwd_rs1 <= "00";
+		end if;
+	end process;
 
-  -- ===========================================================================
-  -- Forward B: operando rs2
-  -- ===========================================================================
-  process(ex_rs2_idx, exmem_rd_idx, exmem_weReg, memwb_rd_idx, memwb_weReg)
-  begin
-    if    exmem_weReg = '1'
-      and exmem_rd_idx /= REG_ZERO
-      and exmem_rd_idx  = ex_rs2_idx
-    then
-      forward_B <= "10";
+	-- ===========================================================================
+	-- Adiantamento para o operando rs2
+	-- ===========================================================================
+	process(i_ex_rs2, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg)
+	begin
+		if    i_exmem_we_reg = '1'
+		  and i_exmem_rd /= REG_ZERO
+		  and i_exmem_rd  = i_ex_rs2
+		then
+			o_fwd_rs2 <= "10";
 
-    elsif memwb_weReg = '1'
-      and memwb_rd_idx /= REG_ZERO
-      and memwb_rd_idx  = ex_rs2_idx
-    then
-      forward_B <= "01";
+		elsif i_memwb_we_reg = '1'
+		  and i_memwb_rd /= REG_ZERO
+		  and i_memwb_rd  = i_ex_rs2
+		then
+			o_fwd_rs2 <= "01";
 
-    else
-      forward_B <= "00";
-    end if;
-  end process;
+		else
+			o_fwd_rs2 <= "00";
+		end if;
+	end process;
 
 end architecture rtl;

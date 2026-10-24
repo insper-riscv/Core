@@ -173,13 +173,13 @@ begin
         palavraControle => palavra
         );
 
-  EXTENDER: entity work.extendSigned
+  EXTENDER: entity work.extend_signed
       port map(
-        entradaA => valorA,
-        entradaB => valorB,
-        controle => signedAB,
-        saidaA   => outA,
-        saidaB   => outB
+        i_d0     => valorA,
+        i_d1     => valorB,
+        i_signed => signedAB,
+        o_d0     => outA,
+        o_d1     => outB
         );
 
   signedAB  <= palavra(4 downto 3);

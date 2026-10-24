@@ -27,7 +27,7 @@ sources:
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd
   - common/hazard_detection_unit.vhd
-  - common/extendSigned.vhd
+  - common/extend_signed.vhd
   - M/decoderM.vhd
   - M/m_decode.vhd
   - M/booth_multiplier_rv32.vhd

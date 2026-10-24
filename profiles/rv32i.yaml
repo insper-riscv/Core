@@ -28,7 +28,7 @@ sources:
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd
   - common/hazard_detection_unit.vhd
-  - common/extendSigned.vhd
+  - common/extend_signed.vhd
   - common/pc_fetch.vhd
   - common/reg_IF_ID.vhd
   - common/reg_ID_EX.vhd
