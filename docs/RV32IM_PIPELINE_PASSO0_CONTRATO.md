@@ -58,8 +58,8 @@ Regra pratica:
 | `exmem_alu_result` | `ALU_out_Mem` | `word_t` |
 | `memwb_alu_result` | `ALU_out_WB` | `word_t` |
 | `memwb_pc4` | `PC4_WB` | `word_t` |
-| `memwb_ctrl_wb_sel` | `selMux_WB` | `wbsel_t` |
-| `exmem_ctrl_load_op`/`memwb_ctrl_load_op` | `opExRAM_WB` (na borda para WB) | `opexram_t` |
+| `memwb_ctrl_wb_sel` | `selMux_WB` | `wb_sel_t` |
+| `exmem_ctrl_load_op`/`memwb_ctrl_load_op` | `opExRAM_WB` (na borda para WB) | `ext_ram_op_t` |
 | `idex_ctrl_is_muldiv` | `isMulDiv` | `std_logic` |
 | `ex_muldiv_start` | `startMul` | `std_logic` |
 | `pipe_stall_muldiv` | `Stall` | `std_logic` |
@@ -71,19 +71,19 @@ Sugestao: criar package (ex.: `src/pipeline_types.vhd`) para evitar divergencia 
 ```vhdl
 subtype word_t  is std_logic_vector(31 downto 0);
 subtype reg_t   is std_logic_vector(4 downto 0);
-subtype opalu_t is std_logic_vector(4 downto 0);
-subtype opeximm_t is std_logic_vector(2 downto 0);
-subtype opexram_t is std_logic_vector(2 downto 0);
-subtype wbsel_t is std_logic_vector(1 downto 0);
-subtype mask4_t is std_logic_vector(3 downto 0);
+subtype alu_op_t is std_logic_vector(4 downto 0);
+subtype ext_imm_op_t is std_logic_vector(2 downto 0);
+subtype ext_ram_op_t is std_logic_vector(2 downto 0);
+subtype wb_sel_t is std_logic_vector(1 downto 0);
+subtype byte_mask_t is std_logic_vector(3 downto 0);
 ```
 
 Mapeamento para compatibilidade com a control unit:
 
-- `opalu_t` = `opALU`
-- `opeximm_t` = `opExImm`
-- `opexram_t` = `opExRAM`
-- `wbsel_t` = `selMuxALUPc4RAM`
+- `alu_op_t` = `opALU`
+- `ext_imm_op_t` = `opExImm`
+- `ext_ram_op_t` = `opExRAM`
+- `wb_sel_t` = `selMuxALUPc4RAM`
 
 ### 2.1 Como usar na pratica
 
@@ -106,17 +106,17 @@ entity rv32im_pipe_reg_id_ex_top is
     clk, reset, en, flush : in  std_logic;
     idex_in_pc            : in  word_t;
     idex_in_rs1_idx       : in  reg_t;
-    idex_in_alu_op        : in  opalu_t;
-    idex_in_load_op       : in  opexram_t;
-    idex_in_wb_sel        : in  wbsel_t;
-    idex_in_store_mask    : in  mask4_t;
+    idex_in_alu_op        : in  alu_op_t;
+    idex_in_load_op       : in  ext_ram_op_t;
+    idex_in_wb_sel        : in  wb_sel_t;
+    idex_in_store_mask    : in  byte_mask_t;
 
     idex_out_pc           : out word_t;
     idex_out_rs1_idx      : out reg_t;
-    idex_out_alu_op       : out opalu_t;
-    idex_out_load_op      : out opexram_t;
-    idex_out_wb_sel       : out wbsel_t;
-    idex_out_store_mask   : out mask4_t
+    idex_out_alu_op       : out alu_op_t;
+    idex_out_load_op      : out ext_ram_op_t;
+    idex_out_wb_sel       : out wb_sel_t;
+    idex_out_store_mask   : out byte_mask_t
   );
 end entity;
 ```
@@ -160,7 +160,7 @@ Sinais que cruzam ID -> EX (contrato principal):
 |---|---|---|---|---|
 | `idex_ctrl_sel_pc_rs1` | `std_logic` | ID | EX | equivale a `selPCRS1` |
 | `idex_ctrl_sel_rs2_imm` | `std_logic` | ID | EX | equivale a `selMuxRS2Imm` |
-| `idex_ctrl_alu_op` | `opalu_t` | ID | EX | codigo ALU/branch/jalr |
+| `idex_ctrl_alu_op` | `alu_op_t` | ID | EX | codigo ALU/branch/jalr |
 | `idex_ctrl_sel_pc_target` | `std_logic` | ID | EX | equivale a `selMuxPc4ALU` |
 | `fwd_sel_a` | `std_logic_vector(1 downto 0)` | Forwarding Unit | EX | equivale a `forward_A` |
 | `fwd_sel_b` | `std_logic_vector(1 downto 0)` | Forwarding Unit | EX | equivale a `forward_B` |
@@ -169,12 +169,12 @@ Sinais que cruzam ID -> EX (contrato principal):
 
 | Sinal | Tipo | Produtor | Consumidor | Observacao |
 |---|---|---|---|---|
-| `idex_ctrl_wb_sel` | `wbsel_t` | ID | EX/MEM/WB | mux WB: ALU/PC4/LOAD |
+| `idex_ctrl_wb_sel` | `wb_sel_t` | ID | EX/MEM/WB | mux WB: ALU/PC4/LOAD |
 | `idex_ctrl_reg_we` | `std_logic` | ID | WB | write enable do RegFile |
 | `idex_ctrl_ram_en` | `std_logic` | ID | MEM | enable memoria |
 | `idex_ctrl_ram_we` | `std_logic` | ID | MEM | store |
 | `idex_ctrl_ram_re` | `std_logic` | ID | MEM | load |
-| `idex_ctrl_load_op` | `opexram_t` | ID | MEM/WB | LB/LBU/LH/LHU/LW |
+| `idex_ctrl_load_op` | `ext_ram_op_t` | ID | MEM/WB | LB/LBU/LH/LHU/LW |
 
 ### 4.4 RV32M e store-format
 
@@ -214,14 +214,14 @@ Sinais que cruzam EX -> MEM:
 | `exmem_alu_result` | `word_t` | EX | MEM/WB | endereco ou resultado ALU |
 | `exmem_rs2_fwd_val` | `word_t` | EX | MEM | dado de store (apos forwarding) |
 | `exmem_store_wdata` | `word_t` | EX | MEM | saida formatada do StoreManager |
-| `exmem_store_mask` | `mask4_t` | EX | MEM | byteena |
+| `exmem_store_mask` | `byte_mask_t` | EX | MEM | byteena |
 | `exmem_ea_lsb` | `std_logic_vector(1 downto 0)` | EX | MEM/WB | alinhamento LB/LH |
-| `exmem_ctrl_wb_sel` | `wbsel_t` | EX | WB | mux WB |
+| `exmem_ctrl_wb_sel` | `wb_sel_t` | EX | WB | mux WB |
 | `exmem_ctrl_reg_we` | `std_logic` | EX | WB | write enable |
 | `exmem_ctrl_ram_en` | `std_logic` | EX | MEM | ram_en |
 | `exmem_ctrl_ram_we` | `std_logic` | EX | MEM | ram_wren |
 | `exmem_ctrl_ram_re` | `std_logic` | EX | MEM | ram_rden |
-| `exmem_ctrl_load_op` | `opexram_t` | EX | MEM/WB | tipo de load |
+| `exmem_ctrl_load_op` | `ext_ram_op_t` | EX | MEM/WB | tipo de load |
 
 Sinais de redirecionamento (nao passam em registrador, mas sao obrigatorios no top-level):
 
@@ -241,7 +241,7 @@ Sinais que cruzam MEM -> WB:
 | `memwb_rd_idx` | `reg_t` | MEM | WB | rd final |
 | `memwb_alu_result` | `word_t` | MEM | WB | para `wb_sel="00"` |
 | `memwb_load_data_ext` | `word_t` | MEM | WB | load ja estendido |
-| `memwb_ctrl_wb_sel` | `wbsel_t` | MEM | WB | mux final |
+| `memwb_ctrl_wb_sel` | `wb_sel_t` | MEM | WB | mux final |
 | `memwb_ctrl_reg_we` | `std_logic` | MEM | WB | escrita no banco |
 
 ## 7. Convenio de reset, stall e flush

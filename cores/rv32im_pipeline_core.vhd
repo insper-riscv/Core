@@ -22,7 +22,7 @@
 --   4. Forwarding Unit atualizado: agora conecta memwb_rd_idx e memwb_weReg
 --      diretamente (em M2 eram stubs apontando para wb_we/wb_rd constantes).
 --
--- CONVENCAO DE ENCODING DO wbsel_t (usado em selMuxALUPc4RAM):
+-- CONVENCAO DE ENCODING DO wb_sel_t (usado em selMuxALUPc4RAM):
 --   "00" = ALU (R-type, I-type ALU, AUIPC, LUI)
 --   "01" = PC+4 (JAL, JALR)
 --   "10" = RAM extendida (LW/LH/LB/LHU/LBU)
@@ -340,13 +340,13 @@ architecture rtl of rv32im_pipeline_core is
   -- Control Unit
   -- =========================================================================
   signal cu_selMuxPc4ALU    : std_logic;
-  signal cu_opExImm         : opeximm_t;
+  signal cu_opExImm         : ext_imm_op_t;
   signal id_opExImm         : std_logic_vector(2 downto 0);  -- opExImm final (base ou Zicsr)
-  signal cu_selMuxALUPc4RAM : wbsel_t;
+  signal cu_selMuxALUPc4RAM : wb_sel_t;
   signal cu_weReg           : std_logic;
   signal base_weReg         : std_logic;  -- control_unit (base ISA)
   signal m_weReg            : std_logic;  -- extensao M (M/m_decode)
-  signal cu_opExRAM         : opexram_t;
+  signal cu_opExRAM         : ext_ram_op_t;
   signal cu_selMuxRS2Imm    : std_logic;
   signal cu_selPCRS1        : std_logic;
   signal base_selPCRS1      : std_logic;
@@ -354,7 +354,7 @@ architecture rtl of rv32im_pipeline_core is
   signal cu_isCsr           : std_logic;  -- Zicsr (Zicsr/csr_decode)
   signal csr_weReg          : std_logic;
   signal csr_useImmI        : std_logic;
-  signal cu_opALU           : opalu_t;
+  signal cu_opALU           : alu_op_t;
   signal cu_isMulDiv        : std_logic;
   signal cu_weRAM           : std_logic;
   signal cu_reRAM           : std_logic;
@@ -384,12 +384,12 @@ architecture rtl of rv32im_pipeline_core is
   signal ex_rs2_val         : word_t;
   signal ex_imm             : word_t;
   signal ex_selMuxPc4ALU    : std_logic;
-  signal ex_selMuxALUPc4RAM : wbsel_t;
+  signal ex_selMuxALUPc4RAM : wb_sel_t;
   signal ex_weReg           : std_logic;
-  signal ex_opExRAM         : opexram_t;
+  signal ex_opExRAM         : ext_ram_op_t;
   signal ex_selMuxRS2Imm    : std_logic;
   signal ex_selPCRS1        : std_logic;
-  signal ex_opALU           : opalu_t;
+  signal ex_opALU           : alu_op_t;
   signal ex_isMulDiv        : std_logic;
   signal mul_started_q      : std_logic := '0';  -- a instrucao M em EX ja recebeu seu start
   signal mul_start_pulse    : std_logic;         -- start da unidade MulDiv, 1 ciclo por instrucao
@@ -458,8 +458,8 @@ architecture rtl of rv32im_pipeline_core is
   signal exmem_weRAM           : std_logic;
   signal exmem_reRAM           : std_logic;
   signal exmem_eRAM            : std_logic;
-  signal exmem_opExRAM         : opexram_t;
-  signal exmem_selMuxALUPc4RAM : wbsel_t;
+  signal exmem_opExRAM         : ext_ram_op_t;
+  signal exmem_selMuxALUPc4RAM : wb_sel_t;
 
   -- =========================================================================
   -- Saidas do reg_MEM_WB (entradas do estagio WB)
@@ -469,8 +469,8 @@ architecture rtl of rv32im_pipeline_core is
   signal memwb_alu_out         : word_t;
   signal memwb_rd_idx          : reg_t;
   signal memwb_weReg           : std_logic;
-  signal memwb_opExRAM         : opexram_t;
-  signal memwb_selMuxALUPc4RAM : wbsel_t;
+  signal memwb_opExRAM         : ext_ram_op_t;
+  signal memwb_selMuxALUPc4RAM : wb_sel_t;
 
   -- =========================================================================
   -- Estagio WB: saida do ExtenderRAM (dado de load extendido)

@@ -9,6 +9,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.pipeline_types.all;
 use work.utils_pkg.all;
 use work.alu_consts.all;
 
@@ -21,7 +22,7 @@ entity alu is
 
 	port (
 		-- Código de operação de 5 bits da ULA (definido em alu_consts).
-		i_op     : in  std_logic_vector(4 downto 0);
+		i_op     : in  alu_op_t;
 		-- Operando A (primeiro operando da operação).
 		i_a      : in  std_logic_vector((data_width-1) downto 0);
 		-- Operando B (segundo operando da operação).

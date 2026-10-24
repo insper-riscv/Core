@@ -57,8 +57,8 @@ entity reg_EX_MEM is
     in_weRAM           : in  std_logic;
     in_reRAM           : in  std_logic;
     in_eRAM            : in  std_logic;
-    in_opExRAM         : in  opexram_t;
-    in_selMuxALUPc4RAM : in  wbsel_t;
+    in_opExRAM         : in  ext_ram_op_t;
+    in_selMuxALUPc4RAM : in  wb_sel_t;
 
     -- =========================================================================
     -- Saidas para o estagio MEM (consumidas por M3)
@@ -77,8 +77,8 @@ entity reg_EX_MEM is
     exmem_weRAM           : out std_logic;
     exmem_reRAM           : out std_logic;
     exmem_eRAM            : out std_logic;
-    exmem_opExRAM         : out opexram_t;
-    exmem_selMuxALUPc4RAM : out wbsel_t
+    exmem_opExRAM         : out ext_ram_op_t;
+    exmem_selMuxALUPc4RAM : out wb_sel_t
   );
 end entity reg_EX_MEM;
 
@@ -95,8 +95,8 @@ architecture rtl of reg_EX_MEM is
   signal r_weRAM           : std_logic := '0';
   signal r_reRAM           : std_logic := '0';
   signal r_eRAM            : std_logic := '0';
-  signal r_opExRAM         : opexram_t := (others => '0');
-  signal r_selMuxALUPc4RAM : wbsel_t   := (others => '0');
+  signal r_opExRAM         : ext_ram_op_t := (others => '0');
+  signal r_selMuxALUPc4RAM : wb_sel_t   := (others => '0');
 begin
 
   process(clk)

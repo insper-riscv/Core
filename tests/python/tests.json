@@ -20,6 +20,7 @@
     "ALU": {
         "toplevel": "alu",
         "sources": [
+            "common/pipeline_types.vhd",
             "common/utils_pkg.vhd",
             "I/alu_consts.vhd",
             "I/alu.vhd"

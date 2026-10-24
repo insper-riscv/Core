@@ -8,44 +8,45 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.pipeline_types.all;
 
 package alu_consts is
 
 	-- Repassa diretamente o operando B (i_b) para a saída (usado em LUI).
-	constant ALU_PASS_B : std_logic_vector(4 downto 0) := "00000";
+	constant ALU_PASS_B : alu_op_t := "00000";
 	-- Soma aritmética (i_a + i_b).
-	constant ALU_ADD    : std_logic_vector(4 downto 0) := "00001";
+	constant ALU_ADD    : alu_op_t := "00001";
 	-- OU exclusivo bit a bit (i_a xor i_b).
-	constant ALU_XOR    : std_logic_vector(4 downto 0) := "00010";
+	constant ALU_XOR    : alu_op_t := "00010";
 	-- OU inclusivo bit a bit (i_a or i_b).
-	constant ALU_OR     : std_logic_vector(4 downto 0) := "00011";
+	constant ALU_OR     : alu_op_t := "00011";
 	-- E lógico bit a bit (i_a and i_b).
-	constant ALU_AND    : std_logic_vector(4 downto 0) := "00100";
+	constant ALU_AND    : alu_op_t := "00100";
 	-- Deslocamento lógico à esquerda (SLL / SLLI).
-	constant ALU_SLL    : std_logic_vector(4 downto 0) := "00101";
+	constant ALU_SLL    : alu_op_t := "00101";
 	-- Deslocamento lógico à direita (SRL / SRLI).
-	constant ALU_SRL    : std_logic_vector(4 downto 0) := "00110";
+	constant ALU_SRL    : alu_op_t := "00110";
 	-- Deslocamento aritmético à direita com preservação de sinal (SRA / SRAI).
-	constant ALU_SRA    : std_logic_vector(4 downto 0) := "00111";
+	constant ALU_SRA    : alu_op_t := "00111";
 	-- Subtração aritmética (i_a - i_b).
-	constant ALU_SUB    : std_logic_vector(4 downto 0) := "01000";
+	constant ALU_SUB    : alu_op_t := "01000";
 	-- Comparação menor-que com sinal (SLT / SLTI).
-	constant ALU_SLT    : std_logic_vector(4 downto 0) := "01001";
+	constant ALU_SLT    : alu_op_t := "01001";
 	-- Comparação menor-que sem sinal (SLTU / SLTIU).
-	constant ALU_SLTU   : std_logic_vector(4 downto 0) := "01010";
+	constant ALU_SLTU   : alu_op_t := "01010";
 	-- Comparação de igualdade para desvio condicional (BEQ).
-	constant ALU_BEQ    : std_logic_vector(4 downto 0) := "01011";
+	constant ALU_BEQ    : alu_op_t := "01011";
 	-- Comparação de diferença para desvio condicional (BNE).
-	constant ALU_BNE    : std_logic_vector(4 downto 0) := "01100";
+	constant ALU_BNE    : alu_op_t := "01100";
 	-- Comparação menor-que com sinal para desvio condicional (BLT).
-	constant ALU_BLT    : std_logic_vector(4 downto 0) := "01101";
+	constant ALU_BLT    : alu_op_t := "01101";
 	-- Comparação maior-ou-igual com sinal para desvio condicional (BGE).
-	constant ALU_BGE    : std_logic_vector(4 downto 0) := "01110";
+	constant ALU_BGE    : alu_op_t := "01110";
 	-- Comparação menor-que sem sinal para desvio condicional (BLTU).
-	constant ALU_BLTU   : std_logic_vector(4 downto 0) := "01111";
+	constant ALU_BLTU   : alu_op_t := "01111";
 	-- Comparação maior-ou-igual sem sinal para desvio condicional (BGEU).
-	constant ALU_BGEU   : std_logic_vector(4 downto 0) := "10000";
+	constant ALU_BGEU   : alu_op_t := "10000";
 	-- Cálculo de endereço-alvo de salto indireto com bit menos significativo zerado (JALR).
-	constant ALU_JALR   : std_logic_vector(4 downto 0) := "10001";
+	constant ALU_JALR   : alu_op_t := "10001";
 
 end package alu_consts;

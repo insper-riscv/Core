@@ -56,8 +56,8 @@ entity reg_MEM_WB is
 
     -- Sinais de controle propagados para o estagio WB
     in_weReg           : in  std_logic;
-    in_opExRAM         : in  opexram_t;
-    in_selMuxALUPc4RAM : in  wbsel_t;
+    in_opExRAM         : in  ext_ram_op_t;
+    in_selMuxALUPc4RAM : in  wb_sel_t;
 
     -- =========================================================================
     -- Saidas para o estagio WB
@@ -71,8 +71,8 @@ entity reg_MEM_WB is
 
     -- Controle
     memwb_weReg           : out std_logic;
-    memwb_opExRAM         : out opexram_t;
-    memwb_selMuxALUPc4RAM : out wbsel_t
+    memwb_opExRAM         : out ext_ram_op_t;
+    memwb_selMuxALUPc4RAM : out wb_sel_t
   );
 end entity reg_MEM_WB;
 
@@ -84,8 +84,8 @@ architecture rtl of reg_MEM_WB is
   signal r_rd_idx  : reg_t  := (others => '0');
 
   signal r_weReg           : std_logic := '0';
-  signal r_opExRAM         : opexram_t := (others => '0');
-  signal r_selMuxALUPc4RAM : wbsel_t   := (others => '0');
+  signal r_opExRAM         : ext_ram_op_t := (others => '0');
+  signal r_selMuxALUPc4RAM : wb_sel_t   := (others => '0');
 begin
 
   process(clk)

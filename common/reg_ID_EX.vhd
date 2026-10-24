@@ -24,12 +24,12 @@ entity reg_ID_EX is
 
     -- Controle vindo da Control Unit + Bubble Mux
     in_selMuxPc4ALU    : in  std_logic;
-    in_selMuxALUPc4RAM : in  wbsel_t;
+    in_selMuxALUPc4RAM : in  wb_sel_t;
     in_weReg           : in  std_logic;
-    in_opExRAM         : in  opexram_t;
+    in_opExRAM         : in  ext_ram_op_t;
     in_selMuxRS2Imm    : in  std_logic;
     in_selPCRS1        : in  std_logic;
-    in_opALU           : in  opalu_t;
+    in_opALU           : in  alu_op_t;
     in_isMulDiv        : in  std_logic;
     in_weRAM           : in  std_logic;
     in_reRAM           : in  std_logic;
@@ -50,12 +50,12 @@ entity reg_ID_EX is
     idex_imm     : out word_t;
 
     idex_selMuxPc4ALU    : out std_logic;
-    idex_selMuxALUPc4RAM : out wbsel_t;
+    idex_selMuxALUPc4RAM : out wb_sel_t;
     idex_weReg           : out std_logic;
-    idex_opExRAM         : out opexram_t;
+    idex_opExRAM         : out ext_ram_op_t;
     idex_selMuxRS2Imm    : out std_logic;
     idex_selPCRS1        : out std_logic;
-    idex_opALU           : out opalu_t;
+    idex_opALU           : out alu_op_t;
     idex_isMulDiv        : out std_logic;
     idex_weRAM           : out std_logic;
     idex_reRAM           : out std_logic;
@@ -78,12 +78,12 @@ architecture rtl of reg_ID_EX is
   signal r_imm     : word_t := (others => '0');
 
   signal r_selMuxPc4ALU    : std_logic := '0';
-  signal r_selMuxALUPc4RAM : wbsel_t   := (others => '0');
+  signal r_selMuxALUPc4RAM : wb_sel_t   := (others => '0');
   signal r_weReg           : std_logic := '0';
-  signal r_opExRAM         : opexram_t := (others => '0');
+  signal r_opExRAM         : ext_ram_op_t := (others => '0');
   signal r_selMuxRS2Imm    : std_logic := '0';
   signal r_selPCRS1        : std_logic := '0';
-  signal r_opALU           : opalu_t   := (others => '0');
+  signal r_opALU           : alu_op_t   := (others => '0');
   signal r_isMulDiv        : std_logic := '0';
   signal r_weRAM           : std_logic := '0';
   signal r_reRAM           : std_logic := '0';
