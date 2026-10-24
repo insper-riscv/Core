@@ -39,16 +39,16 @@ begin
   -- Write enable por registrador (x0 não é gravável)
   ---------------------------------------------------------------------------
   GEN_REGISTERS : for i in 1 to 31 generate
-    register_I : entity work.genericRegister
+    register_I : entity work.generic_register
       generic map (
-        DATA_WIDTH => 32
+        data_width => 32
       )
       port map (
-        clock       => clk,
-        clear       => clear,
-        enable      => we_ind(i),          -- <<< usa o sinal intermediário
-        source      => data_in,
-        destination => registers(i)
+        i_clk    => clk,
+        i_rst    => clear,
+        i_enable => we_ind(i),          -- <<< usa o sinal intermediário
+        i_d      => data_in,
+        o_d      => registers(i)
       );
   end generate;
 

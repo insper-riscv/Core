@@ -7,12 +7,12 @@ generics: {HAS_M: true, HAS_ZICSR: true, HAS_ZIFENCEI: true}
 sources:
   - common/rv32i_ctrl_consts.vhd
   - common/pipeline_types.vhd
-  - common/genericRegister.vhd
-  - common/genericAdder.vhd
-  - common/genericAdderU.vhd
+  - common/generic_register.vhd
+  - common/adder.vhd
+  - common/adder_u.vhd
   - common/mux_2x1.vhd
   - common/genericMux3x1.vhd
-  - common/FlipFlop.vhd
+  - common/flip_flop.vhd
   - I/ALU.vhd
   - common/RegFile.vhd
   - common/InstructionDecoder.vhd
