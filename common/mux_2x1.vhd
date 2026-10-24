@@ -1,3 +1,13 @@
+-- =============================================================================
+-- Multiplexador 2x1 parametrizável
+--
+-- Seleciona combinacionalmente entre dois barramentos de entrada de largura
+-- configurável (data_width) de acordo com o sinal seletor i_sel.
+--
+-- Quando i_sel = '0': o_d = i_d0
+-- Quando i_sel = '1': o_d = i_d1
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 

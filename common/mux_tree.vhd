@@ -1,3 +1,11 @@
+-- =============================================================================
+-- Multiplexador em árvore binária parametrizável
+--
+-- Seleciona uma palavra de largura data_width a partir de uma matriz de
+-- 2^selector_width palavras (i_array) utilizando uma árvore balanceada de
+-- selector_width estágios de seleção binária controlada por i_sel.
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use work.utils_pkg.all;

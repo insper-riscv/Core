@@ -1,3 +1,11 @@
+-- =============================================================================
+-- Decodificador binário para one-hot parametrizável
+--
+-- Converte um índice binário de largura num_inputs em um vetor one-hot de
+-- 2^num_inputs bits, onde apenas o bit correspondente ao valor numérico de
+-- i_d vale '1' e todos os demais valem '0'.
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 

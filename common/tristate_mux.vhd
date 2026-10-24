@@ -1,3 +1,11 @@
+-- =============================================================================
+-- Multiplexador parametrizável baseado em buffers tri-state
+--
+-- Decodifica o seletor binário i_sel em um vetor one-hot via onehot_decoder
+-- e habilita apenas a palavra correspondente de i_array no barramento de
+-- saída o_d, mantendo as demais em alta impedância ('Z').
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use work.utils_pkg.all;

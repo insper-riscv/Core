@@ -1,3 +1,14 @@
+-- =============================================================================
+-- Flip-Flop tipo D de 1 bit com habilitação e reset assíncrono
+--
+-- Armazena um bit de estado na borda de subida de i_clk quando i_enable = '1'.
+--
+-- Quando i_rst = '1' (assíncrono): o_d = '0'
+-- Quando i_rst = '0' e borda de subida de i_clk:
+--   - i_enable = '1': o_d recebe i_d
+--   - i_enable = '0': o_d mantém o valor anterior
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 

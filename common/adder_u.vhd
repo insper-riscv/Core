@@ -1,3 +1,12 @@
+-- =============================================================================
+-- Somador binário parametrizável com extensão mista (signed + unsigned)
+--
+-- Realiza combinacionalmente a soma entre o primeiro operando interpretado
+-- com sinal (signed) e o segundo operando interpretado sem sinal (unsigned),
+-- mantendo a largura configurável (data_width):
+--   o_d = signed(i_d0) + signed(resize(unsigned(i_d1), data_width))
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

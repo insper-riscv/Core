@@ -1,3 +1,11 @@
+-- =============================================================================
+-- Somador binário parametrizável sem sinal (unsigned)
+--
+-- Realiza combinacionalmente a soma aritmética de dois vetores de largura
+-- configurável (data_width):
+--   o_d = unsigned(i_d0) + unsigned(i_d1)
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;

@@ -1,3 +1,15 @@
+-- =============================================================================
+-- Registrador paralelo parametrizável com habilitação e reset assíncrono
+--
+-- Armazena um vetor de dados de largura configurável (data_width) na borda
+-- de subida de i_clk quando i_enable = '1'.
+--
+-- Quando i_rst = '1' (assíncrono): zera imediatamente a saída o_d.
+-- Quando i_rst = '0' e borda de subida de i_clk:
+--   - i_enable = '1': o_d recebe i_d
+--   - i_enable = '0': o_d mantém o valor armazenado
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -25,22 +37,16 @@ end entity;
 
 architecture rtl of generic_register is
 begin
-    -- In Altera devices, register signals have a set priority.
-    -- The HDL design should reflect this priority.
     process(i_rst, i_clk)
     begin
-        -- The asynchronous reset signal has the highest priority
+        -- O sinal de reset assíncrono possui a maior prioridade.
         if (i_rst = '1') then
-            o_d <= (others => '0');    -- Código reconfigurável.
+            o_d <= (others => '0');
         else
-            -- At a clock edge, if asynchronous signals have not taken priority,
-            -- respond to the appropriate synchronous signal.
-            -- Check for synchronous reset, then synchronous load.
-            -- If none of these takes precedence, update the register output
-            -- to be the register input.
+            -- Na borda de subida do clock, atualiza o registrador se habilitado.
             if (rising_edge(i_clk)) then
                 if (i_enable = '1') then
-                        o_d <= i_d;
+                    o_d <= i_d;
                 end if;
             end if;
         end if;

@@ -1,10 +1,26 @@
+-- =============================================================================
+-- Banco de registradores discreto do pipeline RV32IM
+--
+-- Baseado no Apêndice C (Register Files) de Patterson & Hennessy.
+-- Implementa 2^addr_width registradores de data_width bits com duas portas de
+-- leitura combinacionais (i_rs1 -> o_rs1, i_rs2 -> o_rs2) e uma porta de
+-- escrita síncrona (i_rd, i_d, i_enable).
+--
+-- Características:
+--   - Registrador zero (x0 / endereço 0) fixado constantemente em zero.
+--   - Demais registradores instanciados discretamente via generic_register
+--     com habilitação decodificada por onehot_decoder.
+--   - Leitura das portas rs1 e rs2 realizada por árvores de multiplexadores
+--     (mux_tree).
+--   - Bypass interno (write-through) via mux_2x1 quando há leitura e escrita
+--     simultânea no mesmo registrador (exceto x0), garantindo que o estágio ID
+--     observe o dado recém-escrito pelo estágio WB no mesmo ciclo.
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 use work.utils_pkg.all;
 
--- Baseado no apêndice C (Register Files) do COD (Patterson & Hennessy).
-
--- Entidade que define um banco de registradores com leitura de 2 registradores e escrita em 1 registrador simultaneamente.
 entity reg_file is
 	
 	generic (

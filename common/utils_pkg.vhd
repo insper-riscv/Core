@@ -1,17 +1,31 @@
+-- =============================================================================
+-- Pacote de tipos e funções utilitárias de hardware
+--
+-- Define o tipo de matriz de palavras (word_array_t) compatível com VHDL-2008
+-- e funções auxiliares combinacionais para comparação de vetores (equals,
+-- not_equals) e cálculo de largura de endereço em tempo de elaboração
+-- (log2_ceil).
+-- =============================================================================
+
 library ieee;
 use ieee.std_logic_1164.all;
 
 package utils_pkg is
 
-  subtype word_t is std_logic_vector;  -- elemento não-constrangido
-  type    word_array_t is array (natural range <>) of word_t; -- array de palavras
-  
+  -- Elemento de palavra de largura não-constrangida.
+  subtype word_t is std_logic_vector;
+  -- Matriz não-constrangida de palavras de dados.
+  type    word_array_t is array (natural range <>) of word_t;
+
+  -- Retorna '1' quando os vetores a e b são bit a bit iguais, e '0' caso contrário.
   function equals(a : in std_logic_vector; b : in std_logic_vector) return std_logic;
-  
+
+  -- Retorna '1' quando os vetores a e b diferem em pelo menos um bit, e '0' caso contrário.
   function not_equals(a : in std_logic_vector; b : in std_logic_vector) return std_logic;
-  
+
+  -- Calcula o menor inteiro natural n tal que 2^n >= arg.
   function log2_ceil(arg : positive) return natural;
-  
+
 end package;
 
 package body utils_pkg is 
