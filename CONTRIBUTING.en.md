@@ -49,7 +49,7 @@ The design-for-reuse methodology for hardware blocks follows the book *Reuse Met
   author    = {Keating, Michael and Bricaud, Pierre},
   edition   = {3},
   year      = {2002},
-  publisher = {Kluwer Academic Publishers},
+  publisher = {Springer},
   isbn      = {978-1402071416}
 }
 ```

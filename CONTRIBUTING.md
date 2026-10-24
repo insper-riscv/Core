@@ -49,7 +49,7 @@ A metodologia de projeto para reuso de blocos de hardware segue o livro *Reuse M
   author    = {Keating, Michael and Bricaud, Pierre},
   edition   = {3},
   year      = {2002},
-  publisher = {Kluwer Academic Publishers},
+  publisher = {Springer},
   isbn      = {978-1402071416}
 }
 ```
