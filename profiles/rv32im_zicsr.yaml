@@ -13,8 +13,9 @@ sources:
   - common/mux_2x1.vhd
   - common/mux_4x1.vhd
   - common/flip_flop.vhd
-  - I/ALU.vhd
   - common/utils_pkg.vhd
+  - I/alu_consts.vhd
+  - I/alu.vhd
   - common/onehot_decoder.vhd
   - common/mux_tree.vhd
   - common/tristate_mux.vhd

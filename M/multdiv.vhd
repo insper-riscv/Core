@@ -175,11 +175,11 @@ begin
 
   EXTENDER: entity work.extend_signed
       port map(
-        i_d0     => valorA,
-        i_d1     => valorB,
+        i_a      => valorA,
+        i_b      => valorB,
         i_signed => signedAB,
-        o_d0     => outA,
-        o_d1     => outB
+        o_a      => outA,
+        o_b      => outB
         );
 
   signedAB  <= palavra(4 downto 3);

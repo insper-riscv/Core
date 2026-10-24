@@ -821,13 +821,13 @@ begin
   -- =========================================================================
   -- EX stage: ALU
   -- =========================================================================
-  u_alu : entity work.ALU
+  u_alu : entity work.alu
     port map (
-      op      => ex_opALU,
-      dA      => ex_alu_op_a,
-      dB      => ex_alu_op_b,
-      dataOut => ex_alu_result,
-      branch  => ex_alu_branch_flag
+      i_op     => ex_opALU,
+      i_a      => ex_alu_op_a,
+      i_b      => ex_alu_op_b,
+      o_d      => ex_alu_result,
+      o_branch => ex_alu_branch_flag
     );
 
   -- =========================================================================
