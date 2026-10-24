@@ -175,7 +175,8 @@ Todo PC a partir de `0x40000000` é buscado por uma porta própria, ligada a uma
 | Porta de busca | `ic_sel` diz que o PC está na SDRAM; `ic_ready` diz que `ic_data` é a instrução desse PC. Com `ic_ready` em zero a busca espera: o PC não anda e o que entra em IF/ID é uma bolha; EX, MEM e WB seguem andando |
 | Redirecionamento durante a espera | Um desvio, salto, trap ou `fence.i` redireciona o PC mesmo com a busca esperando |
 | `fence.i` | `Zifencei/fencei_unit.vhd` sobe `take` com a instrução válida e o pipeline andando: o core pulsa `ic_inval`, esvazia IF/ID e ID/EX e põe no PC o endereço da instrução seguinte |
-| Stores anteriores | O estágio de memória só deixa o pipeline andar quando o acesso terminou; no ciclo em que o `fence.i` executa, todo store anterior já chegou à memória |
+| Stores anteriores, sem cache de dados | O estágio de memória só deixa o pipeline andar quando o acesso terminou; no ciclo em que o `fence.i` executa, todo store anterior já chegou à memória |
+| Stores anteriores, com cache de dados (`HAS_DCACHE`) | A unidade pede o flush da cache de dados (`dc_flush`, um pulso) e segura a instrução em EX até o pulso `dc_done`. Só o início do pipeline fica parado (PC, IF/ID, ID/EX): EX/MEM recebe bolhas e MEM/WB segue andando, para o acesso mais velho que está em MEM terminar e a cache poder começar o flush |
 | Sem `fence.i` | A cache de instruções não observa stores; o resultado da execução de código modificado sem `fence.i` é indefinido, como a especificação permite |
 
 ## Critério de aceite de uma extensão
