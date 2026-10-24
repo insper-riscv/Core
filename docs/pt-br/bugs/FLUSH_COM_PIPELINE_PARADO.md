@@ -94,3 +94,7 @@ um desvio tomado que pula **três** instruções.
 O desvio precisa pular mais de uma instrução. Com uma só, o destino coincide
 com o endereço que o PC já estava buscando e o erro fica escondido, como na
 seção 3.
+
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../LICENSE).

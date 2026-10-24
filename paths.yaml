@@ -7,4 +7,4 @@ references:
   - {name: profile rv32im_zicsr_zifencei sources, file: profiles/rv32im_zicsr_zifencei.yaml, yaml: sources, base: .}
   - {name: profile rv32i sources, file: profiles/rv32i.yaml, yaml: sources, base: .}
   - {name: per-entity tests.json, file: tests/python/tests.json, yaml: "*.sources", base: .}
-  - {name: entry points, paths: [tests/python/runner.py, docs/contracts]}
+  - {name: entry points, paths: [tests/python/runner.py, docs/pt-br/contracts, docs/en/contracts]}

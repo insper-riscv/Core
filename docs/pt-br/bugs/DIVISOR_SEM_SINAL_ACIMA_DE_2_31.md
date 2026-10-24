@@ -73,3 +73,7 @@ O teste de entidade `non_restoring_divider` roda o divisor isolado e compara quo
 | Aleatório | 60 pares de 32 bits, nos dois modos, com semente fixa |
 
 O teste de bordas sem sinal exercita 23 pares que o divisor de 33 bits calcula errado, todos com divisor $\ge \texttt{0x80000001}$; com 34 bits nenhum falha. Os três testes passam. A suíte de simulação do projeto (89 programas) e as 47 execuções do ACT4 para as extensões I e M passam com o divisor corrigido.
+
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../LICENSE).
