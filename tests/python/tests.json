@@ -1,11 +1,21 @@
 {
     "bancoRegistradores": {
-        "toplevel": "regfile",
+        "toplevel": "reg_file",
         "sources": [
+            "common/utils_pkg.vhd",
+            "common/onehot_decoder.vhd",
             "common/generic_register.vhd",
-            "common/RegFile.vhd"
+            "common/mux_2x1.vhd",
+            "common/mux_tree.vhd",
+            "common/reg_file.vhd"
         ],
-        "test_module": "tests.python.unittests.common.bancoRegistradores"
+        "test_module": "tests.python.unittests.common.bancoRegistradores",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
     },
     "ALU": {
         "toplevel": "alu",
@@ -111,7 +121,11 @@
             "common/genericMux3x1.vhd",
             "common/flip_flop.vhd",
             "I/ALU.vhd",
-            "common/RegFile.vhd",
+            "common/utils_pkg.vhd",
+            "common/onehot_decoder.vhd",
+            "common/mux_tree.vhd",
+            "common/tristate_mux.vhd",
+            "common/reg_file.vhd",
             "common/InstructionDecoder.vhd",
             "I/ExtenderImm.vhd",
             "I/ExtenderRAM.vhd",
@@ -172,7 +186,11 @@
             "common/genericMux3x1.vhd",
             "common/flip_flop.vhd",
             "I/ALU.vhd",
-            "common/RegFile.vhd",
+            "common/utils_pkg.vhd",
+            "common/onehot_decoder.vhd",
+            "common/mux_tree.vhd",
+            "common/tristate_mux.vhd",
+            "common/reg_file.vhd",
             "common/InstructionDecoder.vhd",
             "I/ExtenderImm.vhd",
             "I/ExtenderRAM.vhd",
@@ -212,7 +230,11 @@
             "common/genericMux3x1.vhd",
             "common/flip_flop.vhd",
             "I/ALU.vhd",
-            "common/RegFile.vhd",
+            "common/utils_pkg.vhd",
+            "common/onehot_decoder.vhd",
+            "common/mux_tree.vhd",
+            "common/tristate_mux.vhd",
+            "common/reg_file.vhd",
             "common/InstructionDecoder.vhd",
             "I/ExtenderImm.vhd",
             "I/ExtenderRAM.vhd",

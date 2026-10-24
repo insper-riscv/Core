@@ -11,23 +11,23 @@ def _mask(width: int) -> int:
 
 async def _read_ports(dut, a_addr: int, b_addr: int):
     """Leituras assíncronas: ajusta endereços e espera pequenos deltas."""
-    dut.rs1.value = a_addr
-    dut.rs2.value = b_addr
+    dut.i_rs1.value = a_addr
+    dut.i_rs2.value = b_addr
     # Espera uma pequena janela para propagação combinacional
     await Timer(1, units="ns")
-    aval = int(dut.d_rs1.value)
-    bval = int(dut.d_rs2.value)
+    aval = int(dut.o_rs1.value)
+    bval = int(dut.o_rs2.value)
     return aval, bval
 
 async def _write_reg(dut, addr: int, data: int):
     """Escrita sincronizada: amostrada na borda de subida do clock."""
-    dut.rd.value = addr
-    dut.data_in.value = data
-    dut.we.value = 1
-    await RisingEdge(dut.clk)
+    dut.i_rd.value = addr
+    dut.i_d.value = data
+    dut.i_enable.value = 1
+    await RisingEdge(dut.i_clk)
     # pequena folga de propagação para leituras combinacionais subsequentes
     #await Timer(1, units="ns")
-    dut.we.value = 0
+    dut.i_enable.value = 0
 
 
 def _restart_clock(dut, period_ns=10):
@@ -38,10 +38,10 @@ def _restart_clock(dut, period_ns=10):
         except Exception:
             pass
 
-    dut.clk.setimmediatevalue(0)
+    dut.i_clk.setimmediatevalue(0)
 
     dut._clk_gen = cocotb.start_soon(
-        Clock(dut.clk, period_ns, units="ns").start()
+        Clock(dut.i_clk, period_ns, units="ns").start()
     )
 
 # ============== 1) Leitura inicial (x0 zero) ==============
@@ -50,12 +50,12 @@ async def inicializacao_e_x0(dut):
     """Verifica leitura inicial e o comportamento do registrador x0 (endereço 0 => sempre zero)."""
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    aw = len(dut.rs1)
-    dw = len(dut.d_rs1)
+    aw = len(dut.i_rs1)
+    dw = len(dut.o_rs1)
     m = _mask(dw)
 
     # Lê x0 simultaneamente em A e B
@@ -75,11 +75,11 @@ async def escrita_e_leitura_basica(dut):
     """Escreve em um registrador e confere leituras nas duas portas."""
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    dw = len(dut.d_rs1)
+    dw = len(dut.o_rs1)
     m = _mask(dw)
 
     addr = 3
@@ -96,11 +96,11 @@ async def x0_sempre_zero(dut):
     """Tenta escrever em x0; leituras de endereço 0 devem continuar retornando zero."""
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    dw = len(dut.d_rs1)
+    dw = len(dut.o_rs1)
     m = _mask(dw)
 
     val = 0xFFFFFFFF & m
@@ -115,12 +115,12 @@ async def leituras_simultaneas(dut):
     """Portas A e B devem ler endereços independentes no mesmo ciclo."""
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    aw = len(dut.rs1)
-    dw = len(dut.d_rs1)
+    aw = len(dut.i_rs1)
+    dw = len(dut.o_rs1)
     m = _mask(dw)
 
     addr_a = 4
@@ -143,31 +143,31 @@ async def write_then_read_same_cycle(dut):
     """
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    await RisingEdge(dut.clk)
+    await RisingEdge(dut.i_clk)
 
-    dw = len(dut.d_rs1)
+    dw = len(dut.o_rs1)
     mask = (1 << dw) - 1
     addr = 9
     novo = 0xCAFEBABE & mask
 
     # Configura leituras
-    dut.rs1.value = addr
-    dut.rs2.value = addr
-    dut.rd.value = addr
-    dut.data_in.value = novo
-    dut.we.value = 1
+    dut.i_rs1.value = addr
+    dut.i_rs2.value = addr
+    dut.i_rd.value = addr
+    dut.i_d.value = novo
+    dut.i_enable.value = 1
 
-    await RisingEdge(dut.clk)
-    dut.we.value = 0
+    await RisingEdge(dut.i_clk)
+    dut.i_enable.value = 0
     
     await Timer(1, units="ns")
     # Log detalhado
-    a = int(dut.d_rs1.value)
-    b = int(dut.d_rs2.value)
+    a = int(dut.o_rs1.value)
+    b = int(dut.o_rs2.value)
     dut._log.info(f"[DEPOIS DA BORDA] addr={addr} novo={novo:#x} A={a:#x} B={b:#x}")
 
     assert a == novo and b == novo, (
@@ -181,12 +181,12 @@ async def fuzz_banco(dut):
     """Sequência aleatória de escritas e leituras; x0 deve permanecer 0 em todas leituras."""
     _restart_clock(dut, 10)
 
-    dut.clear.value=1
+    dut.i_rst.value=1
     await Timer(1, units="ns")
-    dut.clear.value=0
+    dut.i_rst.value=0
 
-    aw = len(dut.rs1)
-    dw = len(dut.d_rs1)
+    aw = len(dut.i_rs1)
+    dw = len(dut.o_rs1)
     m = _mask(dw)
     nregs = 2**aw # Quantidade de registradores no banco
 

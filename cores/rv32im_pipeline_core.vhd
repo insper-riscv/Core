@@ -677,17 +677,17 @@ begin
   -- ID stage: RegFile
   -- Agora com loop fechado: wb_we/wb_rd/wb_data vem do estagio WB.
   -- =========================================================================
-  u_regfile : entity work.RegFile
+  u_regfile : entity work.reg_file
     port map (
-      clk     => clk,
-      clear   => reset,
-      we      => wb_we,
-      rs1     => id_rs1_idx,
-      rs2     => id_rs2_idx,
-      rd      => wb_rd,
-      data_in => wb_data,
-      d_rs1   => id_rs1_val,
-      d_rs2   => id_rs2_val
+      i_clk    => clk,
+      i_rst    => reset,
+      i_enable => wb_we,
+      i_rs1    => id_rs1_idx,
+      i_rs2    => id_rs2_idx,
+      i_rd     => wb_rd,
+      i_d      => wb_data,
+      o_rs1    => id_rs1_val,
+      o_rs2    => id_rs2_val
     );
 
   -- =========================================================================
