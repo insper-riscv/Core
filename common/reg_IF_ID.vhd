@@ -46,6 +46,9 @@ entity reg_IF_ID is
     in_pc           : in  word_t;   -- PC da instrucao (pc_out do pc_fetch)
     in_pc4          : in  word_t;   -- PC + 4          (pc4_out do pc_fetch)
     in_instr        : in  word_t;   -- instrucao da ROM (rom_data)
+    -- '0' = a instrucao ainda nao chegou (busca esperando a memoria): o que
+    -- entra e' uma bolha em vez de uma instrucao valida
+    in_ok           : in  std_logic := '1';
 
     -- -------------------------------------------------------------------------
     -- Saidas (disponibilizadas ao estagio ID)
@@ -88,7 +91,7 @@ begin
 
       elsif ifid_write_en = '1' then
         -- Captura normal
-        r_valid <= '1';
+        r_valid <= in_ok;
         r_pc    <= in_pc;
         r_pc4   <= in_pc4;
         r_instr <= in_instr;

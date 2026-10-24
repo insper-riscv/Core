@@ -45,7 +45,10 @@ entity rv32im_pipeline_core is
     HAS_M : boolean := true;
     -- Zicsr: instancia o banco de CSRs do modo maquina; sem ele (false) as
     -- instrucoes CSR sao NOP, como qualquer opcode desconhecido.
-    HAS_ZICSR : boolean := false
+    HAS_ZICSR : boolean := false;
+    -- Zifencei: FENCE.I invalida a cache de instrucoes (ic_inval) e refaz a busca da
+    -- instrucao seguinte; sem ele (false) a instrucao e' um NOP.
+    HAS_ZIFENCEI : boolean := false
   );
   port (
     clk   : in  std_logic;
@@ -109,7 +112,19 @@ entity rv32im_pipeline_core is
     sdram_wren    : out std_logic;
     sdram_rdata   : in  std_logic_vector(31 downto 0) := (others => '0');
     sdram_ready   : in  std_logic := '1';
-    mem_advance   : out std_logic
+    mem_advance   : out std_logic;
+
+    -- Busca de instrucao em SDRAM: todo PC a partir de SDRAM_BASE_BYTES e' buscado
+    -- por esta porta (uma cache de instrucoes fora do core). if_addr e' o PC e
+    -- ic_sel diz que ele esta' nessa regiao. ic_ready diz que ic_data e' a
+    -- instrucao desse PC; enquanto for '0' o PC e o IF/ID esperam (so' o inicio
+    -- do pipeline: EX, MEM e WB continuam) e o que entra em IF/ID e' uma bolha.
+    -- ic_inval pede a invalidacao da cache de instrucoes (fence.i). Com os
+    -- defaults (ready = '1') uma plataforma sem busca em SDRAM nao muda.
+    ic_data  : in  std_logic_vector(31 downto 0) := (others => '0');
+    ic_ready : in  std_logic := '1';
+    ic_sel   : out std_logic;
+    ic_inval : out std_logic
   );
 end entity rv32im_pipeline_core;
 
@@ -125,6 +140,16 @@ architecture rtl of rv32im_pipeline_core is
       isMulDiv    : out std_logic;
       weReg       : out std_logic;
       selPCRS1    : out std_logic
+    );
+  end component;
+
+  component fencei_unit is
+    port (
+      ex_valid : in  std_logic;
+      run      : in  std_logic;
+      opcode   : in  std_logic_vector(6 downto 0);
+      funct3   : in  std_logic_vector(2 downto 0);
+      take     : out std_logic
     );
   end component;
 
@@ -249,6 +274,13 @@ architecture rtl of rv32im_pipeline_core is
   constant BOOT_ROM_SIZE_BYTES : unsigned(31 downto 0) := to_unsigned(16#00000800#, 32);
   signal is_boot_rom_if : std_logic;
   signal if_instr_mux   : std_logic_vector(31 downto 0);
+
+  -- Busca em SDRAM: o PC a partir de SDRAM_BASE_BYTES vem de ic_data; a busca espera
+  -- (if_wait) enquanto a cache de instrucoes nao tem a instrucao desse PC.
+  signal if_in_sdram    : std_logic;
+  signal if_wait        : std_logic;
+  signal pc_write_en    : std_logic;
+  signal fencei_take    : std_logic;  -- FENCE.I em EX, com o pipeline andando
 
   -- FLASH x RAM: decodificacao de endereco de dado (estagio MEM/WB) --
   -- ver comentario junto do mux, na secao do estagio MEM. RAM_BASE_BYTES
@@ -447,7 +479,7 @@ begin
   -- =========================================================================
   -- Logica combinacional de controle de PC e flush
   -- =========================================================================
-  pc_src <= "11" when trap_take = '1' or mret_take = '1' else
+  pc_src <= "11" when trap_take = '1' or mret_take = '1' or fencei_take = '1' else
             "10" when ex_jalr_taken   = '1' else
             "01" when ex_branch_taken = '1' else
             "00";
@@ -459,10 +491,12 @@ begin
   --
   -- trap_take e mret_take ja' incluem pipe_run (a excecao so' e' tomada no ciclo
   -- em que o pipeline anda) e esvaziam IF/ID e ID/EX da mesma forma.
-  flush_if_id <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take;
-  flush_id_ex <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take;
+  flush_if_id <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
+  flush_id_ex <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
 
-  redirect_pc <= csr_mepc when mret_take = '1' else csr_mtvec;
+  redirect_pc <= csr_mepc when mret_take = '1' else
+                 ex_pc4   when fencei_take = '1' else
+                 csr_mtvec;
 
   -- BUG TIMING (resolvido): saida_capt no multdiv eh atualizado na borda quando done_int=1.
   -- No ciclo em que done_int=1, busy ja caiu para 0 (Booth foi para S_DONE no ciclo anterior).
@@ -493,7 +527,7 @@ begin
     port map (
       clk            => clk,
       reset          => reset,
-      if_pc_write_en => if_pc_write_en,
+      if_pc_write_en => pc_write_en,
       pc_src         => pc_src,
       branch_target  => ex_branch_target,
       jalr_target    => ex_jalr_target,
@@ -533,7 +567,20 @@ begin
   -- reset ja decodifica '1' sozinho, ja que 0 < BOOT_ROM_SIZE_BYTES).
   is_boot_rom_if <= '1' when unsigned(if_pc) < BOOT_ROM_SIZE_BYTES else '0';
 
-  if_instr_mux <= boot_rom_data when is_boot_rom_if = '1' else flash_data;
+  if_in_sdram <= '1' when unsigned(if_pc) >= SDRAM_BASE_BYTES else '0';
+  ic_sel      <= if_in_sdram;
+  if_wait     <= if_in_sdram and (not ic_ready);
+
+  if_instr_mux <= boot_rom_data when is_boot_rom_if = '1' else
+                  ic_data       when if_in_sdram = '1'    else
+                  flash_data;
+
+  -- O PC anda quando a HDU deixa e a instrucao chegou; um desvio, salto ou trap
+  -- redireciona o PC mesmo com a busca esperando.
+  pc_write_en <= (if_pc_write_en and (not if_wait))
+                 or (((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take);
+
+  ic_inval <= fencei_take;
 
   -- =========================================================================
   -- Registrador IF/ID
@@ -547,6 +594,7 @@ begin
       in_pc         => if_pc,
       in_pc4        => if_pc4,
       in_instr      => if_instr_mux,
+      in_ok         => not if_wait,
       ifid_valid    => ifid_valid,
       ifid_pc       => ifid_pc,
       ifid_pc4      => ifid_pc4,
@@ -845,6 +893,19 @@ begin
   -- O dado de escrita e' rs1 (com forwarding) ou, nas versoes com imediato
   -- (funct3[2] = 1), o campo rs1 como numero sem sinal de 5 bits (zimm).
   -- =========================================================================
+  gen_fencei : if HAS_ZIFENCEI generate
+    u_fencei : fencei_unit
+      port map (
+        ex_valid => ex_valid,
+        run      => pipe_run,
+        opcode   => ex_opCode,
+        funct3   => ex_funct3,
+        take     => fencei_take
+      );
+  else generate
+    fencei_take <= '0';
+  end generate gen_fencei;
+
   gen_csr : if HAS_ZICSR generate
     ex_isCsr <= '1' when ex_opCode = "1110011"
                      and ex_funct3 /= "000" and ex_funct3 /= "100"

@@ -167,6 +167,17 @@ CSRs implementados, todos do modo máquina:
 | `0x341` | `mepc` | leitura e escrita | 0 | bits 1 e 0 fixos em zero |
 | `0xF11` a `0xF15` | `mvendorid`, `marchid`, `mimpid`, `mhartid`, `mconfigptr` | somente leitura | 0 | lidos como zero |
 
+### 1.7 Zifencei e a busca de instrução em SDRAM
+Todo PC a partir de `0x40000000` é buscado por uma porta própria, ligada a uma cache de instruções fora do core. O generic `HAS_ZIFENCEI` liga o `fence.i`; sem ele (`false`) a instrução é um NOP.
+
+| Ponto | Comportamento |
+| :--- | :--- |
+| Porta de busca | `ic_sel` diz que o PC está na SDRAM; `ic_ready` diz que `ic_data` é a instrução desse PC. Com `ic_ready` em zero a busca espera: o PC não anda e o que entra em IF/ID é uma bolha; EX, MEM e WB seguem andando |
+| Redirecionamento durante a espera | Um desvio, salto, trap ou `fence.i` redireciona o PC mesmo com a busca esperando |
+| `fence.i` | `Zifencei/fencei_unit.vhd` sobe `take` com a instrução válida e o pipeline andando: o core pulsa `ic_inval`, esvazia IF/ID e ID/EX e põe no PC o endereço da instrução seguinte |
+| Stores anteriores | O estágio de memória só deixa o pipeline andar quando o acesso terminou; no ciclo em que o `fence.i` executa, todo store anterior já chegou à memória |
+| Sem `fence.i` | A cache de instruções não observa stores; o resultado da execução de código modificado sem `fence.i` é indefinido, como a especificação permite |
+
 ## Critério de aceite de uma extensão
 - Testes por entidade da extensão passam sozinhos, sem o pipeline.
 - `mul;mul`/`div;rem` consecutivos com operandos distintos passam (regressão
