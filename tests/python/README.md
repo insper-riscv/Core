@@ -1,46 +1,46 @@
-# `tests/python`: per-entity VHDL unit tests (cocotb + GHDL)
+# `tests/python`: Testes Unitários por Entidade (Cocotb + GHDL)
 
-Cocotb testbenches that exercise individual VHDL entities of the Core
-(`ALU`, `RegFile`, the control, hazard and forwarding units, the extenders,
-the store manager, the bubble mux, the instruction decoder) directly, one file
-per entity. They drive the entity's ports straight from Python, without
-`riscv-tools`' compiler or simulation flow. Tests that need the simulation
-memories (whole-core instruction tests) live in the
-[Tests](https://github.com/insper-riscv/Tests) repository.
+🌐 [Português](README.md) · [English](README.en.md)
 
-## Structure
+Suíte de testbenches em Python (cocotb) que exercita individualmente as entidades VHDL do processador (`alu`, `reg_file`, `control_unit`, `hazard_detection_unit`, `forwarding_unit`, `bubble_mux`, `extender_imm`, `extender_ram`, `store_manager`, `m_decode`, `non_restoring_divider_rv32`, `csr_decode`, `csr_file`, `trap_unit` e o topo `core`), conduzindo as portas diretamente a partir do simulador GHDL.
+
+## 1. Estrutura de Diretórios
 
 ```
 tests/python/
-├── runner.py                    # catalog loader + cocotb/GHDL driver
-├── tests.json                   # catalog: name -> {toplevel, sources, test_module, ...}
+├── runner.py                    # Carregador do catálogo e executor cocotb/GHDL
+├── tests.json                   # Catálogo de alvos: nome -> {toplevel, sources, test_module, parameters}
 ├── unittests/
-│   ├── common/                  # entities of common/ (one file per entity) + data/ (fixtures, e.g. riscv_opcodes.csv)
-│   ├── I/                       # entities of I/
-│   └── M/                       # entities of M/
-└── sim_build/                   # generated: <group>/<name>/{waves.ghw, ...} per test
+│   ├── common/                  # Testes das entidades de common/ e tabela de referência (data/riscv_opcodes.csv)
+│   ├── I/                       # Testes das entidades da extensão base I/
+│   ├── M/                       # Testes do decodificador e divisor da extensão M/
+│   ├── Zicsr/                   # Testes de csr_decode, csr_file e trap_unit
+│   └── cores/                   # Testes de integração do topo core (stalls de SDRAM, I-cache e FENCE.I)
+└── sim_build/                   # Artefatos gerados por simulação (<grupo>/<nome>/waves.ghw)
 ```
 
-## Running
+## 2. Execução
 
 ```bash
-make test                # every entry in tests.json (skips "skip": true ones)
-make test TEST=ALU       # one entry, by its tests.json key
+make test                # Executa todas as entradas ativas de tests.json
+make test TEST=ALU       # Executa apenas uma entrada específica pelo nome no catálogo
 ```
 
-`SIM` picks the simulator (defaults to `ghdl`).
+A variável de ambiente `SIM` seleciona o simulador (padrão `ghdl`).
 
-## The catalog (`tests.json`)
+## 3. Catálogo de Testes (`tests.json`)
 
-Each entry is a test name mapping to:
+Cada chave de `tests/python/tests.json` define um alvo de teste com os seguintes campos:
 
-| Field | Meaning |
+| Campo | Significado |
 | :--- | :--- |
-| `toplevel` | the VHDL entity under test |
-| `sources` | its source files, relative to the root of this repository, in dependency order |
-| `test_module` | the Python module with the cocotb tests |
-| `skip` | optional: `true` leaves the entry out of a full run |
-| `parameters` | optional: generics passed to the simulator |
+| `toplevel` | Nome da entidade VHDL sob teste (por exemplo, `alu`, `reg_file`, `core`) |
+| `sources` | Lista de arquivos VHDL necessários, relativos à raiz do repositório e em ordem de dependência de compilação |
+| `test_module` | Módulo Python contendo os testes `@cocotb.test()` |
+| `parameters` | Dicionário opcional de generics passados ao simulador na elaboração (por exemplo, `{"has_m": false, "has_zifencei": true}`) |
+| `build_args` / `test_args` | Argumentos adicionais repassados ao GHDL (por exemplo, `["--std=08"]`) |
+| `skip` | Booleano opcional; quando `true`, omite o alvo na execução completa sem filtro |
 
-A new entity test is a file in `unittests/<common|I|M>/`, next to the folder of the
-entity's source, and an entry here.
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
