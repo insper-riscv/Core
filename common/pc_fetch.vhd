@@ -1,112 +1,103 @@
 -- =============================================================================
--- pc_fetch.vhd
--- Estagio IF: registrador de PC + calculo de PC+4 + MUX de proximo PC
+-- Unidade de busca e atualização do Program Counter (estágio IF)
 --
--- Implementa o Passo 1 do pipeline RV32IM 5 estagios.
--- Substitui os dois genericRegister (PC_IF e PC_ID) que estavam soltos
--- dentro do rv32i3stage_core.vhd.
---
--- Entradas de selecao de proximo PC (pc_src):
---   "00" -> PC + 4          (fluxo normal)
---   "01" -> branch_target   (branch taken, vem de EX: PC_ID + imm)
---   "10" -> jalr_target     (JALR, vem de EX: ALU_out com LSB zerado)
---
--- Controle de stall:
---   if_pc_write_en = '0' -> PC congela (stall por load-use ou muldiv)
---
--- Compatibilidade com o contrato (RV32IM_PIPELINE_PASSO0_CONTRATO.md):
---   - if_pc_write_en  alias PC_write
---   - rom_addr        <= PC atual (equivalente a rom_addr <= PC_IF_out no core)
---   - pc_out          -> ifid_pc  (entrada do reg_IF_ID)
---   - pc4_out         -> ifid_pc4 (entrada do reg_IF_ID)
+-- Mantém o registrador de Program Counter (PC), calcula combinacionalmente
+-- PC + 4 via somador (adder) e seleciona o próximo endereço do PC via
+-- multiplexador 4x1 (mux_4x1) de acordo com i_pc_src:
+--   - PC_SRC_PC4      ("00") -> PC + 4 (fluxo sequencial normal)
+--   - PC_SRC_BRANCH   ("01") -> i_branch_target (branch tomado ou JAL)
+--   - PC_SRC_JALR     ("10") -> i_jalr_target (salto indireto JALR)
+--   - PC_SRC_REDIRECT ("11") -> i_redirect_pc (trap, MRET ou FENCE.I; tem
+--                               prioridade sobre congelamento de stall)
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.numeric_std.all;
-use work.rv32im_pipeline_types.all;
+use work.pipeline_types.all;
+use work.pc_src_consts.all;
 
 entity pc_fetch is
-  port (
-    clk               : in  std_logic;
-    reset             : in  std_logic;
 
-    -- Controle de stall (da Hazard Detection Unit)
-    -- '1' = normal, '0' = congela PC (stall)
-    if_pc_write_en    : in  std_logic;
+	port (
+		-- Sinal de clock.
+		i_clk           : in  std_logic;
+		-- Sinal de reset síncrono ativo em '1'.
+		i_rst           : in  std_logic;
+		-- Habilita a atualização do registrador PC ('1' = avança, '0' = congela em stall).
+		i_pc_we         : in  std_logic;
+		-- Seletor de 2 bits da fonte do próximo PC (definido em pc_src_consts).
+		i_pc_src        : in  pc_src_t;
+		-- Endereço-alvo de desvio condicional ou JAL calculado no estágio EX (PC + imm).
+		i_branch_target : in  word_t;
+		-- Endereço-alvo de salto indireto JALR calculado no estágio EX ((rs1 + imm) & ~1).
+		i_jalr_target   : in  word_t;
+		-- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
+		i_redirect_pc   : in  word_t := (others => '0');
+		-- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
+		o_pc            : out word_t;
+		-- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
+		o_pc4           : out word_t
+	);
 
-    -- Selecao do proximo PC
-    -- "00" = PC+4, "01" = branch_target, "10" = jalr_target
-    pc_src            : in  std_logic_vector(1 downto 0);
-
-    -- Alvos de desvio (calculados no estagio EX)
-    branch_target     : in  word_t;   -- PC_ID + imm  (branches / JAL)
-    jalr_target       : in  word_t;   -- (rs1 + imm) AND 0xFFFFFFFE
-
-    -- Saidas para o registrador IF/ID
-    pc_out            : out word_t;   -- PC da instrucao atual
-    pc4_out           : out word_t;   -- PC + 4
-
-    -- Interface com a ROM (equivalente a rom_addr no core original)
-    rom_addr          : out word_t;
-    rom_rden          : out std_logic
-  );
 end entity pc_fetch;
 
 architecture rtl of pc_fetch is
 
-  -- Registrador de PC interno
-  signal pc_reg   : word_t := (others => '0');
+	-- Incremento constante de 4 bytes por instrução de 32 bits.
+	constant PC_STEP_4 : word_t := x"00000004";
 
-  -- PC + 4 combinacional
-  signal pc4_wire : word_t;
-
-  -- Proximo valor do PC (saida do MUX)
-  signal pc_next  : word_t;
+	-- Valor atual armazenado no registrador de Program Counter.
+	signal pc_reg   : word_t;
+	-- Resultado combinacional da soma PC + 4.
+	signal pc4_wire : word_t;
+	-- Próximo endereço selecionado pelo multiplexador de entrada do PC.
+	signal pc_next  : word_t;
+	-- Habilitação efetiva de atualização do registrador PC.
+	signal pc_en    : std_logic;
 
 begin
 
-  -- -------------------------------------------------------------------------
-  -- PC + 4 (adder combinacional, equivalente ao Adder_PC4_IF do core)
-  -- -------------------------------------------------------------------------
-  pc4_wire <= std_logic_vector(unsigned(pc_reg) + 4);
+	-- Somador combinacional para cálculo de PC + 4.
+	u_pc4_adder : entity work.adder
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_a => pc_reg,
+			i_b => PC_STEP_4,
+			o_d => pc4_wire
+		);
 
-  -- -------------------------------------------------------------------------
-  -- MUX de proximo PC
-  -- "00" -> PC + 4 (fluxo normal)
-  -- "01" -> branch_target (branch taken ou JAL)
-  -- "10" -> jalr_target   (JALR)
-  -- "11" -> reservado, usa PC+4 por seguranca
-  -- -------------------------------------------------------------------------
-  with pc_src select pc_next <=
-    pc4_wire      when "00",
-    branch_target when "01",
-    jalr_target   when "10",
-    pc4_wire      when others;
+	-- Multiplexador 4x1 de seleção do próximo valor do PC.
+	u_pc_mux : entity work.mux_4x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => pc4_wire,
+			i_d1  => i_branch_target,
+			i_d2  => i_jalr_target,
+			i_d3  => i_redirect_pc,
+			i_sel => i_pc_src,
+			o_d   => pc_next
+		);
 
-  -- -------------------------------------------------------------------------
-  -- Registrador de PC com enable e reset sincrono
-  -- -------------------------------------------------------------------------
-  process(clk)
-  begin
-    if rising_edge(clk) then
-      if reset = '1' then
-        pc_reg <= (others => '0');
-      elsif if_pc_write_en = '1' then
-        pc_reg <= pc_next;
-      end if;
-      -- if_pc_write_en = '0': pc_reg mantem valor (stall)
-    end if;
-  end process;
+	pc_en <= '1' when (i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT) else '0';
 
-  -- -------------------------------------------------------------------------
-  -- Saidas
-  -- -------------------------------------------------------------------------
-  pc_out   <= pc_reg;
-  pc4_out  <= pc4_wire;
+	-- Registrador estrutural de 32 bits do Program Counter.
+	u_pc_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => pc_en,
+			i_d      => pc_next,
+			o_d      => pc_reg
+		);
 
-  -- Interface ROM: endereco e sempre o PC atual
-  rom_addr <= pc_reg;
-  rom_rden <= '1';
+	o_pc  <= pc_reg;
+	o_pc4 <= pc4_wire;
 
 end architecture rtl;

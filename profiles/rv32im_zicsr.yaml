@@ -1,0 +1,52 @@
+# Sources of the rv32im_zicsr profile (I + M + Zicsr), in GHDL dependency order.
+# Paths are relative to the root of this repository.
+profile: rv32im_zicsr
+extensions: [I, M, Zicsr]
+top: cpu
+generics: {has_m: true, has_zicsr: true}
+sources:
+  - common/pipeline_types.vhd
+  - common/opcode_consts.vhd
+  - common/funct3_consts.vhd
+  - common/funct7_consts.vhd
+  - common/alu_consts.vhd
+  - common/ext_imm_consts.vhd
+  - common/ext_ram_consts.vhd
+  - common/wb_sel_consts.vhd
+  - common/pc_src_consts.vhd
+  - common/mem_map_consts.vhd
+  - common/generic_register.vhd
+  - common/adder.vhd
+  - common/mux_2x1.vhd
+  - common/mux_4x1.vhd
+  - common/flip_flop.vhd
+  - common/utils_pkg.vhd
+  - I/alu.vhd
+  - common/onehot_decoder.vhd
+  - common/mux_tree.vhd
+  - common/reg_file.vhd
+  - I/extender_imm.vhd
+  - I/extender_ram.vhd
+  - I/store_manager.vhd
+  - common/control_unit.vhd
+  - common/bubble_mux.vhd
+  - common/forwarding_unit.vhd
+  - common/hazard_detection_unit.vhd
+  - M/m_decode.vhd
+  - M/booth_multiplier_rv32.vhd
+  - M/non_restoring_divider_rv32.vhd
+  - M/multdiv.vhd
+  - Zicsr/csr_decode.vhd
+  - Zicsr/csr_file.vhd
+  - Zicsr/trap_unit.vhd
+  - common/pc_fetch.vhd
+  - common/reg_if_id.vhd
+  - common/reg_id_ex.vhd
+  - common/reg_ex_mem.vhd
+  - common/reg_mem_wb.vhd
+  - core/stage_if.vhd
+  - core/stage_id.vhd
+  - core/stage_ex.vhd
+  - core/stage_mem.vhd
+  - core/stage_wb.vhd
+  - core/cpu.vhd
