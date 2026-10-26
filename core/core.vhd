@@ -320,7 +320,13 @@ architecture rtl of core is
 	signal wb_we             : std_logic;
 	-- Índice final do registrador destino rd para escrita no RegFile.
 	signal wb_rd             : reg_t;
-	-- Dado final de 32 bits selecionado no estágio WB.
+	-- Dado de 32 bits selecionado no estágio WB, como a memória o entrega neste ciclo.
+	signal wb_data_raw       : word_t;
+	-- Indica que o ciclo anterior foi um stall de EX/MEM (base_run = '0'): WB repete a instrução.
+	signal wb_repeat         : std_logic;
+	-- Dado entregue por WB no ciclo anterior (o que a instrução em WB escreveu primeiro).
+	signal wb_data_prev      : word_t;
+	-- Dado final de 32 bits do estágio WB: o primeiro ciclo da instrução, repetido enquanto ela é segurada.
 	signal wb_data           : word_t;
 
 begin
@@ -637,7 +643,43 @@ begin
 			i_sdram_rdata => i_sdram_rdata,
 			o_wb_we       => wb_we,
 			o_wb_rd       => wb_rd,
-			o_wb_data     => wb_data
+			o_wb_data     => wb_data_raw
+		);
+
+	-- A instrução em WB é segurada enquanto base_run = '0' e escreve o banco de registradores e o
+	-- forwarding a cada ciclo desse stall. A memória síncrona, porém, passa a responder ao endereço
+	-- da instrução parada em MEM, então o dado de um load em WB só vale no primeiro ciclo. Os ciclos
+	-- seguintes repetem o dado do ciclo anterior.
+	u_wb_repeat_ff : entity work.flip_flop
+		port map (
+			i_d      => not base_run,
+			o_d      => wb_repeat,
+			i_enable => '1',
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
+	u_wb_data_prev_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => '1',
+			i_d      => wb_data,
+			o_d      => wb_data_prev
+		);
+
+	u_mux_wb_data : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => wb_data_raw,
+			i_d1  => wb_data_prev,
+			i_sel => wb_repeat,
+			o_d   => wb_data
 		);
 
 end architecture rtl;
