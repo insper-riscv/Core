@@ -15,6 +15,9 @@
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
+--   - O misa anuncia RV32I e, quando has_m = true, a extensão M. Contadores
+--     (cycle, instret) não existem, e mie e mip leem zero porque não há
+--     interrupções.
 --
 -- Todos os registradores de estado utilizam instâncias estruturais de
 -- generic_register e flip_flop.
@@ -25,6 +28,10 @@ use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 
 entity csr_file is
+	generic (
+		-- Faz o misa anunciar a extensão M (bit 12), para o perfil que a inclui.
+		has_m : boolean := true
+	);
 	port (
 		-- Sinal de clock do sistema.
 		i_clk        : in  std_logic;
@@ -95,7 +102,9 @@ architecture rtl of csr_file is
 	constant ADDR_MCONFIGPTR : std_logic_vector(11 downto 0) := x"F15";
 
 	-- Valor fixo do registrador misa: RV32 (MXL = 1) com extensões I e M habilitadas.
-	constant MISA_VALUE      : word_t := x"40001100";
+	-- misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
+	constant MISA_BASE       : word_t := x"40000100";
+	constant MISA_WITH_M     : word_t := x"40001100";
 
 	-- Bit MIE (bit 3) armazenado no registrador mstatus.
 	signal mstatus_mie       : std_logic;
@@ -114,6 +123,8 @@ architecture rtl of csr_file is
 
 	-- Palavra completa de 32 bits montada a partir dos campos de mstatus (MPP = "11", MPIE, MIE).
 	signal mstatus_value     : word_t;
+	-- Valor lido do misa, conforme as extensões do perfil.
+	signal misa_value        : word_t;
 	-- Valor lido combinacionalmente do CSR selecionado por i_addr.
 	signal old_value         : word_t;
 	-- Novo valor calculado para escrita pela operação CSR (RW, RS ou RC).
@@ -158,13 +169,15 @@ architecture rtl of csr_file is
 begin
 
 	-- Montagem da palavra mstatus: MPP (bits [12:11]) fixo em "11" (Machine Mode).
+	misa_value    <= MISA_WITH_M when has_m else MISA_BASE;
+
 	mstatus_value <= (12 => '1', 11 => '1', 7 => mstatus_mpie, 3 => mstatus_mie, others => '0');
 
 	-- Seleção combinacional de leitura do CSR.
 	with i_addr select
 		old_value <=
 			mstatus_value when ADDR_MSTATUS,
-			MISA_VALUE    when ADDR_MISA,
+			misa_value    when ADDR_MISA,
 			mtvec_reg     when ADDR_MTVEC,
 			mscratch_reg  when ADDR_MSCRATCH,
 			mepc_reg      when ADDR_MEPC,

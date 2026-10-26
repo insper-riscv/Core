@@ -154,6 +154,8 @@ Ao adicionar, renomear ou remover qualquer arquivo `.vhd` ou `.md`, atualize ime
 - `paths.yaml`
 - `docs/pt-br/` e `docs/en/`
 
+O CI roda essas verificações a cada push. Num pull request de alguém de fora do projeto, ele só começa depois que um membro que pode fazer o merge aprova a execução na página do pull request.
+
 ---
 
 Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](LICENSE).

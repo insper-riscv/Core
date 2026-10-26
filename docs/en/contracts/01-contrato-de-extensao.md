@@ -59,6 +59,8 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Write operand | `ex_fwd_rs1_val` for register instructions (`i_funct3(2) = '0'`) or the 5-bit `i_rs1_idx` zero-extended to 32 bits for immediate forms (`i_funct3(2) = '1'`) |
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
+| `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; writes are ignored |
+| Not implemented | `cycle`, `time` and `instret` (an access is an illegal CSR access) and interrupts (`mie` and `mip` read zero and ignore writes) |
 
 Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority):
 
@@ -94,7 +96,7 @@ The `rv32im_zicsr_zifencei` profile enables `has_zifencei = true`:
 | :--- | :--- |
 | Instruction fetch from SDRAM (`>= 0x40000000`) | The IF stage asserts `o_ic_sel = '1'` and reads `i_ic_data`. While `i_ic_ready = '0'`, the PC stays frozen and `o_instr_valid = '0'` injects bubbles into `reg_if_id`, while EX, MEM, and WB continue advancing |
 | `FENCE.I` execution without D-cache (`has_dcache = false`) | When `FENCE.I` is valid in EX and `i_base_run = '1'`, `o_take` pulses for 1 cycle, asserting `o_ic_inval = '1'`, flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$ |
-| `FENCE.I` execution with write-back D-cache (`has_dcache = true`) | The unit emits a pulse on `o_dc_flush` (`o_flush_req`) and holds `o_busy = '1'` (freezing PC, `IF/ID`, and `ID/EX` and injecting bubbles into `EX/MEM`) until `i_dc_done = '1'` is received, at which point it pulses `o_take = '1'` and invalidates the I-cache |
+| `FENCE.I` execution with write-back D-cache (`has_dcache = true`) | The unit emits a pulse on `o_dc_flush` (`o_flush_req`) and holds `o_busy = '1'` (freezing PC, `IF/ID`, and `ID/EX` and injecting bubbles into `EX/MEM`) until `i_dc_done = '1'` is received, which must come at least one cycle after the pulse on `o_dc_flush` because the unit only accepts it afterwards, at which point it pulses `o_take = '1'` and invalidates the I-cache |
 
 ---
 

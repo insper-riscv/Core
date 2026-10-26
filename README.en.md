@@ -68,7 +68,7 @@ The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
-  bash -c "uv sync --extra sim && make check && make profiles && make test && bash formal/run.sh"
+  bash -c "uv sync && make check && make profiles && make test && bash formal/run.sh"
 ```
 
 ---

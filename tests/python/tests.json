@@ -25,7 +25,13 @@
             "common/alu_consts.vhd",
             "I/alu.vhd"
         ],
-        "test_module": "tests.python.unittests.I.ALU"
+        "test_module": "tests.python.unittests.I.ALU",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
     },
     "ExtenderRAM": {
         "toplevel": "extender_ram",
@@ -430,5 +436,98 @@
         "test_args": [
             "--std=08"
         ]
+    },
+    "CoreMulDiv": {
+        "toplevel": "core",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
+            "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
+            "common/generic_register.vhd",
+            "common/adder.vhd",
+            "common/mux_2x1.vhd",
+            "common/mux_4x1.vhd",
+            "common/flip_flop.vhd",
+            "common/utils_pkg.vhd",
+            "I/alu.vhd",
+            "common/onehot_decoder.vhd",
+            "common/mux_tree.vhd",
+            "common/reg_file.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
+            "common/control_unit.vhd",
+            "common/bubble_mux.vhd",
+            "M/m_decode.vhd",
+            "M/booth_multiplier_rv32.vhd",
+            "M/non_restoring_divider_rv32.vhd",
+            "M/multdiv.vhd",
+            "common/forwarding_unit.vhd",
+            "common/hazard_detection_unit.vhd",
+            "common/pc_fetch.vhd",
+            "common/reg_if_id.vhd",
+            "common/reg_id_ex.vhd",
+            "common/reg_ex_mem.vhd",
+            "common/reg_mem_wb.vhd",
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/core.vhd"
+        ],
+        "test_module": "tests.python.unittests.cores.MulDiv",
+        "parameters": {
+            "has_m": true
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "BoothMultiplier": {
+        "toplevel": "booth_multiplier_rv32",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "M/booth_multiplier_rv32.vhd"
+        ],
+        "test_module": "tests.python.unittests.M.booth_multiplier"
+    },
+    "MultDiv": {
+        "toplevel": "multdiv",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/funct3_consts.vhd",
+            "common/generic_register.vhd",
+            "common/flip_flop.vhd",
+            "common/adder.vhd",
+            "common/mux_2x1.vhd",
+            "M/booth_multiplier_rv32.vhd",
+            "M/non_restoring_divider_rv32.vhd",
+            "M/multdiv.vhd"
+        ],
+        "test_module": "tests.python.unittests.M.multdiv"
+    },
+    "CsrFileNoM": {
+        "toplevel": "csr_file",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/flip_flop.vhd",
+            "common/generic_register.vhd",
+            "Zicsr/csr_file.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.csr_misa_no_m",
+        "parameters": {
+            "has_m": false
+        }
     }
 }

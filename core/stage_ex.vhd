@@ -139,6 +139,9 @@ architecture rtl of stage_ex is
 	end component;
 
 	component csr_file is
+		generic (
+			has_m : boolean := true
+		);
 		port (
 			i_clk        : in  std_logic;
 			i_rst        : in  std_logic;
@@ -401,6 +404,9 @@ begin
 		                (31 downto 5 => '0') & i_rs1_idx;
 
 		u_csr_file : csr_file
+			generic map (
+				has_m => has_m
+			)
 			port map (
 				i_clk        => i_clk,
 				i_rst        => i_rst,
