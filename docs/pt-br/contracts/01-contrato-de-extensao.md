@@ -96,7 +96,7 @@ O perfil `rv32im_zicsr_zifencei` habilita `has_zifencei = true`:
 | :--- | :--- |
 | Busca de instruções em SDRAM (`>= 0x40000000`) | O estágio IF asserta `o_ic_sel = '1'` e lê `i_ic_data`. Enquanto `i_ic_ready = '0'`, o PC permanece congelado e `o_instr_valid = '0'` injeta bolhas em `reg_if_id`, enquanto EX, MEM e WB continuam avançando |
 | Execução de `FENCE.I` sem D-cache (`has_dcache = false`) | Quando `FENCE.I` está válida em EX e `i_base_run = '1'`, `o_take` pulsa por 1 ciclo, acionando `o_ic_inval = '1'`, limpando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$ |
-| Execução de `FENCE.I` com D-cache write-back (`has_dcache = true`) | A unidade emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que deve vir pelo menos um ciclo depois do pulso em `o_dc_flush` porque a unidade só o aceita depois disso, momento em que pulsa `o_take = '1'` e invalida a I-cache |
+| Execução de `FENCE.I` com D-cache write-back (`has_dcache = true`) | A unidade retém a instrução em EX por um ciclo, para que os stores anteriores deixem MEM e cheguem à cache, emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que a cache pode levantar no próprio ciclo do pulso em `o_dc_flush` ou em qualquer ciclo depois, momento em que pulsa `o_take = '1'` e invalida a I-cache |
 
 ---
 

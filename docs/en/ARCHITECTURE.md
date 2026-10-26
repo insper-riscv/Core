@@ -112,7 +112,7 @@ In the EX stage:
 
 ### 3.3. Zifencei Extension
 
-When `has_zifencei = true`, the `fencei_unit` in the EX stage detects the `FENCE.I` instruction (`opcode = OPCODE_MISC_MEM` and `funct3 = FUNCT3_FENCE_I`). Without a write-back data cache (`has_dcache = false`), it pulses `o_take = '1'` immediately when `i_run = '1'`. With a data cache (`has_dcache = true`), it requests a flush (`o_flush_req = '1'`), holds `o_busy = '1'` until `i_dc_done = '1'` is received, and then pulses `o_take = '1'`, invalidating the external instruction cache (`o_ic_inval = '1'`), flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$.
+When `has_zifencei = true`, the `fencei_unit` in the EX stage detects the `FENCE.I` instruction (`opcode = OPCODE_MISC_MEM` and `funct3 = FUNCT3_FENCE_I`). Without a write-back data cache (`has_dcache = false`), it pulses `o_take = '1'` immediately when `i_run = '1'`. With a data cache (`has_dcache = true`), it holds the instruction for one cycle so that the older stores reach the cache, requests a flush (`o_flush_req = '1'`), holds `o_busy = '1'` until `i_dc_done = '1'` is received, and then pulses `o_take = '1'`, invalidating the external instruction cache (`o_ic_inval = '1'`), flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$.
 
 ---
 

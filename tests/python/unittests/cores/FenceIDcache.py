@@ -12,7 +12,7 @@ from tests.python.unittests.cores.FenceI import FENCE_I, NOP, run
 
 @cocotb.test()
 async def test_fence_i_flushes_the_data_cache_first(dut):
-    for latency in (1, 4, 20):
+    for latency in (-1, 0, 1, 4, 20):
         ram, (pulses, flushes) = await run(dut, FENCE_I, flush_latency=latency)
         assert ram.get(0x8004) == 1, f"first run, flush latency {latency}"
         assert ram.get(0x8000) == 2, f"the rewritten instruction did not run (flush latency {latency})"
