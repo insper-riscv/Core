@@ -2,7 +2,7 @@
 
 🌐 [Português](README.md) · [English](README.en.md)
 
-Suíte de testbenches em Python (cocotb) que exercita individualmente as entidades VHDL do processador (`alu`, `reg_file`, `control_unit`, `hazard_detection_unit`, `forwarding_unit`, `bubble_mux`, `extender_imm`, `extender_ram`, `store_manager`, `m_decode`, `non_restoring_divider_rv32`, `csr_decode`, `csr_file`, `trap_unit` e o topo `cpu`), conduzindo as portas diretamente a partir do simulador GHDL.
+Suíte de testbenches em Python (cocotb) que exercita individualmente as entidades VHDL do processador (`alu`, `reg_file`, `control_unit`, `hazard_detection_unit`, `forwarding_unit`, `bubble_mux`, `extender_imm`, `extender_ram`, `store_manager`, `m_decode`, `non_restoring_divider_rv32`, `csr_decode`, `csr_file`, `trap_unit` e o topo `core`), conduzindo as portas diretamente a partir do simulador GHDL.
 
 ## 1. Estrutura de Diretórios
 
@@ -15,7 +15,7 @@ tests/python/
 │   ├── I/                       # Testes das entidades da extensão base I/
 │   ├── M/                       # Testes do decodificador e divisor da extensão M/
 │   ├── Zicsr/                   # Testes de csr_decode, csr_file e trap_unit
-│   └── cores/                   # Testes de integração do topo cpu (stalls de SDRAM, I-cache e FENCE.I)
+│   └── cores/                   # Testes de integração do topo core (stalls de SDRAM, I-cache e FENCE.I)
 └── sim_build/                   # Artefatos gerados por simulação (<grupo>/<nome>/waves.ghw)
 ```
 
@@ -34,7 +34,7 @@ Cada chave de `tests/python/tests.json` define um alvo de teste com os seguintes
 
 | Campo | Significado |
 | :--- | :--- |
-| `toplevel` | Nome da entidade VHDL sob teste (por exemplo, `alu`, `reg_file`, `cpu`) |
+| `toplevel` | Nome da entidade VHDL sob teste (por exemplo, `alu`, `reg_file`, `core`) |
 | `sources` | Lista de arquivos VHDL necessários, relativos à raiz do repositório e em ordem de dependência de compilação |
 | `test_module` | Módulo Python contendo os testes `@cocotb.test()` |
 | `parameters` | Dicionário opcional de generics passados ao simulador na elaboração (por exemplo, `{"has_m": false, "has_zifencei": true}`) |

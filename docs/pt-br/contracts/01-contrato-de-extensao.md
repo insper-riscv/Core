@@ -4,7 +4,7 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `core/cpu.vhd` por um generic booleano (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
 ## 2. Regras de Integração no Pipeline
 
@@ -21,7 +21,7 @@ O estágio ID combina as habilitações de escrita por disjunção lógica (`cu_
 
 ### 2.2. Efeitos Permitidos no Pipeline
 
-Uma extensão interage com o controle global do pipeline em `core/cpu.vhd` exclusivamente por três mecanismos:
+Uma extensão interage com o controle global do pipeline em `core/core.vhd` exclusivamente por três mecanismos:
 
 1. **Parada por ocupação multiciclo (`o_muldiv_stall` / `o_fencei_busy`):** congela os estágios anteriores enquanto a operação aguarda conclusão.
 2. **Descarte e redirecionamento de fluxo (`o_fencei_take`, `o_mret_take`):** esvazia `reg_if_id` e `reg_id_ex` e redireciona o PC para `o_redirect_pc`.

@@ -14,7 +14,7 @@ The bounds of the instruction address space (IF stage) and data address space (M
 
 The IF stage (`core/stage_if.vhd`) presents the current PC address on `o_if_addr` with `o_if_rden = '1'` and selects the fetched instruction according to the address range:
 
-| Port on top level `cpu` | Direction | Address region | Description |
+| Port on top level `core` | Direction | Address region | Description |
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | All | Byte address of the current Program Counter |
 | `o_if_rden` | `out` | All | Instruction read enable (hardwired to `'1'`) |
@@ -33,7 +33,7 @@ In the MEM stage (`core/stage_mem.vhd`), the effective address computed in the E
 
 Used for reading constants (`.rodata`) and copying the `.data` section at startup, with a fixed 1-cycle synchronous latency:
 
-| Port on top level `cpu` | Direction | Stage | Meaning |
+| Port on top level `core` | Direction | Stage | Meaning |
 | :--- | :--- | :--- | :--- |
 | `o_flash_addr2` | `out` | MEM | Byte address of the Flash read |
 | `o_flash_rden2` | `out` | MEM | Read enable (`exmem_re_ram and exmem_valid and is_flash_data`) |
@@ -43,7 +43,7 @@ Used for reading constants (`.rodata`) and copying the `.data` section at startu
 
 1-cycle synchronous data memory with byte-mask controlled writes:
 
-| Port on top level `cpu` | Direction | Stage | Meaning |
+| Port on top level `core` | Direction | Stage | Meaning |
 | :--- | :--- | :--- | :--- |
 | `o_ram_addr` | `out` | MEM | Byte address of the access |
 | `o_ram_wdata` | `out` | MEM | 32-bit word with write bytes positioned by `store_manager` |
@@ -57,7 +57,7 @@ Used for reading constants (`.rodata`) and copying the `.data` section at startu
 
 Every read or write access with an address at or above `0x40000000` uses the processor's external master port:
 
-| Port on top level `cpu` | Direction | Stage | Meaning |
+| Port on top level `core` | Direction | Stage | Meaning |
 | :--- | :--- | :--- | :--- |
 | `o_sdram_addr` | `out` | MEM | Byte address of the external access |
 | `o_sdram_wdata` | `out` | MEM | 32-bit datum aligned for writing |

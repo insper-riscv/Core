@@ -4,7 +4,7 @@ This guide details the inputs, outputs, internal components, and control encodin
 
 ## 1. Structural Top Level and Pipeline Stages
 
-The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `core/cpu.vhd`:
+The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `core/core.vhd`:
 
 | Order | Entity | File | Primary function |
 | :--- | :--- | :--- | :--- |

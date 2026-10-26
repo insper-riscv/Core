@@ -2,7 +2,7 @@
 
 🌐 [Português](README.md) · [English](README.en.md)
 
-RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF, ID, EX, MEM, and WB), modularized by ISA extension (`I`, `M`, `Zicsr`, and `Zifencei`) under a single top-level entity (`cpu`), accompanied by per-entity unit tests via cocotb/GHDL and formal verification via SymbiYosys.
+RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF, ID, EX, MEM, and WB), modularized by ISA extension (`I`, `M`, `Zicsr`, and `Zifencei`) under a single top-level entity (`core`), accompanied by per-entity unit tests via cocotb/GHDL and formal verification via SymbiYosys.
 
 ## 1. Documentation
 
@@ -26,7 +26,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 | `M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
 | `Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
 | `Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
-| `core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`cpu`) |
+| `core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
 | `profiles/` | Source and generic manifests for each supported profile (`rv32i.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
 | `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, and formal verification script via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
@@ -34,9 +34,9 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 ## 3. ISA Profiles
 
-The structural top level `cpu` takes four boolean generics that enable or disable each extension at elaboration time:
+The structural top level `core` takes four boolean generics that enable or disable each extension at elaboration time:
 
-| Profile (`profiles/`) | Active extensions | Generics configured on top level `cpu` |
+| Profile (`profiles/`) | Active extensions | Generics configured on top level `core` |
 | :--- | :--- | :--- |
 | `rv32i` | RV32I | `has_m: false, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
 | `rv32im` | RV32I + M | `has_m: true, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |

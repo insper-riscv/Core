@@ -23,7 +23,7 @@ profiles:
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
 	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
 	  $(GHDL) -a $(STD) --workdir=$$dir $$srcs && \
-	  $(GHDL) --elab-run $(STD) --workdir=$$dir cpu $$gens --stop-time=1ns >/dev/null 2>&1 \
+	  $(GHDL) --elab-run $(STD) --workdir=$$dir core $$gens --stop-time=1ns >/dev/null 2>&1 \
 	  && echo "profile $$p builds ($$gens)" || { echo "profile $$p FAILED"; exit 1; }; \
 	done
 

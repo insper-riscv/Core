@@ -2,7 +2,7 @@
 # Paths are relative to the root of this repository.
 profile: rv32im
 extensions: [I, M]
-top: cpu
+top: core
 generics: {has_m: true}
 sources:
   - common/pipeline_types.vhd
@@ -46,4 +46,4 @@ sources:
   - core/stage_ex.vhd
   - core/stage_mem.vhd
   - core/stage_wb.vhd
-  - core/cpu.vhd
+  - core/core.vhd

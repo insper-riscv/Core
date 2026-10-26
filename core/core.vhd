@@ -1,5 +1,5 @@
 -- =============================================================================
--- Topo Estrutural do Processador RISC-V RV32 em Pipeline de 5 Estágios (cpu)
+-- Topo Estrutural do Processador RISC-V RV32 em Pipeline de 5 Estágios (core)
 --
 -- Conecta estruturalmente os 5 estágios do pipeline e seus 4 registradores de
 -- barreira temporal:
@@ -11,7 +11,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 
-entity cpu is
+entity core is
 	generic (
 		-- Habilita a extensão M de multiplicação e divisão inteira.
 		has_m        : boolean := false;
@@ -90,9 +90,9 @@ entity cpu is
 		-- Pulso de confirmação de término do flush da cache de dados write-back.
 		i_dc_done       : in  std_logic := '0'
 	);
-end entity cpu;
+end entity core;
 
-architecture rtl of cpu is
+architecture rtl of core is
 
 	-- =========================================================================
 	-- Sinais globais de avanço, stall e flush entre estágios

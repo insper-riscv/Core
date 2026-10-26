@@ -14,7 +14,7 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 
 O estágio IF (`core/stage_if.vhd`) apresenta o endereço atual do PC em `o_if_addr` com `o_if_rden = '1'` e seleciona a instrução conforme a faixa de endereço:
 
-| Porta no topo `cpu` | Direção | Região de endereço | Descrição |
+| Porta no topo `core` | Direção | Região de endereço | Descrição |
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | Todas | Endereço de byte do Program Counter atual |
 | `o_if_rden` | `out` | Todas | Habilitação de leitura de instrução (fixa em `'1'`) |
@@ -33,7 +33,7 @@ No estágio MEM (`core/stage_mem.vhd`), o endereço efetivo calculado no estági
 
 Utilizada para leitura de constantes (`.rodata`) e cópia da seção `.data` na inicialização, com latência síncrona fixa de 1 ciclo:
 
-| Porta no topo `cpu` | Direção | Estágio | Significado |
+| Porta no topo `core` | Direção | Estágio | Significado |
 | :--- | :--- | :--- | :--- |
 | `o_flash_addr2` | `out` | MEM | Endereço de byte da leitura na Flash |
 | `o_flash_rden2` | `out` | MEM | Habilitação de leitura (`exmem_re_ram and exmem_valid and is_flash_data`) |
@@ -43,7 +43,7 @@ Utilizada para leitura de constantes (`.rodata`) e cópia da seção `.data` na 
 
 Memória de dados síncrona de 1 ciclo de latência com escrita controlada por máscara de bytes:
 
-| Porta no topo `cpu` | Direção | Estágio | Significado |
+| Porta no topo `core` | Direção | Estágio | Significado |
 | :--- | :--- | :--- | :--- |
 | `o_ram_addr` | `out` | MEM | Endereço de byte do acesso |
 | `o_ram_wdata` | `out` | MEM | Palavra de 32 bits com os bytes de escrita posicionados pelo `store_manager` |
@@ -57,7 +57,7 @@ Memória de dados síncrona de 1 ciclo de latência com escrita controlada por m
 
 Todo acesso de leitura ou escrita com endereço a partir de `0x40000000` utiliza a porta mestre externa do processador:
 
-| Porta no topo `cpu` | Direção | Estágio | Significado |
+| Porta no topo `core` | Direção | Estágio | Significado |
 | :--- | :--- | :--- | :--- |
 | `o_sdram_addr` | `out` | MEM | Endereço de byte do acesso externo |
 | `o_sdram_wdata` | `out` | MEM | Dado de 32 bits alinhado para escrita |

@@ -3,7 +3,7 @@
 # an M instruction is a NOP. Paths are relative to the root of this repository.
 profile: rv32i
 extensions: [I]
-top: cpu
+top: core
 generics: {has_m: false}
 sources:
   - common/pipeline_types.vhd
@@ -43,4 +43,4 @@ sources:
   - core/stage_ex.vhd
   - core/stage_mem.vhd
   - core/stage_wb.vhd
-  - core/cpu.vhd
+  - core/core.vhd

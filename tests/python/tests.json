@@ -128,7 +128,7 @@
         "test_module": "tests.python.unittests.common.BubbleMux"
     },
     "CoreSdramStall": {
-        "toplevel": "cpu",
+        "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -167,7 +167,7 @@
             "core/stage_ex.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
-            "core/cpu.vhd"
+            "core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.SdramStall",
         "parameters": {
@@ -211,7 +211,7 @@
         "test_module": "tests.python.unittests.Zicsr.trap_unit"
     },
     "CoreFetchStall": {
-        "toplevel": "cpu",
+        "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -250,7 +250,7 @@
             "core/stage_ex.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
-            "core/cpu.vhd"
+            "core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FetchStall",
         "parameters": {
@@ -264,7 +264,7 @@
         ]
     },
     "CoreFenceI": {
-        "toplevel": "cpu",
+        "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -304,7 +304,7 @@
             "core/stage_ex.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
-            "core/cpu.vhd"
+            "core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FenceI",
         "parameters": {
@@ -319,7 +319,7 @@
         ]
     },
     "CoreFenceIDcache": {
-        "toplevel": "cpu",
+        "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
             "common/opcode_consts.vhd",
@@ -359,7 +359,7 @@
             "core/stage_ex.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
-            "core/cpu.vhd"
+            "core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.FenceIDcache",
         "parameters": {

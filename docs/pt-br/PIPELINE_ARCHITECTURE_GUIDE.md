@@ -4,7 +4,7 @@ Este guia detalha as entradas, saídas, componentes internos e códigos de contr
 
 ## 1. Topo Estrutural e Estágios do Pipeline
 
-O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `core/cpu.vhd`:
+O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `core/core.vhd`:
 
 | Ordem | Entidade | Arquivo | Função principal |
 | :--- | :--- | :--- | :--- |

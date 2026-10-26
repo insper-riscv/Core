@@ -4,7 +4,7 @@
 
 The RISC-V specification defines the architectural semantics of each instruction (opcodes, `funct3`/`funct7` fields, and register effects). The extension contract defines how the hardware of an extension (`M/`, `Zicsr/`, `Zifencei/`) connects to the pipeline stages (`core/`) without coupling the base logic (`common/` and `I/`) to the internal details of each extension.
 
-Each extension resides in its own folder and is enabled at the top level `core/cpu.vhd` by a boolean generic (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
+Each extension resides in its own folder and is enabled at the top level `core/core.vhd` by a boolean generic (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
 ## 2. Pipeline Integration Rules
 
@@ -21,7 +21,7 @@ The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_w
 
 ### 2.2. Permitted Pipeline Effects
 
-An extension interacts with global pipeline control in `core/cpu.vhd` exclusively through three mechanisms:
+An extension interacts with global pipeline control in `core/core.vhd` exclusively through three mechanisms:
 
 1. **Multi-cycle busy stall (`o_muldiv_stall` / `o_fencei_busy`):** freezes earlier stages while the operation awaits completion.
 2. **Flow discard and redirection (`o_fencei_take`, `o_mret_take`):** flushes `reg_if_id` and `reg_id_ex` and redirects the PC to `o_redirect_pc`.
