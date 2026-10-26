@@ -213,8 +213,8 @@ def _legal(opcode: int, funct3: int, funct7: int) -> bool:
         return True
     if opcode == 0b0110011:                                       # OP (funct7 = 1 is the M extension)
         return funct7 == 0 or (funct7 == 0b0100000 and funct3 in (0, 5))
-    if opcode == 0b0001111:                                       # MISC-MEM: FENCE and FENCE.I
-        return funct3 in (0, 1)
+    if opcode == 0b0001111:                                       # MISC-MEM: FENCE (FENCE.I is Zifencei)
+        return funct3 == 0
     return False
 
 

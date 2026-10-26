@@ -13,8 +13,9 @@
 -- O o_illegal marca toda instrução que não existe em RV32I: opcode fora da
 -- tabela, funct3 ou funct7 inválido, ou encoding comprimido (bits [1:0] /= "11").
 -- SYSTEM fica legal aqui, porque o trap_unit decide ECALL, EBREAK, MRET, WFI e
--- CSRs, e funct7 = FUNCT7_MULDIV em OP fica ilegal aqui, porque o m_decode o
--- reivindica no estágio ID quando a extensão M existe.
+-- CSRs, e funct7 = FUNCT7_MULDIV em OP e FENCE.I em MISC-MEM ficam ilegais aqui,
+-- porque o m_decode e o stage_id os reivindicam no estágio ID quando as
+-- extensões M e Zifencei existem.
 -- =============================================================================
 
 library ieee;
@@ -360,7 +361,7 @@ begin
 					end if;
 
 				when OPCODE_MISC_MEM =>
-					if funct3 = FUNCT3_FENCE or funct3 = FUNCT3_FENCE_I then
+					if funct3 = FUNCT3_FENCE then
 						o_illegal <= '0';
 					end if;
 
