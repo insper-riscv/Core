@@ -9,7 +9,8 @@
 --   Código (o_cause) | Exceção                                 | Valor em o_tval
 --   -----------------+-----------------------------------------+------------------
 --          0         | Alvo de desvio ou salto desalinhado     | i_cf_target
---          2         | Instrução ilegal (SYSTEM/CSR inválida)  | 0x00000000
+--          2         | Instrução ilegal (qualquer encoding     | 0x00000000
+--                    | inexistente, SYSTEM ou CSR inválido)    |
 --          3         | Breakpoint (EBREAK)                     | 0x00000000
 --          4         | Endereço de Load desalinhado            | i_ea
 --          6         | Endereço de Store desalinhado           | i_ea
@@ -46,6 +47,8 @@ entity trap_unit is
 		i_cf_target   : in  word_t;
 		-- Indica acesso ilegal a registrador CSR sinalizado pelo csr_file.
 		i_csr_illegal : in  std_logic;
+		-- Instrução inexistente apontada pela decodificação no estágio ID ('1' = ilegal).
+		i_illegal     : in  std_logic := '0';
 		-- Pulso que comanda a tomada de trap síncrono no ciclo atual.
 		o_take        : out std_logic;
 		-- Pulso que comanda o retorno de trap (instrução MRET) no ciclo atual.
@@ -136,21 +139,21 @@ begin
 
 	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
 
-	has_exc <= cf_misal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
+	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
 	           ld_misal or st_misal or is_ecall;
 
 	o_take      <= has_exc and i_ex_valid and i_run;
 	o_mret_take <= is_mret and i_ex_valid and i_run;
 
 	o_cause <= CAUSE_MISALIGNED_PC when cf_misal = '1' else
-	           CAUSE_ILLEGAL_INSTR when (sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
+	           CAUSE_ILLEGAL_INSTR when (i_illegal = '1' or sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
 	           CAUSE_MACHINE_ECALL;
 
 	o_tval  <= i_cf_target when cf_misal = '1' else
-	           i_ea        when (ld_misal = '1' or st_misal = '1') else
+	           i_ea        when ((ld_misal = '1' or st_misal = '1') and i_illegal = '0') else
 	           (others => '0');
 
 end architecture rtl;

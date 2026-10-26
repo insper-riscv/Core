@@ -9,7 +9,7 @@ CAUSE_LOAD_MISALIGNED, CAUSE_STORE_MISALIGNED, CAUSE_ECALL = 4, 6, 11
 
 
 async def probe(dut, opcode=OP_ALU, funct3=0, rd=1, rs1=2, imm12=0, ea=0, cf_taken=0,
-                cf_target=0, csr_illegal=0, valid=1, run=1):
+                cf_target=0, csr_illegal=0, valid=1, run=1, illegal=0):
     dut.i_ex_valid.value = valid
     dut.i_run.value = run
     dut.i_opcode.value = opcode
@@ -21,6 +21,7 @@ async def probe(dut, opcode=OP_ALU, funct3=0, rd=1, rs1=2, imm12=0, ea=0, cf_tak
     dut.i_cf_taken.value = cf_taken
     dut.i_cf_target.value = cf_target
     dut.i_csr_illegal.value = csr_illegal
+    dut.i_illegal.value = illegal
     await Timer(1, unit="ns")
     return (int(dut.o_take.value), int(dut.o_mret_take.value), int(dut.o_cause.value), int(dut.o_tval.value))
 
@@ -96,3 +97,27 @@ async def test_taken_only_when_valid_and_running(dut):
     assert (await system(dut, 0x000, run=0))[:2] == (0, 0)
     assert (await system(dut, 0x302, valid=0))[:2] == (0, 0)
     assert (await system(dut, 0x302, run=0))[:2] == (0, 0)
+
+
+@cocotb.test()
+async def test_undefined_encoding_is_illegal(dut):
+    """An encoding the decoder flags traps with cause 2 and a zero mtval, whatever its opcode."""
+    for opcode in (OP_ALU, OP_LOAD, OP_STORE, 0b0000000):
+        assert await probe(dut, opcode, illegal=1, ea=0x1234) == (1, 0, CAUSE_ILLEGAL, 0)
+    # a flagged load or store with a misaligned address is still an illegal instruction, with mtval zero
+    assert await probe(dut, OP_LOAD, funct3=0b010, illegal=1, ea=0x1233) == (1, 0, CAUSE_ILLEGAL, 0)
+    assert await probe(dut, OP_STORE, funct3=0b010, illegal=1, ea=0x1233) == (1, 0, CAUSE_ILLEGAL, 0)
+
+
+@cocotb.test()
+async def test_undefined_encoding_needs_a_running_valid_instruction(dut):
+    """A bubble, or a stalled pipeline, takes nothing."""
+    assert (await probe(dut, illegal=1, valid=0))[0] == 0
+    assert (await probe(dut, illegal=1, run=0))[0] == 0
+
+
+@cocotb.test()
+async def test_misaligned_target_goes_first(dut):
+    """A misaligned target keeps cause 0 when the same instruction is also flagged."""
+    take, _, cause, tval = await probe(dut, illegal=1, cf_taken=1, cf_target=0x102)
+    assert (take, cause, tval) == (1, CAUSE_MISALIGNED_TARGET, 0x102)

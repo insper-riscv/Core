@@ -189,3 +189,60 @@ async def test_control_unit_m_is_not_decoded_here(dut):
         assert got_funct3 == funct3, (
             f"o_funct3 got={got_funct3:03b} exp={funct3:03b}"
         )
+
+
+def _legal(opcode: int, funct3: int, funct7: int) -> bool:
+    """Whether the encoding is an instruction of RV32I, SYSTEM aside (the trap unit decides it)."""
+    if opcode & 0b11 != 0b11:
+        return False
+    if opcode in (0b0110111, 0b0010111, 0b1101111, 0b1110011):   # LUI, AUIPC, JAL, SYSTEM
+        return True
+    if opcode == 0b1100111:                                       # JALR
+        return funct3 == 0
+    if opcode == 0b1100011:                                       # BRANCH
+        return funct3 in (0, 1, 4, 5, 6, 7)
+    if opcode == 0b0000011:                                       # LOAD
+        return funct3 in (0, 1, 2, 4, 5)
+    if opcode == 0b0100011:                                       # STORE
+        return funct3 in (0, 1, 2)
+    if opcode == 0b0010011:                                       # OP-IMM
+        if funct3 == 1:
+            return funct7 == 0
+        if funct3 == 5:
+            return funct7 in (0, 0b0100000)
+        return True
+    if opcode == 0b0110011:                                       # OP (funct7 = 1 is the M extension)
+        return funct7 == 0 or (funct7 == 0b0100000 and funct3 in (0, 5))
+    if opcode == 0b0001111:                                       # MISC-MEM: FENCE and FENCE.I
+        return funct3 in (0, 1)
+    return False
+
+
+@cocotb.test()
+async def test_illegal_flag(dut):
+    """o_illegal marks exactly the encodings that RV32I does not define."""
+    for opcode in range(128):
+        for funct3 in range(8):
+            for funct7 in (0, 1, 2, 0b0100000, 0b0100001, 0b1000000, 0x7F):
+                dut.i_inst.value = build_instruction(opcode, funct3, funct7)
+                await Timer(1, unit="ns")
+                got = int(dut.o_illegal.value)
+                want = int(not _legal(opcode, funct3, funct7))
+                assert got == want, (
+                    f"opcode={opcode:07b} funct3={funct3:03b} funct7={funct7:07b}: "
+                    f"o_illegal got={got} exp={want}"
+                )
+
+
+@cocotb.test()
+async def test_table_instructions_are_legal(dut):
+    """Every instruction of the reference table is legal, but the NOP row (the all-zero word, which RISC-V defines as illegal)."""
+    for row in load_reference():
+        if row["INST"] == "NOP":
+            continue
+        opcode = int(row["OpCode[6:0]"], 2)
+        funct3 = _parse_field(row["funct3[2:0]"], 3)
+        funct7 = _parse_field(row["funct7[6:0]"], 7)
+        dut.i_inst.value = build_instruction(opcode, funct3, funct7)
+        await Timer(1, unit="ns")
+        assert int(dut.o_illegal.value) == 0, f"{row['INST']} is flagged illegal"

@@ -1,6 +1,6 @@
 // Properties of trap_unit (combinational), checked on the Verilog netlist GHDL synthesizes.
 module props (input clk);
-  (* anyseq *) wire ex_valid, run, cf_taken, csr_illegal;
+  (* anyseq *) wire ex_valid, run, cf_taken, csr_illegal, illegal;
   (* anyseq *) wire [6:0] opcode;
   (* anyseq *) wire [2:0] funct3;
   (* anyseq *) wire [4:0] rd_idx, rs1_idx;
@@ -10,7 +10,7 @@ module props (input clk);
 
   trap_unit dut (.i_ex_valid(ex_valid), .i_run(run), .i_opcode(opcode), .i_funct3(funct3), .i_rd_idx(rd_idx),
     .i_rs1_idx(rs1_idx), .i_imm12(imm12), .i_ea(ea), .i_cf_taken(cf_taken), .i_cf_target(cf_target),
-    .i_csr_illegal(csr_illegal), .o_take(take), .o_mret_take(mret_take), .o_cause(cause), .o_tval(tval));
+    .i_csr_illegal(csr_illegal), .i_illegal(illegal), .o_take(take), .o_mret_take(mret_take), .o_cause(cause), .o_tval(tval));
 
   localparam SYSTEM = 7'b1110011, LOAD = 7'b0000011, STORE = 7'b0100011;
   wire no_regs = funct3 == 3'b000 && rd_idx == 5'd0 && rs1_idx == 5'd0;
@@ -18,6 +18,9 @@ module props (input clk);
   wire active = ex_valid && run;
 
   // Only a branch, JAL or JALR is a taken control-flow instruction.
+  // The decoder never flags SYSTEM: the trap unit decides it.
+  always @(*) assume (!illegal || opcode != SYSTEM);
+
   always @(*) assume (!cf_taken || opcode == 7'b1100011 || opcode == 7'b1101111 || opcode == 7'b1100111);
 
   always @(*) begin
@@ -34,6 +37,7 @@ module props (input clk);
     if (take) begin
       assert (cause == 0 || cause == 2 || cause == 3 || cause == 4 || cause == 6 || cause == 11);
       if (cause == 2 || cause == 3 || cause == 11) assert (tval == 32'h0);
+      if (cause == 2) assert (illegal || opcode == SYSTEM);
       if (cause == 4 || cause == 6) assert (tval == ea);
       if (cause == 0) assert (cf_misal && tval == cf_target);
       if (cause == 4) assert (opcode == LOAD);
@@ -47,17 +51,22 @@ module props (input clk);
     if (active && opcode == SYSTEM && no_regs && imm12 == 12'h001 && !cf_misal) assert (take && cause == 3);
     if (active && opcode == SYSTEM && no_regs && imm12 == 12'h105) assert (!take && !mret_take);
 
+    // A flagged instruction traps with cause 2, unless its jump target is misaligned.
+    if (active && illegal && !cf_misal) assert (take && cause == 2);
+
     // Aligned accesses and aligned jumps do not trap.
-    if (opcode == LOAD && !cf_misal && ((funct3 == 3'b010 && ea[1:0] == 0) || (funct3[1:0] == 2'b01 && !ea[0]) || funct3[1:0] == 2'b00 || funct3 == 3'b100))
+
+    if (opcode == LOAD && !cf_misal && !illegal && ((funct3 == 3'b010 && ea[1:0] == 0) || (funct3[1:0] == 2'b01 && !ea[0]) || funct3[1:0] == 2'b00 || funct3 == 3'b100))
       assert (!take);
-    if (opcode == STORE && !cf_misal && ((funct3 == 3'b010 && ea[1:0] == 0) || (funct3 == 3'b001 && !ea[0]) || funct3 == 3'b000))
+    if (opcode == STORE && !cf_misal && !illegal && ((funct3 == 3'b010 && ea[1:0] == 0) || (funct3 == 3'b001 && !ea[0]) || funct3 == 3'b000))
       assert (!take);
-    if (opcode != SYSTEM && opcode != LOAD && opcode != STORE && !cf_misal) assert (!take);
+    if (opcode != SYSTEM && opcode != LOAD && opcode != STORE && !cf_misal && !illegal) assert (!take);
   end
 
 `ifdef COVER
   always @(*) begin
     cover (take && cause == 0);
+    cover (take && cause == 2 && illegal);
     cover (take && cause == 2 && opcode == SYSTEM && funct3 == 3'b001);
     cover (take && cause == 2 && opcode == SYSTEM && funct3 == 3'b000);
     cover (take && cause == 3);

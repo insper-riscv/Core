@@ -67,6 +67,8 @@ entity stage_ex is
 		i_is_muldiv       : in  std_logic;
 		-- Indica que a instrução em EX pertence à extensão Zicsr (decodificado no ID).
 		i_is_csr          : in  std_logic;
+		-- Indica instrução inexistente em EX ('1' = ilegal; só gera exceção com has_zicsr).
+		i_illegal         : in  std_logic;
 		-- Campo opcode da instrução no estágio EX.
 		i_opcode          : in  opcode_t;
 		-- Campo funct3 da instrução no estágio EX.
@@ -175,6 +177,7 @@ architecture rtl of stage_ex is
 			i_cf_taken    : in  std_logic;
 			i_cf_target   : in  word_t;
 			i_csr_illegal : in  std_logic;
+			i_illegal     : in  std_logic;
 			o_take        : out std_logic;
 			o_mret_take   : out std_logic;
 			o_cause       : out word_t;
@@ -442,6 +445,7 @@ begin
 				i_cf_taken    => ex_cf_taken,
 				i_cf_target   => ex_cf_target,
 				i_csr_illegal => csr_illegal,
+				i_illegal     => i_illegal,
 				o_take        => trap_take_int,
 				o_mret_take   => mret_take_int,
 				o_cause       => trap_cause,

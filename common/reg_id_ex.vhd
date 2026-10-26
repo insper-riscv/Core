@@ -64,6 +64,8 @@ entity reg_id_ex is
 		i_is_muldiv   : in  std_logic;
 		-- Indica instrução pertencente à extensão Zicsr (acesso a registrador CSR).
 		i_is_csr      : in  std_logic := '0';
+		-- Indica instrução inexistente (gera exceção de instrução ilegal no estágio EX).
+		i_illegal     : in  std_logic := '0';
 		-- Habilita escrita na memória de dados (pós-bubble_mux).
 		i_we_ram      : in  std_logic;
 		-- Habilita leitura da memória de dados (pós-bubble_mux).
@@ -110,6 +112,8 @@ entity reg_id_ex is
 		o_is_muldiv   : out std_logic;
 		-- Indicador de instrução CSR registrado para o estágio EX.
 		o_is_csr      : out std_logic;
+		-- Indica instrução ilegal registrada em ID/EX.
+		o_illegal     : out std_logic;
 		-- Habilitação de escrita na RAM registrada para o estágio EX.
 		o_we_ram      : out std_logic;
 		-- Habilitação de leitura da RAM registrada para o estágio EX.
@@ -162,6 +166,8 @@ architecture rtl of reg_id_ex is
 	signal r_is_muldiv   : std_logic    := '0';
 	-- Indicador de instrução CSR armazenado.
 	signal r_is_csr      : std_logic    := '0';
+	-- Indica instrução ilegal registrada.
+	signal r_illegal     : std_logic    := '0';
 	-- Habilitação de escrita na RAM armazenada.
 	signal r_we_ram      : std_logic    := '0';
 	-- Habilitação de leitura da RAM armazenada.
@@ -197,6 +203,7 @@ begin
 				r_alu_op      <= (others => '0');
 				r_is_muldiv   <= '0';
 				r_is_csr      <= '0';
+				r_illegal     <= '0';
 				r_we_ram      <= '0';
 				r_re_ram      <= '0';
 				r_en_ram      <= '0';
@@ -221,6 +228,7 @@ begin
 				r_alu_op      <= i_alu_op;
 				r_is_muldiv   <= i_is_muldiv;
 				r_is_csr      <= i_is_csr;
+				r_illegal     <= i_illegal;
 				r_we_ram      <= i_we_ram;
 				r_re_ram      <= i_re_ram;
 				r_en_ram      <= i_en_ram;
@@ -248,6 +256,7 @@ begin
 	o_alu_op      <= r_alu_op;
 	o_is_muldiv   <= r_is_muldiv;
 	o_is_csr      <= r_is_csr;
+	o_illegal     <= r_illegal;
 	o_we_ram      <= r_we_ram;
 	o_re_ram      <= r_re_ram;
 	o_en_ram      <= r_en_ram;

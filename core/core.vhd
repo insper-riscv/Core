@@ -180,6 +180,8 @@ architecture rtl of core is
 	signal id_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr gerado no estágio ID.
 	signal id_is_csr         : std_logic;
+	-- Indicador de instrução inexistente gerado no estágio ID.
+	signal id_illegal        : std_logic;
 	-- Habilitação de escrita na memória de dados gerada no estágio ID.
 	signal id_we_ram         : std_logic;
 	-- Habilitação de leitura na memória de dados gerada no estágio ID.
@@ -230,6 +232,8 @@ architecture rtl of core is
 	signal ex_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr registrado em ID/EX.
 	signal ex_is_csr         : std_logic;
+	-- Indicador de instrução inexistente registrado em ID/EX.
+	signal ex_illegal        : std_logic;
 	-- Habilitação de escrita na memória registrada em ID/EX.
 	signal ex_we_ram         : std_logic;
 	-- Habilitação de leitura na memória registrada em ID/EX.
@@ -425,6 +429,7 @@ begin
 			o_alu_op      => id_alu_op,
 			o_is_muldiv   => id_is_muldiv,
 			o_is_csr      => id_is_csr,
+			o_illegal     => id_illegal,
 			o_we_ram      => id_we_ram,
 			o_re_ram      => id_re_ram,
 			o_en_ram      => id_en_ram,
@@ -456,6 +461,7 @@ begin
 			i_alu_op      => id_alu_op,
 			i_is_muldiv   => id_is_muldiv,
 			i_is_csr      => id_is_csr,
+			i_illegal     => id_illegal,
 			i_we_ram      => id_we_ram,
 			i_re_ram      => id_re_ram,
 			i_en_ram      => id_en_ram,
@@ -479,6 +485,7 @@ begin
 			o_alu_op      => ex_alu_op,
 			o_is_muldiv   => ex_is_muldiv,
 			o_is_csr      => ex_is_csr,
+			o_illegal     => ex_illegal,
 			o_we_ram      => ex_we_ram,
 			o_re_ram      => ex_re_ram,
 			o_en_ram      => ex_en_ram,
@@ -516,6 +523,7 @@ begin
 			i_alu_op          => ex_alu_op,
 			i_is_muldiv       => ex_is_muldiv,
 			i_is_csr          => ex_is_csr,
+			i_illegal         => ex_illegal,
 			i_opcode          => ex_opcode,
 			i_funct3          => ex_funct3,
 			i_exmem_rd        => exmem_rd_idx,
