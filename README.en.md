@@ -63,10 +63,10 @@ bash formal/run.sh  # Run formal proofs (SymbiYosys + Z3) for csr_file and trap_
 
 ### 4.2. Execution via Docker
 
-The `ghcr.io/insper-riscv/infra-toolchain:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, Z3, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
+The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, Z3, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
 
 ```bash
-docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/infra-toolchain:latest \
+docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
   bash -c "uv sync --extra sim && make check && make profiles && make test && bash formal/run.sh"
 ```
 

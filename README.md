@@ -63,10 +63,10 @@ bash formal/run.sh  # Execução das provas formais (SymbiYosys + Z3) para csr_f
 
 ### 4.2. Execução via Docker
 
-A imagem `ghcr.io/insper-riscv/infra-toolchain:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, Z3, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
+A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, Z3, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
 
 ```bash
-docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/infra-toolchain:latest \
+docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
   bash -c "uv sync --extra sim && make check && make profiles && make test && bash formal/run.sh"
 ```
 
