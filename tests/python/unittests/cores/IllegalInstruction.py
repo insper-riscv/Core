@@ -39,6 +39,7 @@ ILLEGAL = [
     _r(0x33, 1, 0b001, 2, 3, 0x20),   # sll with funct7 = 0100000
     _r(0x33, 1, 0b000, 2, 3, 0x02),   # add with funct7 = 0000010
     0x0000200F,                       # misc-mem with funct3 = 010
+    0x0000100F,                       # fence.i, which needs the Zifencei extension
     0x0000007F,                       # an opcode no extension uses
 ]
 LEGAL = [

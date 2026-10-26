@@ -399,8 +399,9 @@ begin
 	-- =========================================================================
 	u_stage_id : entity work.stage_id
 		generic map (
-			has_m     => has_m,
-			has_zicsr => has_zicsr
+			has_m        => has_m,
+			has_zicsr    => has_zicsr,
+			has_zifencei => has_zifencei
 		)
 		port map (
 			i_clk         => i_clk,

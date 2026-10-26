@@ -67,7 +67,7 @@ Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução
 | Código (`o_cause`) | Exceção | Valor gravado em `mtval` (`o_tval`) |
 | ---: | :--- | :--- |
 | `0` | Endereço-alvo de branch ou salto tomado com bits `[1:0] /= "00"` | Endereço-alvo desalinhado (`i_cf_target`) |
-| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um ou encoding comprimido) | `0x00000000` |
+| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um, encoding comprimido ou `FENCE.I` com `has_zifencei = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
 | `4` | Endereço efetivo de Load desalinhado (`LW` com `ea[1:0] /= "00"`, `LH`/`LHU` com `ea[0] = '1'`) | Endereço efetivo (`i_ea`) |
 | `6` | Endereço efetivo de Store desalinhado (`SW` com `ea[1:0] /= "00"`, `SH` com `ea[0] = '1'`) | Endereço efetivo (`i_ea`) |

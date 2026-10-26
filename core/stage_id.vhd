@@ -16,13 +16,17 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.ext_imm_consts.all;
+use work.opcode_consts.all;
+use work.funct3_consts.all;
 
 entity stage_id is
 	generic (
 		-- Habilita o decodificador da extensão M (m_decode).
 		has_m     : boolean := false;
 		-- Habilita o decodificador da extensão Zicsr (csr_decode).
-		has_zicsr : boolean := false
+		has_zicsr : boolean := false;
+		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
+		has_zifencei : boolean := false
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -155,6 +159,8 @@ architecture rtl of stage_id is
 	signal cu_illegal      : std_logic;
 	-- Indica instrução da extensão M decodificada no estágio ID.
 	signal id_is_muldiv    : std_logic;
+	-- Indica FENCE.I decodificado no estágio ID e legal porque a extensão Zifencei existe.
+	signal id_is_fencei    : std_logic;
 
 begin
 
@@ -210,7 +216,8 @@ begin
 	end generate gen_csr_decode;
 
 	o_is_muldiv   <= id_is_muldiv;
-	o_illegal     <= cu_illegal and (not id_is_muldiv);
+	id_is_fencei  <= '1' when (has_zifencei and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
+	o_illegal     <= cu_illegal and (not id_is_muldiv) and (not id_is_fencei);
 	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg;
 	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;

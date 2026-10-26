@@ -67,7 +67,7 @@ Synchronous exceptions detected by `trap_unit` (at most one per instruction, wit
 | Code (`o_cause`) | Exception | Value written to `mtval` (`o_tval`) |
 | ---: | :--- | :--- |
 | `0` | Taken branch or jump target address with bits `[1:0] /= "00"` | Misaligned target address (`i_cf_target`) |
-| `2` | Unsupported `SYSTEM` instruction (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, or `ECALL`/`EBREAK`/`MRET`/`WFI` with `rd /= x0` or `rs1 /= x0`), illegal CSR access (`i_csr_illegal = '1'`), or any encoding that RV32IM does not define (`i_illegal = '1'`: a reserved opcode, an invalid `funct3` or `funct7`, all zeros, all ones or a compressed encoding) | `0x00000000` |
+| `2` | Unsupported `SYSTEM` instruction (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, or `ECALL`/`EBREAK`/`MRET`/`WFI` with `rd /= x0` or `rs1 /= x0`), illegal CSR access (`i_csr_illegal = '1'`), or any encoding that RV32IM does not define (`i_illegal = '1'`: a reserved opcode, an invalid `funct3` or `funct7`, all zeros, all ones, a compressed encoding, or `FENCE.I` when `has_zifencei = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
 | `4` | Misaligned Load effective address (`LW` with `ea[1:0] /= "00"`, `LH`/`LHU` with `ea[0] = '1'`) | Effective address (`i_ea`) |
 | `6` | Misaligned Store effective address (`SW` with `ea[1:0] /= "00"`, `SH` with `ea[0] = '1'`) | Effective address (`i_ea`) |
