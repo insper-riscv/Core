@@ -326,6 +326,8 @@ architecture rtl of core is
 	signal wb_rd             : reg_t;
 	-- Dado de 32 bits selecionado no estágio WB, como a memória o entrega neste ciclo.
 	signal wb_data_raw       : word_t;
+	-- Próximo valor de wb_repeat: o ciclo atual é um stall de EX/MEM (base_run = '0').
+	signal wb_repeat_nxt     : std_logic;
 	-- Indica que o ciclo anterior foi um stall de EX/MEM (base_run = '0'): WB repete a instrução.
 	signal wb_repeat         : std_logic;
 	-- Dado entregue por WB no ciclo anterior (o que a instrução em WB escreveu primeiro).
@@ -658,9 +660,11 @@ begin
 	-- forwarding a cada ciclo desse stall. A memória síncrona, porém, passa a responder ao endereço
 	-- da instrução parada em MEM, então o dado de um load em WB só vale no primeiro ciclo. Os ciclos
 	-- seguintes repetem o dado do ciclo anterior.
+	wb_repeat_nxt <= not base_run;
+
 	u_wb_repeat_ff : entity work.flip_flop
 		port map (
-			i_d      => not base_run,
+			i_d      => wb_repeat_nxt,
 			o_d      => wb_repeat,
 			i_enable => '1',
 			i_clk    => i_clk,
