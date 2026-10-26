@@ -90,7 +90,9 @@ entity stage_id is
 		-- Campo opcode (bits [6:0]) da instrução.
 		o_opcode      : out opcode_t;
 		-- Campo funct3 (bits [14:12]) da instrução.
-		o_funct3      : out funct3_t
+		o_funct3      : out funct3_t;
+		-- Instrução inexistente em RV32I e fora da extensão M ('1' = ilegal).
+		o_illegal     : out std_logic
 	);
 end entity stage_id;
 
@@ -149,6 +151,10 @@ architecture rtl of stage_id is
 	signal cu_en_ram       : std_logic;
 	-- Seletor de inserção de bolha gerado pela HDU.
 	signal id_bubble_sel   : std_logic;
+	-- Instrução ilegal segundo o control_unit, antes de a extensão M reivindicá-la.
+	signal cu_illegal      : std_logic;
+	-- Indica instrução da extensão M decodificada no estágio ID.
+	signal id_is_muldiv    : std_logic;
 
 begin
 
@@ -171,19 +177,20 @@ begin
 			o_re_ram      => cu_re_ram,
 			o_en_ram      => cu_en_ram,
 			o_opcode      => o_opcode,
-			o_funct3      => o_funct3
+			o_funct3      => o_funct3,
+			o_illegal     => cu_illegal
 		);
 
 	gen_m_decode : if has_m generate
 		u_m_decode : m_decode
 			port map (
 				i_instr      => i_instr,
-				o_is_muldiv  => o_is_muldiv,
+				o_is_muldiv  => id_is_muldiv,
 				o_we_reg     => m_we_reg,
 				o_sel_pc_rs1 => m_sel_pc_rs1
 			);
 	else generate
-		o_is_muldiv  <= '0';
+		id_is_muldiv <= '0';
 		m_we_reg     <= '0';
 		m_sel_pc_rs1 <= '0';
 	end generate gen_m_decode;
@@ -202,6 +209,8 @@ begin
 		csr_use_imm_i <= '0';
 	end generate gen_csr_decode;
 
+	o_is_muldiv   <= id_is_muldiv;
+	o_illegal     <= cu_illegal and (not id_is_muldiv);
 	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg;
 	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;
