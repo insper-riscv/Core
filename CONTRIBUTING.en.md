@@ -154,6 +154,8 @@ When adding, renaming, or removing any `.vhd` or `.md` file, immediately update:
 - `paths.yaml`
 - `docs/pt-br/` and `docs/en/`
 
+The CI runs these checks on every push. On a pull request from someone outside the project, it starts only after a member who can merge approves the run in the pull request page.
+
 ---
 
 Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](LICENSE).

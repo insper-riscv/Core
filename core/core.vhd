@@ -25,7 +25,7 @@ entity core is
 	port (
 		-- Sinal de clock principal do processador.
 		i_clk           : in  std_logic;
-		-- Sinal de reset síncrono/assíncrono ativo em '1'.
+		-- Sinal de reset ativo em '1': assíncrono nos registradores de uso geral, síncrono nos de pipeline.
 		i_rst           : in  std_logic;
 
 		-- Endereço de busca de instrução (PC atual no estágio IF).

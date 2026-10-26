@@ -234,7 +234,7 @@ begin
 			i_ifid_opcode => id_opcode,
 			i_idex_rd     => i_ex_rd,
 			i_idex_re_ram => i_ex_re_ram,
-			i_muldiv_busy => i_pipe_stall,
+			i_stall       => i_pipe_stall,
 			o_pc_we       => o_pc_we,
 			o_ifid_we     => o_ifid_we,
 			o_bubble_sel  => id_bubble_sel

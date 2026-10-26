@@ -11,7 +11,7 @@ def set_inputs(dut, ifid_rs1: int, ifid_rs2: int, idex_rd: int,
     dut.i_ifid_rs2.value    = ifid_rs2 & 0x1F
     dut.i_idex_rd.value     = idex_rd & 0x1F
     dut.i_idex_re_ram.value = idex_reRAM & 0x1
-    dut.i_muldiv_busy.value = muldiv_busy & 0x1
+    dut.i_stall.value = muldiv_busy & 0x1
     dut.i_ifid_valid.value  = ifid_valid & 0x1
     dut.i_ifid_opcode.value = int(ifid_opcode, 2)
 
