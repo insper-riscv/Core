@@ -21,8 +21,8 @@ netlist() {
     "$root/common/pipeline_types.vhd" \
     "$root/common/opcode_consts.vhd" \
     "$root/common/funct3_consts.vhd" \
-    "$root/common/flip_flop.vhd" \
-    "$root/common/generic_register.vhd" \
+    "$root/../Common-Components/flip_flop.vhd" \
+    "$root/../Common-Components/generic_register.vhd" \
     "$root/common/mem_map_consts.vhd" \
     "$root/Zicsr/csr_addr_consts.vhd" \
     "$1"
