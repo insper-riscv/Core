@@ -22,7 +22,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 
 | Caminho | Conteúdo |
 | :--- | :--- |
-| `common/` | Blocos compartilhados por todos os perfis, incluindo pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard, gerador de PC e primitivos parametrizáveis |
+| `common/` | Blocos compartilhados por todos os perfis, incluindo pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard, gerador de PC e as demais peças próprias do Core; os blocos genéricos (somador, flip-flop, registradores, multiplexadores e decodificador one-hot) vêm do repositório [Common-Components](https://github.com/insper-riscv/Common-Components), ao lado deste |
 | `I/` | Extensão inteira base RV32I, composta pela ULA, extensor de imediatos, extensor de leitura de memória e gerenciador de alinhamento de stores |
 | `M/` | Extensão de multiplicação e divisão inteira RV32M, contendo decodificador dedicado, multiplicador sequencial de Booth radix-2, divisor não-restaurador de 34 bits e unidade integradora |
 | `Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
@@ -53,6 +53,7 @@ Quando uma extensão está desabilitada pelo seu generic, as instruções corres
 
 ```bash
 git clone --recurse-submodules https://github.com/insper-riscv/Core.git
+git clone https://github.com/insper-riscv/Common-Components.git   # ao lado: os blocos genéricos
 cd Core
 uv sync
 
