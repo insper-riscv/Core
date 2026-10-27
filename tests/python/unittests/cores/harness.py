@@ -16,8 +16,11 @@ RAM_BASE = 0x8000
 DONE_ADDR = RAM_BASE + 0x7FC
 
 
-async def run_program(dut, program, flash=None, max_cycles=4000):
-    """Run until the program stores 1 at DONE_ADDR; return the RAM as {address: word}."""
+async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None):
+    """Run until the program stores 1 at DONE_ADDR; return the RAM as {address: word}.
+
+    ``monitor``, when given, is called once per cycle after the memory models have settled.
+    """
     imem = {4 * i: w for i, w in enumerate(program)}
     flash = flash or {}
     ram = {}
@@ -60,6 +63,9 @@ async def run_program(dut, program, flash=None, max_cycles=4000):
                 ram_next = ram.get(addr, 0)
         if int(dut.o_flash_rden2.value):
             flash_next = flash.get(int(dut.o_flash_addr2.value) & ~3, 0)
+
+        if monitor is not None:
+            monitor(dut)
 
         if ram.get(DONE_ADDR) == 1:
             break

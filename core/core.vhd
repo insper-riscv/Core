@@ -92,7 +92,14 @@ entity core is
 		-- Pulso que requisita o flush da cache de dados write-back (instrução FENCE.I).
 		o_dc_flush      : out std_logic;
 		-- Pulso de confirmação de término do flush da cache de dados write-back.
-		i_dc_done       : in  std_logic := '0'
+		i_dc_done       : in  std_logic := '0';
+
+		-- Pulso de um ciclo: uma exceção ocorreu e o core não tem CSRs para registrá-la (só existe sem Zicsr; '0' com Zicsr).
+		o_trap          : out std_logic;
+		-- Código de causa da exceção sinalizada, no formato do mcause (zero com Zicsr).
+		o_trap_cause    : out word_t;
+		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
+		o_trap_pc       : out word_t
 	);
 end entity core;
 
@@ -120,6 +127,8 @@ architecture rtl of core is
 	signal flush_id_ex       : std_logic;
 	-- Sinal de flush síncrono do registrador EX/MEM.
 	signal flush_ex_mem      : std_logic;
+	-- Pulso de exceção sinalizada sem Zicsr, que mata a instrução em EX sem redirecionar o PC.
+	signal trap_sig          : std_logic;
 
 	-- =========================================================================
 	-- Sinais do Estágio IF -> Registrador IF/ID
@@ -346,10 +355,16 @@ begin
 	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy;
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= base_run;
+	o_trap        <= trap_sig;
+
+	-- Sem CSRs e sem acesso desalinhado em hardware, nada trataria o acesso: a combinação é proibida.
+	assert has_zicsr or has_zicclsm
+		report "has_zicclsm = false exige has_zicsr: o acesso desalinhado precisa de trap ou de suporte em hardware"
+		severity failure;
 
 	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
-	flush_ex_mem  <= trap_take or (fencei_busy and base_run);
+	flush_ex_mem  <= trap_take or trap_sig or (fencei_busy and base_run);
 
 	-- =========================================================================
 	-- 1. Estágio IF (Instruction Fetch) + Registrador IF/ID
@@ -554,6 +569,9 @@ begin
 			o_jalr_target     => ex_jalr_target,
 			o_redirect_pc     => ex_redirect_pc,
 			o_trap_take       => trap_take,
+			o_trap_sig        => trap_sig,
+			o_trap_sig_cause  => o_trap_cause,
+			o_trap_sig_pc     => o_trap_pc,
 			o_mret_take       => mret_take,
 			o_fencei_take     => fencei_take,
 			o_fencei_busy     => fencei_busy,
