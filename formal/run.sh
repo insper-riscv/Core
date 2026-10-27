@@ -14,7 +14,7 @@ expect() {
   else printf '  WRONG %-62s wanted %s, got %s\n' "$1" "$2" "$3"; fail=1; fi
 }
 
-# netlist <vhdl> <entity> <name>: the Verilog netlist GHDL synthesizes for the entity.
+# netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity.
 netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
   ghdl -a --std=08 --workdir="$work" \
@@ -26,7 +26,7 @@ netlist() {
     "$root/common/mem_map_consts.vhd" \
     "$root/Zicsr/csr_addr_consts.vhd" \
     "$1"
-  ghdl --synth --std=08 --workdir="$work" --out=verilog "$2" > "$3.v"
+  ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
 
 # prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS or FAIL
@@ -61,6 +61,9 @@ echo "trap_unit"
 netlist "$trap" trap_unit trap
 expect "causes, mtval, MRET, ecall/ebreak/wfi, aligned accesses (induction)" PASS "$(prove trap.v "$trap_props" prove 2 ''        trap_safety)"
 expect "cover: every cause and MRET are reachable"                           PASS "$(prove trap.v "$trap_props" cover 2 '-DCOVER' trap_cover)"
+expect "Zicclsm: misaligned in the main memory runs, outside it traps (induction)" PASS "$(prove trap.v "$trap_props" prove 2 '-DZICCLSM_ON' trap_zicclsm_on)"
+netlist "$trap" trap_unit trap_off -gHAS_ZICCLSM=false
+expect "no Zicclsm: every misaligned access traps (induction)"                PASS "$(prove trap_off.v "$trap_props" prove 2 '-DZICCLSM_OFF' trap_zicclsm_off)"
 
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression>
@@ -76,6 +79,8 @@ mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_
 mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
+mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
+mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = \"01\"/i_ea(1 downto 0) = \"01\"/"
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

@@ -63,6 +63,36 @@ module props (input clk);
     if (opcode != SYSTEM && opcode != LOAD && opcode != STORE && !cf_misal && !illegal) assert (!take);
   end
 
+`ifdef ZICCLSM_ON
+  // With Zicclsm the main memory (RAM and SDRAM, [0x8000, 0x80000000)) runs a misaligned access when its two words
+  // lie in the same region, and everything else traps with cause 4 or 6.
+  wire is_load  = opcode == LOAD  && (funct3 == 3'b010 || funct3[1:0] == 2'b01 || funct3[1:0] == 2'b00 || funct3 == 3'b100);
+  wire is_store = opcode == STORE && (funct3 == 3'b010 || funct3 == 3'b001 || funct3 == 3'b000);
+  wire unaligned = ((funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[0]));
+  wire [31:0] next_word = {ea[31:2] + 30'd1, 2'b00};
+  wire ram_pair  = ea >= 32'h8000 && ea < 32'h40000000 && next_word >= 32'h8000 && next_word < 32'h40000000;
+  wire sdram_pair = ea >= 32'h40000000 && ea < 32'h80000000 && next_word >= 32'h40000000 && next_word < 32'h80000000;
+  wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
+  wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && ea >= 32'h8000 && ea < 32'h80000000;
+  wire runs     = in_word || (crosses && (ram_pair || sdram_pair));
+  always @(*) begin
+    if (active && !cf_misal && !illegal && (is_load || is_store) && unaligned && runs) assert (!take);
+    if (active && !cf_misal && !illegal && is_load  && unaligned && !runs) assert (take && cause == 4 && tval == ea);
+    if (active && !cf_misal && !illegal && is_store && unaligned && !runs) assert (take && cause == 6 && tval == ea);
+  end
+`endif
+
+`ifdef ZICCLSM_OFF
+  // Without Zicclsm every misaligned load and store traps.
+  wire unaligned = ((funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[0]));
+  always @(*) begin
+    if (active && !cf_misal && !illegal && opcode == LOAD  && (funct3 == 3'b010 || funct3[1:0] == 2'b01) && unaligned)
+      assert (take && cause == 4 && tval == ea);
+    if (active && !cf_misal && !illegal && opcode == STORE && (funct3 == 3'b010 || funct3 == 3'b001) && unaligned)
+      assert (take && cause == 6 && tval == ea);
+  end
+`endif
+
 `ifdef COVER
   always @(*) begin
     cover (take && cause == 0);
