@@ -15,6 +15,8 @@ entity core is
 	generic (
 		-- Habilita a extensão M de multiplicação e divisão inteira.
 		has_m        : boolean := false;
+		-- Habilita só a multiplicação (extensão Zmmul), sem divisão; has_m já a inclui.
+		has_zmmul    : boolean := false;
 		-- Habilita a extensão Zicsr e o tratamento de exceções do modo máquina.
 		has_zicsr    : boolean := false;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
@@ -400,6 +402,7 @@ begin
 	u_stage_id : entity work.stage_id
 		generic map (
 			has_m        => has_m,
+			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei
 		)
@@ -502,6 +505,7 @@ begin
 	u_stage_ex : entity work.stage_ex
 		generic map (
 			has_m        => has_m,
+			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei,
 			has_dcache   => has_dcache

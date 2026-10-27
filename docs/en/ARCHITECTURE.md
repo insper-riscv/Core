@@ -91,6 +91,8 @@ $$
 
 When `has_m = true`, the `m_decode` decoder in the ID stage recognizes R-type instructions with `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`), asserting `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'`.
 
+With `has_zmmul = true` and `has_m = false` (the Zmmul extension), `m_decode` recognizes only the four multiplications (`funct3(2) = '0'`) and `multdiv` does not instantiate the divider. `DIV`, `DIVU`, `REM` and `REMU` have no owner, and the control unit treats them as illegal instructions.
+
 In the EX stage, the `multdiv` unit internally generates a single start pulse (`start_pulse`) on the first cycle in which a valid instruction enters EX, latches `i_funct3` in a dedicated register throughout the operation, and triggers the corresponding operator:
 
 | Internal operator | Instructions served | Latency | Corner-case handling |

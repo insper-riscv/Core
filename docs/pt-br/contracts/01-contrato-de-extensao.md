@@ -4,7 +4,7 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
 ## 2. Regras de Integração no Pipeline
 
@@ -59,7 +59,7 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Operando de escrita | `ex_fwd_rs1_val` para instruções por registrador (`i_funct3(2) = '0'`) ou o índice `i_rs1_idx` estendido com zero para 32 bits nas formas imediatas (`i_funct3(2) = '1'`) |
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
-| `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; escritas são ignoradas |
+| `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
 | Não implementados | `cycle`, `time` e `instret` (o acesso é um acesso CSR ilegal) e interrupções (`mie` e `mip` leem zero e ignoram escritas) |
 
 Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:

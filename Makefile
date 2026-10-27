@@ -18,7 +18,7 @@ check:
 # has no M/ files, which proves the core builds without them. GHDL 6 takes the
 # generic at run time, so each profile is elaborated and run for 1 ns.
 profiles:
-	@for p in rv32i rv32im rv32im_zicsr rv32im_zicsr_zifencei; do \
+	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicsr_zifencei; do \
 	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
 	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \

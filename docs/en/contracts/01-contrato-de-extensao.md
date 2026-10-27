@@ -4,7 +4,7 @@
 
 The RISC-V specification defines the architectural semantics of each instruction (opcodes, `funct3`/`funct7` fields, and register effects). The extension contract defines how the hardware of an extension (`M/`, `Zicsr/`, `Zifencei/`) connects to the pipeline stages (`core/`) without coupling the base logic (`common/` and `I/`) to the internal details of each extension.
 
-Each extension resides in its own folder and is enabled at the top level `core/core.vhd` by a boolean generic (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
+Each extension resides in its own folder and is enabled at the top level `core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
 ## 2. Pipeline Integration Rules
 
@@ -59,7 +59,7 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Write operand | `ex_fwd_rs1_val` for register instructions (`i_funct3(2) = '0'`) or the 5-bit `i_rs1_idx` zero-extended to 32 bits for immediate forms (`i_funct3(2) = '1'`) |
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
-| `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; writes are ignored |
+| `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; Zmmul has no bit of its own; writes are ignored |
 | Not implemented | `cycle`, `time` and `instret` (an access is an illegal CSR access) and interrupts (`mie` and `mip` read zero and ignore writes) |
 
 Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:

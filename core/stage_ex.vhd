@@ -6,7 +6,7 @@
 -- unidades de extensão do estágio EX:
 --   1. Unidade de adiantamento (forwarding_unit) e muxes de operandos rs1/rs2.
 --   2. ULA principal (alu) e somadores de endereço-alvo de branch/JAL e JALR.
---   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true).
+--   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true; só a multiplicação quando has_zmmul = true).
 --   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando has_zicsr = true).
 --   5. Unidade de sincronização FENCE.I (fencei_unit, quando has_zifencei = true).
 --   6. Gerenciador de alinhamento de escrita em memória (store_manager).
@@ -19,8 +19,10 @@ use work.opcode_consts.all;
 
 entity stage_ex is
 	generic (
-		-- Habilita a instância da unidade de multiplicação e divisão (multdiv).
+		-- Habilita a unidade de multiplicação e divisão (multdiv) completa.
 		has_m        : boolean := false;
+		-- Habilita a multiplicação sem o divisor (extensão Zmmul); has_m já a inclui.
+		has_zmmul    : boolean := false;
 		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
 		has_zicsr    : boolean := false;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
@@ -125,6 +127,9 @@ end entity stage_ex;
 architecture rtl of stage_ex is
 
 	component multdiv is
+		generic (
+			has_div     : boolean := true
+		);
 		port (
 			i_clk       : in  std_logic;
 			i_rst       : in  std_logic := '0';
@@ -349,8 +354,11 @@ begin
 	-- =========================================================================
 	-- Extensão M: Multiplicação e Divisão Inteira (multdiv)
 	-- =========================================================================
-	gen_m : if has_m generate
+	gen_m : if (has_m or has_zmmul) generate
 		u_muldiv : multdiv
+			generic map (
+				has_div => has_m
+			)
 			port map (
 				i_clk       => i_clk,
 				i_rst       => i_rst,
