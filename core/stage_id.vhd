@@ -218,9 +218,10 @@ begin
 				o_use_imm_i => csr_use_imm_i
 			);
 	else generate
+		-- Sem CSRs, SYSTEM ainda carrega o imediato tipo I: o detector de exceções distingue ECALL de EBREAK por ele.
+		csr_use_imm_i <= '1' when i_instr(6 downto 0) = OPCODE_SYSTEM else '0';
 		o_is_csr      <= '0';
 		csr_we_reg    <= '0';
-		csr_use_imm_i <= '0';
 	end generate gen_csr_decode;
 
 	o_is_muldiv   <= id_is_muldiv;

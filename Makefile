@@ -15,7 +15,8 @@ check:
 
 # Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml,
 # a flat `- path` list) and elaborate the top with the profile's generic. rv32i
-# has no M/ files, which proves the core builds without them. GHDL 6 takes the
+# has no M/ files, which proves the core builds without them. A last check shows that the
+# forbidden combination (no Zicsr and no Zicclsm) does not elaborate. GHDL 6 takes the
 # generic at run time, so each profile is elaborated and run for 1 ns.
 profiles:
 	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicsr_zifencei; do \
@@ -26,6 +27,10 @@ profiles:
 	  $(GHDL) --elab-run $(STD) --workdir=$$dir -o $$dir/core core $$gens --stop-time=1ns >/dev/null 2>&1 \
 	  && echo "profile $$p builds ($$gens)" || { echo "profile $$p FAILED"; exit 1; }; \
 	done
+	@dir=$(WDIR)/rv32i; \
+	if $(GHDL) --elab-run $(STD) --workdir=$$dir -o $$dir/core core -ghas_zicclsm=false --stop-time=1ns >/dev/null 2>&1; \
+	then echo "profile without Zicsr and without Zicclsm was accepted, it must be rejected"; exit 1; \
+	else echo "profile without Zicsr and without Zicclsm is rejected, as it must"; fi
 
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
 test:

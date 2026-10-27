@@ -113,6 +113,12 @@ entity stage_ex is
 		o_redirect_pc     : out word_t;
 		-- Pulso que indica tomada de exceção síncrona no estágio EX.
 		o_trap_take       : out std_logic;
+		-- Pulso que sinaliza uma exceção detectada em EX sem Zicsr (o core não tem CSRs para registrá-la).
+		o_trap_sig        : out std_logic;
+		-- Código de causa da exceção sinalizada, no formato do mcause (zero com Zicsr).
+		o_trap_sig_cause  : out word_t;
+		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
+		o_trap_sig_pc     : out word_t;
 		-- Pulso que indica execução de retorno de exceção (MRET) no estágio EX.
 		o_mret_take       : out std_logic;
 		-- Pulso que indica conclusão de instrução FENCE.I no estágio EX.
@@ -248,6 +254,14 @@ architecture rtl of stage_ex is
 	signal csr_illegal        : std_logic;
 	-- Pulso interno de tomada de trap síncrono.
 	signal trap_take_int      : std_logic;
+	-- Exceção detectada sem Zicsr: sinalizada na saída, sem redirecionar o PC.
+	signal sig_take           : std_logic;
+	-- Causa da exceção sinalizada sem Zicsr.
+	signal sig_cause          : word_t;
+	-- Valor adicional da exceção sinalizada sem Zicsr (não exportado: o core sem CSRs não tem mtval).
+	signal sig_tval           : word_t;
+	-- Saída de MRET do detector sem Zicsr (descartada: sem modo M não há retorno de trap).
+	signal sig_mret           : std_logic;
 	-- Pulso interno de retorno de trap (MRET).
 	signal mret_take_int      : std_logic;
 	-- Código da causa da exceção síncrona.
@@ -445,6 +459,11 @@ begin
 		ex_cf_taken  <= branch_taken_int or jalr_taken_int;
 		ex_cf_target <= ex_alu_result when jalr_taken_int = '1' else branch_target_int;
 
+		sig_take  <= '0';
+		sig_cause <= (others => '0');
+		sig_tval  <= (others => '0');
+		sig_mret  <= '0';
+
 		u_trap_unit : trap_unit
 			generic map (
 				has_zicclsm => has_zicclsm
@@ -468,6 +487,30 @@ begin
 				o_tval        => trap_tval
 			);
 	else generate
+		-- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
+		u_trap_detect : trap_unit
+			generic map (
+				has_zicclsm => has_zicclsm
+			)
+			port map (
+				i_ex_valid    => i_valid,
+				i_run         => i_pipe_run,
+				i_opcode      => i_opcode,
+				i_funct3      => i_funct3,
+				i_rd_idx      => i_rd_idx,
+				i_rs1_idx     => i_rs1_idx,
+				i_imm12       => i_imm(11 downto 0),
+				i_ea          => ex_alu_result,
+				i_cf_taken    => '0',
+				i_cf_target   => (others => '0'),
+				i_csr_illegal => '1',
+				i_illegal     => i_illegal,
+				o_take        => sig_take,
+				o_mret_take   => sig_mret,
+				o_cause       => sig_cause,
+				o_tval        => sig_tval
+			);
+
 		trap_take_int <= '0';
 		mret_take_int <= '0';
 		trap_cause    <= (others => '0');
@@ -484,6 +527,9 @@ begin
 	end generate gen_csr;
 
 	o_trap_take   <= trap_take_int;
+	o_trap_sig       <= sig_take;
+	o_trap_sig_cause <= sig_cause when sig_take = '1' else (others => '0');
+	o_trap_sig_pc    <= i_pc      when sig_take = '1' else (others => '0');
 	o_mret_take   <= mret_take_int;
 
 	o_redirect_pc <= csr_mepc when mret_take_int   = '1' else
