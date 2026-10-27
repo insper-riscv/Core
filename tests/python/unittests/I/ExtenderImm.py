@@ -27,11 +27,11 @@ def zext(val, bits, width=32):
 
 
 async def apply_and_check(dut, op, inp, expected, name):
-    dut.Inst31downto7.value = inp & ((1 << len(dut.Inst31downto7)) - 1)
-    dut.opExImm.value = op
+    dut.i_instr.value = inp & ((1 << len(dut.i_instr)) - 1)
+    dut.i_op.value = op
     await Timer(1, "ns")
 
-    got = int(dut.signalOut.value)
+    got = int(dut.o_imm.value)
     assert got == expected, (
         f"{name} falhou: input={inp:#09x}, esperado={expected:#010x}, obtido={got:#010x}"
     )
