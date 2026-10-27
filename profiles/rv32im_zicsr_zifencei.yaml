@@ -15,15 +15,15 @@ sources:
   - common/wb_sel_consts.vhd
   - common/pc_src_consts.vhd
   - common/mem_map_consts.vhd
-  - common/generic_register.vhd
-  - common/adder.vhd
-  - common/mux_2x1.vhd
-  - common/mux_4x1.vhd
-  - common/flip_flop.vhd
-  - common/utils_pkg.vhd
+  - ../Common-Components/generic_register.vhd
+  - ../Common-Components/adder.vhd
+  - ../Common-Components/mux_2x1.vhd
+  - ../Common-Components/mux_4x1.vhd
+  - ../Common-Components/flip_flop.vhd
+  - ../Common-Components/utils_pkg.vhd
   - I/alu.vhd
-  - common/onehot_decoder.vhd
-  - common/mux_tree.vhd
+  - ../Common-Components/onehot_decoder.vhd
+  - ../Common-Components/mux_tree.vhd
   - common/reg_file.vhd
   - I/extender_imm.vhd
   - I/extender_ram.vhd
