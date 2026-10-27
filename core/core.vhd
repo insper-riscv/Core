@@ -21,6 +21,8 @@ entity core is
 		has_zicsr    : boolean := false;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
 		has_zifencei : boolean := false;
+		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
+		has_zicclsm  : boolean := true;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache   : boolean := false
 	);
@@ -508,6 +510,7 @@ begin
 			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei,
+			has_zicclsm  => has_zicclsm,
 			has_dcache   => has_dcache
 		)
 		port map (

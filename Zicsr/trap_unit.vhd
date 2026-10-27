@@ -19,11 +19,17 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
+use work.mem_map_consts.all;
 
 entity trap_unit is
+	generic (
+		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' faz todo desalinhado gerar trap.
+		has_zicclsm   : boolean := true
+	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
 		i_ex_valid    : in  std_logic;
@@ -101,10 +107,18 @@ architecture rtl of trap_unit is
 
 	-- Indica instrução da classe SYSTEM com codificação não suportada/ilegal.
 	signal sys_illegal : std_logic;
-	-- Indica instrução de leitura de memória (LOAD) com endereço desalinhado.
+	-- Indica instrução de leitura de memória (LOAD) com endereço desalinhado, já descontados os casos que o hardware executa.
 	signal ld_misal    : std_logic;
-	-- Indica instrução de escrita em memória (STORE) com endereço desalinhado.
+	-- Indica instrução de escrita em memória (STORE) com endereço desalinhado, já descontados os casos que o hardware executa.
 	signal st_misal    : std_logic;
+	-- Indica LOAD com endereço desalinhado, executado ou não pelo hardware.
+	signal ld_unaligned : std_logic;
+	-- Indica STORE com endereço desalinhado, executado ou não pelo hardware.
+	signal st_unaligned : std_logic;
+	-- Indica que o endereço efetivo está na memória principal (RAM interna ou SDRAM): fora da flash e da janela de periféricos.
+	signal in_main_mem : std_logic;
+	-- Indica que o acesso desalinhado cabe numa única palavra (LH, LHU ou SH com offset 1) e o hardware o executa.
+	signal misal_in_word : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
 
@@ -127,15 +141,24 @@ begin
 	                         is_mret = '0' and is_wfi = '0')
 	                   else '0';
 
-	ld_misal <= '1' when (i_opcode = OPCODE_LOAD and
-	                      ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= "00") or
-	                       ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
-	                else '0';
+	ld_unaligned <= '1' when (i_opcode = OPCODE_LOAD and
+	                          ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= "00") or
+	                           ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
+	                    else '0';
 
-	st_misal <= '1' when (i_opcode = OPCODE_STORE and
-	                      ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= "00") or
-	                       (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
-	                else '0';
+	st_unaligned <= '1' when (i_opcode = OPCODE_STORE and
+	                          ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= "00") or
+	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
+	                    else '0';
+
+	in_main_mem <= '1' when (unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES) else '0';
+
+	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = "01" and
+	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
+	                 else '0';
+
+	ld_misal <= ld_unaligned and (not misal_in_word);
+	st_misal <= st_unaligned and (not misal_in_word);
 
 	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
 

@@ -46,12 +46,18 @@ begin
 
 	is_store <= '1' when i_opcode = OPCODE_STORE else '0';
 
-	-- Alinhamento e máscara para Store Halfword (SH).
-	sh_data <= X"0000" & i_rs2_data(15 downto 0) when i_byte_offset(1) = '0' else
-	           i_rs2_data(15 downto 0) & X"0000";
+	-- Alinhamento e máscara para Store Halfword (SH), com offset 0, 1 (bytes 1 e 2) ou 2.
+	with i_byte_offset select
+		sh_data <=
+			X"0000" & i_rs2_data(15 downto 0)          when "00",
+			X"00"   & i_rs2_data(15 downto 0) & X"00"  when "01",
+			i_rs2_data(15 downto 0) & X"0000"          when others;
 
-	sh_mask <= "0011" when i_byte_offset(1) = '0' else
-	           "1100";
+	with i_byte_offset select
+		sh_mask <=
+			"0011" when "00",
+			"0110" when "01",
+			"1100" when others;
 
 	-- Alinhamento e máscara para Store Byte (SB).
 	with i_byte_offset select
