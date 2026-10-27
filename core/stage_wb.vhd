@@ -13,6 +13,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
+use work.ext_ram_consts.all;
 
 entity stage_wb is
 	port (
@@ -34,6 +35,8 @@ entity stage_wb is
 		i_flash_data2  : in  word_t;
 		-- Palavra de dados lida da memória RAM interna.
 		i_ram_rdata    : in  word_t;
+		-- Primeira palavra de um load desalinhado que cruzou a palavra, retida pela misaligned_unit.
+		i_first_word   : in  word_t;
 		-- Palavra de dados lida do barramento externo SDRAM.
 		i_sdram_rdata  : in  word_t;
 		-- Habilitação final de escrita enviada ao banco de registradores (reg_file).
@@ -55,6 +58,16 @@ architecture rtl of stage_wb is
 	signal mem_read_data    : word_t;
 	-- Palavra de 32 bits alinhada e estendida pelo módulo extender_ram.
 	signal wb_ram_extended  : word_t;
+	-- Load que cruzou a palavra: a primeira palavra está retida e a segunda chega agora.
+	signal is_cross_wb      : std_logic;
+	-- Par de palavras do load que cruzou, deslocado até o primeiro byte do dado.
+	signal cross_pair       : std_logic_vector(63 downto 0);
+	-- Palavra baixa do par deslocado: o dado do load alinhado ao byte 0.
+	signal cross_word       : word_t;
+	-- Palavra entregue ao extensor: a juntada de duas palavras ou a lida da memória.
+	signal ext_data         : word_t;
+	-- Posição do dado dentro da palavra entregue ao extensor.
+	signal ext_offset       : std_logic_vector(1 downto 0);
 
 begin
 
@@ -65,11 +78,22 @@ begin
 	                    i_sdram_rdata when is_sdram_wb      = '1' else
 	                    i_ram_rdata;
 
+	is_cross_wb <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= "00") or
+	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = "11"))
+	               else '0';
+
+	cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
+	                                           8 * to_integer(unsigned(i_alu_out(1 downto 0)))));
+	cross_word <= cross_pair(31 downto 0);
+
+	ext_data   <= cross_word when is_cross_wb = '1' else mem_read_data;
+	ext_offset <= "00"       when is_cross_wb = '1' else i_alu_out(1 downto 0);
+
 	u_extender_ram : entity work.extender_ram
 		port map (
-			i_data        => mem_read_data,
+			i_data        => ext_data,
 			i_op          => i_ext_ram_op,
-			i_byte_offset => i_alu_out(1 downto 0),
+			i_byte_offset => ext_offset,
 			o_data        => wb_ram_extended
 		);
 

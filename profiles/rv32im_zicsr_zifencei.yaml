@@ -28,6 +28,7 @@ sources:
   - I/extender_imm.vhd
   - I/extender_ram.vhd
   - I/store_manager.vhd
+  - I/misaligned_unit.vhd
   - common/control_unit.vhd
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd

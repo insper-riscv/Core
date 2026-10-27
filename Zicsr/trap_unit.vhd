@@ -12,8 +12,10 @@
 --          2         | Instrução ilegal (qualquer encoding     | 0x00000000
 --                    | inexistente, SYSTEM ou CSR inválido)    |
 --          3         | Breakpoint (EBREAK)                     | 0x00000000
---          4         | Endereço de Load desalinhado            | i_ea
---          6         | Endereço de Store desalinhado           | i_ea
+--          4         | Endereço de Load desalinhado que o      | i_ea
+--                    | hardware não executa                    |
+--          6         | Endereço de Store desalinhado que o     | i_ea
+--                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
 -- =============================================================================
 
@@ -119,6 +121,14 @@ architecture rtl of trap_unit is
 	signal in_main_mem : std_logic;
 	-- Indica que o acesso desalinhado cabe numa única palavra (LH, LHU ou SH com offset 1) e o hardware o executa.
 	signal misal_in_word : std_logic;
+	-- Indica acesso que ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
+	signal crosses_word : std_logic;
+	-- Palavra seguinte à do endereço efetivo, onde termina um acesso que cruza.
+	signal next_word    : unsigned(31 downto 0);
+	-- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal.
+	signal same_region  : std_logic;
+	-- Indica acesso desalinhado que o hardware executa (dentro da palavra ou cruzando, na memória principal).
+	signal misal_exec   : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
 
@@ -157,8 +167,25 @@ begin
 	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
 	                 else '0';
 
-	ld_misal <= ld_unaligned and (not misal_in_word);
-	st_misal <= st_unaligned and (not misal_in_word);
+	crosses_word <= '1' when ((i_funct3 = FUNCT3_LW or i_funct3 = FUNCT3_SW) and i_ea(1 downto 0) /= "00") or
+	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = "11")
+	                else '0';
+
+	next_word <= (unsigned(i_ea(31 downto 2)) + 1) & "00";
+
+	same_region <= '1' when ((unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < SDRAM_BASE_BYTES and
+	                          next_word >= RAM_BASE_BYTES and next_word < SDRAM_BASE_BYTES) or
+	                         (unsigned(i_ea) >= SDRAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES and
+	                          next_word >= SDRAM_BASE_BYTES and next_word < PERIPHERAL_BASE_BYTES))
+	               else '0';
+
+	misal_exec <= '1' when (misal_in_word = '1' or
+	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and
+	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
+	              else '0';
+
+	ld_misal <= ld_unaligned and (not misal_exec);
+	st_misal <= st_unaligned and (not misal_exec);
 
 	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
 
