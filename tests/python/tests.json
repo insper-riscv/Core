@@ -202,6 +202,7 @@
             "common/pipeline_types.vhd",
             "common/flip_flop.vhd",
             "common/generic_register.vhd",
+            "Zicsr/csr_addr_consts.vhd",
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_file"
@@ -523,6 +524,7 @@
             "common/pipeline_types.vhd",
             "common/flip_flop.vhd",
             "common/generic_register.vhd",
+            "Zicsr/csr_addr_consts.vhd",
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_misa_no_m",
@@ -563,6 +565,7 @@
             "M/non_restoring_divider_rv32.vhd",
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
+            "Zicsr/csr_addr_consts.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -625,6 +628,7 @@
             "M/multdiv.vhd",
             "Zifencei/fencei_unit.vhd",
             "Zicsr/csr_decode.vhd",
+            "Zicsr/csr_addr_consts.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
