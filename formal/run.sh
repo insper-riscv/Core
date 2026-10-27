@@ -23,6 +23,7 @@ netlist() {
     "$root/common/funct3_consts.vhd" \
     "$root/common/flip_flop.vhd" \
     "$root/common/generic_register.vhd" \
+    "$root/common/mem_map_consts.vhd" \
     "$root/Zicsr/csr_addr_consts.vhd" \
     "$1"
   ghdl --synth --std=08 --workdir="$work" --out=verilog "$2" > "$3.v"

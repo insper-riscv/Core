@@ -27,6 +27,8 @@ entity stage_ex is
 		has_zicsr    : boolean := false;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
 		has_zifencei : boolean := false;
+		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
+		has_zicclsm  : boolean := true;
 		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
 		has_dcache   : boolean := false
 	);
@@ -170,6 +172,9 @@ architecture rtl of stage_ex is
 	end component;
 
 	component trap_unit is
+		generic (
+			has_zicclsm   : boolean := true
+		);
 		port (
 			i_ex_valid    : in  std_logic;
 			i_run         : in  std_logic;
@@ -441,6 +446,9 @@ begin
 		ex_cf_target <= ex_alu_result when jalr_taken_int = '1' else branch_target_int;
 
 		u_trap_unit : trap_unit
+			generic map (
+				has_zicclsm => has_zicclsm
+			)
 			port map (
 				i_ex_valid    => i_valid,
 				i_run         => i_pipe_run,

@@ -121,3 +121,40 @@ async def test_misaligned_target_goes_first(dut):
     """A misaligned target keeps cause 0 when the same instruction is also flagged."""
     take, _, cause, tval = await probe(dut, illegal=1, cf_taken=1, cf_target=0x102)
     assert (take, cause, tval) == (1, CAUSE_MISALIGNED_TARGET, 0x102)
+
+
+MAIN_MEMORY = [0x8000, 0x3FFFFF00, 0x40000000, 0x7FFFFFF0]
+OUTSIDE_MAIN_MEMORY = [0x0, 0x1000, 0x7FF0, 0x80000000, 0xD0000000]
+IN_WORD = [(OP_LOAD, 0b001, CAUSE_LOAD_MISALIGNED), (OP_LOAD, 0b101, CAUSE_LOAD_MISALIGNED),
+           (OP_STORE, 0b001, CAUSE_STORE_MISALIGNED)]
+CROSSING = [(OP_LOAD, 0b010, 1, CAUSE_LOAD_MISALIGNED), (OP_LOAD, 0b010, 2, CAUSE_LOAD_MISALIGNED),
+            (OP_LOAD, 0b010, 3, CAUSE_LOAD_MISALIGNED), (OP_LOAD, 0b001, 3, CAUSE_LOAD_MISALIGNED),
+            (OP_LOAD, 0b101, 3, CAUSE_LOAD_MISALIGNED), (OP_STORE, 0b010, 1, CAUSE_STORE_MISALIGNED),
+            (OP_STORE, 0b010, 2, CAUSE_STORE_MISALIGNED), (OP_STORE, 0b010, 3, CAUSE_STORE_MISALIGNED),
+            (OP_STORE, 0b001, 3, CAUSE_STORE_MISALIGNED)]
+
+
+@cocotb.test()
+async def test_halfword_inside_a_word_is_executed_in_main_memory(dut):
+    """LH, LHU and SH at offset 1 do not trap in the RAM or the SDRAM."""
+    for opcode, funct3, _ in IN_WORD:
+        for base in MAIN_MEMORY:
+            assert (await probe(dut, opcode, funct3, ea=base + 1))[0] == 0, (opcode, funct3, hex(base))
+
+
+@cocotb.test()
+async def test_halfword_inside_a_word_traps_outside_main_memory(dut):
+    """The flash and the peripheral window do not run a misaligned access, even inside a word."""
+    for opcode, funct3, cause in IN_WORD:
+        for base in OUTSIDE_MAIN_MEMORY:
+            assert await probe(dut, opcode, funct3, ea=base + 1) == (1, 0, cause, base + 1), (
+                opcode, funct3, hex(base))
+
+
+@cocotb.test()
+async def test_access_crossing_a_word_still_traps(dut):
+    """An access that spans two words traps in every region until the two-step unit exists."""
+    for opcode, funct3, offset, cause in CROSSING:
+        for base in MAIN_MEMORY + OUTSIDE_MAIN_MEMORY:
+            assert await probe(dut, opcode, funct3, ea=base + offset) == (1, 0, cause, base + offset), (
+                opcode, funct3, offset, hex(base))

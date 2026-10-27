@@ -33,9 +33,12 @@ architecture rtl of extender_ram is
 	signal selected_byte : std_logic_vector(7 downto 0);
 begin
 
-	-- Seleção da meia-palavra alinhada (endereços com offset 0 ou 2).
-	selected_half <= i_data(15 downto 0) when i_byte_offset(1) = '0' else
-	                 i_data(31 downto 16);
+	-- Seleção da meia-palavra pelo offset do endereço (0: bytes 0 e 1; 1: bytes 1 e 2; 2: bytes 2 e 3).
+	with i_byte_offset select
+		selected_half <=
+			i_data(15 downto 0)  when "00",
+			i_data(23 downto 8)  when "01",
+			i_data(31 downto 16) when others;
 
 	-- Seleção do byte correspondente ao deslocamento i_byte_offset.
 	with i_byte_offset select
