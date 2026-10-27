@@ -126,6 +126,8 @@ package funct3_consts is
   ------------------------------------------------------------------
   -- Instruções privilegiadas sem acesso direto a CSR (ECALL, EBREAK, MRET).
   constant FUNCT3_PRIV     : funct3_t := "000";
+  -- Subfunção reservada da classe SYSTEM (nem privilegiada nem acesso a CSR).
+  constant FUNCT3_SYSTEM_RESERVED : funct3_t := "100";
   -- Leitura e escrita atômica em CSR via registrador (CSRRW).
   constant FUNCT3_CSRRW    : funct3_t := "001";
   -- Leitura e set de bits atômico em CSR via registrador (CSRRS).
