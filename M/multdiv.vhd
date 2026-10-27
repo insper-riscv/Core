@@ -1,7 +1,8 @@
 -- =============================================================================
 -- Unidade integrada de multiplicação e divisão inteira (Extensão RV32M)
 --
--- Coordena a execução das 8 instruções da extensão M no estágio EX:
+-- Coordena a execução das 8 instruções da extensão M no estágio EX (com
+-- has_div = false, só as 4 multiplicações da extensão Zmmul, sem o divisor):
 --   - Multiplicação (33 ciclos via booth_multiplier_rv32):
 --     MUL (32 bits baixos), MULH (32 bits altos signed x signed),
 --     MULHSU (32 bits altos signed x unsigned) e MULHU (32 bits altos unsigned x unsigned).
@@ -16,7 +17,7 @@
 -- O stall é o OU do pulso de início (combinacional, para parar a instrução já no
 -- primeiro ciclo) com um flip-flop que guarda o sinal de ocupado do ciclo anterior.
 -- Esse flip-flop cobre os ciclos de cálculo e o de término, e assim o pulso de
--- término não entra na lógica de stall do pipeline (docs/pt-br/timing/STALL_REGISTRADO_DO_MULTDIV.md).
+-- término não entra na lógica de stall do pipeline.
 -- =============================================================================
 
 library ieee;
@@ -26,6 +27,10 @@ use work.pipeline_types.all;
 use work.funct3_consts.all;
 
 entity multdiv is
+	generic (
+		-- Instancia o divisor (extensão M completa); '0' deixa só a multiplicação (Zmmul).
+		has_div     : boolean := true
+	);
 	port (
 		-- Sinal de clock do sistema.
 		i_clk       : in  std_logic;
@@ -209,21 +214,28 @@ begin
 		);
 
 	-- Instância única do divisor não-restaurador de 32 bits (atende signed e unsigned).
-	u_divider : entity work.non_restoring_divider_rv32
-		port map (
-			i_clk         => i_clk,
-			i_rst         => i_rst,
-			i_start       => start_div,
-			i_is_unsigned => is_unsigned,
-			i_dividend    => i_a,
-			i_divisor     => i_b,
-			o_quotient    => div_quotient,
-			o_remainder   => div_remainder,
-			o_done        => div_done,
-			o_busy        => div_busy,
-			o_div_by_zero => open,
-			o_overflow    => open
-		);
+	gen_divider : if has_div generate
+		u_divider : entity work.non_restoring_divider_rv32
+			port map (
+				i_clk         => i_clk,
+				i_rst         => i_rst,
+				i_start       => start_div,
+				i_is_unsigned => is_unsigned,
+				i_dividend    => i_a,
+				i_divisor     => i_b,
+				o_quotient    => div_quotient,
+				o_remainder   => div_remainder,
+				o_done        => div_done,
+				o_busy        => div_busy,
+				o_div_by_zero => open,
+				o_overflow    => open
+			);
+	else generate
+		div_quotient  <= (others => '0');
+		div_remainder <= (others => '0');
+		div_done      <= '0';
+		div_busy      <= '0';
+	end generate gen_divider;
 
 	-- Correção da parte alta para operandos sem sinal (MULHSU / MULHU).
 	corr_a <= i_b when (i_a(31) = '1' and signed_mode(1) = '0') else (others => '0');

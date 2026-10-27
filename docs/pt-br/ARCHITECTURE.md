@@ -91,6 +91,8 @@ $$
 
 Quando `has_m = true`, o decodificador `m_decode` no estágio ID reconhece instruções R-type com `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`), ativando `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'`.
 
+Com `has_zmmul = true` e `has_m = false` (extensão Zmmul), o `m_decode` reconhece só as quatro multiplicações (`funct3(2) = '0'`) e a `multdiv` não instancia o divisor. `DIV`, `DIVU`, `REM` e `REMU` ficam sem dono, e a unidade de controle as trata como instruções ilegais.
+
 No estágio EX, a unidade `multdiv` gera internamente um pulso único de início (`start_pulse`) no primeiro ciclo em que a instrução válida entra em EX, preserva `i_funct3` em um registrador próprio durante toda a operação e aciona o operador correspondente:
 
 | Operador interno | Instruções atendidas | Latência | Tratamento de casos de borda |

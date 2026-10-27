@@ -28,7 +28,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
 | `Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
 | `core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
-| `profiles/` | Manifestos de fontes e generics de cada perfil suportado (`rv32i.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
+| `profiles/` | Manifestos de fontes e generics de cada perfil suportado (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby` e script de verificação formal via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
 | `tests/FPGA/entities/` | Projeto Quartus para validação em placa do banco de registradores ([documentação](tests/FPGA/entities/bancoRegistradores/README.md)) |
@@ -40,6 +40,7 @@ O topo estrutural `core` recebe quatro generics booleanos que habilitam ou desab
 | Perfil (`profiles/`) | Extensões ativas | Generics configurados no topo `core` |
 | :--- | :--- | :--- |
 | `rv32i` | RV32I | `has_m: false, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
+| `rv32i_zmmul` | RV32I + Zmmul | `has_zmmul: true, has_m: false, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
 | `rv32im` | RV32I + M | `has_m: true, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
 | `rv32im_zicsr` | RV32I + M + Zicsr | `has_m: true, has_zicsr: true, has_zifencei: false, has_dcache_Wb: false` |
 | `rv32im_zicsr_zifencei` | RV32I + M + Zicsr + Zifencei | `has_m: true, has_zicsr: true, has_zifencei: true, has_dcache_Wb: false` |

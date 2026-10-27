@@ -21,8 +21,10 @@ use work.funct3_consts.all;
 
 entity stage_id is
 	generic (
-		-- Habilita o decodificador da extensão M (m_decode).
+		-- Habilita o decodificador da extensão M completa (m_decode, multiplicação e divisão).
 		has_m     : boolean := false;
+		-- Habilita o decodificador só da multiplicação (extensão Zmmul); has_m já a inclui.
+		has_zmmul : boolean := false;
 		-- Habilita o decodificador da extensão Zicsr (csr_decode).
 		has_zicsr : boolean := false;
 		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
@@ -103,6 +105,9 @@ end entity stage_id;
 architecture rtl of stage_id is
 
 	component m_decode is
+		generic (
+			has_div : boolean := true
+		);
 		port (
 			i_instr      : in  word_t;
 			o_is_muldiv  : out std_logic;
@@ -187,8 +192,11 @@ begin
 			o_illegal     => cu_illegal
 		);
 
-	gen_m_decode : if has_m generate
+	gen_m_decode : if (has_m or has_zmmul) generate
 		u_m_decode : m_decode
+			generic map (
+				has_div => has_m
+			)
 			port map (
 				i_instr      => i_instr,
 				o_is_muldiv  => id_is_muldiv,
