@@ -129,6 +129,22 @@ architecture rtl of core is
 	signal flush_ex_mem      : std_logic;
 	-- Pulso de exceção sinalizada sem Zicsr, que mata a instrução em EX sem redirecionar o PC.
 	signal trap_sig          : std_logic;
+	-- A memória avança neste ciclo: sem parada de multdiv nem espera da SDRAM, mesmo com a etapa 1 de um acesso desalinhado.
+	signal mem_run           : std_logic;
+	-- O acesso em MEM cruza a palavra e é executado em duas etapas.
+	signal mis_cross         : std_logic;
+	-- Etapa 1 de um acesso desalinhado em andamento: o pipeline espera.
+	signal mis_stall         : std_logic;
+	-- Endereço, dado e máscara da etapa corrente do acesso desalinhado.
+	signal mis_addr          : word_t;
+	signal mis_data          : word_t;
+	signal mis_mask          : byte_mask_t;
+	-- Primeira palavra lida por um load desalinhado, retida para o estágio WB.
+	signal mis_first_word    : word_t;
+	-- Endereço, dado e máscara que o estágio MEM de fato apresenta às memórias.
+	signal mem_addr          : word_t;
+	signal mem_wdata         : word_t;
+	signal mem_mask          : byte_mask_t;
 
 	-- =========================================================================
 	-- Sinais do Estágio IF -> Registrador IF/ID
@@ -351,10 +367,11 @@ architecture rtl of core is
 begin
 
 	-- Coordenação global de stalls e flushes entre os estágios.
-	base_run      <= not (muldiv_stall or sdram_wait);
-	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy;
+	mem_run       <= not (muldiv_stall or sdram_wait);
+	base_run      <= mem_run and (not mis_stall);
+	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy or mis_stall;
 	pipe_run      <= base_run and (not fencei_busy);
-	o_mem_advance <= base_run;
+	o_mem_advance <= mem_run;
 	o_trap        <= trap_sig;
 
 	-- Sem CSRs e sem acesso desalinhado em hardware, nada trataria o acesso: a combinação é proibida.
@@ -614,12 +631,44 @@ begin
 	-- =========================================================================
 	-- 4. Estágio MEM (Memory Access) + Registrador MEM/WB
 	-- =========================================================================
+	u_misaligned_unit : entity work.misaligned_unit
+		generic map (
+			has_zicclsm => has_zicclsm
+		)
+		port map (
+			i_clk         => i_clk,
+			i_rst         => i_rst,
+			i_valid       => exmem_valid,
+			i_en          => exmem_en_ram,
+			i_re          => exmem_re_ram,
+			i_we          => exmem_we_ram,
+			i_ext_op      => exmem_ext_ram_op,
+			i_byte_mask   => exmem_byteena,
+			i_addr        => exmem_alu_out,
+			i_store_data  => exmem_store_data,
+			i_ready       => i_sdram_ready,
+			i_advance     => mem_run,
+			i_base_run    => base_run,
+			i_ram_rdata   => i_ram_rdata,
+			i_sdram_rdata => i_sdram_rdata,
+			o_cross       => mis_cross,
+			o_stall       => mis_stall,
+			o_addr        => mis_addr,
+			o_data        => mis_data,
+			o_mask        => mis_mask,
+			o_first_word  => mis_first_word
+		);
+
+	mem_addr  <= mis_addr when mis_cross = '1' else exmem_alu_out;
+	mem_wdata <= mis_data when mis_cross = '1' else exmem_store_data;
+	mem_mask  <= mis_mask when mis_cross = '1' else exmem_byteena;
+
 	u_stage_mem : entity work.stage_mem
 		port map (
 			i_valid         => exmem_valid,
-			i_alu_out       => exmem_alu_out,
-			i_store_data    => exmem_store_data,
-			i_byte_mask     => exmem_byteena,
+			i_alu_out       => mem_addr,
+			i_store_data    => mem_wdata,
+			i_byte_mask     => mem_mask,
 			i_we_ram        => exmem_we_ram,
 			i_re_ram        => exmem_re_ram,
 			i_en_ram        => exmem_en_ram,
@@ -676,6 +725,7 @@ begin
 			i_wb_sel      => memwb_wb_sel,
 			i_flash_data2 => i_flash_data2,
 			i_ram_rdata   => i_ram_rdata,
+			i_first_word  => mis_first_word,
 			i_sdram_rdata => i_sdram_rdata,
 			o_wb_we       => wb_we,
 			o_wb_rd       => wb_rd,

@@ -1,9 +1,9 @@
-"""A halfword access at offset 1 runs in the RAM; every other misaligned access traps.
+"""A halfword access at offset 1 runs in the RAM; a misaligned access outside the main memory traps.
 
-LH, LHU and SH at offset 1 stay inside one word, so the core executes them. An access that
-crosses a word (LW and SW at offsets 1 to 3, LH and SH at offset 3), and any misaligned access
-outside the main memory (the flash and the peripheral window), traps with mcause 4 or 6 and has
-no effect.
+LH, LHU and SH at offset 1 stay inside one word, so the core executes them. Any misaligned access
+outside the main memory (the flash and the peripheral window), even inside a word, traps with
+mcause 4 or 6 and has no effect. The accesses that cross a word run in the two-step unit, which
+the CoreMisaligned test covers.
 """
 
 import cocotb
@@ -41,10 +41,6 @@ def load_constant(rd, value):
 
 
 TRAPPING = [  # (instruction, expected mcause)
-    (lw(24, 8, 1), 4),
-    (lh(24, 8, 3), 4),
-    (sw(24, 8, 2), 6),
-    (sh(24, 8, 3), 6),
     (lh(24, 15, 1), 4),
     (lh(24, 16, 1), 4),
     (sh(24, 16, 1), 6),
@@ -106,7 +102,7 @@ def build():
 
 @cocotb.test()
 async def test_halfword_at_offset_one_runs_and_the_rest_traps(dut):
-    """The three accesses run with the right bytes; each of the seven others traps once and changes nothing."""
+    """The three accesses run with the right bytes; each of the three outside the main memory traps once and changes nothing."""
     ram = await run_program(dut, build(), max_cycles=6000)
     assert ram[RAM_BASE + slot("lh")] == 0xFFFFF6A5, hex(ram[RAM_BASE + slot("lh")])
     assert ram[RAM_BASE + slot("lhu")] == 0x0000F6A5, hex(ram[RAM_BASE + slot("lhu")])
