@@ -22,7 +22,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 | Path | Contents |
 | :--- | :--- |
-| `common/` | Blocks shared across all profiles, including type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units, PC generator, and the other parts specific to the Core; the generic blocks (adder, flip-flop, registers, multiplexers, and one-hot decoder) come from the [Common-Components](https://github.com/insper-riscv/Common-Components) repository, next to this one |
+| `common/` | Blocks shared across all profiles, including type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units, PC generator, and the other parts specific to the Core; the generic blocks (adder, flip-flop, registers, multiplexers, and one-hot decoder) come from the [Common-Components](https://github.com/insper-riscv/Common-Components) repository, included as a submodule |
 | `I/` | Base integer extension RV32I, comprising the ALU, immediate extender, memory read extender, and store alignment manager |
 | `M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
 | `Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
@@ -53,7 +53,6 @@ When an extension is disabled by its generic, the corresponding instructions beh
 
 ```bash
 git clone --recurse-submodules https://github.com/insper-riscv/Core.git
-git clone https://github.com/insper-riscv/Common-Components.git   # next to it: the generic blocks
 cd Core
 uv sync
 
