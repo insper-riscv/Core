@@ -138,6 +138,10 @@ architecture rtl of trap_unit is
 
 begin
 
+	assert RAM_BASE_BYTES = x"00008000" and SDRAM_BASE_BYTES = x"40000000" and PERIPHERAL_BASE_BYTES = x"80000000"
+		report "O trap_unit decodifica as regiões por bits do endereço: RAM_BASE, SDRAM_BASE e PERIPHERAL_BASE devem ser 2**15, 2**30 e 2**31"
+		severity failure;
+
 	is_system <= '1' when i_opcode = OPCODE_SYSTEM else '0';
 	is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= FUNCT3_SYSTEM_RESERVED) else '0';
 	no_regs   <= '1' when (i_funct3 = FUNCT3_PRIV and i_rd_idx = REG_ZERO and i_rs1_idx = REG_ZERO) else '0';
@@ -162,7 +166,9 @@ begin
 	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
 	                    else '0';
 
-	in_main_mem <= '1' when (unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES) else '0';
+	-- As fronteiras do mapa são potências de 2 (conferido nas asserções acima), então "ea >= RAM_BASE" é "algum bit
+	-- [30:15] em '1'" e "ea < PERIPHERAL_BASE" é "bit 31 em '0'", sem comparador numérico depois da ULA.
+	in_main_mem <= '1' when (i_ea(31) = '0' and i_ea(30 downto 15) /= (30 downto 15 => '0')) else '0';
 
 	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
 	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
@@ -174,8 +180,9 @@ begin
 
 	last_word <= '1' when i_ea(29 downto 2) = (29 downto 2 => '1') else '0';
 
-	same_region <= '1' when (((unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < SDRAM_BASE_BYTES) or
-	                          (unsigned(i_ea) >= SDRAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES)) and
+	-- RAM interna: bits [31:30] = "00" e algum bit [29:15] em '1'. SDRAM: bits [31:30] = "01".
+	same_region <= '1' when (((i_ea(31 downto 30) = "00" and i_ea(29 downto 15) /= (29 downto 15 => '0')) or
+	                          i_ea(31 downto 30) = "01") and
 	                         last_word = '0')
 	               else '0';
 
