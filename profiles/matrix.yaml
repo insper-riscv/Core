@@ -1,0 +1,15 @@
+# The extensions of the core and the rules between them; `riscv-tools profiles` expands this file
+# into every valid profile. Each extension names the generic of `core` that turns it on.
+base: rv32i
+extensions:
+  - {name: Zicsr,    generic: has_zicsr}
+  - {name: Zifencei, generic: has_zifencei}
+  - {name: Zmmul,    generic: has_zmmul}
+  - {name: M,        generic: has_m, base_letter: m}
+  - {name: Zicclsm,  generic: has_zicclsm, absent_token: nozicclsm}
+# M includes the multiplication of Zmmul, so the two never coexist.
+mutually_exclusive:
+  - [M, Zmmul]
+# Without Zicsr the core has no trap to signal a misaligned access, so it must run it.
+requires_any:
+  - [Zicsr, Zicclsm]
