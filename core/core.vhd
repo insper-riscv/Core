@@ -135,15 +135,19 @@ architecture rtl of core is
 	signal mis_cross         : std_logic;
 	-- Etapa 1 de um acesso desalinhado em andamento: o pipeline espera.
 	signal mis_stall         : std_logic;
-	-- Endereço, dado e máscara da etapa corrente do acesso desalinhado.
+	-- Endereço da etapa corrente do acesso desalinhado.
 	signal mis_addr          : word_t;
+	-- Dado de escrita da etapa corrente do acesso desalinhado.
 	signal mis_data          : word_t;
+	-- Máscara de bytes da etapa corrente do acesso desalinhado.
 	signal mis_mask          : byte_mask_t;
 	-- Primeira palavra lida por um load desalinhado, retida para o estágio WB.
 	signal mis_first_word    : word_t;
-	-- Endereço, dado e máscara que o estágio MEM de fato apresenta às memórias.
+	-- Endereço que o estágio MEM de fato apresenta às memórias.
 	signal mem_addr          : word_t;
+	-- Dado de escrita que o estágio MEM de fato apresenta às memórias.
 	signal mem_wdata         : word_t;
+	-- Máscara de bytes que o estágio MEM de fato apresenta às memórias.
 	signal mem_mask          : byte_mask_t;
 
 	-- =========================================================================
