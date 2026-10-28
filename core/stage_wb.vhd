@@ -12,6 +12,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
 use work.mem_map_consts.all;
 use work.ext_ram_consts.all;
 
@@ -67,7 +68,7 @@ architecture rtl of stage_wb is
 	-- Palavra entregue ao extensor: a juntada de duas palavras ou a lida da memória.
 	signal ext_data         : word_t;
 	-- Posição do dado dentro da palavra entregue ao extensor.
-	signal ext_offset       : std_logic_vector(1 downto 0);
+	signal ext_offset       : byte_offset_t;
 
 begin
 
@@ -78,8 +79,8 @@ begin
 	                    i_sdram_rdata when is_sdram_wb      = '1' else
 	                    i_ram_rdata;
 
-	is_cross_wb <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= "00") or
-	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = "11"))
+	is_cross_wb <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
+	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3))
 	               else '0';
 
 	cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
@@ -87,7 +88,7 @@ begin
 	cross_word <= cross_pair(31 downto 0);
 
 	ext_data   <= cross_word when is_cross_wb = '1' else mem_read_data;
-	ext_offset <= "00"       when is_cross_wb = '1' else i_alu_out(1 downto 0);
+	ext_offset <= BYTE_OFFSET_0 when is_cross_wb = '1' else i_alu_out(1 downto 0);
 
 	u_extender_ram : entity work.extender_ram
 		port map (

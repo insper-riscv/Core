@@ -27,6 +27,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
 use work.ext_ram_consts.all;
 use work.mem_map_consts.all;
 
@@ -84,7 +85,7 @@ end entity misaligned_unit;
 architecture rtl of misaligned_unit is
 
 	-- Dois bits menos significativos do endereço efetivo: posição do primeiro byte na palavra.
-	signal offset         : std_logic_vector(1 downto 0);
+	signal offset         : byte_offset_t;
 	-- Load que ocupa duas palavras (LW fora do offset 0, LH ou LHU no offset 3).
 	signal load_cross     : std_logic;
 	-- Store que ocupa duas palavras (SW fora do offset 0, SH no offset 3).
@@ -119,13 +120,13 @@ begin
 	offset <= i_addr(1 downto 0);
 
 	load_cross <= '1' when (i_re = '1' and
-	                        ((i_ext_op = EXT_RAM_LW and offset /= "00") or
-	                         ((i_ext_op = EXT_RAM_LH or i_ext_op = EXT_RAM_LHU) and offset = "11")))
+	                        ((i_ext_op = EXT_RAM_LW and offset /= BYTE_OFFSET_0) or
+	                         ((i_ext_op = EXT_RAM_LH or i_ext_op = EXT_RAM_LHU) and offset = BYTE_OFFSET_3)))
 	              else '0';
 
 	store_cross <= '1' when (i_we = '1' and
-	                         ((i_byte_mask = "1111" and offset /= "00") or
-	                          (i_byte_mask = "1100" and offset = "11")))
+	                         ((i_byte_mask = BYTE_MASK_WORD and offset /= BYTE_OFFSET_0) or
+	                          (i_byte_mask = BYTE_MASK_HALF_HIGH and offset = BYTE_OFFSET_3)))
 	               else '0';
 
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
@@ -145,8 +146,8 @@ begin
 			i_rst    => i_rst
 		);
 
-	raw_data <= i_store_data when i_byte_mask = "1111" else x"0000" & i_store_data(31 downto 16);
-	raw_mask <= "1111" when i_byte_mask = "1111" else "0011";
+	raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else x"0000" & i_store_data(31 downto 16);
+	raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
 
 	data64 <= std_logic_vector(shift_left(unsigned(x"00000000" & raw_data), 8 * to_integer(unsigned(offset))));
 	mask8  <= std_logic_vector(shift_left(unsigned("0000" & raw_mask), to_integer(unsigned(offset))));
@@ -155,9 +156,9 @@ begin
 
 	o_cross <= cross;
 	o_stall <= cross and (not second);
-	o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & "00";
+	o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & BYTE_OFFSET_0;
 	o_data  <= data64(31 downto 0) when second = '0' else data64(63 downto 32);
-	o_mask  <= (others => '0') when i_we = '0' else
+	o_mask  <= BYTE_MASK_NONE when i_we = '0' else
 	           mask8(3 downto 0) when second = '0' else
 	           mask8(7 downto 4);
 

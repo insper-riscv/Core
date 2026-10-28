@@ -6,6 +6,7 @@ top: core
 generics: {has_m: true, has_zicsr: true}
 sources:
   - common/pipeline_types.vhd
+  - common/byte_mask_consts.vhd
   - common/opcode_consts.vhd
   - common/funct3_consts.vhd
   - common/funct7_consts.vhd
