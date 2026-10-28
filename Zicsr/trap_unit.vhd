@@ -123,9 +123,9 @@ architecture rtl of trap_unit is
 	signal misal_in_word : std_logic;
 	-- Indica acesso que ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
 	signal crosses_word : std_logic;
-	-- Palavra seguinte à do endereço efetivo, onde termina um acesso que cruza.
-	signal next_word    : unsigned(31 downto 0);
-	-- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal.
+	-- Indica que o endereço efetivo está na última palavra de uma região de 1 GiB (bits [29:2] todos em '1'): a palavra seguinte pertence à outra região.
+	signal last_word    : std_logic;
+	-- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal (RAM interna ou SDRAM).
 	signal same_region  : std_logic;
 	-- Indica acesso desalinhado que o hardware executa (dentro da palavra ou cruzando, na memória principal).
 	signal misal_exec   : std_logic;
@@ -171,12 +171,11 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = "11")
 	                else '0';
 
-	next_word <= (unsigned(i_ea(31 downto 2)) + 1) & "00";
+	last_word <= '1' when i_ea(29 downto 2) = (29 downto 2 => '1') else '0';
 
-	same_region <= '1' when ((unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < SDRAM_BASE_BYTES and
-	                          next_word >= RAM_BASE_BYTES and next_word < SDRAM_BASE_BYTES) or
-	                         (unsigned(i_ea) >= SDRAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES and
-	                          next_word >= SDRAM_BASE_BYTES and next_word < PERIPHERAL_BASE_BYTES))
+	same_region <= '1' when (((unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < SDRAM_BASE_BYTES) or
+	                          (unsigned(i_ea) >= SDRAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES)) and
+	                         last_word = '0')
 	               else '0';
 
 	misal_exec <= '1' when (misal_in_word = '1' or
