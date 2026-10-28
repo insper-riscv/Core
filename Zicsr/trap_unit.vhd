@@ -23,6 +23,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
 use work.mem_map_consts.all;
@@ -152,23 +153,23 @@ begin
 	                   else '0';
 
 	ld_unaligned <= '1' when (i_opcode = OPCODE_LOAD and
-	                          ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= "00") or
+	                          ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
 	                           ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
 	                    else '0';
 
 	st_unaligned <= '1' when (i_opcode = OPCODE_STORE and
-	                          ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= "00") or
+	                          ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
 	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
 	                    else '0';
 
 	in_main_mem <= '1' when (unsigned(i_ea) >= RAM_BASE_BYTES and unsigned(i_ea) < PERIPHERAL_BASE_BYTES) else '0';
 
-	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = "01" and
+	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
 	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
 	                 else '0';
 
-	crosses_word <= '1' when ((i_funct3 = FUNCT3_LW or i_funct3 = FUNCT3_SW) and i_ea(1 downto 0) /= "00") or
-	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = "11")
+	crosses_word <= '1' when ((i_funct3 = FUNCT3_LW or i_funct3 = FUNCT3_SW) and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
+	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
 	last_word <= '1' when i_ea(29 downto 2) = (29 downto 2 => '1') else '0';
@@ -186,7 +187,7 @@ begin
 	ld_misal <= ld_unaligned and (not misal_exec);
 	st_misal <= st_unaligned and (not misal_exec);
 
-	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
+	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0) else '0';
 
 	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
 	           ld_misal or st_misal or is_ecall;

@@ -11,6 +11,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
 
@@ -49,30 +50,30 @@ begin
 	-- Alinhamento e máscara para Store Halfword (SH), com offset 0, 1 (bytes 1 e 2) ou 2.
 	with i_byte_offset select
 		sh_data <=
-			X"0000" & i_rs2_data(15 downto 0)          when "00",
-			X"00"   & i_rs2_data(15 downto 0) & X"00"  when "01",
+			X"0000" & i_rs2_data(15 downto 0)          when BYTE_OFFSET_0,
+			X"00"   & i_rs2_data(15 downto 0) & X"00"  when BYTE_OFFSET_1,
 			i_rs2_data(15 downto 0) & X"0000"          when others;
 
 	with i_byte_offset select
 		sh_mask <=
-			"0011" when "00",
-			"0110" when "01",
-			"1100" when others;
+			BYTE_MASK_HALF_LOW  when BYTE_OFFSET_0,
+			BYTE_MASK_HALF_MID  when BYTE_OFFSET_1,
+			BYTE_MASK_HALF_HIGH when others;
 
 	-- Alinhamento e máscara para Store Byte (SB).
 	with i_byte_offset select
 		sb_data <=
-			X"000000" & i_rs2_data(7 downto 0)            when "00",
-			X"0000"   & i_rs2_data(7 downto 0) & X"00"    when "01",
-			X"00"     & i_rs2_data(7 downto 0) & X"0000"  when "10",
+			X"000000" & i_rs2_data(7 downto 0)            when BYTE_OFFSET_0,
+			X"0000"   & i_rs2_data(7 downto 0) & X"00"    when BYTE_OFFSET_1,
+			X"00"     & i_rs2_data(7 downto 0) & X"0000"  when BYTE_OFFSET_2,
 			i_rs2_data(7 downto 0)             & X"000000" when others;
 
 	with i_byte_offset select
 		sb_mask <=
-			"0001" when "00",
-			"0010" when "01",
-			"0100" when "10",
-			"1000" when others;
+			BYTE_MASK_BYTE_0 when BYTE_OFFSET_0,
+			BYTE_MASK_BYTE_1 when BYTE_OFFSET_1,
+			BYTE_MASK_BYTE_2 when BYTE_OFFSET_2,
+			BYTE_MASK_BYTE_3 when others;
 
 	-- Seleção final do dado e da máscara de acordo com i_funct3 quando is_store = '1'.
 	o_data <= i_rs2_data      when (is_store = '1' and i_funct3 = FUNCT3_SW) else
@@ -80,9 +81,9 @@ begin
 	          sb_data         when (is_store = '1' and i_funct3 = FUNCT3_SB) else
 	          (others => '0');
 
-	o_byte_mask <= "1111"     when (is_store = '1' and i_funct3 = FUNCT3_SW) else
+	o_byte_mask <= BYTE_MASK_WORD when (is_store = '1' and i_funct3 = FUNCT3_SW) else
 	               sh_mask    when (is_store = '1' and i_funct3 = FUNCT3_SH) else
 	               sb_mask    when (is_store = '1' and i_funct3 = FUNCT3_SB) else
-	               (others => '0');
+	               BYTE_MASK_NONE;
 
 end architecture rtl;

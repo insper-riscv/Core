@@ -21,6 +21,7 @@
         "toplevel": "alu",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "Common-Components/src/utils_pkg.vhd",
             "common/alu_consts.vhd",
             "I/alu.vhd"
@@ -37,6 +38,7 @@
         "toplevel": "extender_ram",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/ext_ram_consts.vhd",
             "I/extender_ram.vhd"
         ],
@@ -46,6 +48,7 @@
         "toplevel": "extender_imm",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/ext_imm_consts.vhd",
             "I/extender_imm.vhd"
         ],
@@ -55,6 +58,7 @@
         "toplevel": "store_manager",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "I/store_manager.vhd"
@@ -65,6 +69,7 @@
         "toplevel": "control_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -80,6 +85,7 @@
         "toplevel": "control_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -95,6 +101,7 @@
         "toplevel": "m_decode",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct7_consts.vhd",
             "M/m_decode.vhd"
@@ -105,6 +112,7 @@
         "toplevel": "non_restoring_divider_rv32",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "M/non_restoring_divider_rv32.vhd"
         ],
         "test_module": "tests.python.unittests.M.non_restoring_divider"
@@ -113,6 +121,7 @@
         "toplevel": "hazard_detection_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/hazard_detection_unit.vhd"
         ],
@@ -122,6 +131,7 @@
         "toplevel": "forwarding_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/forwarding_unit.vhd"
         ],
         "test_module": "tests.python.unittests.common.ForwardingUnit"
@@ -137,6 +147,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -191,6 +202,7 @@
         "toplevel": "csr_decode",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "Zicsr/csr_decode.vhd"
@@ -201,6 +213,7 @@
         "toplevel": "csr_file",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
@@ -212,6 +225,7 @@
         "toplevel": "trap_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/mem_map_consts.vhd",
@@ -229,6 +243,7 @@
         "toplevel": "trap_unit",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/mem_map_consts.vhd",
@@ -249,6 +264,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -303,6 +319,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -359,6 +376,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -416,6 +434,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -474,6 +493,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -532,6 +552,7 @@
         "toplevel": "booth_multiplier_rv32",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "M/booth_multiplier_rv32.vhd"
         ],
         "test_module": "tests.python.unittests.M.booth_multiplier"
@@ -540,6 +561,7 @@
         "toplevel": "multdiv",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/funct3_consts.vhd",
             "Common-Components/src/generic_register.vhd",
             "Common-Components/src/flip_flop.vhd",
@@ -561,6 +583,7 @@
         "toplevel": "csr_file",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
@@ -575,6 +598,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -638,6 +662,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -701,6 +726,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -763,6 +789,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -828,6 +855,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",
@@ -888,6 +916,7 @@
         "toplevel": "core",
         "sources": [
             "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
             "common/opcode_consts.vhd",
             "common/funct3_consts.vhd",
             "common/funct7_consts.vhd",

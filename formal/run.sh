@@ -19,6 +19,7 @@ netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
   ghdl -a --std=08 --workdir="$work" \
     "$root/common/pipeline_types.vhd" \
+    "$root/common/byte_mask_consts.vhd" \
     "$root/common/opcode_consts.vhd" \
     "$root/common/funct3_consts.vhd" \
     "$root/Common-Components/src/flip_flop.vhd" \
@@ -80,7 +81,7 @@ mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcau
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
-mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = \"01\"/i_ea(1 downto 0) = \"01\"/"
+mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }
