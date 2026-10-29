@@ -19,6 +19,10 @@ entity core is
 		has_zmmul    : boolean := false;
 		-- Habilita a extensão Zicsr e o tratamento de exceções do modo máquina.
 		has_zicsr    : boolean := false;
+		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time); exige has_zicsr.
+		has_zicntr   : boolean := false;
+		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
+		tick_cycles  : positive := 50;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
 		has_zifencei : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
@@ -301,6 +305,8 @@ architecture rtl of core is
 	signal ex_redirect_pc    : word_t;
 	-- Pulso de tomada de exceção síncrona gerado no estágio EX.
 	signal trap_take         : std_logic;
+	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
+	signal retire_pulse      : std_logic;
 	-- Pulso de retorno de exceção (MRET) gerado no estágio EX.
 	signal mret_take         : std_logic;
 	-- Pulso de conclusão de FENCE.I gerado no estágio EX.
@@ -379,7 +385,13 @@ begin
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= mem_run;
 	o_trap        <= trap_sig;
-	o_retire      <= ex_valid and pipe_run and (not trap_take) and (not trap_sig);
+	retire_pulse  <= ex_valid and pipe_run and (not trap_take) and (not trap_sig);
+	o_retire      <= retire_pulse;
+
+	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
+	assert has_zicsr or (not has_zicntr)
+		report "has_zicntr = true exige has_zicsr"
+		severity failure;
 
 	-- Sem CSRs e sem acesso desalinhado em hardware, nada trataria o acesso: a combinação é proibida.
 	assert has_zicsr or has_zicclsm
@@ -548,6 +560,8 @@ begin
 			has_m        => has_m,
 			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
+			has_zicntr   => has_zicntr,
+			tick_cycles  => tick_cycles,
 			has_zifencei => has_zifencei,
 			has_zicclsm  => has_zicclsm,
 			has_dcache   => has_dcache
@@ -558,6 +572,7 @@ begin
 			i_base_run        => base_run,
 			i_pipe_run        => pipe_run,
 			i_valid           => ex_valid,
+			i_retire          => retire_pulse,
 			i_pc              => ex_pc,
 			i_pc4             => ex_pc4,
 			i_rs1_idx         => ex_rs1_idx,

@@ -25,6 +25,10 @@ entity stage_ex is
 		has_zmmul    : boolean := false;
 		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
 		has_zicsr    : boolean := false;
+		-- Habilita os contadores da extensão Zicntr no banco de CSRs; exige has_zicsr.
+		has_zicntr   : boolean := false;
+		-- Ciclos de clock do core por tick do contador time.
+		tick_cycles  : positive := 50;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
 		has_zifencei : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
@@ -43,6 +47,8 @@ entity stage_ex is
 		i_pipe_run        : in  std_logic;
 		-- Bit de validade da instrução no estágio EX.
 		i_valid           : in  std_logic;
+		-- Pulso de um ciclo: uma instrução foi retirada em EX (incrementa minstret com Zicntr).
+		i_retire          : in  std_logic := '0';
 		-- Endereço PC da instrução no estágio EX.
 		i_pc              : in  word_t;
 		-- Valor PC + 4 da instrução no estágio EX.
@@ -155,7 +161,9 @@ architecture rtl of stage_ex is
 
 	component csr_file is
 		generic (
-			has_m : boolean := true
+			has_m       : boolean := true;
+			has_zicntr  : boolean := false;
+			tick_cycles : positive := 50
 		);
 		port (
 			i_clk        : in  std_logic;
@@ -172,6 +180,7 @@ architecture rtl of stage_ex is
 			i_trap_pc    : in  word_t;
 			i_trap_tval  : in  word_t;
 			i_mret_take  : in  std_logic;
+			i_retire     : in  std_logic;
 			o_mtvec      : out word_t;
 			o_mepc       : out word_t
 		);
@@ -435,7 +444,9 @@ begin
 
 		u_csr_file : csr_file
 			generic map (
-				has_m => has_m
+				has_m       => has_m,
+				has_zicntr  => has_zicntr,
+				tick_cycles => tick_cycles
 			)
 			port map (
 				i_clk        => i_clk,
@@ -452,6 +463,7 @@ begin
 				i_trap_pc    => i_pc,
 				i_trap_tval  => trap_tval,
 				i_mret_take  => mret_take_int,
+				i_retire     => i_retire,
 				o_mtvec      => csr_mtvec,
 				o_mepc       => csr_mepc
 			);
