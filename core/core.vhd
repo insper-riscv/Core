@@ -99,7 +99,9 @@ entity core is
 		-- Código de causa da exceção sinalizada, no formato do mcause (zero com Zicsr).
 		o_trap_cause    : out word_t;
 		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
-		o_trap_pc       : out word_t
+		o_trap_pc       : out word_t;
+		-- Pulso de um ciclo: uma instrução foi retirada em EX (válida, com o pipeline andando e sem exceção).
+		o_retire        : out std_logic
 	);
 end entity core;
 
@@ -377,6 +379,7 @@ begin
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= mem_run;
 	o_trap        <= trap_sig;
+	o_retire      <= ex_valid and pipe_run and (not trap_take) and (not trap_sig);
 
 	-- Sem CSRs e sem acesso desalinhado em hardware, nada trataria o acesso: a combinação é proibida.
 	assert has_zicsr or has_zicclsm
