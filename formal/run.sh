@@ -26,6 +26,8 @@ netlist() {
     "$root/Common-Components/src/generic_register.vhd" \
     "$root/common/mem_map_consts.vhd" \
     "$root/Zicsr/csr_addr_consts.vhd" \
+    "$root/Zicntr/counter64.vhd" \
+    "$root/Zicntr/tick_divider.vhd" \
     "$1"
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
@@ -66,6 +68,13 @@ expect "Zicclsm: misaligned in the main memory runs, outside it traps (induction
 netlist "$trap" trap_unit trap_off -gHAS_ZICCLSM=false
 expect "no Zicclsm: every misaligned access traps (induction)"                PASS "$(prove trap_off.v "$trap_props" prove 2 '-DZICCLSM_OFF' trap_zicclsm_off)"
 
+echo "counter64"
+cnt="$root/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
+netlist "$cnt" counter64 cnt
+expect "the value shown is the ideal 64-bit counter, carry and writes (induction)" PASS "$(prove cnt.v "$cnt_props" prove 4 ''           cnt_safety)"
+expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
+expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
+
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression>
   local copy="$out/mut_$5.vhd"
@@ -83,5 +92,9 @@ mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_m
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+
+mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = x\"FFFFFFFF\"/lo = x\"FFFFFFFE\"/"
+mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata when/lo_nxt <= std_logic_vector(unsigned(i_wdata) + 1) when/"
+mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

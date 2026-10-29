@@ -15,9 +15,14 @@
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
---   - O misa anuncia RV32I e, quando has_m = true, a extensão M. Contadores
---     (cycle, instret) não existem, e mie e mip leem zero porque não há
---     interrupções.
+--   - O misa anuncia RV32I e, quando has_m = true, a extensão M. mie e mip leem
+--     zero porque não há interrupções.
+--   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
+--     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
+--     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
+--     a cada tick_cycles ciclos. mcycle e minstret aceitam escrita; cycle, time e
+--     instret (0xC00 a 0xC82) são somente leitura. Sem has_zicntr esses endereços
+--     são inexistentes.
 --
 -- Todos os registradores de estado utilizam instâncias estruturais de
 -- generic_register e flip_flop.
@@ -31,7 +36,11 @@ use work.csr_addr_consts.all;
 entity csr_file is
 	generic (
 		-- Faz o misa anunciar a extensão M (bit 12), para o perfil que a inclui.
-		has_m : boolean := true
+		has_m : boolean := true;
+		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time e seus espelhos).
+		has_zicntr : boolean := false;
+		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
+		tick_cycles : positive := 50
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -62,6 +71,8 @@ entity csr_file is
 		i_trap_tval  : in  word_t    := (others => '0');
 		-- Pulso que comanda a execução do retorno de exceção (MRET).
 		i_mret_take  : in  std_logic := '0';
+		-- Pulso de um ciclo: uma instrução foi retirada em EX (incrementa minstret).
+		i_retire     : in  std_logic := '0';
 		-- Endereço base do tratador de traps armazenado no registrador mtvec.
 		o_mtvec      : out word_t;
 		-- Endereço de retorno de exceção armazenado no registrador mepc.
@@ -70,6 +81,15 @@ entity csr_file is
 end entity csr_file;
 
 architecture rtl of csr_file is
+
+	-- Converte um booleano em std_logic ('1' para verdadeiro).
+	function bool_to_sl(b : boolean) return std_logic is
+	begin
+		if b then
+			return '1';
+		end if;
+		return '0';
+	end function;
 
 	-- Valor fixo do registrador misa: RV32 (MXL = 1) com extensões I e M habilitadas.
 	-- misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
@@ -107,6 +127,35 @@ architecture rtl of csr_file is
 	signal has_write_effect  : std_logic;
 	-- Indica que uma escrita normal de instrução CSR deve ser efetivada neste ciclo.
 	signal csr_write_valid   : std_logic;
+
+	-- Indica que i_addr é um endereço de contador da extensão Zicntr e o perfil a inclui.
+	signal is_cntr_addr      : std_logic;
+	-- Valor lido do contador selecionado por i_addr (zero fora dos endereços de contador).
+	signal cntr_value        : word_t;
+	-- Metade baixa de mcycle.
+	signal mcycle_lo         : word_t;
+	-- Metade alta de mcycle.
+	signal mcycle_hi         : word_t;
+	-- Metade baixa de minstret.
+	signal minstret_lo       : word_t;
+	-- Metade alta de minstret.
+	signal minstret_hi       : word_t;
+	-- Metade baixa de time.
+	signal time_lo           : word_t;
+	-- Metade alta de time.
+	signal time_hi           : word_t;
+	-- Pulso de tick do contador time.
+	signal time_tick         : std_logic;
+	-- Escrita efetiva de uma instrução CSR no endereço do contador (sem trap nem mret no ciclo).
+	signal cntr_write        : std_logic;
+	-- Escrita na metade baixa de mcycle.
+	signal mcycle_we_lo      : std_logic;
+	-- Escrita na metade alta de mcycle.
+	signal mcycle_we_hi      : std_logic;
+	-- Escrita na metade baixa de minstret.
+	signal minstret_we_lo    : std_logic;
+	-- Escrita na metade alta de minstret.
+	signal minstret_we_hi    : std_logic;
 
 	-- Sinais de habilitação e próximo valor para os flip-flops de mstatus (MIE e MPIE).
 	signal mie_we            : std_logic;
@@ -153,14 +202,14 @@ begin
 			mepc_reg      when ADDR_MEPC,
 			mcause_reg    when ADDR_MCAUSE,
 			mtval_reg     when ADDR_MTVAL,
-			(others => '0') when others;
+			cntr_value    when others;
 
 	with i_addr select
 		is_known_addr <=
 			'1' when ADDR_MSTATUS | ADDR_MISA | ADDR_MIE | ADDR_MTVEC | ADDR_MSTATUSH |
 			         ADDR_MSCRATCH | ADDR_MEPC | ADDR_MCAUSE | ADDR_MTVAL | ADDR_MIP |
 			         ADDR_MVENDORID | ADDR_MARCHID | ADDR_MIMPID | ADDR_MHARTID | ADDR_MCONFIGPTR,
-			'0' when others;
+			is_cntr_addr when others;
 
 	o_rdata <= old_value;
 	o_mtvec <= mtvec_reg;
@@ -205,6 +254,94 @@ begin
 
 	mtval_we    <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else '0';
 	mtval_nxt   <= i_trap_tval  when i_trap_take = '1' else new_value;
+
+	-- Contadores da extensão Zicntr.
+	cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
+
+	mcycle_we_lo   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLE);
+	mcycle_we_hi   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLEH);
+	minstret_we_lo <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRET);
+	minstret_we_hi <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRETH);
+
+	gen_zicntr : if has_zicntr generate
+
+		is_cntr_addr <= '1' when (i_addr = ADDR_MCYCLE or i_addr = ADDR_MCYCLEH or
+		                          i_addr = ADDR_MINSTRET or i_addr = ADDR_MINSTRETH or
+		                          i_addr = ADDR_CYCLE or i_addr = ADDR_CYCLEH or
+		                          i_addr = ADDR_TIME or i_addr = ADDR_TIMEH or
+		                          i_addr = ADDR_INSTRET or i_addr = ADDR_INSTRETH) else '0';
+
+		cntr_value <= mcycle_lo   when (i_addr = ADDR_MCYCLE or i_addr = ADDR_CYCLE) else
+		              mcycle_hi   when (i_addr = ADDR_MCYCLEH or i_addr = ADDR_CYCLEH) else
+		              minstret_lo when (i_addr = ADDR_MINSTRET or i_addr = ADDR_INSTRET) else
+		              minstret_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH) else
+		              time_lo     when i_addr = ADDR_TIME else
+		              time_hi     when i_addr = ADDR_TIMEH else
+		              (others => '0');
+
+		-- mcycle soma 1 a cada ciclo de clock do core, inclusive nos ciclos de parada.
+		u_mcycle : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => '1',
+				i_we_lo => mcycle_we_lo,
+				i_we_hi => mcycle_we_hi,
+				i_wdata => new_value,
+				o_lo    => mcycle_lo,
+				o_hi    => mcycle_hi
+			);
+
+		-- minstret soma 1 a cada instrução retirada em EX.
+		u_minstret : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => i_retire,
+				i_we_lo => minstret_we_lo,
+				i_we_hi => minstret_we_hi,
+				i_wdata => new_value,
+				o_lo    => minstret_lo,
+				o_hi    => minstret_hi
+			);
+
+		-- Divisor que gera o tick do contador time.
+		u_time_tick : entity work.tick_divider
+			generic map (
+				tick_cycles => tick_cycles
+			)
+			port map (
+				i_clk  => i_clk,
+				i_rst  => i_rst,
+				o_tick => time_tick
+			);
+
+		-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
+		u_time : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => time_tick,
+				i_we_lo => '0',
+				i_we_hi => '0',
+				i_wdata => (others => '0'),
+				o_lo    => time_lo,
+				o_hi    => time_hi
+			);
+
+	end generate gen_zicntr;
+
+	gen_no_zicntr : if not has_zicntr generate
+		is_cntr_addr <= '0';
+		cntr_value   <= (others => '0');
+		mcycle_lo    <= (others => '0');
+		mcycle_hi    <= (others => '0');
+		minstret_lo  <= (others => '0');
+		minstret_hi  <= (others => '0');
+		time_lo      <= (others => '0');
+		time_hi      <= (others => '0');
+		time_tick    <= '0';
+	end generate gen_no_zicntr;
 
 	-- Instâncias estruturais de flip_flop e generic_register para os CSRs.
 	u_mstatus_mie_ff : entity work.flip_flop

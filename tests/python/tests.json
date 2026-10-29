@@ -209,6 +209,26 @@
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_decode"
     },
+    "Counter64": {
+        "toplevel": "counter64",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Zicntr/counter64.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicntr.counter64"
+    },
+    "TickDivider": {
+        "toplevel": "tick_divider",
+        "sources": [
+            "Zicntr/tick_divider.vhd"
+        ],
+        "parameters": {
+            "tick_cycles": 4
+        },
+        "test_module": "tests.python.unittests.Zicntr.tick_divider"
+    },
     "CsrFile": {
         "toplevel": "csr_file",
         "sources": [
@@ -217,9 +237,43 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_file"
+    },
+    "CsrFileZicntr": {
+        "toplevel": "csr_file",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
+            "Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zicntr": true,
+            "tick_cycles": 4
+        },
+        "test_module": "tests.python.unittests.Zicntr.csr_file_zicntr"
+    },
+    "CsrFileNoZicntr": {
+        "toplevel": "csr_file",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
+            "Zicsr/csr_file.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicntr.csr_file_no_zicntr"
     },
     "TrapUnit": {
         "toplevel": "trap_unit",
@@ -587,6 +641,8 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.csr_misa_no_m",
@@ -630,6 +686,8 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -694,6 +752,8 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -758,6 +818,8 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -822,6 +884,8 @@
             "Zifencei/fencei_unit.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -887,6 +951,8 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
@@ -948,6 +1014,8 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
             "Zicsr/trap_unit.vhd",
             "common/forwarding_unit.vhd",
