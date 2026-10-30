@@ -3,7 +3,7 @@
 profile: rv32im_zicsr
 extensions: [I, M, Zicsr]
 top: core
-generics: {has_m: true, has_zicsr: true}
+generics: {has_m: true, has_zicsr: true, has_zicclsm: false}
 sources:
   - common/pipeline_types.vhd
   - common/byte_mask_consts.vhd

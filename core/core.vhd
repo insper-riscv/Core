@@ -393,10 +393,6 @@ begin
 		report "has_zicntr = true exige has_zicsr"
 		severity failure;
 
-	-- Sem CSRs e sem acesso desalinhado em hardware, nada trataria o acesso: a combinação é proibida.
-	assert has_zicsr or has_zicclsm
-		report "has_zicclsm = false exige has_zicsr: o acesso desalinhado precisa de trap ou de suporte em hardware"
-		severity failure;
 
 	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;

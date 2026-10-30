@@ -978,6 +978,71 @@
             "--std=08"
         ]
     },
+    "CoreTrapSignalNoZicclsm": {
+        "toplevel": "core",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
+            "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Common-Components/src/adder.vhd",
+            "Common-Components/src/mux_2x1.vhd",
+            "Common-Components/src/mux_4x1.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/utils_pkg.vhd",
+            "I/alu.vhd",
+            "Common-Components/src/onehot_decoder.vhd",
+            "Common-Components/src/mux_tree.vhd",
+            "common/reg_file.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
+            "I/misaligned_unit.vhd",
+            "common/control_unit.vhd",
+            "common/bubble_mux.vhd",
+            "M/m_decode.vhd",
+            "M/booth_multiplier_rv32.vhd",
+            "M/non_restoring_divider_rv32.vhd",
+            "M/multdiv.vhd",
+            "Zicsr/csr_decode.vhd",
+            "Zicsr/csr_addr_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
+            "Zicsr/csr_file.vhd",
+            "Zicsr/trap_unit.vhd",
+            "common/forwarding_unit.vhd",
+            "common/hazard_detection_unit.vhd",
+            "common/pc_fetch.vhd",
+            "common/reg_if_id.vhd",
+            "common/reg_id_ex.vhd",
+            "common/reg_ex_mem.vhd",
+            "common/reg_mem_wb.vhd",
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/core.vhd"
+        ],
+        "test_module": "tests.python.unittests.cores.TrapSignalNoZicclsm",
+        "parameters": {
+            "has_zicclsm": false
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
     "CoreMisaligned": {
         "toplevel": "core",
         "sources": [
