@@ -7,23 +7,23 @@ def set_inputs(dut, ifid_rs1: int, ifid_rs2: int, idex_rd: int,
                ifid_valid: int = 1,
                ifid_opcode: str = "0110011") -> None:
     # ifid_opcode default="0110011" = R-type (usa rs1 e rs2)
-    dut.ifid_rs1.value    = ifid_rs1 & 0x1F
-    dut.ifid_rs2.value    = ifid_rs2 & 0x1F
-    dut.idex_rd.value     = idex_rd & 0x1F
-    dut.idex_reRAM.value  = idex_reRAM & 0x1
-    dut.muldiv_busy.value = muldiv_busy & 0x1
-    dut.ifid_valid.value  = ifid_valid & 0x1
-    dut.ifid_opcode.value = int(ifid_opcode, 2)
+    dut.i_ifid_rs1.value    = ifid_rs1 & 0x1F
+    dut.i_ifid_rs2.value    = ifid_rs2 & 0x1F
+    dut.i_idex_rd.value     = idex_rd & 0x1F
+    dut.i_idex_re_ram.value = idex_reRAM & 0x1
+    dut.i_stall.value = muldiv_busy & 0x1
+    dut.i_ifid_valid.value  = ifid_valid & 0x1
+    dut.i_ifid_opcode.value = int(ifid_opcode, 2)
 
 
 def check_outputs(dut, exp_pc_we: int, exp_ifid_we: int, exp_bubble: int,
                   msg: str = "") -> None:
-    assert int(dut.if_pc_write_en.value) == exp_pc_we, \
-        f"{msg}: if_pc_write_en esperado={exp_pc_we} obtido={int(dut.if_pc_write_en.value)}"
-    assert int(dut.ifid_write_en.value) == exp_ifid_we, \
-        f"{msg}: ifid_write_en esperado={exp_ifid_we} obtido={int(dut.ifid_write_en.value)}"
-    assert int(dut.id_bubble_sel.value) == exp_bubble, \
-        f"{msg}: id_bubble_sel esperado={exp_bubble} obtido={int(dut.id_bubble_sel.value)}"
+    assert int(dut.o_pc_we.value) == exp_pc_we, \
+        f"{msg}: o_pc_we esperado={exp_pc_we} obtido={int(dut.o_pc_we.value)}"
+    assert int(dut.o_ifid_we.value) == exp_ifid_we, \
+        f"{msg}: o_ifid_we esperado={exp_ifid_we} obtido={int(dut.o_ifid_we.value)}"
+    assert int(dut.o_bubble_sel.value) == exp_bubble, \
+        f"{msg}: o_bubble_sel esperado={exp_bubble} obtido={int(dut.o_bubble_sel.value)}"
 
 
 @cocotb.test()

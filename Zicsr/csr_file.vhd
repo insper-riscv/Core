@@ -1,0 +1,425 @@
+-- =============================================================================
+-- Banco de registradores de controle e estado (CSRs) do Modo Máquina (Extensão Zicsr)
+--
+-- Implementa a leitura combinacional (o_rdata) e a atualização atômica dos CSRs
+-- do modo máquina (M-mode) no estágio EX quando i_commit = '1':
+--   - Operações suportadas via i_op (funct3):
+--     * CSRRW / CSRRWI (bits [1:0] = "01"): escrita direta (new = i_wdata)
+--     * CSRRS / CSRRSI (bits [1:0] = "10"): set de bits (new = old or i_wdata)
+--     * CSRRC / CSRRCI (bits [1:0] = "11"): clear de bits (new = old and not i_wdata)
+--     Nas operações RS e RC, quando i_src_zero = '1' (rs1 = x0 ou zimm = 0),
+--     nenhuma escrita efetiva é realizada.
+--   - Tratamento de Trap (i_trap_take = '1'): grava mepc, mcause e mtval, copia
+--     MIE para MPIE e zera MIE.
+--   - Retorno de Trap (i_mret_take = '1'): restaura MIE a partir de MPIE e
+--     define MPIE = '1'.
+--   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
+--     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
+--   - O misa anuncia RV32I e, quando has_m = true, a extensão M. mie e mip leem
+--     zero porque não há interrupções.
+--   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
+--     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
+--     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
+--     a cada tick_cycles ciclos. mcycle e minstret aceitam escrita; cycle, time e
+--     instret (0xC00 a 0xC82) são somente leitura. Sem has_zicntr esses endereços
+--     são inexistentes.
+--
+-- Todos os registradores de estado utilizam instâncias estruturais de
+-- generic_register e flip_flop.
+-- =============================================================================
+
+library ieee;
+use ieee.std_logic_1164.all;
+use work.pipeline_types.all;
+use work.csr_addr_consts.all;
+
+entity csr_file is
+	generic (
+		-- Faz o misa anunciar a extensão M (bit 12), para o perfil que a inclui.
+		has_m : boolean := true;
+		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time e seus espelhos).
+		has_zicntr : boolean := false;
+		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
+		tick_cycles : positive := 50
+	);
+	port (
+		-- Sinal de clock do sistema.
+		i_clk        : in  std_logic;
+		-- Sinal de reset ativo em '1'.
+		i_rst        : in  std_logic;
+		-- Habilita a efetivação da escrita de instrução CSR válida no estágio EX.
+		i_commit     : in  std_logic;
+		-- Endereço de 12 bits do registrador CSR (extraído de instr[31:20]).
+		i_addr       : in  std_logic_vector(11 downto 0);
+		-- Código funct3 que seleciona o modo da operação CSR (RW, RS, RC).
+		i_op         : in  funct3_t;
+		-- Dado de 32 bits de entrada para escrita/modificação (rs1 ou imediato zimm).
+		i_wdata      : in  word_t;
+		-- Indica que o campo fonte rs1/zimm é igual a zero (inibe escrita em RS/RC).
+		i_src_zero   : in  std_logic;
+		-- Valor atual (antigo) de 32 bits lido combinacionalmente do CSR selecionado.
+		o_rdata      : out word_t;
+		-- Indica acesso a endereço CSR não implementado ou escrita em CSR somente-leitura.
+		o_illegal    : out std_logic;
+		-- Pulso que comanda o salvamento de contexto de exceção síncrona no modo máquina.
+		i_trap_take  : in  std_logic := '0';
+		-- Código da causa da exceção a ser gravado em mcause.
+		i_trap_cause : in  word_t    := (others => '0');
+		-- Endereço PC da instrução que gerou a exceção a ser gravado em mepc.
+		i_trap_pc    : in  word_t    := (others => '0');
+		-- Valor informativo de falha (endereço desalinhado ou zero) a ser gravado em mtval.
+		i_trap_tval  : in  word_t    := (others => '0');
+		-- Pulso que comanda a execução do retorno de exceção (MRET).
+		i_mret_take  : in  std_logic := '0';
+		-- Pulso de um ciclo: uma instrução foi retirada em EX (incrementa minstret).
+		i_retire     : in  std_logic := '0';
+		-- Endereço base do tratador de traps armazenado no registrador mtvec.
+		o_mtvec      : out word_t;
+		-- Endereço de retorno de exceção armazenado no registrador mepc.
+		o_mepc       : out word_t
+	);
+end entity csr_file;
+
+architecture rtl of csr_file is
+
+	-- Converte um booleano em std_logic ('1' para verdadeiro).
+	function bool_to_sl(b : boolean) return std_logic is
+	begin
+		if b then
+			return '1';
+		end if;
+		return '0';
+	end function;
+
+	-- Valor fixo do registrador misa: RV32 (MXL = 1) com extensões I e M habilitadas.
+	-- misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
+	constant MISA_BASE       : word_t := x"40000100";
+	constant MISA_WITH_M     : word_t := x"40001100";
+
+	-- Bit MIE (bit 3) armazenado no registrador mstatus.
+	signal mstatus_mie       : std_logic;
+	-- Bit MPIE (bit 7) armazenado no registrador mstatus.
+	signal mstatus_mpie      : std_logic;
+	-- Valor registrado do CSR mtvec.
+	signal mtvec_reg         : word_t;
+	-- Valor registrado do CSR mscratch.
+	signal mscratch_reg      : word_t;
+	-- Valor registrado do CSR mepc.
+	signal mepc_reg          : word_t;
+	-- Valor registrado do CSR mcause.
+	signal mcause_reg        : word_t;
+	-- Valor registrado do CSR mtval.
+	signal mtval_reg         : word_t;
+
+	-- Palavra completa de 32 bits montada a partir dos campos de mstatus (MPP = "11", MPIE, MIE).
+	signal mstatus_value     : word_t;
+	-- Valor lido do misa, conforme as extensões do perfil.
+	signal misa_value        : word_t;
+	-- Valor lido combinacionalmente do CSR selecionado por i_addr.
+	signal old_value         : word_t;
+	-- Novo valor calculado para escrita pela operação CSR (RW, RS ou RC).
+	signal new_value         : word_t;
+	-- Indica se o endereço i_addr corresponde a um CSR reconhecido pelo hardware.
+	signal is_known_addr     : std_logic;
+	-- Indica se o endereço i_addr pertence à faixa somente-leitura (bits [11:10] = "11").
+	signal is_read_only      : std_logic;
+	-- Indica se a instrução CSR produz efeito de escrita (CSRRW ou fonte não nula).
+	signal has_write_effect  : std_logic;
+	-- Indica que uma escrita normal de instrução CSR deve ser efetivada neste ciclo.
+	signal csr_write_valid   : std_logic;
+
+	-- Indica que i_addr é um endereço de contador da extensão Zicntr e o perfil a inclui.
+	signal is_cntr_addr      : std_logic;
+	-- Valor lido do contador selecionado por i_addr (zero fora dos endereços de contador).
+	signal cntr_value        : word_t;
+	-- Metade baixa de mcycle.
+	signal mcycle_lo         : word_t;
+	-- Metade alta de mcycle.
+	signal mcycle_hi         : word_t;
+	-- Metade baixa de minstret.
+	signal minstret_lo       : word_t;
+	-- Metade alta de minstret.
+	signal minstret_hi       : word_t;
+	-- Metade baixa de time.
+	signal time_lo           : word_t;
+	-- Metade alta de time.
+	signal time_hi           : word_t;
+	-- Pulso de tick do contador time.
+	signal time_tick         : std_logic;
+	-- Escrita efetiva de uma instrução CSR no endereço do contador (sem trap nem mret no ciclo).
+	signal cntr_write        : std_logic;
+	-- Escrita na metade baixa de mcycle.
+	signal mcycle_we_lo      : std_logic;
+	-- Escrita na metade alta de mcycle.
+	signal mcycle_we_hi      : std_logic;
+	-- Escrita na metade baixa de minstret.
+	signal minstret_we_lo    : std_logic;
+	-- Escrita na metade alta de minstret.
+	signal minstret_we_hi    : std_logic;
+
+	-- Sinais de habilitação e próximo valor para os flip-flops de mstatus (MIE e MPIE).
+	signal mie_we            : std_logic;
+	-- Próximo bit a ser gravado em mstatus_mie.
+	signal mie_nxt           : std_logic;
+	-- Habilitação de escrita do bit mstatus_mpie.
+	signal mpie_we           : std_logic;
+	-- Próximo bit a ser gravado em mstatus_mpie.
+	signal mpie_nxt          : std_logic;
+
+	-- Sinais de habilitação e próximo valor para os registradores CSR de 32 bits.
+	signal mtvec_we          : std_logic;
+	-- Próximo valor alinhado para escrita em mtvec.
+	signal mtvec_nxt         : word_t;
+	-- Habilitação de escrita em mscratch.
+	signal mscratch_we       : std_logic;
+	-- Habilitação de escrita em mepc (por trap ou instrução CSR).
+	signal mepc_we           : std_logic;
+	-- Próximo valor alinhado para escrita em mepc.
+	signal mepc_nxt          : word_t;
+	-- Habilitação de escrita em mcause (por trap ou instrução CSR).
+	signal mcause_we         : std_logic;
+	-- Próximo valor para escrita em mcause.
+	signal mcause_nxt        : word_t;
+	-- Habilitação de escrita em mtval (por trap ou instrução CSR).
+	signal mtval_we          : std_logic;
+	-- Próximo valor para escrita em mtval.
+	signal mtval_nxt         : word_t;
+
+begin
+
+	-- Montagem da palavra mstatus: MPP (bits [12:11]) fixo em "11" (Machine Mode).
+	misa_value    <= MISA_WITH_M when has_m else MISA_BASE;
+
+	mstatus_value <= (12 => '1', 11 => '1', 7 => mstatus_mpie, 3 => mstatus_mie, others => '0');
+
+	-- Seleção combinacional de leitura do CSR.
+	with i_addr select
+		old_value <=
+			mstatus_value when ADDR_MSTATUS,
+			misa_value    when ADDR_MISA,
+			mtvec_reg     when ADDR_MTVEC,
+			mscratch_reg  when ADDR_MSCRATCH,
+			mepc_reg      when ADDR_MEPC,
+			mcause_reg    when ADDR_MCAUSE,
+			mtval_reg     when ADDR_MTVAL,
+			cntr_value    when others;
+
+	with i_addr select
+		is_known_addr <=
+			'1' when ADDR_MSTATUS | ADDR_MISA | ADDR_MIE | ADDR_MTVEC | ADDR_MSTATUSH |
+			         ADDR_MSCRATCH | ADDR_MEPC | ADDR_MCAUSE | ADDR_MTVAL | ADDR_MIP |
+			         ADDR_MVENDORID | ADDR_MARCHID | ADDR_MIMPID | ADDR_MHARTID | ADDR_MCONFIGPTR,
+			is_cntr_addr when others;
+
+	o_rdata <= old_value;
+	o_mtvec <= mtvec_reg;
+	o_mepc  <= mepc_reg;
+
+	-- Cálculo do valor modificado conforme os bits [1:0] de i_op (01=RW, 10=RS, 11=RC).
+	with i_op(1 downto 0) select
+		new_value <=
+			i_wdata                     when "01",
+			old_value or i_wdata        when "10",
+			old_value and (not i_wdata) when others;
+
+	has_write_effect <= '1' when (i_op(1 downto 0) = "01" or i_src_zero = '0') else '0';
+	is_read_only     <= '1' when i_addr(11 downto 10) = "11" else '0';
+	o_illegal        <= (not is_known_addr) or (has_write_effect and is_read_only);
+
+	csr_write_valid  <= '1' when (i_commit = '1' and has_write_effect = '1' and is_known_addr = '1' and is_read_only = '0') else '0';
+
+	-- Controle de atualização de mstatus.MIE e mstatus.MPIE (prioridade: trap_take > mret_take > escrita CSR).
+	mie_we  <= '1' when (i_trap_take = '1' or i_mret_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MSTATUS)) else '0';
+	mie_nxt <= '0'          when i_trap_take = '1' else
+	           mstatus_mpie when i_mret_take = '1' else
+	           new_value(3);
+
+	mpie_we  <= mie_we;
+	mpie_nxt <= mstatus_mie when i_trap_take = '1' else
+	            '1'         when i_mret_take = '1' else
+	            new_value(7);
+
+	-- Controle de atualização dos CSRs de 32 bits.
+	mtvec_we    <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and i_mret_take = '0') else '0';
+	mtvec_nxt   <= new_value(31 downto 2) & "00";
+
+	mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and i_mret_take = '0') else '0';
+
+	mepc_we     <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else '0';
+	mepc_nxt    <= i_trap_pc(31 downto 2) & "00" when i_trap_take = '1' else
+	               new_value(31 downto 2) & "00";
+
+	mcause_we   <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else '0';
+	mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;
+
+	mtval_we    <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else '0';
+	mtval_nxt   <= i_trap_tval  when i_trap_take = '1' else new_value;
+
+	-- Contadores da extensão Zicntr.
+	cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
+
+	mcycle_we_lo   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLE);
+	mcycle_we_hi   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLEH);
+	minstret_we_lo <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRET);
+	minstret_we_hi <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRETH);
+
+	gen_zicntr : if has_zicntr generate
+
+		is_cntr_addr <= '1' when (i_addr = ADDR_MCYCLE or i_addr = ADDR_MCYCLEH or
+		                          i_addr = ADDR_MINSTRET or i_addr = ADDR_MINSTRETH or
+		                          i_addr = ADDR_CYCLE or i_addr = ADDR_CYCLEH or
+		                          i_addr = ADDR_TIME or i_addr = ADDR_TIMEH or
+		                          i_addr = ADDR_INSTRET or i_addr = ADDR_INSTRETH) else '0';
+
+		cntr_value <= mcycle_lo   when (i_addr = ADDR_MCYCLE or i_addr = ADDR_CYCLE) else
+		              mcycle_hi   when (i_addr = ADDR_MCYCLEH or i_addr = ADDR_CYCLEH) else
+		              minstret_lo when (i_addr = ADDR_MINSTRET or i_addr = ADDR_INSTRET) else
+		              minstret_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH) else
+		              time_lo     when i_addr = ADDR_TIME else
+		              time_hi     when i_addr = ADDR_TIMEH else
+		              (others => '0');
+
+		-- mcycle soma 1 a cada ciclo de clock do core, inclusive nos ciclos de parada.
+		u_mcycle : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => '1',
+				i_we_lo => mcycle_we_lo,
+				i_we_hi => mcycle_we_hi,
+				i_wdata => new_value,
+				o_lo    => mcycle_lo,
+				o_hi    => mcycle_hi
+			);
+
+		-- minstret soma 1 a cada instrução retirada em EX.
+		u_minstret : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => i_retire,
+				i_we_lo => minstret_we_lo,
+				i_we_hi => minstret_we_hi,
+				i_wdata => new_value,
+				o_lo    => minstret_lo,
+				o_hi    => minstret_hi
+			);
+
+		-- Divisor que gera o tick do contador time.
+		u_time_tick : entity work.tick_divider
+			generic map (
+				tick_cycles => tick_cycles
+			)
+			port map (
+				i_clk  => i_clk,
+				i_rst  => i_rst,
+				o_tick => time_tick
+			);
+
+		-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
+		u_time : entity work.counter64
+			port map (
+				i_clk   => i_clk,
+				i_rst   => i_rst,
+				i_inc   => time_tick,
+				i_we_lo => '0',
+				i_we_hi => '0',
+				i_wdata => (others => '0'),
+				o_lo    => time_lo,
+				o_hi    => time_hi
+			);
+
+	end generate gen_zicntr;
+
+	gen_no_zicntr : if not has_zicntr generate
+		is_cntr_addr <= '0';
+		cntr_value   <= (others => '0');
+		mcycle_lo    <= (others => '0');
+		mcycle_hi    <= (others => '0');
+		minstret_lo  <= (others => '0');
+		minstret_hi  <= (others => '0');
+		time_lo      <= (others => '0');
+		time_hi      <= (others => '0');
+		time_tick    <= '0';
+	end generate gen_no_zicntr;
+
+	-- Instâncias estruturais de flip_flop e generic_register para os CSRs.
+	u_mstatus_mie_ff : entity work.flip_flop
+		port map (
+			i_d      => mie_nxt,
+			o_d      => mstatus_mie,
+			i_enable => mie_we,
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
+	u_mstatus_mpie_ff : entity work.flip_flop
+		port map (
+			i_d      => mpie_nxt,
+			o_d      => mstatus_mpie,
+			i_enable => mpie_we,
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
+	u_mtvec_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => mtvec_we,
+			i_d      => mtvec_nxt,
+			o_d      => mtvec_reg
+		);
+
+	u_mscratch_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => mscratch_we,
+			i_d      => new_value,
+			o_d      => mscratch_reg
+		);
+
+	u_mepc_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => mepc_we,
+			i_d      => mepc_nxt,
+			o_d      => mepc_reg
+		);
+
+	u_mcause_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => mcause_we,
+			i_d      => mcause_nxt,
+			o_d      => mcause_reg
+		);
+
+	u_mtval_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => mtval_we,
+			i_d      => mtval_nxt,
+			o_d      => mtval_reg
+		);
+
+end architecture rtl;

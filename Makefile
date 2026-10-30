@@ -3,27 +3,36 @@ GHDL  := ghdl
 STD   := --std=08
 WDIR  := build/ghdl
 
-VHDL := $(shell find common I M cores -name '*.vhd' | sort)
+VHDL := $(shell find common I M Zicsr Zicntr Zifencei core -name '*.vhd' | sort) $(sort $(wildcard Common-Components/src/*.vhd))
 
-.PHONY: check profiles test paths clean
+.PHONY: check profiles profile-matrix test paths clean
 
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
 	@mkdir -p $(WDIR)
-	@$(GHDL) -a $(STD) --work=work --workdir=$(WDIR) $$(uv run riscv-tools vhdl-sort $(VHDL))
+	@$(GHDL) -a $(STD) -Wno-library --work=work --workdir=$(WDIR) $$(uv run riscv-tools vhdl-sort $(VHDL))
 	@echo "VHDL syntax check passed"
 
 # Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml,
 # a flat `- path` list) and elaborate the top with the profile's generic. rv32i
-# has no M/ files, which proves the core builds without them.
-profiles:
-	@for p in rv32i rv32im; do \
+# has no M/ files, which proves the core builds without them, and the last profile has every
+# extension. GHDL 6 takes the generic at run time, so each profile is elaborated and run for 1 ns.
+profiles: profile-matrix
+	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicsr_zifencei rv32im_zicclsm_zicntr_zifencei; do \
 	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
-	  has_m=$$(sed -n 's/^generics: {HAS_M: \(.*\)}/\1/p' profiles/$$p.yaml); \
+	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
 	  $(GHDL) -a $(STD) --workdir=$$dir $$srcs && \
-	  $(GHDL) -e $(STD) --workdir=$$dir -gHAS_M=$$has_m rv32im_pipeline_core \
-	  && echo "profile $$p builds (HAS_M=$$has_m)" || exit 1; \
+	  $(GHDL) --elab-run $(STD) --workdir=$$dir -o $$dir/core core $$gens --stop-time=1ns >/dev/null 2>&1 \
+	  && echo "profile $$p builds ($$gens)" || { echo "profile $$p FAILED"; exit 1; }; \
+	done
+
+# Every profile of profiles/matrix.yaml (riscv-tools profiles) elaborates with its generics, on the
+# sources `check` analyzed.
+profile-matrix: check
+	@uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics | while read -r name gens; do \
+	  $(GHDL) --elab-run $(STD) --workdir=$(WDIR) -o $(WDIR)/matrix core $$gens --stop-time=1ns >/dev/null 2>&1 \
+	  && echo "matrix $$name builds" || { echo "matrix $$name FAILED ($$gens)"; exit 1; }; \
 	done
 
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
