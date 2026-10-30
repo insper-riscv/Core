@@ -3,7 +3,7 @@
 profile: rv32i_zmmul
 extensions: [I, Zmmul]
 top: core
-generics: {has_zmmul: true}
+generics: {has_zmmul: true, has_zicclsm: false}
 sources:
   - common/pipeline_types.vhd
   - common/byte_mask_consts.vhd

@@ -4,7 +4,7 @@
 profile: rv32i
 extensions: [I]
 top: core
-generics: {has_m: false}
+generics: {has_m: false, has_zicclsm: false}
 sources:
   - common/pipeline_types.vhd
   - common/byte_mask_consts.vhd
