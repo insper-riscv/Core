@@ -48,8 +48,8 @@ The structural top level `core` takes one boolean generic per extension, which e
 A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The list of profiles comes from `profiles/matrix.yaml`:
 
 ```bash
-uv run riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
-uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and GHDL -g flags
+riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
+riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and GHDL -g flags
 make profile-matrix                                                        # elaborate each profile with its generics
 ```
 

@@ -48,8 +48,8 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e o core precisa de Zicsr ou de Zicclsm, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. A lista de perfis vem de `profiles/matrix.yaml`:
 
 ```bash
-uv run riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
-uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e flags -g do GHDL
+riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
+riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e flags -g do GHDL
 make profile-matrix                                                        # elabora cada perfil com seus generics
 ```
 
