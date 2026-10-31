@@ -6,7 +6,7 @@
 -- unidades de extensão do estágio EX:
 --   1. Unidade de adiantamento (forwarding_unit) e muxes de operandos rs1/rs2.
 --   2. ULA principal (alu) e somadores de endereço-alvo de branch/JAL e JALR.
---   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true).
+--   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true; só a multiplicação quando has_zmmul = true).
 --   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando has_zicsr = true).
 --   5. Unidade de sincronização FENCE.I (fencei_unit, quando has_zifencei = true).
 --   6. Gerenciador de alinhamento de escrita em memória (store_manager).
@@ -19,16 +19,28 @@ use work.opcode_consts.all;
 
 entity stage_ex is
 	generic (
-		-- Habilita a instância da unidade de multiplicação e divisão (multdiv).
+		-- Habilita a unidade de multiplicação e divisão (multdiv) completa.
 		has_m        : boolean := false;
+		-- Habilita a multiplicação sem o divisor (extensão Zmmul); has_m já a inclui.
+		has_zmmul    : boolean := false;
 		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
 		has_zicsr    : boolean := false;
+		-- Habilita os contadores da extensão Zicntr no banco de CSRs; exige has_zicsr.
+		has_zicntr   : boolean := false;
+		-- Ciclos de clock do core por tick do contador time.
+		tick_cycles  : positive := 50;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
 		has_zifencei : boolean := false;
+		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
+		has_zicclsm  : boolean := true;
 		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
-		has_dcache   : boolean := false
+		has_dcache   : boolean := false;
+		-- Quantidade de contadores de eventos da extensão Zihpm no banco de CSRs (0 = sem Zihpm); exige has_zicsr.
+		hpm_counters : natural range 0 to 4 := 0
 	);
 	port (
+		-- Vetor de eventos do SoC: o bit K vale '1' nos ciclos do evento de código K (contadores do Zihpm).
+		i_hpm_events      : in  std_logic_vector(15 downto 0) := (others => '0');
 		-- Sinal de clock principal do processador.
 		i_clk             : in  std_logic;
 		-- Sinal de reset ativo em '1'.
@@ -39,6 +51,8 @@ entity stage_ex is
 		i_pipe_run        : in  std_logic;
 		-- Bit de validade da instrução no estágio EX.
 		i_valid           : in  std_logic;
+		-- Pulso de um ciclo: uma instrução foi retirada em EX (incrementa minstret com Zicntr).
+		i_retire          : in  std_logic := '0';
 		-- Endereço PC da instrução no estágio EX.
 		i_pc              : in  word_t;
 		-- Valor PC + 4 da instrução no estágio EX.
@@ -63,10 +77,14 @@ entity stage_ex is
 		i_sel_pc_rs1      : in  std_logic;
 		-- Código de operação da ULA.
 		i_alu_op          : in  alu_op_t;
+		-- Seleção one-hot do resultado da ULA vinda do registrador ID/EX.
+		i_alu_sel         : in  alu_sel_t;
 		-- Indica que a instrução em EX pertence à extensão M (decodificado no ID).
 		i_is_muldiv       : in  std_logic;
 		-- Indica que a instrução em EX pertence à extensão Zicsr (decodificado no ID).
 		i_is_csr          : in  std_logic;
+		-- Indica instrução inexistente em EX ('1' = ilegal; só gera exceção com has_zicsr).
+		i_illegal         : in  std_logic;
 		-- Campo opcode da instrução no estágio EX.
 		i_opcode          : in  opcode_t;
 		-- Campo funct3 da instrução no estágio EX.
@@ -85,10 +103,24 @@ entity stage_ex is
 		i_memwb_we_reg    : in  std_logic;
 		-- Bit de validade da instrução no estágio MEM/WB.
 		i_memwb_valid     : in  std_logic;
-		-- Dado final do estágio WB para adiantamento (forwarding).
-		i_wb_data         : in  word_t;
+		-- Resultado do estágio EX da instrução em MEM/WB (registrado), para adiantamento. Um load nunca é adiantado daqui.
+		i_memwb_alu_out   : in  word_t;
+		-- Índice do registrador destino rd da instrução no registrador WB2 (para forwarding).
+		i_wb2_rd          : in  reg_t;
+		-- Habilitação de escrita em registrador da instrução no registrador WB2.
+		i_wb2_we_reg      : in  std_logic;
+		-- Dado final do estágio WB já registrado (WB2), para adiantamento (forwarding).
+		i_wb2_data        : in  word_t;
 		-- Confirmação de término do flush da cache de dados write-back (Zifencei).
 		i_dc_done         : in  std_logic;
+		-- Exceção de endereço do acesso à memória do estágio MEM: tem prioridade sobre a deste estágio.
+		i_mem_trap_take   : in  std_logic := '0';
+		-- Código mcause da exceção do estágio MEM.
+		i_mem_trap_cause  : in  word_t    := (others => '0');
+		-- PC da instrução em MEM que gerou a exceção (vira o mepc).
+		i_mem_trap_pc     : in  word_t    := (others => '0');
+		-- Valor de mtval da exceção do estágio MEM.
+		i_mem_trap_tval   : in  word_t    := (others => '0');
 		-- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
 		o_final_result    : out word_t;
 		-- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
@@ -107,6 +139,12 @@ entity stage_ex is
 		o_redirect_pc     : out word_t;
 		-- Pulso que indica tomada de exceção síncrona no estágio EX.
 		o_trap_take       : out std_logic;
+		-- Pulso que sinaliza uma exceção detectada em EX sem Zicsr (o core não tem CSRs para registrá-la).
+		o_trap_sig        : out std_logic;
+		-- Código de causa da exceção sinalizada, no formato do mcause (zero com Zicsr).
+		o_trap_sig_cause  : out word_t;
+		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
+		o_trap_sig_pc     : out word_t;
 		-- Pulso que indica execução de retorno de exceção (MRET) no estágio EX.
 		o_mret_take       : out std_logic;
 		-- Pulso que indica conclusão de instrução FENCE.I no estágio EX.
@@ -123,6 +161,9 @@ end entity stage_ex;
 architecture rtl of stage_ex is
 
 	component multdiv is
+		generic (
+			has_div     : boolean := true
+		);
 		port (
 			i_clk       : in  std_logic;
 			i_rst       : in  std_logic := '0';
@@ -139,6 +180,12 @@ architecture rtl of stage_ex is
 	end component;
 
 	component csr_file is
+		generic (
+			has_m       : boolean := true;
+			has_zicntr  : boolean := false;
+			tick_cycles : positive := 50;
+			hpm_counters : natural range 0 to 4 := 0
+		);
 		port (
 			i_clk        : in  std_logic;
 			i_rst        : in  std_logic;
@@ -154,12 +201,19 @@ architecture rtl of stage_ex is
 			i_trap_pc    : in  word_t;
 			i_trap_tval  : in  word_t;
 			i_mret_take  : in  std_logic;
+			i_retire     : in  std_logic;
+			i_retire_cancel : in std_logic;
+			i_events     : in  std_logic_vector(15 downto 0);
 			o_mtvec      : out word_t;
 			o_mepc       : out word_t
 		);
 	end component;
 
 	component trap_unit is
+		generic (
+			has_zicclsm   : boolean := true;
+			check_ea      : boolean := true
+		);
 		port (
 			i_ex_valid    : in  std_logic;
 			i_run         : in  std_logic;
@@ -172,6 +226,7 @@ architecture rtl of stage_ex is
 			i_cf_taken    : in  std_logic;
 			i_cf_target   : in  word_t;
 			i_csr_illegal : in  std_logic;
+			i_illegal     : in  std_logic;
 			o_take        : out std_logic;
 			o_mret_take   : out std_logic;
 			o_cause       : out word_t;
@@ -222,6 +277,14 @@ architecture rtl of stage_ex is
 
 	-- Sinais internos da extensão Zicsr e Trap Unit.
 	signal csr_commit         : std_logic;
+	-- Pulso de exceção entregue ao banco de CSRs: a deste estágio ou a do estágio MEM.
+	signal csr_trap_take      : std_logic;
+	-- Causa da exceção entregue ao banco de CSRs.
+	signal csr_trap_cause     : word_t;
+	-- PC da instrução que gerou a exceção entregue ao banco de CSRs.
+	signal csr_trap_pc        : word_t;
+	-- Valor de mtval da exceção entregue ao banco de CSRs.
+	signal csr_trap_tval      : word_t;
 	-- Indica que o campo rs1/zimm da instrução CSR é igual a zero.
 	signal csr_src_zero       : std_logic;
 	-- Dado de 32 bits para escrita/modificação no CSR.
@@ -232,6 +295,14 @@ architecture rtl of stage_ex is
 	signal csr_illegal        : std_logic;
 	-- Pulso interno de tomada de trap síncrono.
 	signal trap_take_int      : std_logic;
+	-- Exceção detectada sem Zicsr: sinalizada na saída, sem redirecionar o PC.
+	signal sig_take           : std_logic;
+	-- Causa da exceção sinalizada sem Zicsr.
+	signal sig_cause          : word_t;
+	-- Valor adicional da exceção sinalizada sem Zicsr (não exportado: o core sem CSRs não tem mtval).
+	signal sig_tval           : word_t;
+	-- Saída de MRET do detector sem Zicsr (descartada: sem modo M não há retorno de trap).
+	signal sig_mret           : std_logic;
 	-- Pulso interno de retorno de trap (MRET).
 	signal mret_take_int      : std_logic;
 	-- Código da causa da exceção síncrona.
@@ -276,6 +347,8 @@ begin
 			i_exmem_we_reg => exmem_we_reg_fwd,
 			i_memwb_rd     => i_memwb_rd,
 			i_memwb_we_reg => memwb_we_reg_fwd,
+			i_wb2_rd       => i_wb2_rd,
+			i_wb2_we_reg   => i_wb2_we_reg,
 			o_fwd_rs1      => ex_forward_a,
 			o_fwd_rs2      => ex_forward_b
 		);
@@ -286,9 +359,9 @@ begin
 		)
 		port map (
 			i_d0  => i_rs1_val,
-			i_d1  => i_wb_data,
+			i_d1  => i_memwb_alu_out,
 			i_d2  => i_exmem_alu_out,
-			i_d3  => i_rs1_val,
+			i_d3  => i_wb2_data,
 			i_sel => ex_forward_a,
 			o_d   => ex_fwd_rs1_val
 		);
@@ -299,9 +372,9 @@ begin
 		)
 		port map (
 			i_d0  => i_rs2_val,
-			i_d1  => i_wb_data,
+			i_d1  => i_memwb_alu_out,
 			i_d2  => i_exmem_alu_out,
-			i_d3  => i_rs2_val,
+			i_d3  => i_wb2_data,
 			i_sel => ex_forward_b,
 			o_d   => ex_fwd_rs2_val
 		);
@@ -334,6 +407,7 @@ begin
 	u_alu : entity work.alu
 		port map (
 			i_op     => i_alu_op,
+			i_res_sel => i_alu_sel,
 			i_a      => ex_alu_op_a,
 			i_b      => ex_alu_op_b,
 			o_d      => ex_alu_result,
@@ -343,8 +417,11 @@ begin
 	-- =========================================================================
 	-- Extensão M: Multiplicação e Divisão Inteira (multdiv)
 	-- =========================================================================
-	gen_m : if has_m generate
+	gen_m : if (has_m or has_zmmul) generate
 		u_muldiv : multdiv
+			generic map (
+				has_div => has_m
+			)
 			port map (
 				i_clk       => i_clk,
 				i_rst       => i_rst,
@@ -395,12 +472,24 @@ begin
 	-- Extensão Zicsr e Detecção de Traps do Modo Máquina
 	-- =========================================================================
 	gen_csr : if has_zicsr generate
+		-- A exceção do estágio MEM é de uma instrução mais antiga: vale no lugar da deste estágio.
+		csr_trap_take  <= trap_take_int or i_mem_trap_take;
+		csr_trap_cause <= i_mem_trap_cause when i_mem_trap_take = '1' else trap_cause;
+		csr_trap_pc    <= i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc;
+		csr_trap_tval  <= i_mem_trap_tval  when i_mem_trap_take = '1' else trap_tval;
+
 		csr_commit   <= i_is_csr and i_valid and i_pipe_run;
 		csr_src_zero <= '1' when i_rs1_idx = REG_ZERO else '0';
 		csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
 		                (31 downto 5 => '0') & i_rs1_idx;
 
 		u_csr_file : csr_file
+			generic map (
+				has_m       => has_m,
+				has_zicntr  => has_zicntr,
+				tick_cycles => tick_cycles,
+				hpm_counters => hpm_counters
+			)
 			port map (
 				i_clk        => i_clk,
 				i_rst        => i_rst,
@@ -411,11 +500,14 @@ begin
 				i_src_zero   => csr_src_zero,
 				o_rdata      => csr_rdata,
 				o_illegal    => csr_illegal,
-				i_trap_take  => trap_take_int,
-				i_trap_cause => trap_cause,
-				i_trap_pc    => i_pc,
-				i_trap_tval  => trap_tval,
+				i_trap_take  => csr_trap_take,
+				i_trap_cause => csr_trap_cause,
+				i_trap_pc    => csr_trap_pc,
+				i_trap_tval  => csr_trap_tval,
 				i_mret_take  => mret_take_int,
+				i_retire     => i_retire,
+				i_retire_cancel => i_mem_trap_take,
+				i_events     => i_hpm_events,
 				o_mtvec      => csr_mtvec,
 				o_mepc       => csr_mepc
 			);
@@ -423,7 +515,41 @@ begin
 		ex_cf_taken  <= branch_taken_int or jalr_taken_int;
 		ex_cf_target <= ex_alu_result when jalr_taken_int = '1' else branch_target_int;
 
+		sig_take  <= '0';
+		sig_cause <= (others => '0');
+		sig_tval  <= (others => '0');
+		sig_mret  <= '0';
+
 		u_trap_unit : trap_unit
+			generic map (
+				has_zicclsm => has_zicclsm,
+				check_ea    => false
+			)
+			port map (
+				i_ex_valid    => i_valid,
+				i_run         => i_pipe_run,
+				i_opcode      => i_opcode,
+				i_funct3      => i_funct3,
+				i_rd_idx      => i_rd_idx,
+				i_rs1_idx     => i_rs1_idx,
+				i_imm12       => i_imm(11 downto 0),
+				i_ea          => (others => '0'),
+				i_cf_taken    => ex_cf_taken,
+				i_cf_target   => ex_cf_target,
+				i_csr_illegal => csr_illegal,
+				i_illegal     => i_illegal,
+				o_take        => trap_take_int,
+				o_mret_take   => mret_take_int,
+				o_cause       => trap_cause,
+				o_tval        => trap_tval
+			);
+	else generate
+		-- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
+		u_trap_detect : trap_unit
+			generic map (
+				has_zicclsm => has_zicclsm,
+				check_ea    => true
+			)
 			port map (
 				i_ex_valid    => i_valid,
 				i_run         => i_pipe_run,
@@ -433,15 +559,16 @@ begin
 				i_rs1_idx     => i_rs1_idx,
 				i_imm12       => i_imm(11 downto 0),
 				i_ea          => ex_alu_result,
-				i_cf_taken    => ex_cf_taken,
-				i_cf_target   => ex_cf_target,
-				i_csr_illegal => csr_illegal,
-				o_take        => trap_take_int,
-				o_mret_take   => mret_take_int,
-				o_cause       => trap_cause,
-				o_tval        => trap_tval
+				i_cf_taken    => '0',
+				i_cf_target   => (others => '0'),
+				i_csr_illegal => '1',
+				i_illegal     => i_illegal,
+				o_take        => sig_take,
+				o_mret_take   => sig_mret,
+				o_cause       => sig_cause,
+				o_tval        => sig_tval
 			);
-	else generate
+
 		trap_take_int <= '0';
 		mret_take_int <= '0';
 		trap_cause    <= (others => '0');
@@ -458,6 +585,9 @@ begin
 	end generate gen_csr;
 
 	o_trap_take   <= trap_take_int;
+	o_trap_sig       <= sig_take;
+	o_trap_sig_cause <= sig_cause when sig_take = '1' else (others => '0');
+	o_trap_sig_pc    <= i_pc      when sig_take = '1' else (others => '0');
 	o_mret_take   <= mret_take_int;
 
 	o_redirect_pc <= csr_mepc when mret_take_int   = '1' else

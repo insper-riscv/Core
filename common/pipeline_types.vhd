@@ -29,14 +29,17 @@ package pipeline_types is
   -- Código de operação da ULA (5 bits).
   subtype alu_op_t  is std_logic_vector(4 downto 0);
 
+  -- Seleção one-hot do resultado de dados da ULA (8 bits), decodificada no estágio ID a partir de alu_op_t.
+  subtype alu_sel_t is std_logic_vector(7 downto 0);
+
   -- Seletor de formato do extensor de imediato (3 bits).
   subtype ext_imm_op_t is std_logic_vector(2 downto 0);
 
   -- Seletor de modo de extensão de leitura da memória de dados (3 bits).
   subtype ext_ram_op_t is std_logic_vector(2 downto 0);
 
-  -- Seletor de fonte para escrita no estágio WB (2 bits).
-  subtype wb_sel_t     is std_logic_vector(1 downto 0);
+  -- Seletor de fonte para escrita no estágio WB (1 bit: 0 = resultado de EX, 1 = dado lido da memória).
+  subtype wb_sel_t     is std_logic_vector(0 downto 0);
 
   -- Seletor de fonte do próximo valor de PC no estágio IF (2 bits).
   subtype pc_src_t     is std_logic_vector(1 downto 0);

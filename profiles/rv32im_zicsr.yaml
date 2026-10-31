@@ -3,9 +3,10 @@
 profile: rv32im_zicsr
 extensions: [I, M, Zicsr]
 top: core
-generics: {has_m: true, has_zicsr: true}
+generics: {has_m: true, has_zicsr: true, has_zicclsm: false}
 sources:
   - common/pipeline_types.vhd
+  - common/byte_mask_consts.vhd
   - common/opcode_consts.vhd
   - common/funct3_consts.vhd
   - common/funct7_consts.vhd
@@ -15,19 +16,20 @@ sources:
   - common/wb_sel_consts.vhd
   - common/pc_src_consts.vhd
   - common/mem_map_consts.vhd
-  - common/generic_register.vhd
-  - common/adder.vhd
-  - common/mux_2x1.vhd
-  - common/mux_4x1.vhd
-  - common/flip_flop.vhd
-  - common/utils_pkg.vhd
+  - Common-Components/src/generic_register.vhd
+  - Common-Components/src/adder.vhd
+  - Common-Components/src/mux_2x1.vhd
+  - Common-Components/src/mux_4x1.vhd
+  - Common-Components/src/flip_flop.vhd
+  - Common-Components/src/utils_pkg.vhd
   - I/alu.vhd
-  - common/onehot_decoder.vhd
-  - common/mux_tree.vhd
+  - Common-Components/src/onehot_decoder.vhd
+  - Common-Components/src/mux_tree.vhd
   - common/reg_file.vhd
   - I/extender_imm.vhd
   - I/extender_ram.vhd
   - I/store_manager.vhd
+  - I/misaligned_unit.vhd
   - common/control_unit.vhd
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd
@@ -37,6 +39,10 @@ sources:
   - M/non_restoring_divider_rv32.vhd
   - M/multdiv.vhd
   - Zicsr/csr_decode.vhd
+  - Zicsr/csr_addr_consts.vhd
+  - Zicsr/csr_event_consts.vhd
+  - Zicntr/counter64.vhd
+  - Zicntr/tick_divider.vhd
   - Zicsr/csr_file.vhd
   - Zicsr/trap_unit.vhd
   - common/pc_fetch.vhd

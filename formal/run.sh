@@ -14,17 +14,23 @@ expect() {
   else printf '  WRONG %-62s wanted %s, got %s\n' "$1" "$2" "$3"; fail=1; fi
 }
 
-# netlist <vhdl> <entity> <name>: the Verilog netlist GHDL synthesizes for the entity.
+# netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity.
 netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
   ghdl -a --std=08 --workdir="$work" \
     "$root/common/pipeline_types.vhd" \
+    "$root/common/byte_mask_consts.vhd" \
     "$root/common/opcode_consts.vhd" \
     "$root/common/funct3_consts.vhd" \
-    "$root/common/flip_flop.vhd" \
-    "$root/common/generic_register.vhd" \
+    "$root/Common-Components/src/flip_flop.vhd" \
+    "$root/Common-Components/src/generic_register.vhd" \
+    "$root/common/mem_map_consts.vhd" \
+    "$root/Zicsr/csr_addr_consts.vhd" \
+    "$root/Zicsr/csr_event_consts.vhd" \
+    "$root/Zicntr/counter64.vhd" \
+    "$root/Zicntr/tick_divider.vhd" \
     "$1"
-  ghdl --synth --std=08 --workdir="$work" --out=verilog "$2" > "$3.v"
+  ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
 
 # prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS or FAIL
@@ -59,14 +65,44 @@ echo "trap_unit"
 netlist "$trap" trap_unit trap
 expect "causes, mtval, MRET, ecall/ebreak/wfi, aligned accesses (induction)" PASS "$(prove trap.v "$trap_props" prove 2 ''        trap_safety)"
 expect "cover: every cause and MRET are reachable"                           PASS "$(prove trap.v "$trap_props" cover 2 '-DCOVER' trap_cover)"
+expect "Zicclsm: misaligned in the main memory runs, outside it traps (induction)" PASS "$(prove trap.v "$trap_props" prove 2 '-DZICCLSM_ON' trap_zicclsm_on)"
+netlist "$trap" trap_unit trap_noea -gcheck_ea=false
+expect "no address check: causes 4 and 6 never occur (induction)"             PASS "$(prove trap_noea.v "$trap_props" prove 2 '-DCHECK_EA_OFF' trap_noea_safety)"
+netlist "$trap" trap_unit trap_off -gHAS_ZICCLSM=false
+expect "no Zicclsm: every misaligned access traps (induction)"                PASS "$(prove trap_off.v "$trap_props" prove 2 '-DZICCLSM_OFF' trap_zicclsm_off)"
+netlist "$trap" trap_unit trap_ext -gext_flash=true
+expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (induction)" PASS "$(prove trap_ext.v "$trap_props" prove 2 '-DZICCLSM_ON -DEXT_FLASH' trap_zicclsm_ext)"
+
+echo "counter64"
+cnt="$root/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
+netlist "$cnt" counter64 cnt
+expect "the value shown is the ideal 64-bit counter, carry and writes (induction)" PASS "$(prove cnt.v "$cnt_props" prove 4 ''           cnt_safety)"
+expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
+expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
+
+echo "csr_file with Zicntr"
+netlist "$csr" csr_file csrc "-ghas_zicntr=true -gtick_cycles=3"
+csr_cntr_props="$root/formal/csr_cntr_props.sv"
+# The counters' own state is internal to the unit that counter64 already proves, so this proof is bounded from reset: it checks the wiring (addresses, halves, write path, legality).
+expect "mcycle/minstret follow the 64-bit models, writes per half, read-only mirrors (bounded, 6 cycles)" PASS "$(prove csrc.v "$csr_cntr_props" bmc 6 ''           csrc_safety)"
+expect "cover: a write at the carry point and a write with a retire are reachable"                PASS "$(prove csrc.v "$csr_cntr_props" cover 12 '-DCOVER' csrc_cover)"
+
+echo "csr_file with Zihpm"
+csr_hpm_props="$root/formal/csr_hpm_props.sv"
+netlist "$csr" csr_file csrh "-ghpm_counters=4"
+# The event counters share the counter64 already proven, so this proof is bounded from reset: it checks the wiring (addresses, halves, event selection, inhibit bits, write path, legality).
+expect "events, inhibit, selectors and counters follow the models, mirrors read-only (bounded, 6 cycles)" PASS "$(prove csrh.v "$csr_hpm_props" bmc 6 '-DNHPM=4' csrh_safety)"
+expect "cover: a count at the carry point, an inhibited event and a write with a count are reachable"  PASS "$(prove csrh.v "$csr_hpm_props" cover 12 '-DNHPM=4 -DCOVER' csrh_cover)"
+netlist "$csr" csr_file csrh2 "-ghpm_counters=2 -ghas_zicntr=true -gtick_cycles=3"
+expect "two event counters with Zicntr: the other two are illegal, mcycle/minstret own bits 0 and 2 (bounded, 6 cycles)" PASS "$(prove csrh2.v "$csr_hpm_props" bmc 6 '-DNHPM=2 -DHAS_CNTR' csrh2_safety)"
 
 # Mutants of the VHDL: each defect must make a proof fail.
-mutant() {  # <file> <props> <entity> <defines> <name> <sed expression>
+mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl generics] [bmc depth]
   local copy="$out/mut_$5.vhd"
   sed "$6" "$1" > "$copy"
   cmp -s "$1" "$copy" && { echo "mutant $5: the edit did not change the file"; exit 1; }
-  netlist "$copy" "$3" "mut_$5"
-  expect "mutant $5 is caught" FAIL "$(prove "mut_$5.v" "$2" bmc 8 "$4" "mut_$5")"
+  netlist "$copy" "$3" "mut_$5" "${7:-}"
+  expect "mutant $5 is caught" FAIL "$(prove "mut_$5.v" "$2" bmc "${8:-8}" "$4" "mut_$5")"
 }
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0'          when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1'         when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
@@ -74,5 +110,24 @@ mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_
 mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
+mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
+mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
+mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = \"11\" else '0';/is_read_only     <= '0';/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hi_is_lo "s/minstret_rd_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/minstret_rd_lo when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/" "-ghas_zicntr=true -gtick_cycles=3" 6
+
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_inhibit_ignored "s/mcycle_inc     <= not inhibit_reg(0);/mcycle_inc     <= '1';/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_inhibit_instret_ignored "s/ and (not inhibit_reg(2));/;/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_cancel_ignored "s/retire_pending and (not i_retire_cancel) and (not inhibit_reg(2));/retire_pending and (not inhibit_reg(2));/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_pending_unseen "s/unsigned'(0 => retire_pending and (not inhibit_reg(2))));/unsigned'(0 => '0'));/" "-ghas_zicntr=true -gtick_cycles=3" 6
+
+mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_inhibit_ignored "s/(not inhibit_reg(3 + k));/'1';/" "-ghpm_counters=4" 6
+mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_code_zero_counts "s/bool_to_sl(event_code(k) \/= std_logic_vector(to_unsigned(EVENT_NONE, EVENT_CODE_WIDTH))) and/'1' and/" "-ghpm_counters=4" 6
+mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=2' hpm_mask_wide "s/mask(3 + k) := '1';/mask(3 + k) := '1'; mask(6) := '1';/" "-ghpm_counters=2" 6
+
+mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = x\"FFFFFFFF\"/lo = x\"FFFFFFFE\"/"
+mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata when/lo_nxt <= std_logic_vector(unsigned(i_wdata) + 1) when/"
+mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

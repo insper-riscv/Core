@@ -111,7 +111,7 @@ end entity mux_2x1;
 
 ## 4. Projeto para Reuso e Proibição de Duplicação
 
-O projeto segue a prática de *Design for Reuse* descrita no *Reuse Methodology Manual* (Keating e Bricaud), que não é uma norma IEEE e não equivale ao SOLID da programação orientada a objetos. Cada regra abaixo se traduz em um critério verificável em revisão:
+O projeto segue a prática de *Design for Reuse* descrita no *Reuse Methodology Manual* (Keating e Bricaud). Cada regra abaixo se traduz em um critério verificável em revisão:
 
 | # | Regra | Critério de revisão no `Core` |
 | :--- | :--- | :--- |
@@ -153,6 +153,8 @@ Ao adicionar, renomear ou remover qualquer arquivo `.vhd` ou `.md`, atualize ime
 - `tests/python/tests.json`
 - `paths.yaml`
 - `docs/pt-br/` e `docs/en/`
+
+O CI roda essas verificações a cada push. Num pull request de alguém de fora do projeto, ele só começa depois que um membro que pode fazer o merge aprova a execução na página do pull request.
 
 ---
 

@@ -9,6 +9,13 @@
 -- FUNCT7_MULDIV ou instruções CSR/Zifencei) produzem um NOP sem efeitos
 -- colaterais nesta unidade, sendo reivindicadas pelos seus decodificadores
 -- dedicados (m_decode, csr_decode, fencei_unit) no topo do pipeline.
+--
+-- O o_illegal marca toda instrução que não existe em RV32I: opcode fora da
+-- tabela, funct3 ou funct7 inválido, ou encoding comprimido (bits [1:0] /= "11").
+-- SYSTEM fica legal aqui, porque o trap_unit decide ECALL, EBREAK, MRET, WFI e
+-- CSRs, e funct7 = FUNCT7_MULDIV em OP e FENCE.I em MISC-MEM ficam ilegais aqui,
+-- porque o m_decode e o stage_id os reivindicam no estágio ID quando as
+-- extensões M e Zifencei existem.
 -- =============================================================================
 
 library ieee;
@@ -52,7 +59,9 @@ entity control_unit is
 		-- Campo opcode extraído da instrução (bits [6:0]) para a HDU e estágios seguintes.
 		o_opcode      : out opcode_t;
 		-- Campo funct3 extraído da instrução (bits [14:12]) para multdiv e StoreManager.
-		o_funct3      : out funct3_t
+		o_funct3      : out funct3_t;
+		-- Indica instrução inexistente em RV32I ('1' = ilegal), antes de a extensão M a reivindicar.
+		o_illegal     : out std_logic
 	);
 
 end entity control_unit;
@@ -85,7 +94,7 @@ begin
 		o_ext_ram_op  <= EXT_RAM_LW;
 		o_sel_rs2_imm <= '0';
 		o_sel_pc_rs1  <= '0';
-		o_alu_op      <= ALU_PASS_B;
+		o_alu_op      <= ALU_ADD;
 		o_we_ram      <= '0';
 		o_re_ram      <= '0';
 		o_en_ram      <= '0';
@@ -215,7 +224,7 @@ begin
 					when FUNCT3_BGE  => o_alu_op <= ALU_BGE;
 					when FUNCT3_BLTU => o_alu_op <= ALU_BLTU;
 					when FUNCT3_BGEU => o_alu_op <= ALU_BGEU;
-					when others      => o_alu_op <= ALU_PASS_B;
+					when others      => o_alu_op <= ALU_ADD;
 				end case;
 
 			-- -----------------------------------------------------------------------
@@ -258,7 +267,7 @@ begin
 				o_ext_imm_op  <= EXT_IMM_U;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
-				o_alu_op      <= ALU_PASS_B;
+				o_alu_op      <= ALU_LUI;
 
 			-- -----------------------------------------------------------------------
 			-- Adição de imediato superior ao PC (U-type AUIPC)
@@ -275,7 +284,6 @@ begin
 			when OPCODE_JAL =>
 				o_sel_pc4_alu <= '1';
 				o_ext_imm_op  <= EXT_IMM_J;
-				o_wb_sel      <= WB_SEL_PC4;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
 				o_alu_op      <= ALU_ADD;
@@ -286,7 +294,6 @@ begin
 			when OPCODE_JALR =>
 				o_sel_pc4_alu <= '1';
 				o_ext_imm_op  <= EXT_IMM_I;
-				o_wb_sel      <= WB_SEL_PC4;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
 				o_sel_pc_rs1  <= '1';
@@ -296,6 +303,70 @@ begin
 				null;
 
 		end case;
+	end process;
+
+	-- Legalidade da instrução: cada formato lista os funct3 e funct7 que existem.
+	process(i_inst)
+	begin
+		o_illegal <= '1';
+
+		if i_inst(1 downto 0) = "11" then
+			case opcode is
+
+				when OPCODE_LUI | OPCODE_AUIPC | OPCODE_JAL | OPCODE_SYSTEM =>
+					o_illegal <= '0';
+
+				when OPCODE_JALR =>
+					if funct3 = FUNCT3_JALR then
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_BRANCH =>
+					if funct3 = FUNCT3_BEQ  or funct3 = FUNCT3_BNE  or funct3 = FUNCT3_BLT or
+					   funct3 = FUNCT3_BGE  or funct3 = FUNCT3_BLTU or funct3 = FUNCT3_BGEU then
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_LOAD =>
+					if funct3 = FUNCT3_LB  or funct3 = FUNCT3_LH or funct3 = FUNCT3_LW or
+					   funct3 = FUNCT3_LBU or funct3 = FUNCT3_LHU then
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_STORE =>
+					if funct3 = FUNCT3_SB or funct3 = FUNCT3_SH or funct3 = FUNCT3_SW then
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_OP_IMM =>
+					if funct3 = FUNCT3_SLLI then
+						if funct7 = FUNCT7_SLLI then
+							o_illegal <= '0';
+						end if;
+					elsif funct3 = FUNCT3_SRLI_SRAI then
+						if funct7 = FUNCT7_SRLI or funct7 = FUNCT7_SRAI then
+							o_illegal <= '0';
+						end if;
+					else
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_OP =>
+					if funct7 = FUNCT7_DEFAULT then
+						o_illegal <= '0';
+					elsif funct7 = FUNCT7_ALT and (funct3 = FUNCT3_ADD_SUB or funct3 = FUNCT3_SRL_SRA) then
+						o_illegal <= '0';
+					end if;
+
+				when OPCODE_MISC_MEM =>
+					if funct3 = FUNCT3_FENCE then
+						o_illegal <= '0';
+					end if;
+
+				when others =>
+					null;
+			end case;
+		end if;
 	end process;
 
 end architecture rtl;

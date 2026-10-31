@@ -14,10 +14,17 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
+use work.ext_ram_consts.all;
+use work.mem_map_consts.all;
 
 entity reg_mem_wb is
-
+	generic (
+		-- Mapa da plataforma sdram: não há FLASH nem RAM internas e o dado vem da porta externa (bits 31, 30 ou 29).
+		ext_flash    : boolean := false
+	);
 	port (
 		-- Sinal de clock.
 		i_clk        : in  std_logic;
@@ -29,8 +36,6 @@ entity reg_mem_wb is
 		i_flush      : in  std_logic;
 		-- Validade da instrução vinda do estágio MEM.
 		i_valid      : in  std_logic;
-		-- Valor de PC + 4 propagado para retorno de salto (JAL / JALR).
-		i_pc4        : in  word_t;
 		-- Resultado calculado no estágio EX (palavra completa para WB e bits [1:0] para o ExtenderRAM).
 		i_alu_out    : in  word_t;
 		-- Endereço do registrador destino rd.
@@ -43,8 +48,6 @@ entity reg_mem_wb is
 		i_wb_sel     : in  wb_sel_t;
 		-- Validade da instrução registrada no estágio WB.
 		o_valid      : out std_logic;
-		-- Valor de PC + 4 registrado para o estágio WB.
-		o_pc4        : out word_t;
 		-- Resultado do estágio EX registrado para o estágio WB.
 		o_alu_out    : out word_t;
 		-- Endereço de rd registrado para o estágio WB (banco de registradores e Forwarding Unit).
@@ -54,7 +57,13 @@ entity reg_mem_wb is
 		-- Modo de extensão de leitura da RAM registrado para o estágio WB.
 		o_ext_ram_op : out ext_ram_op_t;
 		-- Seletor de write-back registrado para o estágio WB.
-		o_wb_sel     : out wb_sel_t
+		o_wb_sel     : out wb_sel_t;
+		-- O endereço do load registrado pertence à memória FLASH (decodificado na entrada do registrador).
+		o_is_flash   : out std_logic;
+		-- O endereço do load registrado pertence à janela externa de SDRAM (decodificado na entrada).
+		o_is_sdram   : out std_logic;
+		-- O load registrado cruza a palavra e usa a primeira palavra retida (decodificado na entrada).
+		o_is_cross   : out std_logic
 	);
 
 end entity reg_mem_wb;
@@ -63,8 +72,6 @@ architecture rtl of reg_mem_wb is
 
 	-- Bit de validade armazenado no registrador MEM/WB.
 	signal r_valid      : std_logic    := '0';
-	-- Valor de PC + 4 armazenado.
-	signal r_pc4        : word_t       := (others => '0');
 	-- Resultado do estágio EX armazenado.
 	signal r_alu_out    : word_t       := (others => '0');
 	-- Endereço de rd armazenado.
@@ -75,38 +82,69 @@ architecture rtl of reg_mem_wb is
 	signal r_ext_ram_op : ext_ram_op_t := (others => '0');
 	-- Seletor de write-back armazenado.
 	signal r_wb_sel     : wb_sel_t     := (others => '0');
+	-- Endereço na FLASH armazenado.
+	signal r_is_flash   : std_logic    := '0';
+	-- Endereço na janela de SDRAM armazenado.
+	signal r_is_sdram   : std_logic    := '0';
+	-- Load com cruzamento de palavra armazenado.
+	signal r_is_cross   : std_logic    := '0';
+	-- Entrada: o endereço de i_alu_out pertence à FLASH (bits [31:15] em '0').
+	signal in_is_flash  : std_logic;
+	-- Entrada: o endereço de i_alu_out pertence à janela de SDRAM (bit 31 ou bit 30 em '1').
+	signal in_is_sdram  : std_logic;
+	-- Entrada: o load cruza a palavra (LW fora de alinhamento ou meia-palavra no byte 3).
+	signal in_is_cross  : std_logic;
 
 begin
+
+	assert RAM_BASE_BYTES = x"00008000" and SDRAM_BASE_BYTES = x"40000000"
+		report "O reg_mem_wb decodifica as regiões por bits do endereço: RAM_BASE e SDRAM_BASE devem ser 2**15 e 2**30"
+		severity failure;
+
+	-- As fronteiras do mapa são potências de 2, então a região sai de testes de bits do endereço.
+	in_is_flash <= '0' when ext_flash else
+	               '1' when i_alu_out(31 downto 15) = (31 downto 15 => '0') else '0';
+	in_is_sdram <= (i_alu_out(31) or i_alu_out(30) or i_alu_out(29)) when ext_flash else
+	               (i_alu_out(31) or i_alu_out(30));
+	in_is_cross <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
+	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3))
+	               else '0';
 
 	process(i_clk)
 	begin
 		if rising_edge(i_clk) then
 			if i_rst = '1' or i_flush = '1' then
 				r_valid      <= '0';
-				r_pc4        <= (others => '0');
 				r_alu_out    <= (others => '0');
 				r_rd         <= (others => '0');
 				r_we_reg     <= '0';
 				r_ext_ram_op <= (others => '0');
 				r_wb_sel     <= (others => '0');
+				r_is_flash   <= '0';
+				r_is_sdram   <= '0';
+				r_is_cross   <= '0';
 			elsif i_en = '1' then
 				r_valid      <= i_valid;
-				r_pc4        <= i_pc4;
 				r_alu_out    <= i_alu_out;
 				r_rd         <= i_rd;
 				r_we_reg     <= i_we_reg;
 				r_ext_ram_op <= i_ext_ram_op;
 				r_wb_sel     <= i_wb_sel;
+				r_is_flash   <= in_is_flash;
+				r_is_sdram   <= in_is_sdram;
+				r_is_cross   <= in_is_cross;
 			end if;
 		end if;
 	end process;
 
 	o_valid      <= r_valid;
-	o_pc4        <= r_pc4;
 	o_alu_out    <= r_alu_out;
 	o_rd         <= r_rd;
 	o_we_reg     <= r_we_reg;
 	o_ext_ram_op <= r_ext_ram_op;
 	o_wb_sel     <= r_wb_sel;
+	o_is_flash   <= r_is_flash;
+	o_is_sdram   <= r_is_sdram;
+	o_is_cross   <= r_is_cross;
 
 end architecture rtl;

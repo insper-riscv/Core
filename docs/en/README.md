@@ -27,7 +27,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 1. **Group 1 (non-branching U-type):** `LUI` and `AUIPC` validate sequential fetch ($\text{PC} + 4$), `EXT_IMM_U` extension, ALU pass/add, and register-file writeback.
 2. **Group 2 (arithmetic and logical I-type):** `ADDI`, `XORI`, `ORI`, `ANDI`, `SLTI`, `SLTIU`, `SLLI`, `SRLI`, and `SRAI` add reading `rs1`, `EXT_IMM_I` and `EXT_IMM_I_SHAMT` extensions, and shifters/comparators in the ALU.
 3. **Group 3 (full R-type):** `ADD`, `SUB`, `XOR`, `OR`, `AND`, `SLL`, `SRL`, `SRA`, `SLT`, and `SLTU` introduce the second read port (`rs2`) and `o_sel_rs2_imm` selection between register and immediate.
-4. **Group 4 (unconditional jumps):** `JAL` and `JALR` introduce writing $\text{PC} + 4$ into the link register (`WB_SEL_PC4`) and PC redirection (`PC_SRC_BRANCH` and `PC_SRC_JALR`).
+4. **Group 4 (unconditional jumps):** `JAL` and `JALR` introduce writing $\text{PC} + 4$ into the link register (through the EX result, with `o_sel_pc4_alu`) and PC redirection (`PC_SRC_BRANCH` and `PC_SRC_JALR`).
 5. **Group 5 (conditional branches):** `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, and `BGEU` add `EXT_IMM_B` extension and the ALU `o_branch` flag for conditional branching.
 6. **Group 6 (loads and stores):** `LW`, `LH`, `LHU`, `LB`, `LBU`, `SW`, `SH`, and `SB` complete data-memory access with write alignment (`store_manager`) and read extension (`extender_ram`).
 
@@ -43,7 +43,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 ![Datapath Stage 1](../instructions/1.png)
 
 - **Immediate extender (`extender_imm`):** `EXT_IMM_U` produces `i_instr[31:12] & x"000"`.
-- **ALU (`alu`):** `ALU_PASS_B` (`o_d = i_b`) and `ALU_ADD` (`o_d = i_a + i_b`).
+- **ALU (`alu`):** `ALU_LUI` (sum with operand A forced to zero, so `o_d = i_b`) and `ALU_ADD` (`o_d = i_a + i_b`).
 - **Control (`control_unit`):** asserts `o_we_reg = '1'` and `o_sel_rs2_imm = '1'`, selecting `o_sel_pc_rs1 = '0'` (PC) for `AUIPC`.
 
 ### 3.2. Group 2: Arithmetic and Logical I-type
@@ -95,7 +95,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 ![Datapath Stage 4](../instructions/4.png)
 
 - **Immediate extender:** `EXT_IMM_J` for `JAL` and `EXT_IMM_I` for `JALR`.
-- **ALU and Control:** `o_sel_pc4_alu = '1'` and `o_wb_sel = WB_SEL_PC4` select $\text{PC} + 4$ as the return address written to `rd`, while `ALU_JALR` computes the `JALR` target address with bit 0 cleared.
+- **ALU and Control:** `o_sel_pc4_alu = '1'` selects $\text{PC} + 4$ as the EX result, which follows the normal write-back (`o_wb_sel = WB_SEL_ALU`) to `rd`, while `ALU_JALR` computes the `JALR` target address with bit 0 cleared.
 
 ### 3.5. Group 5: Conditional Branches (`BRANCH`)
 

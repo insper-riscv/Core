@@ -2,10 +2,10 @@
 -- Decodificador de instruções da extensão Zicsr e classe SYSTEM
 --
 -- Reivindica no estágio ID as instruções da classe SYSTEM (opcode = OPCODE_SYSTEM):
---   - Acessos a CSRs (funct3 diferente de FUNCT3_PRIV e "100": CSRRW, CSRRS, CSRRC,
+--   - Acessos a CSRs (funct3 diferente de FUNCT3_PRIV e FUNCT3_SYSTEM_RESERVED: CSRRW, CSRRS, CSRRC,
 --     CSRRWI, CSRRSI, CSRRCI): ativam o_is_csr = '1', o_we_reg = '1' e o_use_imm_i = '1'.
 --   - Instruções privilegiadas (ECALL, EBREAK, MRET, WFI, funct3 = FUNCT3_PRIV) ou
---     subfunção reservada ("100"): ativam apenas o_use_imm_i = '1' para encaminhar
+--     subfunção reservada (FUNCT3_SYSTEM_RESERVED): ativam apenas o_use_imm_i = '1' para encaminhar
 --     o campo instr[31:20] até a trap_unit no estágio EX.
 -- =============================================================================
 
@@ -42,7 +42,7 @@ begin
 
 	is_system <= '1' when opcode = OPCODE_SYSTEM else '0';
 
-	is_csr_op <= '1' when (is_system = '1' and funct3 /= FUNCT3_PRIV and funct3 /= "100") else '0';
+	is_csr_op <= '1' when (is_system = '1' and funct3 /= FUNCT3_PRIV and funct3 /= FUNCT3_SYSTEM_RESERVED) else '0';
 
 	o_is_csr    <= is_csr_op;
 	o_we_reg    <= is_csr_op;

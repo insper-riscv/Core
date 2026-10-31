@@ -5,13 +5,16 @@ from cocotb.triggers import Timer
 def set_inputs(dut, ifid_rs1: int, ifid_rs2: int, idex_rd: int,
                idex_reRAM: int, muldiv_busy: int,
                ifid_valid: int = 1,
-               ifid_opcode: str = "0110011") -> None:
+               ifid_opcode: str = "0110011",
+               exmem_rd: int = 0, exmem_reRAM: int = 0) -> None:
     # ifid_opcode default="0110011" = R-type (usa rs1 e rs2)
     dut.i_ifid_rs1.value    = ifid_rs1 & 0x1F
     dut.i_ifid_rs2.value    = ifid_rs2 & 0x1F
     dut.i_idex_rd.value     = idex_rd & 0x1F
     dut.i_idex_re_ram.value = idex_reRAM & 0x1
-    dut.i_muldiv_busy.value = muldiv_busy & 0x1
+    dut.i_stall.value = muldiv_busy & 0x1
+    dut.i_exmem_rd.value     = exmem_rd & 0x1F
+    dut.i_exmem_re_ram.value = exmem_reRAM & 0x1
     dut.i_ifid_valid.value  = ifid_valid & 0x1
     dut.i_ifid_opcode.value = int(ifid_opcode, 2)
 
@@ -84,3 +87,34 @@ async def test_all_registers(dut):
         check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1,
                       msg=f"rd=rs1={rd}")
     dut._log.info("test_all_registers: OK")
+
+
+@cocotb.test()
+async def test_load_in_mem_stage_also_stalls(dut):
+    """Um load em MEM ainda nao entregou o dado alinhado: o dependente espera mais um ciclo."""
+    set_inputs(dut, ifid_rs1=3, ifid_rs2=2, idex_rd=9, idex_reRAM=0, muldiv_busy=0,
+               exmem_rd=3, exmem_reRAM=1)
+    await Timer(1, units="ns")
+    check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1, msg="rs1")
+    set_inputs(dut, ifid_rs1=1, ifid_rs2=4, idex_rd=9, idex_reRAM=0, muldiv_busy=0,
+               exmem_rd=4, exmem_reRAM=1)
+    await Timer(1, units="ns")
+    check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1, msg="rs2")
+
+
+@cocotb.test()
+async def test_non_load_in_mem_stage_does_not_stall(dut):
+    """Um resultado de ULA em MEM ja e adiantado de EX/MEM: sem espera."""
+    set_inputs(dut, ifid_rs1=3, ifid_rs2=2, idex_rd=9, idex_reRAM=0, muldiv_busy=0,
+               exmem_rd=3, exmem_reRAM=0)
+    await Timer(1, units="ns")
+    check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)
+
+
+@cocotb.test()
+async def test_load_in_mem_stage_with_x0_destination(dut):
+    """Load em MEM com destino x0 nunca causa espera."""
+    set_inputs(dut, ifid_rs1=0, ifid_rs2=0, idex_rd=9, idex_reRAM=0, muldiv_busy=0,
+               exmem_rd=0, exmem_reRAM=1)
+    await Timer(1, units="ns")
+    check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)

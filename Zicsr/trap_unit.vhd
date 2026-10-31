@@ -9,20 +9,34 @@
 --   Código (o_cause) | Exceção                                 | Valor em o_tval
 --   -----------------+-----------------------------------------+------------------
 --          0         | Alvo de desvio ou salto desalinhado     | i_cf_target
---          2         | Instrução ilegal (SYSTEM/CSR inválida)  | 0x00000000
+--          2         | Instrução ilegal (qualquer encoding     | 0x00000000
+--                    | inexistente, SYSTEM ou CSR inválido)    |
 --          3         | Breakpoint (EBREAK)                     | 0x00000000
---          4         | Endereço de Load desalinhado            | i_ea
---          6         | Endereço de Store desalinhado           | i_ea
+--          4         | Endereço de Load desalinhado que o      | i_ea
+--                    | hardware não executa                    |
+--          6         | Endereço de Store desalinhado que o     | i_ea
+--                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.byte_mask_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
+use work.mem_map_consts.all;
 
 entity trap_unit is
+	generic (
+		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' faz todo desalinhado gerar trap.
+		has_zicclsm   : boolean := true;
+		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
+		check_ea      : boolean := true;
+		-- Mapa da plataforma sdram: a memória principal é a FLASH (bit 29) e a SDRAM (bit 30), sem RAM interna.
+		ext_flash     : boolean := false
+	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
 		i_ex_valid    : in  std_logic;
@@ -46,6 +60,8 @@ entity trap_unit is
 		i_cf_target   : in  word_t;
 		-- Indica acesso ilegal a registrador CSR sinalizado pelo csr_file.
 		i_csr_illegal : in  std_logic;
+		-- Instrução inexistente apontada pela decodificação no estágio ID ('1' = ilegal).
+		i_illegal     : in  std_logic := '0';
 		-- Pulso que comanda a tomada de trap síncrono no ciclo atual.
 		o_take        : out std_logic;
 		-- Pulso que comanda o retorno de trap (instrução MRET) no ciclo atual.
@@ -98,10 +114,26 @@ architecture rtl of trap_unit is
 
 	-- Indica instrução da classe SYSTEM com codificação não suportada/ilegal.
 	signal sys_illegal : std_logic;
-	-- Indica instrução de leitura de memória (LOAD) com endereço desalinhado.
+	-- Indica instrução de leitura de memória (LOAD) com endereço desalinhado, já descontados os casos que o hardware executa.
 	signal ld_misal    : std_logic;
-	-- Indica instrução de escrita em memória (STORE) com endereço desalinhado.
+	-- Indica instrução de escrita em memória (STORE) com endereço desalinhado, já descontados os casos que o hardware executa.
 	signal st_misal    : std_logic;
+	-- Indica LOAD com endereço desalinhado, executado ou não pelo hardware.
+	signal ld_unaligned : std_logic;
+	-- Indica STORE com endereço desalinhado, executado ou não pelo hardware.
+	signal st_unaligned : std_logic;
+	-- Indica que o endereço efetivo está na memória principal (RAM interna ou SDRAM): fora da flash e da janela de periféricos.
+	signal in_main_mem : std_logic;
+	-- Indica que o acesso desalinhado cabe numa única palavra (LH, LHU ou SH com offset 1) e o hardware o executa.
+	signal misal_in_word : std_logic;
+	-- Indica acesso que ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
+	signal crosses_word : std_logic;
+	-- Indica que o endereço efetivo está na última palavra de uma região de 1 GiB (bits [29:2] todos em '1'): a palavra seguinte pertence à outra região.
+	signal last_word    : std_logic;
+	-- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal (RAM interna ou SDRAM).
+	signal same_region  : std_logic;
+	-- Indica acesso desalinhado que o hardware executa (dentro da palavra ou cruzando, na memória principal).
+	signal misal_exec   : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
 
@@ -110,8 +142,12 @@ architecture rtl of trap_unit is
 
 begin
 
+	assert RAM_BASE_BYTES = x"00008000" and SDRAM_BASE_BYTES = x"40000000" and PERIPHERAL_BASE_BYTES = x"80000000"
+		report "O trap_unit decodifica as regiões por bits do endereço: RAM_BASE, SDRAM_BASE e PERIPHERAL_BASE devem ser 2**15, 2**30 e 2**31"
+		severity failure;
+
 	is_system <= '1' when i_opcode = OPCODE_SYSTEM else '0';
-	is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= "100") else '0';
+	is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= FUNCT3_SYSTEM_RESERVED) else '0';
 	no_regs   <= '1' when (i_funct3 = FUNCT3_PRIV and i_rd_idx = REG_ZERO and i_rs1_idx = REG_ZERO) else '0';
 
 	is_ecall  <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_ECALL)  else '0';
@@ -124,33 +160,68 @@ begin
 	                         is_mret = '0' and is_wfi = '0')
 	                   else '0';
 
-	ld_misal <= '1' when (i_opcode = OPCODE_LOAD and
-	                      ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= "00") or
-	                       ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
+	ld_unaligned <= '1' when (i_opcode = OPCODE_LOAD and
+	                          ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
+	                           ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')))
+	                    else '0';
+
+	st_unaligned <= '1' when (i_opcode = OPCODE_STORE and
+	                          ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
+	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
+	                    else '0';
+
+	-- As fronteiras do mapa são potências de 2 (conferido nas asserções acima), então "ea >= RAM_BASE" é "algum bit
+	-- [30:15] em '1'" e "ea < PERIPHERAL_BASE" é "bit 31 em '0'", sem comparador numérico depois da ULA.
+	in_main_mem <= '1' when ((ext_flash and i_ea(31) = '0' and (i_ea(30) /= i_ea(29))) or
+	                         ((not ext_flash) and i_ea(31) = '0' and i_ea(30 downto 15) /= (30 downto 15 => '0')))
+	               else '0';
+
+	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
+	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
+	                 else '0';
+
+	crosses_word <= '1' when ((i_funct3 = FUNCT3_LW or i_funct3 = FUNCT3_SW) and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
+	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	st_misal <= '1' when (i_opcode = OPCODE_STORE and
-	                      ((i_funct3 = FUNCT3_SW and i_ea(1 downto 0) /= "00") or
-	                       (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
-	                else '0';
+	last_word <= '1' when ((ext_flash and i_ea(28 downto 2) = (28 downto 2 => '1')) or
+	                       ((not ext_flash) and i_ea(29 downto 2) = (29 downto 2 => '1')))
+	             else '0';
 
-	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= "00") else '0';
+	-- RAM interna: bits [31:30] = "00" e algum bit [29:15] em '1'. SDRAM: bits [31:30] = "01".
+	-- Mapa da sdram (ext_flash): FLASH é "001" e SDRAM é "010" nos bits [31:29], e cada uma acaba na palavra [28:2] toda em '1'.
+	same_region <= '1' when ((ext_flash and (i_ea(31 downto 29) = "001" or i_ea(31 downto 29) = "010") and last_word = '0') or
+	                         ((not ext_flash) and
+	                          ((i_ea(31 downto 30) = "00" and i_ea(29 downto 15) /= (29 downto 15 => '0')) or
+	                           i_ea(31 downto 30) = "01") and
+	                          last_word = '0'))
+	               else '0';
 
-	has_exc <= cf_misal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
+	misal_exec <= '1' when (misal_in_word = '1' or
+	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and
+	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
+	              else '0';
+
+	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
+	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
+
+	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0) else '0';
+
+	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
 	           ld_misal or st_misal or is_ecall;
 
 	o_take      <= has_exc and i_ex_valid and i_run;
 	o_mret_take <= is_mret and i_ex_valid and i_run;
 
 	o_cause <= CAUSE_MISALIGNED_PC when cf_misal = '1' else
-	           CAUSE_ILLEGAL_INSTR when (sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
+	           CAUSE_ILLEGAL_INSTR when (i_illegal = '1' or sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
 	           CAUSE_MACHINE_ECALL;
 
 	o_tval  <= i_cf_target when cf_misal = '1' else
-	           i_ea        when (ld_misal = '1' or st_misal = '1') else
+	           i_ea        when ((ld_misal = '1' or st_misal = '1') and i_illegal = '0') else
 	           (others => '0');
 
 end architecture rtl;

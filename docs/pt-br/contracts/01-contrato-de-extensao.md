@@ -4,7 +4,7 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
 ## 2. Regras de Integração no Pipeline
 
@@ -59,16 +59,18 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Operando de escrita | `ex_fwd_rs1_val` para instruções por registrador (`i_funct3(2) = '0'`) ou o índice `i_rs1_idx` estendido com zero para 32 bits nas formas imediatas (`i_funct3(2) = '1'`) |
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
+| `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
+| Não implementados | Interrupções (`mie` e `mip` leem zero e ignoram escritas); os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
 
-Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo):
+Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `has_zicsr = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
 
 | Código (`o_cause`) | Exceção | Valor gravado em `mtval` (`o_tval`) |
 | ---: | :--- | :--- |
 | `0` | Endereço-alvo de branch ou salto tomado com bits `[1:0] /= "00"` | Endereço-alvo desalinhado (`i_cf_target`) |
-| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`) ou acesso CSR ilegal (`i_csr_illegal = '1'`) | `0x00000000` |
+| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um, encoding comprimido ou `FENCE.I` com `has_zifencei = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
-| `4` | Endereço efetivo de Load desalinhado (`LW` com `ea[1:0] /= "00"`, `LH`/`LHU` com `ea[0] = '1'`) | Endereço efetivo (`i_ea`) |
-| `6` | Endereço efetivo de Store desalinhado (`SW` com `ea[1:0] /= "00"`, `SH` com `ea[0] = '1'`) | Endereço efetivo (`i_ea`) |
+| `4` | Endereço efetivo de Load desalinhado que o hardware não executa: fora da memória principal (flash e periféricos), com as duas palavras em regiões diferentes (RAM interna e SDRAM), ou qualquer load desalinhado com `has_zicclsm = false` | Endereço efetivo (`i_ea`) |
+| `6` | Endereço efetivo de Store desalinhado que o hardware não executa, nas mesmas condições da causa 4 | Endereço efetivo (`i_ea`) |
 | `11` | Chamada de ambiente do modo máquina (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
 Ao tomar uma exceção (`o_take = '1'`), `mepc` recebe o PC da instrução, `mcause` recebe `o_cause`, `mtval` recebe `o_tval`, `mstatus.MPIE` recebe `mstatus.MIE`, `mstatus.MIE` é zerado e o PC salta para `mtvec`. Na instrução `MRET` (`0x30200073`), `mstatus.MIE` restaura `mstatus.MPIE`, `mstatus.MPIE` recebe `'1'` e o PC salta para `mepc`. A instrução `WFI` (`0x10500073`) executa como `NOP`.
@@ -94,7 +96,7 @@ O perfil `rv32im_zicsr_zifencei` habilita `has_zifencei = true`:
 | :--- | :--- |
 | Busca de instruções em SDRAM (`>= 0x40000000`) | O estágio IF asserta `o_ic_sel = '1'` e lê `i_ic_data`. Enquanto `i_ic_ready = '0'`, o PC permanece congelado e `o_instr_valid = '0'` injeta bolhas em `reg_if_id`, enquanto EX, MEM e WB continuam avançando |
 | Execução de `FENCE.I` sem D-cache (`has_dcache = false`) | Quando `FENCE.I` está válida em EX e `i_base_run = '1'`, `o_take` pulsa por 1 ciclo, acionando `o_ic_inval = '1'`, limpando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$ |
-| Execução de `FENCE.I` com D-cache write-back (`has_dcache = true`) | A unidade emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, momento em que pulsa `o_take = '1'` e invalida a I-cache |
+| Execução de `FENCE.I` com D-cache write-back (`has_dcache = true`) | A unidade retém a instrução em EX por um ciclo, para que os stores anteriores deixem MEM e cheguem à cache, emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que a cache pode levantar no próprio ciclo do pulso em `o_dc_flush` ou em qualquer ciclo depois, momento em que pulsa `o_take = '1'` e invalida a I-cache |
 
 ---
 

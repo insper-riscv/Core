@@ -44,7 +44,7 @@ def program(fence):
 async def run(dut, fence, latency=2, flush_latency=None):
     """Run the program. With flush_latency the data cache is write-back: a store stays dirty in
     the cache and reaches the backing memory only when the core asks for a flush and the model
-    answers dc_done flush_latency cycles later."""
+    answers dc_done flush_latency cycles later (a negative value: in the very cycle of the request)."""
     boot = {4 * i: w for i, w in enumerate(BOOT)}
     backing = {CODE_BASE + 4 * i: w for i, w in enumerate(program(fence))}
     lines = {}                                # the cache: line address -> four words
@@ -101,7 +101,13 @@ async def run(dut, fence, latency=2, flush_latency=None):
         if flush_latency is not None:
             if int(dut.o_dc_flush.value):
                 flushes += 1
-                flush_countdown = flush_latency
+                if flush_latency < 0:
+                    # a data cache that answers in the very cycle of the request
+                    backing.update(dirty)
+                    dirty.clear()
+                    dut.i_dc_done.value = 1
+                else:
+                    flush_countdown = flush_latency
             elif flush_countdown is not None:
                 if flush_countdown == 0:
                     backing.update(dirty)

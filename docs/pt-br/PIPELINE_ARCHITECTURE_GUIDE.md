@@ -15,7 +15,7 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 | 3 | `stage_ex` | `core/stage_ex.vhd` | Forwarding de operandos, execução na ULA, unidade MulDiv, banco de CSRs e Trap Unit, unidade `FENCE.I`, cálculo de desvios e alinhamento de store |
 | Barreira 3 | `reg_ex_mem` | `common/reg_ex_mem.vhd` | Registro síncrono do resultado de EX, dados e máscara de bytes de store, destino `rd` e controles de memória/WB entre EX e MEM |
 | 4 | `stage_mem` | `core/stage_mem.vhd` | Decodificação do espaço de dados (Flash porta 2, RAM interna e janela externa SDRAM/periféricos) e controle de espera `o_sdram_wait` |
-| Barreira 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Registro síncrono de `o_pc4`, `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op` e `o_wb_sel` entre MEM e WB |
+| Barreira 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Registro síncrono de `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op` e `o_wb_sel` entre MEM e WB |
 | 5 | `stage_wb` | `core/stage_wb.vhd` | Seleção da palavra lida da memória, extensão de byte/meia-palavra (`extender_ram`) e seleção do valor final de escrita no banco de registradores |
 
 ## 2. Detalhamento por Estágio
@@ -64,30 +64,32 @@ O estágio ID reúne seis subblocos:
 
 No estágio EX:
 
-1. **Adiantamento (`forwarding_unit`):** seleciona cada operando (`ex_fwd_rs1_val` e `ex_fwd_rs2_val`) via `mux_4x1` entre o valor vindo de ID/EX (`"00"`), o dado final de WB (`"01"`) e o resultado em EX/MEM (`"10"`).
+1. **Adiantamento (`forwarding_unit`):** seleciona cada operando (`ex_fwd_rs1_val` e `ex_fwd_rs2_val`) via `mux_4x1` entre o valor vindo de ID/EX (`"00"`), o resultado de EX registrado em MEM/WB (`"01"`), o resultado em EX/MEM (`"10"`) e o dado final de WB registrado em WB2 (`"11"`).
 2. **Seleção de entrada da ULA:** dois multiplexadores `mux_2x1` escolhem o operando A (`i_pc` quando `i_sel_pc_rs1 = '0'`, ou `ex_fwd_rs1_val` quando `'1'`) e o operando B (`ex_fwd_rs2_val` quando `i_sel_rs2_imm = '0'`, ou `i_imm` quando `'1'`).
 3. **ULA (`alu`):** executa a operação definida em `common/alu_consts.vhd`:
 
 | Constante | Código | Operação em `o_d` | Flag `o_branch` |
 | :--- | :--- | :--- | :--- |
-| `ALU_PASS_B` | `"00000"` | `i_b` | `'0'` |
-| `ALU_ADD` | `"00001"` | `unsigned(i_a) + unsigned(i_b)` | `'0'` |
-| `ALU_XOR` | `"00010"` | `i_a xor i_b` | `'0'` |
-| `ALU_OR` | `"00011"` | `i_a or i_b` | `'0'` |
-| `ALU_AND` | `"00100"` | `i_a and i_b` | `'0'` |
-| `ALU_SLL` | `"00101"` | `i_a << unsigned(i_b[4:0])` | `'0'` |
-| `ALU_SRL` | `"00110"` | `unsigned(i_a) >> unsigned(i_b[4:0])` | `'0'` |
-| `ALU_SRA` | `"00111"` | `signed(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_ADD` | `"00000"` | `unsigned(i_a) + unsigned(i_b)` | `'0'` |
+| `ALU_SLL` | `"00001"` | `i_a << unsigned(i_b[4:0])` | `'0'` |
+| `ALU_XOR` | `"00100"` | `i_a xor i_b` | `'0'` |
+| `ALU_SRL` | `"00101"` | `unsigned(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_OR` | `"00110"` | `i_a or i_b` | `'0'` |
+| `ALU_AND` | `"00111"` | `i_a and i_b` | `'0'` |
 | `ALU_SUB` | `"01000"` | `unsigned(i_a) - unsigned(i_b)` | `'0'` |
-| `ALU_SLT` | `"01001"` | `1` se `signed(i_a) < signed(i_b)`, senão `0` | `'0'` |
-| `ALU_SLTU` | `"01010"` | `1` se `unsigned(i_a) < unsigned(i_b)`, senão `0` | `'0'` |
-| `ALU_BEQ` | `"01011"` | `0` | `'1'` se `i_a = i_b` |
-| `ALU_BNE` | `"01100"` | `0` | `'1'` se `i_a /= i_b` |
-| `ALU_BLT` | `"01101"` | `0` | `'1'` se `signed(i_a) < signed(i_b)` |
-| `ALU_BGE` | `"01110"` | `0` | `'1'` se `signed(i_a) >= signed(i_b)` |
-| `ALU_BLTU` | `"01111"` | `0` | `'1'` se `unsigned(i_a) < unsigned(i_b)` |
-| `ALU_BGEU` | `"10000"` | `0` | `'1'` se `unsigned(i_a) >= unsigned(i_b)` |
-| `ALU_JALR` | `"10001"` | `(unsigned(i_a) + unsigned(i_b)) & ~1` | `'0'` |
+| `ALU_SLT` | `"01010"` | `1` se `signed(i_a) < signed(i_b)`, senão `0` | `'0'` |
+| `ALU_SLTU` | `"01011"` | `1` se `unsigned(i_a) < unsigned(i_b)`, senão `0` | `'0'` |
+| `ALU_SRA` | `"01101"` | `signed(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_JALR` | `"10000"` | `(unsigned(i_a) + unsigned(i_b)) & ~1` | `'0'` |
+| `ALU_LUI` | `"10001"` | `i_b` (operando A forçado a zero) | `'0'` |
+| `ALU_BEQ` | `"11000"` | `0` | `'1'` se `i_a = i_b` |
+| `ALU_BNE` | `"11001"` | `0` | `'1'` se `i_a /= i_b` |
+| `ALU_BLT` | `"11100"` | `0` | `'1'` se `signed(i_a) < signed(i_b)` |
+| `ALU_BGE` | `"11101"` | `0` | `'1'` se `signed(i_a) >= signed(i_b)` |
+| `ALU_BLTU` | `"11110"` | `0` | `'1'` se `unsigned(i_a) < unsigned(i_b)` |
+| `ALU_BGEU` | `"11111"` | `0` | `'1'` se `unsigned(i_a) >= unsigned(i_b)` |
+
+A codificação do código de operação e o somador-subtrator compartilhado estão descritos em [ULA.md](ULA.md).
 
 4. **Seleção do resultado de EX:** o sinal `ex_alu_mux_result` escolhe entre `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`) e `ex_alu_result`. Em seguida, `u_mux_ex_final` (`mux_2x1`) seleciona entre `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) e `i_pc4` (`i_sel_pc4_alu = '1'`, usado em `JAL` e `JALR`).
 5. **Alinhamento de Store (`store_manager`):** desloca `ex_fwd_rs2_val` para as lanes de byte correspondentes a `ex_alu_result(1 downto 0)` e gera a máscara de 4 bits `o_store_byte_mask` (`"1111"` para `SW`, `"0011"`/`"1100"` para `SH` e `"0001"`/`"0010"`/`"0100"`/`"1000"` para `SB`).
@@ -114,13 +116,12 @@ No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_d
 | `EXT_RAM_LB` | `"011"` | Byte selecionado por `i_byte_offset(1 downto 0)` com extensão de sinal |
 | `EXT_RAM_LBU` | `"100"` | Byte selecionado por `i_byte_offset(1 downto 0)` com extensão por zero |
 
-Por fim, o multiplexador `u_mux_wb` (`mux_4x1`) seleciona `o_wb_data` de acordo com `common/wb_sel_consts.vhd`:
+Por fim, o multiplexador `u_mux_wb` (`mux_2x1`) seleciona `o_wb_data` de acordo com `common/wb_sel_consts.vhd`:
 
 | Constante | Código (`i_wb_sel`) | Dado selecionado para escrita no banco de registradores |
 | :--- | :--- | :--- |
-| `WB_SEL_ALU` | `"00"` | `i_alu_out` (resultado da ULA, da unidade MulDiv ou leitura de CSR) |
-| `WB_SEL_PC4` | `"01"` | `i_pc4` (endereço de retorno de `JAL` e `JALR`) |
-| `WB_SEL_RAM` | `"10"` | `wb_ram_extended` (dado de load formatado pelo `extender_ram`) |
+| `WB_SEL_ALU` | `"0"` | `i_alu_out` (resultado da ULA, da unidade MulDiv ou leitura de CSR, e endereço de retorno de `JAL` e `JALR`) |
+| `WB_SEL_RAM` | `"1"` | `wb_ram_extended` (dado de load formatado pelo `extender_ram`) |
 
 ---
 

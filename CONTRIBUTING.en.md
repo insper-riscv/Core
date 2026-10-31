@@ -111,7 +111,7 @@ end entity mux_2x1;
 
 ## 4. Design for Reuse and Zero Duplication
 
-The project follows the *Design for Reuse* practice described in the *Reuse Methodology Manual* (Keating and Bricaud), which is not an IEEE standard and is not equivalent to the SOLID principles of object-oriented programming. Each rule below translates into a criterion that can be checked in review:
+The project follows the *Design for Reuse* practice described in the *Reuse Methodology Manual* (Keating and Bricaud). Each rule below translates into a criterion that can be checked in review:
 
 | # | Rule | Review criterion in `Core` |
 | :--- | :--- | :--- |
@@ -153,6 +153,8 @@ When adding, renaming, or removing any `.vhd` or `.md` file, immediately update:
 - `tests/python/tests.json`
 - `paths.yaml`
 - `docs/pt-br/` and `docs/en/`
+
+The CI runs these checks on every push. On a pull request from someone outside the project, it starts only after a member who can merge approves the run in the pull request page.
 
 ---
 

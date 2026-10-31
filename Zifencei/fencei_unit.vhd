@@ -3,11 +3,14 @@
 --
 -- Executa a instrução FENCE.I (opcode OPCODE_MISC_MEM, funct3 FUNCT3_FENCE_I)
 -- no estágio EX do pipeline:
---   1. Com cache de dados (has_dcache = true): solicita o flush da cache de
---      dados (o_flush_req = '1' por um ciclo) e mantém a instrução retida em EX
---      (o_busy = '1') até receber a confirmação de conclusão (i_dc_done = '1'),
---      garantindo que stores anteriores de código já estejam gravados.
---   2. Ao concluir (ou imediatamente quando has_dcache = false), asserta
+--   1. Com cache de dados (has_dcache = true): retém a instrução em EX por um
+--      ciclo, para que os stores anteriores deixem o estágio MEM e cheguem ao
+--      cache, e então solicita o flush da cache de dados (o_flush_req = '1' por
+--      um ciclo). A instrução fica retida (o_busy = '1') até receber a
+--      confirmação de conclusão (i_dc_done = '1'), que pode vir no ciclo do
+--      pulso (cache que responde combinacionalmente) ou em qualquer ciclo
+--      depois dele.
+--   2. Ao concluir (ou imediatamente quando has_dcache = false), garante
 --      o_take = '1' por um ciclo para que o core invalide a cache de instruções,
 --      esvazie os estágios IF/ID e ID/EX e redirecione o PC para PC + 4.
 --
@@ -54,6 +57,14 @@ end entity fencei_unit;
 architecture rtl of fencei_unit is
 	-- Indica que a instrução válida no estágio EX é um FENCE.I.
 	signal is_fencei   : std_logic;
+	-- Ciclo de chegada do FENCE.I a EX, antes do pulso de flush.
+	signal request     : std_logic;
+	-- Ciclo do pulso de flush da cache de dados.
+	signal pulse       : std_logic;
+	-- Estado registrado: o FENCE.I foi retido e o pulso de flush sai neste ciclo ou quando o pipeline avançar.
+	signal armed       : std_logic := '0';
+	-- Próximo estado do flip-flop que arma o pulso de flush.
+	signal armed_nxt   : std_logic;
 	-- Estado registrado que indica espera pelo término do flush da cache de dados.
 	signal waiting     : std_logic := '0';
 	-- Próximo estado do flip-flop de espera do flush da cache de dados.
@@ -64,17 +75,39 @@ begin
 
 	gen_dc : if has_dcache generate
 
-		o_flush_req <= '1' when (is_fencei = '1' and i_run = '1' and waiting = '0') else '0';
+		-- Ciclo de chegada: o FENCE.I está em EX com o pipeline avançando e nada pedido ainda. O store
+		-- logo atrás dele ainda está em MEM neste ciclo e só chega à cache na borda seguinte.
+		request     <= '1' when (is_fencei = '1' and i_run = '1' and armed = '0' and waiting = '0') else '0';
 
-		o_busy      <= '1' when ((is_fencei = '1' and i_run = '1' and waiting = '0') or 
-								(waiting = '1' and i_dc_done = '0')) 
-							else '0';
+		-- Ciclo do pulso: os stores anteriores já deixaram MEM.
+		pulse       <= '1' when (is_fencei = '1' and i_run = '1' and armed = '1') else '0';
 
-		o_take      <= '1' when (waiting = '1' and i_dc_done = '1' and is_fencei = '1') else '0';
+		o_flush_req <= pulse;
 
-		waiting_nxt <= '1' when (is_fencei = '1' and i_run = '1' and waiting = '0') else
+		-- Retido na chegada, até o pulso sair e enquanto a cache não confirmou.
+		o_busy      <= '1' when (request = '1' or (armed = '1' and pulse = '0') or
+		                         ((pulse = '1' or waiting = '1') and i_dc_done = '0')) else '0';
+
+		-- Concluído com a confirmação, a que veio no ciclo do pulso ou a da espera.
+		o_take      <= '1' when ((pulse = '1' or (waiting = '1' and is_fencei = '1')) and i_dc_done = '1') else '0';
+
+		armed_nxt   <= '1' when request = '1' else
+		               '0' when pulse = '1' else
+		               armed;
+
+		-- Passa a esperar só se a cache não confirmou no ciclo do pulso.
+		waiting_nxt <= '1' when (pulse = '1' and i_dc_done = '0') else
 		               '0' when (waiting = '1' and i_dc_done = '1') else
 		               waiting;
+
+		u_armed_ff : entity work.flip_flop
+			port map (
+				i_d      => armed_nxt,
+				o_d      => armed,
+				i_enable => '1',
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
 
 		u_waiting_ff : entity work.flip_flop
 			port map (

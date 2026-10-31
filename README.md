@@ -16,32 +16,42 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [contracts/02-barramento-e-memoria.md](docs/pt-br/contracts/02-barramento-e-memoria.md): protocolo de barramento de instruções e de dados (endereçamento em byte, habilitação por byte, handshake de espera por memória lenta e cache de instruções).
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/pt-br/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): análise matemática da faixa do resto parcial na divisão não-restauradora e do uso de 34 bits internos para divisores sem sinal acima de $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/pt-br/bugs/FLUSH_COM_PIPELINE_PARADO.md): análise da interação entre redirecionamento de desvio em EX e parada global do pipeline por espera de memória em MEM.
+- [bugs/LOAD_EM_WB_DURANTE_STALL.md](docs/pt-br/bugs/LOAD_EM_WB_DURANTE_STALL.md): análise do load segurado em WB que era sobrescrito pelo load seguinte enquanto a unidade M para o pipeline.
 
 ## 2. Estrutura do Repositório
 
 | Caminho | Conteúdo |
 | :--- | :--- |
-| `common/` | Blocos compartilhados por todos os perfis, incluindo pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard, gerador de PC e primitivos parametrizáveis |
+| `common/` | Blocos compartilhados por todos os perfis, incluindo pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard, gerador de PC e as demais peças próprias do Core; os blocos genéricos (somador, flip-flop, registradores, multiplexadores e decodificador one-hot) vêm do repositório [Common-Components](https://github.com/insper-riscv/Common-Components), incluído como submódulo |
 | `I/` | Extensão inteira base RV32I, composta pela ULA, extensor de imediatos, extensor de leitura de memória e gerenciador de alinhamento de stores |
 | `M/` | Extensão de multiplicação e divisão inteira RV32M, contendo decodificador dedicado, multiplicador sequencial de Booth radix-2, divisor não-restaurador de 34 bits e unidade integradora |
 | `Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
 | `Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
 | `core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
-| `profiles/` | Manifestos de fontes e generics de cada perfil suportado (`rv32i.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
+| `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby` e script de verificação formal via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
 | `tests/FPGA/entities/` | Projeto Quartus para validação em placa do banco de registradores ([documentação](tests/FPGA/entities/bancoRegistradores/README.md)) |
 
 ## 3. Perfis da ISA
 
-O topo estrutural `core` recebe quatro generics booleanos que habilitam ou desabilitam cada extensão em tempo de elaboração:
+O topo estrutural `core` recebe um generic booleano por extensão, que habilita ou desabilita a extensão em tempo de elaboração:
 
-| Perfil (`profiles/`) | Extensões ativas | Generics configurados no topo `core` |
-| :--- | :--- | :--- |
-| `rv32i` | RV32I | `has_m: false, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im` | RV32I + M | `has_m: true, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im_zicsr` | RV32I + M + Zicsr | `has_m: true, has_zicsr: true, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im_zicsr_zifencei` | RV32I + M + Zicsr + Zifencei | `has_m: true, has_zicsr: true, has_zifencei: true, has_dcache_Wb: false` |
+| Extensão | Generic | Padrão | Com o generic desligado |
+| :--- | :--- | :--- | :--- |
+| M | `has_m` | `false` | As instruções M comportam-se como `NOP` |
+| Zmmul | `has_zmmul` | `false` | As instruções de multiplicação comportam-se como `NOP` |
+| Zicsr | `has_zicsr` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
+| Zifencei | `has_zifencei` | `false` | `FENCE.I` comporta-se como `NOP` |
+| Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
+
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e o core precisa de Zicsr ou de Zicclsm, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. A lista de perfis vem de `profiles/matrix.yaml`:
+
+```bash
+uv run riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
+uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e flags -g do GHDL
+make profile-matrix                                                        # elabora cada perfil com seus generics
+```
 
 Quando uma extensão está desabilitada pelo seu generic, as instruções correspondentes comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
@@ -67,7 +77,7 @@ A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insp
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
-  bash -c "uv sync --extra sim && make check && make profiles && make test && bash formal/run.sh"
+  bash -c "uv sync && make check && make profiles && make test && bash formal/run.sh"
 ```
 
 ---

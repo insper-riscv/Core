@@ -16,32 +16,42 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/en/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): mathematical analysis of the partial remainder range in non-restoring division and the use of 34 internal bits for unsigned divisors above $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/en/bugs/FLUSH_COM_PIPELINE_PARADO.md): analysis of the interaction between branch redirection in EX and global pipeline stall caused by memory wait in MEM.
+- [bugs/LOAD_EM_WB_DURANTE_STALL.md](docs/en/bugs/LOAD_EM_WB_DURANTE_STALL.md): analysis of a load held in WB that was overwritten by the next load while the M unit stalls the pipeline.
 
 ## 2. Repository Structure
 
 | Path | Contents |
 | :--- | :--- |
-| `common/` | Blocks shared across all profiles, including type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units, PC generator, and parameterized primitives |
+| `common/` | Blocks shared across all profiles, including type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units, PC generator, and the other parts specific to the Core; the generic blocks (adder, flip-flop, registers, multiplexers, and one-hot decoder) come from the [Common-Components](https://github.com/insper-riscv/Common-Components) repository, included as a submodule |
 | `I/` | Base integer extension RV32I, comprising the ALU, immediate extender, memory read extender, and store alignment manager |
 | `M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
 | `Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
 | `Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
 | `core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
-| `profiles/` | Source and generic manifests for each supported profile (`rv32i.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
+| `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
 | `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, and formal verification script via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
 | `tests/FPGA/entities/` | Quartus project for on-board validation of the register file ([documentation](tests/FPGA/entities/bancoRegistradores/README.en.md)) |
 
 ## 3. ISA Profiles
 
-The structural top level `core` takes four boolean generics that enable or disable each extension at elaboration time:
+The structural top level `core` takes one boolean generic per extension, which enables or disables the extension at elaboration time:
 
-| Profile (`profiles/`) | Active extensions | Generics configured on top level `core` |
-| :--- | :--- | :--- |
-| `rv32i` | RV32I | `has_m: false, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im` | RV32I + M | `has_m: true, has_zicsr: false, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im_zicsr` | RV32I + M + Zicsr | `has_m: true, has_zicsr: true, has_zifencei: false, has_dcache_Wb: false` |
-| `rv32im_zicsr_zifencei` | RV32I + M + Zicsr + Zifencei | `has_m: true, has_zicsr: true, has_zifencei: true, has_dcache_Wb: false` |
+| Extension | Generic | Default | With the generic off |
+| :--- | :--- | :--- | :--- |
+| M | `has_m` | `false` | M instructions behave as `NOP` |
+| Zmmul | `has_zmmul` | `false` | Multiplication instructions behave as `NOP` |
+| Zicsr | `has_zicsr` | `false` | No CSRs and no traps; the core signals the exception on `o_trap` |
+| Zifencei | `has_zifencei` | `false` | `FENCE.I` behaves as `NOP` |
+| Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
+
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The list of profiles comes from `profiles/matrix.yaml`:
+
+```bash
+uv run riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
+uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and GHDL -g flags
+make profile-matrix                                                        # elaborate each profile with its generics
+```
 
 When an extension is disabled by its generic, the corresponding instructions behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
@@ -67,7 +77,7 @@ The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
-  bash -c "uv sync --extra sim && make check && make profiles && make test && bash formal/run.sh"
+  bash -c "uv sync && make check && make profiles && make test && bash formal/run.sh"
 ```
 
 ---

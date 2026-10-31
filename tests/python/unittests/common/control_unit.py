@@ -27,24 +27,24 @@ def _parse_field(val: str, width: int) -> int:
         "LBU": 0b100,
 
         # opALU[4:0]
-        "PASS_B": 0b00000,
-        "ADD":    0b00001,
-        "XOR":    0b00010,
-        "OR":     0b00011,
-        "AND":    0b00100,
-        "SLL":    0b00101,
-        "SRL":    0b00110,
-        "SRA":    0b00111,
+        "ADD":    0b00000,
+        "SLL":    0b00001,
+        "XOR":    0b00100,
+        "SRL":    0b00101,
+        "OR":     0b00110,
+        "AND":    0b00111,
         "SUB":    0b01000,
-        "SLT":    0b01001,
-        "SLTU":   0b01010,
-        "BEQ":    0b01011,
-        "BNE":    0b01100,
-        "BLT":    0b01101,
-        "BGE":    0b01110,
-        "BLTU":   0b01111,
-        "BGEU":   0b10000,
-        "JALR":   0b10001,
+        "SLT":    0b01010,
+        "SLTU":   0b01011,
+        "SRA":    0b01101,
+        "JALR":   0b10000,
+        "LUI":    0b10001,
+        "BEQ":    0b11000,
+        "BNE":    0b11001,
+        "BLT":    0b11100,
+        "BGE":    0b11101,
+        "BLTU":   0b11110,
+        "BGEU":   0b11111,
     }
 
     if val in symbol_map:
@@ -101,7 +101,7 @@ async def test_control_unit(dut):
 
         exp_selMuxPc4ALU    = _parse_field(row["SelMuxPc4ALU"], 1)
         exp_opExImm         = _parse_field(row["opExImm[2:0]"], 3)
-        exp_selMuxALUPc4RAM = _parse_field(row["selMuxALUPc4RAM[1:0]"], 2)
+        exp_selMuxALURAM = _parse_field(row["selMuxALURAM"], 1)
         exp_weReg           = _parse_field(row["weReg"], 1)
         exp_opExRAM         = _parse_field(row["opExRAM[2:0]"], 3)
         exp_selMuxRS2Imm    = _parse_field(row["selMuxRS2Imm"], 1)
@@ -113,7 +113,7 @@ async def test_control_unit(dut):
 
         got_selMuxPc4ALU    = int(dut.o_sel_pc4_alu.value)
         got_opExImm         = int(dut.o_ext_imm_op.value)
-        got_selMuxALUPc4RAM = int(dut.o_wb_sel.value)
+        got_selMuxALURAM = int(dut.o_wb_sel.value)
         got_weReg           = int(dut.o_we_reg.value)
         got_opExRAM         = int(dut.o_ext_ram_op.value)
         got_selMuxRS2Imm    = int(dut.o_sel_rs2_imm.value)
@@ -129,8 +129,8 @@ async def test_control_unit(dut):
         assert got_opExImm == exp_opExImm, (
             f"{inst_name}: opExImm got={got_opExImm:03b} exp={exp_opExImm:03b}"
         )
-        assert got_selMuxALUPc4RAM == exp_selMuxALUPc4RAM, (
-            f"{inst_name}: selMuxALUPc4RAM got={got_selMuxALUPc4RAM:02b} exp={exp_selMuxALUPc4RAM:02b}"
+        assert got_selMuxALURAM == exp_selMuxALURAM, (
+            f"{inst_name}: selMuxALURAM got={got_selMuxALURAM:b} exp={exp_selMuxALURAM:b}"
         )
         assert got_weReg == exp_weReg, (
             f"{inst_name}: weReg got={got_weReg} exp={exp_weReg}"
@@ -189,3 +189,60 @@ async def test_control_unit_m_is_not_decoded_here(dut):
         assert got_funct3 == funct3, (
             f"o_funct3 got={got_funct3:03b} exp={funct3:03b}"
         )
+
+
+def _legal(opcode: int, funct3: int, funct7: int) -> bool:
+    """Whether the encoding is an instruction of RV32I, SYSTEM aside (the trap unit decides it)."""
+    if opcode & 0b11 != 0b11:
+        return False
+    if opcode in (0b0110111, 0b0010111, 0b1101111, 0b1110011):   # LUI, AUIPC, JAL, SYSTEM
+        return True
+    if opcode == 0b1100111:                                       # JALR
+        return funct3 == 0
+    if opcode == 0b1100011:                                       # BRANCH
+        return funct3 in (0, 1, 4, 5, 6, 7)
+    if opcode == 0b0000011:                                       # LOAD
+        return funct3 in (0, 1, 2, 4, 5)
+    if opcode == 0b0100011:                                       # STORE
+        return funct3 in (0, 1, 2)
+    if opcode == 0b0010011:                                       # OP-IMM
+        if funct3 == 1:
+            return funct7 == 0
+        if funct3 == 5:
+            return funct7 in (0, 0b0100000)
+        return True
+    if opcode == 0b0110011:                                       # OP (funct7 = 1 is the M extension)
+        return funct7 == 0 or (funct7 == 0b0100000 and funct3 in (0, 5))
+    if opcode == 0b0001111:                                       # MISC-MEM: FENCE (FENCE.I is Zifencei)
+        return funct3 == 0
+    return False
+
+
+@cocotb.test()
+async def test_illegal_flag(dut):
+    """o_illegal marks exactly the encodings that RV32I does not define."""
+    for opcode in range(128):
+        for funct3 in range(8):
+            for funct7 in (0, 1, 2, 0b0100000, 0b0100001, 0b1000000, 0x7F):
+                dut.i_inst.value = build_instruction(opcode, funct3, funct7)
+                await Timer(1, unit="ns")
+                got = int(dut.o_illegal.value)
+                want = int(not _legal(opcode, funct3, funct7))
+                assert got == want, (
+                    f"opcode={opcode:07b} funct3={funct3:03b} funct7={funct7:07b}: "
+                    f"o_illegal got={got} exp={want}"
+                )
+
+
+@cocotb.test()
+async def test_table_instructions_are_legal(dut):
+    """Every instruction of the reference table is legal, but the NOP row (the all-zero word, which RISC-V defines as illegal)."""
+    for row in load_reference():
+        if row["INST"] == "NOP":
+            continue
+        opcode = int(row["OpCode[6:0]"], 2)
+        funct3 = _parse_field(row["funct3[2:0]"], 3)
+        funct7 = _parse_field(row["funct7[6:0]"], 7)
+        dut.i_inst.value = build_instruction(opcode, funct3, funct7)
+        await Timer(1, unit="ns")
+        assert int(dut.o_illegal.value) == 0, f"{row['INST']} is flagged illegal"

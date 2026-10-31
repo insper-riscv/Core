@@ -16,13 +16,20 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.ext_imm_consts.all;
+use work.opcode_consts.all;
+use work.funct3_consts.all;
+use work.alu_consts.all;
 
 entity stage_id is
 	generic (
-		-- Habilita o decodificador da extensão M (m_decode).
+		-- Habilita o decodificador da extensão M completa (m_decode, multiplicação e divisão).
 		has_m     : boolean := false;
+		-- Habilita o decodificador só da multiplicação (extensão Zmmul); has_m já a inclui.
+		has_zmmul : boolean := false;
 		-- Habilita o decodificador da extensão Zicsr (csr_decode).
-		has_zicsr : boolean := false
+		has_zicsr : boolean := false;
+		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
+		has_zifencei : boolean := false
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -39,6 +46,10 @@ entity stage_id is
 		i_wb_rd       : in  reg_t;
 		-- Dado de 32 bits a ser escrito no banco de registradores vindo do estágio WB.
 		i_wb_data     : in  word_t;
+		-- Endereço do registrador destino rd da instrução no estágio MEM (para detecção load-use).
+		i_mem_rd      : in  reg_t;
+		-- Indica se a instrução no estágio MEM é uma leitura de memória (load).
+		i_mem_re_ram  : in  std_logic;
 		-- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
 		i_ex_rd       : in  reg_t;
 		-- Indica se a instrução no estágio EX é uma leitura de memória (load).
@@ -77,6 +88,8 @@ entity stage_id is
 		o_sel_pc_rs1  : out std_logic;
 		-- Código de operação da ULA.
 		o_alu_op      : out alu_op_t;
+		-- Seleção one-hot do resultado de dados da ULA, decodificada do código de operação.
+		o_alu_sel     : out alu_sel_t;
 		-- Indica que a instrução pertence à extensão M (multiplicação/divisão).
 		o_is_muldiv   : out std_logic;
 		-- Indica que a instrução pertence à extensão Zicsr (acesso a registrador CSR).
@@ -90,13 +103,18 @@ entity stage_id is
 		-- Campo opcode (bits [6:0]) da instrução.
 		o_opcode      : out opcode_t;
 		-- Campo funct3 (bits [14:12]) da instrução.
-		o_funct3      : out funct3_t
+		o_funct3      : out funct3_t;
+		-- Instrução inexistente em RV32I e fora da extensão M ('1' = ilegal).
+		o_illegal     : out std_logic
 	);
 end entity stage_id;
 
 architecture rtl of stage_id is
 
 	component m_decode is
+		generic (
+			has_div : boolean := true
+		);
 		port (
 			i_instr      : in  word_t;
 			o_is_muldiv  : out std_logic;
@@ -125,6 +143,8 @@ architecture rtl of stage_id is
 
 	-- Operação do extensor de imediato gerada pela unidade de controle base.
 	signal cu_ext_imm_op   : ext_imm_op_t;
+	-- Código de operação da ULA gerado pela unidade de controle.
+	signal cu_alu_op       : alu_op_t;
 	-- Operação efetiva do extensor de imediato (forçada para EXT_IMM_I em instruções SYSTEM/CSR).
 	signal id_ext_imm_op   : ext_imm_op_t;
 	-- Habilitação de escrita em registrador da unidade de controle base RV32I.
@@ -149,6 +169,12 @@ architecture rtl of stage_id is
 	signal cu_en_ram       : std_logic;
 	-- Seletor de inserção de bolha gerado pela HDU.
 	signal id_bubble_sel   : std_logic;
+	-- Instrução ilegal segundo o control_unit, antes de a extensão M reivindicá-la.
+	signal cu_illegal      : std_logic;
+	-- Indica instrução da extensão M decodificada no estágio ID.
+	signal id_is_muldiv    : std_logic;
+	-- Indica FENCE.I decodificado no estágio ID e legal porque a extensão Zifencei existe.
+	signal id_is_fencei    : std_logic;
 
 begin
 
@@ -166,24 +192,28 @@ begin
 			o_ext_ram_op  => o_ext_ram_op,
 			o_sel_rs2_imm => o_sel_rs2_imm,
 			o_sel_pc_rs1  => base_sel_pc_rs1,
-			o_alu_op      => o_alu_op,
+			o_alu_op      => cu_alu_op,
 			o_we_ram      => cu_we_ram,
 			o_re_ram      => cu_re_ram,
 			o_en_ram      => cu_en_ram,
 			o_opcode      => o_opcode,
-			o_funct3      => o_funct3
+			o_funct3      => o_funct3,
+			o_illegal     => cu_illegal
 		);
 
-	gen_m_decode : if has_m generate
+	gen_m_decode : if (has_m or has_zmmul) generate
 		u_m_decode : m_decode
+			generic map (
+				has_div => has_m
+			)
 			port map (
 				i_instr      => i_instr,
-				o_is_muldiv  => o_is_muldiv,
+				o_is_muldiv  => id_is_muldiv,
 				o_we_reg     => m_we_reg,
 				o_sel_pc_rs1 => m_sel_pc_rs1
 			);
 	else generate
-		o_is_muldiv  <= '0';
+		id_is_muldiv <= '0';
 		m_we_reg     <= '0';
 		m_sel_pc_rs1 <= '0';
 	end generate gen_m_decode;
@@ -197,11 +227,15 @@ begin
 				o_use_imm_i => csr_use_imm_i
 			);
 	else generate
+		-- Sem CSRs, SYSTEM ainda carrega o imediato tipo I: o detector de exceções distingue ECALL de EBREAK por ele.
+		csr_use_imm_i <= '1' when i_instr(6 downto 0) = OPCODE_SYSTEM else '0';
 		o_is_csr      <= '0';
 		csr_we_reg    <= '0';
-		csr_use_imm_i <= '0';
 	end generate gen_csr_decode;
 
+	o_is_muldiv   <= id_is_muldiv;
+	id_is_fencei  <= '1' when (has_zifencei and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
+	o_illegal     <= cu_illegal and (not id_is_muldiv) and (not id_is_fencei);
 	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg;
 	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;
@@ -212,6 +246,9 @@ begin
 			i_op    => id_ext_imm_op,
 			o_imm   => o_imm
 		);
+
+	o_alu_op  <= cu_alu_op;
+	o_alu_sel <= alu_result_select(cu_alu_op);
 
 	u_regfile : entity work.reg_file
 		port map (
@@ -234,7 +271,9 @@ begin
 			i_ifid_opcode => id_opcode,
 			i_idex_rd     => i_ex_rd,
 			i_idex_re_ram => i_ex_re_ram,
-			i_muldiv_busy => i_pipe_stall,
+			i_exmem_rd    => i_mem_rd,
+			i_exmem_re_ram => i_mem_re_ram,
+			i_stall       => i_pipe_stall,
 			o_pc_we       => o_pc_we,
 			o_ifid_we     => o_ifid_we,
 			o_bubble_sel  => id_bubble_sel

@@ -12,9 +12,9 @@
 --    a instrução válida em decodificação no estágio ID lê efetivamente rs1 ou
 --    rs2 coincidindo com i_idex_rd.
 --
--- 2. Stall externo (i_muldiv_busy = '1'):
---    Congela os estágios anteriores quando o estágio EX/MEM aguarda conclusão
---    de operação multiciclo.
+-- 2. Parada global (i_stall = '1'):
+--    Congela os estágios anteriores quando EX ou MEM aguardam a conclusão de
+--    uma operação multiciclo, da memória externa ou do FENCE.I.
 -- =============================================================================
 
 library ieee;
@@ -37,8 +37,12 @@ entity hazard_detection_unit is
 		i_idex_rd     : in  reg_t;
 		-- Indica que a instrução no estágio EX é uma leitura de memória (load).
 		i_idex_re_ram : in  std_logic;
-		-- Sinal de ocupação/espera vindo do estágio EX/MEM (MulDiv ou memória).
-		i_muldiv_busy : in  std_logic;
+		-- Endereço do registrador destino rd da instrução no estágio MEM.
+		i_exmem_rd    : in  reg_t := (others => '0');
+		-- Indica que a instrução no estágio MEM é uma leitura de memória (load).
+		i_exmem_re_ram : in std_logic := '0';
+		-- Parada global do pipeline (MulDiv, espera da memória externa ou FENCE.I).
+		i_stall       : in  std_logic;
 		-- Habilita a escrita no registrador PC ('1' = avança, '0' = congela).
 		o_pc_we       : out std_logic;
 		-- Habilita a escrita no registrador IF/ID ('1' = avança, '0' = congela).
@@ -83,14 +87,20 @@ begin
 		else '0';
 
 	-- Detecta conflito load-use quando a instrução em EX é um load para rd /= x0 usado em ID.
+	-- Um load só entrega o dado alinhado ao registrador WB2, dois estágios depois de MEM; o dependente espera
+	-- enquanto o load está em EX ou em MEM.
 	load_use_hazard <=
-		'1' when (i_idex_re_ram = '1' and
-		          i_idex_rd /= REG_ZERO and
-		          ((ifid_uses_rs1 = '1' and i_idex_rd = i_ifid_rs1) or
-		           (ifid_uses_rs2 = '1' and i_idex_rd = i_ifid_rs2)))
+		'1' when ((i_idex_re_ram = '1' and
+		           i_idex_rd /= REG_ZERO and
+		           ((ifid_uses_rs1 = '1' and i_idex_rd = i_ifid_rs1) or
+		            (ifid_uses_rs2 = '1' and i_idex_rd = i_ifid_rs2))) or
+		          (i_exmem_re_ram = '1' and
+		           i_exmem_rd /= REG_ZERO and
+		           ((ifid_uses_rs1 = '1' and i_exmem_rd = i_ifid_rs1) or
+		            (ifid_uses_rs2 = '1' and i_exmem_rd = i_ifid_rs2))))
 		else '0';
 
-	stall <= load_use_hazard or i_muldiv_busy;
+	stall <= load_use_hazard or i_stall;
 
 	o_pc_we      <= not stall;
 	o_ifid_we    <= not stall;

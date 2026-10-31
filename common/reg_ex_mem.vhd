@@ -30,8 +30,10 @@ entity reg_ex_mem is
 		i_flush      : in  std_logic;
 		-- Validade da instrução vinda do estágio EX.
 		i_valid      : in  std_logic;
-		-- Valor de PC + 4 propagado para retorno de salto (JAL / JALR).
-		i_pc4        : in  word_t;
+		-- PC da instrução vinda do estágio EX (vira o mepc se o acesso à memória gerar exceção).
+		i_pc         : in  word_t;
+		-- Campo funct3 da instrução vinda do estágio EX (tamanho e sinal do acesso à memória).
+		i_funct3     : in  funct3_t;
 		-- Resultado final do estágio EX (endereço de memória ou resultado de operação).
 		i_alu_out    : in  word_t;
 		-- Dado alinhado para escrita em memória vindo do StoreManager.
@@ -54,8 +56,6 @@ entity reg_ex_mem is
 		i_wb_sel     : in  wb_sel_t;
 		-- Validade da instrução registrada no estágio MEM.
 		o_valid      : out std_logic;
-		-- Valor de PC + 4 registrado para o estágio MEM.
-		o_pc4        : out word_t;
 		-- Resultado do estágio EX registrado para o estágio MEM (e adiantamento EX/MEM).
 		o_alu_out    : out word_t;
 		-- Dado de escrita alinhado registrado para o estágio MEM.
@@ -75,7 +75,11 @@ entity reg_ex_mem is
 		-- Modo de extensão de leitura da RAM registrado para o estágio MEM.
 		o_ext_ram_op : out ext_ram_op_t;
 		-- Seletor de write-back registrado para o estágio MEM.
-		o_wb_sel     : out wb_sel_t
+		o_wb_sel     : out wb_sel_t;
+		-- PC da instrução registrado para o estágio MEM.
+		o_pc         : out word_t;
+		-- Campo funct3 registrado para o estágio MEM.
+		o_funct3     : out funct3_t
 	);
 
 end entity reg_ex_mem;
@@ -84,8 +88,10 @@ architecture rtl of reg_ex_mem is
 
 	-- Bit de validade armazenado no registrador EX/MEM.
 	signal r_valid      : std_logic    := '0';
-	-- Valor de PC + 4 armazenado.
-	signal r_pc4        : word_t       := (others => '0');
+	-- PC da instrução armazenado.
+	signal r_pc         : word_t       := (others => '0');
+	-- Campo funct3 armazenado.
+	signal r_funct3     : funct3_t     := (others => '0');
 	-- Resultado do estágio EX armazenado.
 	signal r_alu_out    : word_t       := (others => '0');
 	-- Dado de escrita em memória armazenado.
@@ -114,7 +120,8 @@ begin
 		if rising_edge(i_clk) then
 			if i_rst = '1' or i_flush = '1' then
 				r_valid      <= '0';
-				r_pc4        <= (others => '0');
+				r_pc         <= (others => '0');
+				r_funct3     <= (others => '0');
 				r_alu_out    <= (others => '0');
 				r_store_data <= (others => '0');
 				r_byte_mask  <= (others => '0');
@@ -127,7 +134,8 @@ begin
 				r_wb_sel     <= (others => '0');
 			elsif i_en = '1' then
 				r_valid      <= i_valid;
-				r_pc4        <= i_pc4;
+				r_pc         <= i_pc;
+				r_funct3     <= i_funct3;
 				r_alu_out    <= i_alu_out;
 				r_store_data <= i_store_data;
 				r_byte_mask  <= i_byte_mask;
@@ -143,7 +151,8 @@ begin
 	end process;
 
 	o_valid      <= r_valid;
-	o_pc4        <= r_pc4;
+	o_pc         <= r_pc;
+	o_funct3     <= r_funct3;
 	o_alu_out    <= r_alu_out;
 	o_store_data <= r_store_data;
 	o_byte_mask  <= r_byte_mask;
