@@ -67,7 +67,9 @@ begin
 	o_busy <= '1' when (state = S_IDLE and i_start = '1' and start_inhibit = '0') else busy_reg;
 
 	process(i_clk)
+		-- Acumulador do próximo ciclo (33 bits: soma ou subtração do multiplicando com o acumulador atual).
 		variable acc_next   : signed(32 downto 0);
+		-- Concatenação acumulador, multiplicador e bit auxiliar de Booth (66 bits) antes do deslocamento aritmético.
 		variable shift_conc : signed(65 downto 0);
 	begin
 		if rising_edge(i_clk) then

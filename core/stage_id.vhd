@@ -111,27 +111,6 @@ end entity stage_id;
 
 architecture rtl of stage_id is
 
-	component m_decode is
-		generic (
-			has_div : boolean := true
-		);
-		port (
-			i_instr      : in  word_t;
-			o_is_muldiv  : out std_logic;
-			o_we_reg     : out std_logic;
-			o_sel_pc_rs1 : out std_logic
-		);
-	end component;
-
-	component csr_decode is
-		port (
-			i_instr     : in  word_t;
-			o_is_csr    : out std_logic;
-			o_we_reg    : out std_logic;
-			o_use_imm_i : out std_logic
-		);
-	end component;
-
 	-- Alias para o campo opcode (bits [6:0]) da instrução em IF/ID.
 	alias id_opcode        : opcode_t is i_instr(6 downto 0);
 	-- Alias para o índice do registrador destino rd (bits [11:7]).
@@ -202,7 +181,7 @@ begin
 		);
 
 	gen_m_decode : if (has_m or has_zmmul) generate
-		u_m_decode : m_decode
+		u_m_decode : entity work.m_decode
 			generic map (
 				has_div => has_m
 			)
@@ -219,7 +198,7 @@ begin
 	end generate gen_m_decode;
 
 	gen_csr_decode : if has_zicsr generate
-		u_csr_decode : csr_decode
+		u_csr_decode : entity work.csr_decode
 			port map (
 				i_instr     => i_instr,
 				o_is_csr    => o_is_csr,

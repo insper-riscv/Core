@@ -22,6 +22,16 @@ use work.pipeline_types.all;
 
 package alu_consts is
 
+	-- Dígito de 2 bits da quantidade de deslocamento, que seleciona a entrada de um estágio de deslocamento 4 para 1.
+	subtype shift_digit_t is std_logic_vector(1 downto 0);
+
+	-- Dígito 0 do deslocamento: o estágio não desloca.
+	constant SHIFT_DIGIT_0 : shift_digit_t := "00";
+	-- Dígito 1 do deslocamento: o estágio desloca 1 * 4**p posições.
+	constant SHIFT_DIGIT_1 : shift_digit_t := "01";
+	-- Dígito 2 do deslocamento: o estágio desloca 2 * 4**p posições.
+	constant SHIFT_DIGIT_2 : shift_digit_t := "10";
+
 	-- Posição do bit de classe de controle em alu_op_t.
 	constant ALU_BIT_CLASS : natural := 4;
 	-- Posição do bit de inversão de B (subtração, comparação e deslocamento aritmético).
@@ -90,6 +100,7 @@ end package alu_consts;
 package body alu_consts is
 
 	function alu_result_select(op : alu_op_t) return alu_sel_t is
+		-- Seleção one-hot do resultado, inicialmente sem nenhum resultado selecionado.
 		variable sel : alu_sel_t := (others => '0');
 	begin
 		if op(ALU_BIT_CLASS) = '1' then

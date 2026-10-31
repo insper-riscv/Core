@@ -9,6 +9,17 @@ The bounds of the instruction address space (IF stage) and data address space (M
 | `BOOT_ROM_SIZE_BYTES` | `0x00000800` (2 KiB) | End of the Boot ROM window (`0x00000000 .. 0x000007FF`) in the IF stage |
 | `RAM_BASE_BYTES` | `0x00008000` (32 KiB) | Base of internal data RAM (`0x00008000 .. 0x3FFFFFFF`); data addresses below this bound access port 2 of Flash memory |
 | `SDRAM_BASE_BYTES` | `0x40000000` (1 GiB) | Base of the external SDRAM and memory-mapped peripheral window (`0x40000000 .. 0xFFFFFFFF`) |
+| `FLASH_EXT_BASE_BYTES` | `0x20000000` | Base of the external FLASH in the sdram platform map |
+| `PERIPHERAL_BASE_BYTES` | `0x80000000` | Base of the peripheral window inside the external window |
+
+The bounds are powers of 2. Each base is computed from the index of its single bit set to `'1'`, and the stages decode the region by testing that address bit, without a numeric comparator.
+
+| Constant (`mem_map_consts`) | Value | Derived base |
+| :--- | :--- | :--- |
+| `RAM_BASE_BIT` | 15 | `RAM_BASE_BYTES` |
+| `FLASH_EXT_BASE_BIT` | 29 | `FLASH_EXT_BASE_BYTES` |
+| `SDRAM_BASE_BIT` | 30 | `SDRAM_BASE_BYTES` |
+| `PERIPHERAL_BASE_BIT` | 31 | `PERIPHERAL_BASE_BYTES` |
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 

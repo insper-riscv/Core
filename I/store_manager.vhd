@@ -10,6 +10,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.byte_mask_consts.all;
 use work.opcode_consts.all;
@@ -35,6 +36,10 @@ end entity store_manager;
 architecture rtl of store_manager is
 	-- Indica que a instrução atual corresponde a uma operação de escrita em memória (STORE).
 	signal is_store  : std_logic;
+	-- Meia-palavra de rs2 estendida com zeros à esquerda, antes do deslocamento (SH).
+	signal sh_base   : unsigned(31 downto 0);
+	-- Byte de rs2 estendido com zeros à esquerda, antes do deslocamento (SB).
+	signal sb_base   : unsigned(31 downto 0);
 	-- Palavra alinhada para escrita de meia-palavra (SH).
 	signal sh_data   : word_t;
 	-- Máscara de bytes para escrita de meia-palavra (SH).
@@ -48,11 +53,13 @@ begin
 	is_store <= '1' when i_opcode = OPCODE_STORE else '0';
 
 	-- Alinhamento e máscara para Store Halfword (SH), com offset 0, 1 (bytes 1 e 2) ou 2.
+	sh_base <= resize(unsigned(i_rs2_data(15 downto 0)), sh_base'length);
+
 	with i_byte_offset select
 		sh_data <=
-			X"0000" & i_rs2_data(15 downto 0)          when BYTE_OFFSET_0,
-			X"00"   & i_rs2_data(15 downto 0) & X"00"  when BYTE_OFFSET_1,
-			i_rs2_data(15 downto 0) & X"0000"          when others;
+			std_logic_vector(sh_base)                                when BYTE_OFFSET_0,
+			std_logic_vector(shift_left(sh_base, BYTE_WIDTH))        when BYTE_OFFSET_1,
+			std_logic_vector(shift_left(sh_base, 2 * BYTE_WIDTH))    when others;
 
 	with i_byte_offset select
 		sh_mask <=
@@ -61,12 +68,14 @@ begin
 			BYTE_MASK_HALF_HIGH when others;
 
 	-- Alinhamento e máscara para Store Byte (SB).
+	sb_base <= resize(unsigned(i_rs2_data(7 downto 0)), sb_base'length);
+
 	with i_byte_offset select
 		sb_data <=
-			X"000000" & i_rs2_data(7 downto 0)            when BYTE_OFFSET_0,
-			X"0000"   & i_rs2_data(7 downto 0) & X"00"    when BYTE_OFFSET_1,
-			X"00"     & i_rs2_data(7 downto 0) & X"0000"  when BYTE_OFFSET_2,
-			i_rs2_data(7 downto 0)             & X"000000" when others;
+			std_logic_vector(sb_base)                                when BYTE_OFFSET_0,
+			std_logic_vector(shift_left(sb_base, BYTE_WIDTH))        when BYTE_OFFSET_1,
+			std_logic_vector(shift_left(sb_base, 2 * BYTE_WIDTH))    when BYTE_OFFSET_2,
+			std_logic_vector(shift_left(sb_base, 3 * BYTE_WIDTH))    when others;
 
 	with i_byte_offset select
 		sb_mask <=

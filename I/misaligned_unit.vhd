@@ -133,7 +133,7 @@ begin
 
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
 
-	is_sdram <= '1' when ((ext_flash and (i_addr(31) = '1' or i_addr(30) = '1' or i_addr(29) = '1')) or
+	is_sdram <= '1' when ((ext_flash and (i_addr(PERIPHERAL_BASE_BIT) = '1' or i_addr(SDRAM_BASE_BIT) = '1' or i_addr(FLASH_EXT_BASE_BIT) = '1')) or
 	                      ((not ext_flash) and unsigned(i_addr) >= SDRAM_BASE_BYTES))
 	            else '0';
 	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
@@ -150,11 +150,12 @@ begin
 			i_rst    => i_rst
 		);
 
-	raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else x"0000" & i_store_data(31 downto 16);
+	raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else
+	            std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
 	raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
 
-	data64 <= std_logic_vector(shift_left(unsigned(x"00000000" & raw_data), 8 * to_integer(unsigned(offset))));
-	mask8  <= std_logic_vector(shift_left(unsigned("0000" & raw_mask), to_integer(unsigned(offset))));
+	data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length), BYTE_WIDTH * to_integer(unsigned(offset))));
+	mask8  <= std_logic_vector(shift_left(resize(unsigned(raw_mask), mask8'length), to_integer(unsigned(offset))));
 
 	next_word <= unsigned(i_addr(31 downto 2)) + 1;
 
@@ -170,7 +171,7 @@ begin
 
 	u_first_word_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,

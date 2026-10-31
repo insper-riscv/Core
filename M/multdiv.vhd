@@ -25,6 +25,7 @@ use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.funct3_consts.all;
+use work.muldiv_consts.all;
 
 entity multdiv is
 	generic (
@@ -91,7 +92,7 @@ architecture rtl of multdiv is
 	-- Indica se a operação travada é de resto de divisão (REM, REMU).
 	signal is_rem_lat     : std_logic;
 	-- Modo de sinal dos operandos A e B ("11"=signed/signed, "10"=signed/unsigned, "00"=unsigned/unsigned).
-	signal signed_mode    : std_logic_vector(1 downto 0);
+	signal signed_mode    : signed_mode_t;
 
 	-- Parte baixa (bits [31:0]) produzida pelo multiplicador de Booth.
 	signal mul_lo         : word_t;
@@ -157,7 +158,7 @@ begin
 	-- Registrador que preserva o funct3 da instrução iniciada durante todos os ciclos de cálculo.
 	u_funct3_reg : entity work.generic_register
 		generic map (
-			data_width => 3
+			data_width => funct3_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -174,9 +175,9 @@ begin
 
 	with funct3_latched select
 		signed_mode <=
-			"11" when FUNCT3_MUL | FUNCT3_MULH | FUNCT3_DIV | FUNCT3_REM,
-			"10" when FUNCT3_MULHSU,
-			"00" when others;
+			SIGNED_BOTH   when FUNCT3_MUL | FUNCT3_MULH | FUNCT3_DIV | FUNCT3_REM,
+			SIGNED_A_ONLY when FUNCT3_MULHSU,
+			SIGNED_NONE   when others;
 
 	busy_int  <= mult_busy or div_busy;
 	done_int  <= mult_done or div_done;
@@ -243,7 +244,7 @@ begin
 
 	u_adder_corr_a : entity work.adder
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_a => mul_hi,
@@ -253,7 +254,7 @@ begin
 
 	u_adder_corr_b : entity work.adder
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_a => high_plus_a,
@@ -263,7 +264,7 @@ begin
 
 	u_mux_mul_res : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => mul_lo,
@@ -274,7 +275,7 @@ begin
 
 	u_mux_div_res : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => div_quotient,
@@ -285,7 +286,7 @@ begin
 
 	u_mux_final_res : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => div_result,
@@ -297,7 +298,7 @@ begin
 	-- Registrador de captura do resultado final no pulso done_int.
 	u_result_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,

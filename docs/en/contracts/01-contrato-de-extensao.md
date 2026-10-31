@@ -6,6 +6,8 @@ The RISC-V specification defines the architectural semantics of each instruction
 
 Each extension resides in its own folder and is enabled at the top level `core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
+The stages instantiate the unit of each extension directly with `entity work`, without a `component` declaration. For that reason every profile analyzes the files of all extensions, and a generic set to `false` removes the unit from the elaboration.
+
 ## 2. Pipeline Integration Rules
 
 ### 2.1. Decoding in the ID Stage

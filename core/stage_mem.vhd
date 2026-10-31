@@ -140,15 +140,11 @@ begin
 	o_trap_take  <= trap_take_int;
 	access_valid <= i_valid and (not trap_take_int);
 
-	assert RAM_BASE_BYTES = x"00008000" and SDRAM_BASE_BYTES = x"40000000"
-		report "O stage_mem decodifica as regiões por bits do endereço: RAM_BASE e SDRAM_BASE devem ser 2**15 e 2**30"
-		severity failure;
-
 	-- As fronteiras do mapa são potências de 2, então a região sai de testes de bits do endereço.
 	is_flash_data   <= '0' when ext_flash else
-	                   '1' when i_alu_out(31 downto 15) = (31 downto 15 => '0') else '0';
-	is_sdram        <= (i_alu_out(31) or i_alu_out(30) or i_alu_out(29)) when ext_flash else
-	                   (i_alu_out(31) or i_alu_out(30));
+	                   '1' when i_alu_out(PERIPHERAL_BASE_BIT downto RAM_BASE_BIT) = (PERIPHERAL_BASE_BIT downto RAM_BASE_BIT => '0') else '0';
+	is_sdram        <= (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT) or i_alu_out(FLASH_EXT_BASE_BIT)) when ext_flash else
+	                   (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT));
 	is_ram_internal <= (not is_flash_data) and (not is_sdram);
 
 	o_flash_addr2   <= i_alu_out;

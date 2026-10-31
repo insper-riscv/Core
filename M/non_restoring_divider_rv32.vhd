@@ -17,6 +17,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.word_consts.all;
 
 entity non_restoring_divider_rv32 is
 	port (
@@ -80,11 +81,6 @@ architecture rtl of non_restoring_divider_rv32 is
 	-- Registrador de saída do resto final.
 	signal r_result           : word_t;
 
-	-- Constante de 32 bits com todos os bits em '1' (-1 em complemento de dois, 0xFFFFFFFF).
-	constant ALL_ONES         : word_t := x"FFFFFFFF";
-	-- Menor inteiro negativo representável em 32 bits com sinal (-2^31, 0x80000000).
-	constant INT_MIN          : word_t := x"80000000";
-
 	-- Registrador interno de ocupação durante o cálculo.
 	signal busy_reg           : std_logic := '0';
 	-- Inibidor que impede reinício imediato enquanto i_start permanecer em '1'.
@@ -97,12 +93,16 @@ begin
 
 	detect_div_by_zero <= '1' when unsigned(i_divisor) = 0 else '0';
 
-	detect_overflow <= '1' when (i_is_unsigned = '0' and i_dividend = INT_MIN and i_divisor = ALL_ONES) else '0';
+	detect_overflow <= '1' when (i_is_unsigned = '0' and i_dividend = WORD_INT_MIN and i_divisor = WORD_ALL_ONES) else '0';
 
 	process(i_clk)
+		-- Resto parcial deslocado de um bit com o próximo bit do dividendo (34 bits com sinal).
 		variable rem_shifted    : signed(33 downto 0);
+		-- Resto parcial após somar ou subtrair o divisor (34 bits com sinal).
 		variable rem_next       : signed(33 downto 0);
+		-- Módulo do dividendo usado nas divisões com sinal.
 		variable abs_dividend_v : unsigned(31 downto 0);
+		-- Módulo do divisor usado nas divisões com sinal.
 		variable abs_divisor_v  : unsigned(31 downto 0);
 	begin
 		if rising_edge(i_clk) then
@@ -168,7 +168,7 @@ begin
 
 								rem_reg    <= (others => '0');
 								quot_reg   <= abs_dividend_v;
-								div_reg    <= signed("00" & std_logic_vector(abs_divisor_v));
+								div_reg    <= signed(resize(abs_divisor_v, div_reg'length));
 								iter_count <= (others => '0');
 								state      <= S_COMPUTE;
 							end if;
@@ -176,10 +176,10 @@ begin
 
 					when S_SPECIAL =>
 						if detect_div_by_zero = '1' then
-							q_result <= ALL_ONES;
+							q_result <= WORD_ALL_ONES;
 							r_result <= i_dividend;
 						else
-							q_result <= INT_MIN;
+							q_result <= WORD_INT_MIN;
 							r_result <= (others => '0');
 						end if;
 						state <= S_DONE;

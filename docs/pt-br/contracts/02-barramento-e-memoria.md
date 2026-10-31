@@ -9,6 +9,17 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 | `BOOT_ROM_SIZE_BYTES` | `0x00000800` (2 KiB) | Fim da janela da Boot ROM (`0x00000000 .. 0x000007FF`) no estágio IF |
 | `RAM_BASE_BYTES` | `0x00008000` (32 KiB) | Base da memória RAM interna de dados (`0x00008000 .. 0x3FFFFFFF`); endereços de dados abaixo deste limite acessam a segunda porta da memória Flash |
 | `SDRAM_BASE_BYTES` | `0x40000000` (1 GiB) | Base da janela externa de SDRAM e periféricos mapeados em memória (`0x40000000 .. 0xFFFFFFFF`) |
+| `FLASH_EXT_BASE_BYTES` | `0x20000000` | Base da FLASH externa no mapa da plataforma sdram |
+| `PERIPHERAL_BASE_BYTES` | `0x80000000` | Base da janela de periféricos dentro da janela externa |
+
+As fronteiras são potências de 2. Cada base é calculada a partir do índice do seu único bit em `'1'`, e os estágios decodificam a região testando esse bit do endereço, sem comparador numérico.
+
+| Constante (`mem_map_consts`) | Valor | Base derivada |
+| :--- | :--- | :--- |
+| `RAM_BASE_BIT` | 15 | `RAM_BASE_BYTES` |
+| `FLASH_EXT_BASE_BIT` | 29 | `FLASH_EXT_BASE_BYTES` |
+| `SDRAM_BASE_BIT` | 30 | `SDRAM_BASE_BYTES` |
+| `PERIPHERAL_BASE_BIT` | 31 | `PERIPHERAL_BASE_BYTES` |
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 

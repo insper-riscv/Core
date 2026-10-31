@@ -12,6 +12,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.ext_ram_consts.all;
+use work.byte_mask_consts.all;
 
 entity extender_ram is
 	port (
@@ -36,16 +37,16 @@ begin
 	-- Seleção da meia-palavra pelo offset do endereço (0: bytes 0 e 1; 1: bytes 1 e 2; 2: bytes 2 e 3).
 	with i_byte_offset select
 		selected_half <=
-			i_data(15 downto 0)  when "00",
-			i_data(23 downto 8)  when "01",
+			i_data(15 downto 0)  when BYTE_OFFSET_0,
+			i_data(23 downto 8)  when BYTE_OFFSET_1,
 			i_data(31 downto 16) when others;
 
 	-- Seleção do byte correspondente ao deslocamento i_byte_offset.
 	with i_byte_offset select
 		selected_byte <=
-			i_data(7 downto 0)   when "00",
-			i_data(15 downto 8)  when "01",
-			i_data(23 downto 16) when "10",
+			i_data(7 downto 0)   when BYTE_OFFSET_0,
+			i_data(15 downto 8)  when BYTE_OFFSET_1,
+			i_data(23 downto 16) when BYTE_OFFSET_2,
 			i_data(31 downto 24) when others;
 
 	-- Extensão de sinal ou zero conforme o tipo de instrução de load.

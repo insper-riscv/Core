@@ -27,6 +27,7 @@ use work.byte_mask_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
 use work.mem_map_consts.all;
+use work.trap_consts.all;
 
 entity trap_unit is
 	generic (
@@ -75,28 +76,6 @@ end entity trap_unit;
 
 architecture rtl of trap_unit is
 
-	-- Campo funct12 da instrução ECALL (0x000).
-	constant IMM12_ECALL          : std_logic_vector(11 downto 0) := x"000";
-	-- Campo funct12 da instrução EBREAK (0x001).
-	constant IMM12_EBREAK         : std_logic_vector(11 downto 0) := x"001";
-	-- Campo funct12 da instrução WFI (0x105).
-	constant IMM12_WFI            : std_logic_vector(11 downto 0) := x"105";
-	-- Campo funct12 da instrução MRET (0x302).
-	constant IMM12_MRET           : std_logic_vector(11 downto 0) := x"302";
-
-	-- Código mcause para endereço de instrução desalinhado (0).
-	constant CAUSE_MISALIGNED_PC  : word_t := x"00000000";
-	-- Código mcause para instrução ilegal (2).
-	constant CAUSE_ILLEGAL_INSTR  : word_t := x"00000002";
-	-- Código mcause para breakpoint EBREAK (3).
-	constant CAUSE_BREAKPOINT     : word_t := x"00000003";
-	-- Código mcause para endereço de load desalinhado (4).
-	constant CAUSE_MISALIGNED_LD  : word_t := x"00000004";
-	-- Código mcause para endereço de store desalinhado (6).
-	constant CAUSE_MISALIGNED_ST  : word_t := x"00000006";
-	-- Código mcause para chamada de ambiente do modo M - ECALL (11).
-	constant CAUSE_MACHINE_ECALL  : word_t := x"0000000B";
-
 	-- Indica que a instrução pertence à classe SYSTEM (opcode 1110011).
 	signal is_system   : std_logic;
 	-- Indica que a instrução SYSTEM é uma operação de acesso a CSR.
@@ -142,10 +121,6 @@ architecture rtl of trap_unit is
 
 begin
 
-	assert RAM_BASE_BYTES = x"00008000" and SDRAM_BASE_BYTES = x"40000000" and PERIPHERAL_BASE_BYTES = x"80000000"
-		report "O trap_unit decodifica as regiões por bits do endereço: RAM_BASE, SDRAM_BASE e PERIPHERAL_BASE devem ser 2**15, 2**30 e 2**31"
-		severity failure;
-
 	is_system <= '1' when i_opcode = OPCODE_SYSTEM else '0';
 	is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= FUNCT3_SYSTEM_RESERVED) else '0';
 	no_regs   <= '1' when (i_funct3 = FUNCT3_PRIV and i_rd_idx = REG_ZERO and i_rs1_idx = REG_ZERO) else '0';
@@ -170,10 +145,11 @@ begin
 	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
 	                    else '0';
 
-	-- As fronteiras do mapa são potências de 2 (conferido nas asserções acima), então "ea >= RAM_BASE" é "algum bit
-	-- [30:15] em '1'" e "ea < PERIPHERAL_BASE" é "bit 31 em '0'", sem comparador numérico depois da ULA.
-	in_main_mem <= '1' when ((ext_flash and i_ea(31) = '0' and (i_ea(30) /= i_ea(29))) or
-	                         ((not ext_flash) and i_ea(31) = '0' and i_ea(30 downto 15) /= (30 downto 15 => '0')))
+	-- As fronteiras do mapa são potências de 2, então "ea >= RAM_BASE" é "algum bit entre a RAM e a SDRAM em '1'"
+	-- e "ea < PERIPHERAL_BASE" é "bit de periféricos em '0'", sem comparador numérico depois da ULA.
+	in_main_mem <= '1' when ((ext_flash and i_ea(PERIPHERAL_BASE_BIT) = '0' and (i_ea(SDRAM_BASE_BIT) /= i_ea(FLASH_EXT_BASE_BIT))) or
+	                         ((not ext_flash) and i_ea(PERIPHERAL_BASE_BIT) = '0' and
+	                          i_ea(SDRAM_BASE_BIT downto RAM_BASE_BIT) /= (SDRAM_BASE_BIT downto RAM_BASE_BIT => '0')))
 	               else '0';
 
 	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
@@ -184,18 +160,13 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	last_word <= '1' when ((ext_flash and i_ea(28 downto 2) = (28 downto 2 => '1')) or
-	                       ((not ext_flash) and i_ea(29 downto 2) = (29 downto 2 => '1')))
+	last_word <= '1' when ((ext_flash and i_ea(FLASH_EXT_BASE_BIT - 1 downto BYTE_OFFSET_0'length) = (FLASH_EXT_BASE_BIT - 1 downto BYTE_OFFSET_0'length => '1')) or
+	                       ((not ext_flash) and i_ea(SDRAM_BASE_BIT - 1 downto BYTE_OFFSET_0'length) = (SDRAM_BASE_BIT - 1 downto BYTE_OFFSET_0'length => '1')))
 	             else '0';
 
-	-- RAM interna: bits [31:30] = "00" e algum bit [29:15] em '1'. SDRAM: bits [31:30] = "01".
-	-- Mapa da sdram (ext_flash): FLASH é "001" e SDRAM é "010" nos bits [31:29], e cada uma acaba na palavra [28:2] toda em '1'.
-	same_region <= '1' when ((ext_flash and (i_ea(31 downto 29) = "001" or i_ea(31 downto 29) = "010") and last_word = '0') or
-	                         ((not ext_flash) and
-	                          ((i_ea(31 downto 30) = "00" and i_ea(29 downto 15) /= (29 downto 15 => '0')) or
-	                           i_ea(31 downto 30) = "01") and
-	                          last_word = '0'))
-	               else '0';
+	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal
+	-- e não na última palavra da região, pois a palavra seguinte pertenceria à região vizinha.
+	same_region <= in_main_mem and (not last_word);
 
 	misal_exec <= '1' when (misal_in_word = '1' or
 	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and

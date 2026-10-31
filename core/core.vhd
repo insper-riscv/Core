@@ -178,9 +178,11 @@ architecture rtl of core is
 	signal mis_mask          : byte_mask_t;
 	-- Primeira palavra lida por um load desalinhado, retida para o estágio WB.
 	signal mis_first_word    : word_t;
-	-- Região e cruzamento do load em WB, decodificados na entrada do registrador MEM/WB.
+	-- Região FLASH do load em WB, decodificada na entrada do registrador MEM/WB.
 	signal memwb_is_flash    : std_logic;
+	-- Região SDRAM do load em WB, decodificada na entrada do registrador MEM/WB.
 	signal memwb_is_sdram    : std_logic;
+	-- Cruzamento de palavra do load em WB, decodificado na entrada do registrador MEM/WB.
 	signal memwb_is_cross    : std_logic;
 	-- Endereço que o estágio MEM de fato apresenta às memórias.
 	signal mem_addr          : word_t;
@@ -344,13 +346,19 @@ architecture rtl of core is
 	signal trap_take         : std_logic;
 	-- Exceção de endereço do acesso à memória no estágio MEM (instrução mais antiga que a de EX).
 	signal mem_trap_take     : std_logic;
-	-- Causa e valor de mtval da exceção de MEM.
+	-- Causa (mcause) da exceção de MEM.
 	signal mem_trap_cause    : word_t;
+	-- Valor de mtval da exceção de MEM.
 	signal mem_trap_tval     : word_t;
 	-- Validade da instrução em EX descontada a exceção de MEM, que a descarta.
 	signal ex_valid_live     : std_logic;
-	-- Campos da instrução em MEM trazidos de EX/MEM.
+	-- Exceção síncrona em EX ou em MEM: redireciona o PC para o vetor de traps.
+	signal any_trap_take     : std_logic;
+	-- Instrução em MEM válida e sem exceção de endereço, liberada para a unidade de acesso desalinhado.
+	signal mis_valid         : std_logic;
+	-- PC da instrução em MEM trazido de EX/MEM.
 	signal exmem_pc          : word_t;
+	-- Campo funct3 da instrução em MEM trazido de EX/MEM.
 	signal exmem_funct3      : funct3_t;
 	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
 	signal retire_pulse      : std_logic;
@@ -437,6 +445,8 @@ begin
 	-- antiga que a de EX, então redireciona o pipeline e descarta a instrução de EX. Sem CSRs, o endereço é
 	-- conferido em EX junto das demais causas, que só são sinalizadas, e mem_trap_take fica em zero.
 	ex_valid_live <= ex_valid and (not mem_trap_take);
+	any_trap_take <= trap_take or mem_trap_take;
+	mis_valid     <= exmem_valid and (not mem_trap_take);
 
 	o_trap        <= trap_sig;
 	retire_pulse  <= ex_valid_live and pipe_run and (not trap_take) and (not trap_sig);
@@ -485,7 +495,7 @@ begin
 			i_pipe_run        => pipe_run,
 			i_ex_branch_taken => ex_branch_taken,
 			i_ex_jalr_taken   => ex_jalr_taken,
-			i_trap_take       => trap_take or mem_trap_take,
+			i_trap_take       => any_trap_take,
 			i_mret_take       => mret_take,
 			i_fencei_take     => fencei_take,
 			i_branch_target   => ex_branch_target,
@@ -750,7 +760,7 @@ begin
 		port map (
 			i_clk         => i_clk,
 			i_rst         => i_rst,
-			i_valid       => exmem_valid and (not mem_trap_take),
+			i_valid       => mis_valid,
 			i_en          => exmem_en_ram,
 			i_re          => exmem_re_ram,
 			i_we          => exmem_we_ram,
@@ -877,7 +887,7 @@ begin
 
 	u_wb_data_prev_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -902,7 +912,7 @@ begin
 
 	u_wb2_rd_reg : entity work.generic_register
 		generic map (
-			data_width => 5
+			data_width => reg_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -914,7 +924,7 @@ begin
 
 	u_wb2_data_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -926,7 +936,7 @@ begin
 
 	u_mux_wb_data : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => wb_data_raw,

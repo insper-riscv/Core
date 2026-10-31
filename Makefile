@@ -14,9 +14,10 @@ check:
 	@echo "VHDL syntax check passed"
 
 # Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml,
-# a flat `- path` list) and elaborate the top with the profile's generic. rv32i
-# has no M/ files, which proves the core builds without them, and the last profile has every
-# extension. GHDL 6 takes the generic at run time, so each profile is elaborated and run for 1 ns.
+# a flat `- path` list) and elaborate the top with the profile's generic. rv32i has no extension
+# enabled and the last profile has every extension enabled. Every profile analyzes the same extension
+# units, because core instantiates them directly, and the disabled ones leave the elaboration.
+# GHDL 6 takes the generic at run time, so each profile is elaborated and run for 1 ns.
 profiles: profile-matrix
 	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicsr_zifencei rv32im_zicclsm_zicntr_zifencei; do \
 	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \

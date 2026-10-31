@@ -44,6 +44,9 @@ use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.csr_addr_consts.all;
 use work.csr_event_consts.all;
+use work.csr_value_consts.all;
+use work.byte_mask_consts.all;
+use work.word_consts.all;
 
 entity csr_file is
 	generic (
@@ -108,11 +111,6 @@ architecture rtl of csr_file is
 		end if;
 		return '0';
 	end function;
-
-	-- Valor fixo do registrador misa: RV32 (MXL = 1) com extensões I e M habilitadas.
-	-- misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
-	constant MISA_BASE       : word_t := x"40000100";
-	constant MISA_WITH_M     : word_t := x"40001100";
 
 	-- Bit MIE (bit 3) armazenado no registrador mstatus.
 	signal mstatus_mie       : std_logic;
@@ -192,6 +190,7 @@ architecture rtl of csr_file is
 	constant HAS_INHIBIT     : boolean := has_zicntr or hpm_counters > 0;
 	-- Bits de mcountinhibit que aceitam escrita: mcycle (0), minstret (2) e um por contador de eventos (3 em diante).
 	function inhibit_mask return std_logic_vector is
+		-- Máscara dos bits de mcountinhibit que aceitam escrita, montada conforme as extensões habilitadas.
 		variable mask : std_logic_vector(6 downto 0) := (others => '0');
 	begin
 		if has_zicntr then
@@ -291,15 +290,15 @@ begin
 	o_mtvec <= mtvec_reg;
 	o_mepc  <= mepc_reg;
 
-	-- Cálculo do valor modificado conforme os bits [1:0] de i_op (01=RW, 10=RS, 11=RC).
+	-- Cálculo do valor modificado conforme os bits [1:0] de i_op (escrita, set ou clear de bits).
 	with i_op(1 downto 0) select
 		new_value <=
-			i_wdata                     when "01",
-			old_value or i_wdata        when "10",
+			i_wdata                     when CSR_OP_WRITE,
+			old_value or i_wdata        when CSR_OP_SET,
 			old_value and (not i_wdata) when others;
 
-	has_write_effect <= '1' when (i_op(1 downto 0) = "01" or i_src_zero = '0') else '0';
-	is_read_only     <= '1' when i_addr(11 downto 10) = "11" else '0';
+	has_write_effect <= '1' when (i_op(1 downto 0) = CSR_OP_WRITE or i_src_zero = '0') else '0';
+	is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';
 	o_illegal        <= (not is_known_addr) or (has_write_effect and is_read_only);
 
 	csr_write_valid  <= '1' when (i_commit = '1' and has_write_effect = '1' and is_known_addr = '1' and is_read_only = '0') else '0';
@@ -317,13 +316,13 @@ begin
 
 	-- Controle de atualização dos CSRs de 32 bits.
 	mtvec_we    <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and i_mret_take = '0') else '0';
-	mtvec_nxt   <= new_value(31 downto 2) & "00";
+	mtvec_nxt   <= new_value(31 downto 2) & BYTE_OFFSET_0;
 
 	mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and i_mret_take = '0') else '0';
 
 	mepc_we     <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else '0';
-	mepc_nxt    <= i_trap_pc(31 downto 2) & "00" when i_trap_take = '1' else
-	               new_value(31 downto 2) & "00";
+	mepc_nxt    <= i_trap_pc(31 downto 2) & BYTE_OFFSET_0 when i_trap_take = '1' else
+	               new_value(31 downto 2) & BYTE_OFFSET_0;
 
 	mcause_we   <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else '0';
 	mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;
@@ -387,7 +386,7 @@ begin
 		-- O programa lê minstret já com a retirada pendente somada.
 		minstret_rd_lo <= std_logic_vector(unsigned(minstret_lo) + unsigned'(0 => retire_pending and (not inhibit_reg(2))));
 		minstret_rd_hi <= std_logic_vector(unsigned(minstret_hi) +
-		                  unsigned'(0 => retire_pending and (not inhibit_reg(2)) and bool_to_sl(minstret_lo = x"FFFFFFFF")));
+		                  unsigned'(0 => retire_pending and (not inhibit_reg(2)) and bool_to_sl(minstret_lo = WORD_ALL_ONES)));
 
 		-- minstret soma 1 a cada instrução retirada em EX, um ciclo depois da retirada e salvo cancelamento.
 		u_minstret : entity work.counter64
@@ -447,7 +446,7 @@ begin
 
 		u_inhibit_reg : entity work.generic_register
 			generic map (
-				data_width => 7
+				data_width => inhibit_reg'length
 			)
 			port map (
 				i_clk    => i_clk,
@@ -512,7 +511,9 @@ begin
 
 	gen_ext_addr : if HAS_INHIBIT generate
 		process (i_addr, inhibit_reg, event_code, hpm_lo, hpm_hi)
+			-- Indica que o endereço pertence a um CSR do grupo de contadores de eventos ou de mcountinhibit.
 			variable known : std_logic;
+			-- Valor lido do CSR do grupo de contadores de eventos ou de mcountinhibit.
 			variable value : word_t;
 		begin
 			known := '0';
@@ -568,7 +569,7 @@ begin
 
 	u_mtvec_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -580,7 +581,7 @@ begin
 
 	u_mscratch_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -592,7 +593,7 @@ begin
 
 	u_mepc_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -604,7 +605,7 @@ begin
 
 	u_mcause_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -616,7 +617,7 @@ begin
 
 	u_mtval_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,

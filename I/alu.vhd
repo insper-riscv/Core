@@ -30,6 +30,7 @@ use ieee.numeric_std.all;
 use work.pipeline_types.all;
 use work.utils_pkg.all;
 use work.alu_consts.all;
+use work.funct3_consts.all;
 
 entity alu is
 
@@ -67,6 +68,7 @@ architecture rtl of alu is
 
 	-- Desloca x à direita de n posições, preenchendo com fill à esquerda.
 	function shift_right_fill(x : std_logic_vector; n : natural; fill : std_logic) return std_logic_vector is
+		-- Vetor resultado do deslocamento à direita, com a largura de x.
 		variable r : std_logic_vector(x'length - 1 downto 0);
 	begin
 		for i in r'range loop
@@ -81,6 +83,7 @@ architecture rtl of alu is
 
 	-- Desloca x à esquerda de n posições, preenchendo com zero à direita.
 	function shift_left_zero(x : std_logic_vector; n : natural) return std_logic_vector is
+		-- Vetor resultado do deslocamento à esquerda, com a largura de x.
 		variable r : std_logic_vector(x'length - 1 downto 0);
 	begin
 		for i in r'range loop
@@ -167,15 +170,15 @@ begin
 		gen_quad : if 2 * p + 1 < SHAMT_WIDTH generate
 			with i_b(2 * p + 1 downto 2 * p) select
 				shl_stage(p + 1) <=
-					shl_stage(p)                                  when "00",
-					shift_left_zero(shl_stage(p), 1 * 4 ** p)     when "01",
-					shift_left_zero(shl_stage(p), 2 * 4 ** p)     when "10",
+					shl_stage(p)                                  when SHIFT_DIGIT_0,
+					shift_left_zero(shl_stage(p), 1 * 4 ** p)     when SHIFT_DIGIT_1,
+					shift_left_zero(shl_stage(p), 2 * 4 ** p)     when SHIFT_DIGIT_2,
 					shift_left_zero(shl_stage(p), 3 * 4 ** p)     when others;
 			with i_b(2 * p + 1 downto 2 * p) select
 				shr_stage(p + 1) <=
-					shr_stage(p)                                          when "00",
-					shift_right_fill(shr_stage(p), 1 * 4 ** p, shift_fill) when "01",
-					shift_right_fill(shr_stage(p), 2 * 4 ** p, shift_fill) when "10",
+					shr_stage(p)                                          when SHIFT_DIGIT_0,
+					shift_right_fill(shr_stage(p), 1 * 4 ** p, shift_fill) when SHIFT_DIGIT_1,
+					shift_right_fill(shr_stage(p), 2 * 4 ** p, shift_fill) when SHIFT_DIGIT_2,
 					shift_right_fill(shr_stage(p), 3 * 4 ** p, shift_fill) when others;
 		end generate gen_quad;
 		gen_single : if 2 * p + 1 >= SHAMT_WIDTH generate
@@ -199,12 +202,12 @@ begin
 
 	with op_sel select
 		o_branch <=
-			is_branch and equal                       when "000",
-			is_branch and not equal                   when "001",
-			is_branch and lt_signed                   when "100",
-			is_branch and not lt_signed               when "101",
-			is_branch and lt_unsigned                 when "110",
-			is_branch and not lt_unsigned             when "111",
+			is_branch and equal                       when FUNCT3_BEQ,
+			is_branch and not equal                   when FUNCT3_BNE,
+			is_branch and lt_signed                   when FUNCT3_BLT,
+			is_branch and not lt_signed               when FUNCT3_BGE,
+			is_branch and lt_unsigned                 when FUNCT3_BLTU,
+			is_branch and not lt_unsigned             when FUNCT3_BGEU,
 			'0'                                       when others;
 
 end architecture rtl;

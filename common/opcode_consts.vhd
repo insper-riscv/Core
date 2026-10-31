@@ -12,6 +12,12 @@ use work.pipeline_types.all;
 package opcode_consts is
 
   ------------------------------------------------------------------
+  -- Prefixo de instrução de 32 bits
+  ------------------------------------------------------------------
+  -- Bits [1:0] de toda instrução de 32 bits (os outros valores indicam instrução comprimida, não suportada).
+  constant OPCODE_LOW_BITS : std_logic_vector(1 downto 0) := "11";
+
+  ------------------------------------------------------------------
   -- RV32I Base Opcodes [6:0]
   ------------------------------------------------------------------
   -- Instruções de leitura de memória (LB, LH, LW, LBU, LHU).
