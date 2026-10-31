@@ -27,24 +27,24 @@ def _parse_field(val: str, width: int) -> int:
         "LBU": 0b100,
 
         # opALU[4:0]
-        "PASS_B": 0b00000,
-        "ADD":    0b00001,
-        "XOR":    0b00010,
-        "OR":     0b00011,
-        "AND":    0b00100,
-        "SLL":    0b00101,
-        "SRL":    0b00110,
-        "SRA":    0b00111,
+        "ADD":    0b00000,
+        "SLL":    0b00001,
+        "XOR":    0b00100,
+        "SRL":    0b00101,
+        "OR":     0b00110,
+        "AND":    0b00111,
         "SUB":    0b01000,
-        "SLT":    0b01001,
-        "SLTU":   0b01010,
-        "BEQ":    0b01011,
-        "BNE":    0b01100,
-        "BLT":    0b01101,
-        "BGE":    0b01110,
-        "BLTU":   0b01111,
-        "BGEU":   0b10000,
-        "JALR":   0b10001,
+        "SLT":    0b01010,
+        "SLTU":   0b01011,
+        "SRA":    0b01101,
+        "JALR":   0b10000,
+        "LUI":    0b10001,
+        "BEQ":    0b11000,
+        "BNE":    0b11001,
+        "BLT":    0b11100,
+        "BGE":    0b11101,
+        "BLTU":   0b11110,
+        "BGEU":   0b11111,
     }
 
     if val in symbol_map:
@@ -101,7 +101,7 @@ async def test_control_unit(dut):
 
         exp_selMuxPc4ALU    = _parse_field(row["SelMuxPc4ALU"], 1)
         exp_opExImm         = _parse_field(row["opExImm[2:0]"], 3)
-        exp_selMuxALUPc4RAM = _parse_field(row["selMuxALUPc4RAM[1:0]"], 2)
+        exp_selMuxALURAM = _parse_field(row["selMuxALURAM"], 1)
         exp_weReg           = _parse_field(row["weReg"], 1)
         exp_opExRAM         = _parse_field(row["opExRAM[2:0]"], 3)
         exp_selMuxRS2Imm    = _parse_field(row["selMuxRS2Imm"], 1)
@@ -113,7 +113,7 @@ async def test_control_unit(dut):
 
         got_selMuxPc4ALU    = int(dut.o_sel_pc4_alu.value)
         got_opExImm         = int(dut.o_ext_imm_op.value)
-        got_selMuxALUPc4RAM = int(dut.o_wb_sel.value)
+        got_selMuxALURAM = int(dut.o_wb_sel.value)
         got_weReg           = int(dut.o_we_reg.value)
         got_opExRAM         = int(dut.o_ext_ram_op.value)
         got_selMuxRS2Imm    = int(dut.o_sel_rs2_imm.value)
@@ -129,8 +129,8 @@ async def test_control_unit(dut):
         assert got_opExImm == exp_opExImm, (
             f"{inst_name}: opExImm got={got_opExImm:03b} exp={exp_opExImm:03b}"
         )
-        assert got_selMuxALUPc4RAM == exp_selMuxALUPc4RAM, (
-            f"{inst_name}: selMuxALUPc4RAM got={got_selMuxALUPc4RAM:02b} exp={exp_selMuxALUPc4RAM:02b}"
+        assert got_selMuxALURAM == exp_selMuxALURAM, (
+            f"{inst_name}: selMuxALURAM got={got_selMuxALURAM:b} exp={exp_selMuxALURAM:b}"
         )
         assert got_weReg == exp_weReg, (
             f"{inst_name}: weReg got={got_weReg} exp={exp_weReg}"

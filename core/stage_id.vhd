@@ -18,6 +18,7 @@ use work.pipeline_types.all;
 use work.ext_imm_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
+use work.alu_consts.all;
 
 entity stage_id is
 	generic (
@@ -45,6 +46,10 @@ entity stage_id is
 		i_wb_rd       : in  reg_t;
 		-- Dado de 32 bits a ser escrito no banco de registradores vindo do estágio WB.
 		i_wb_data     : in  word_t;
+		-- Endereço do registrador destino rd da instrução no estágio MEM (para detecção load-use).
+		i_mem_rd      : in  reg_t;
+		-- Indica se a instrução no estágio MEM é uma leitura de memória (load).
+		i_mem_re_ram  : in  std_logic;
 		-- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
 		i_ex_rd       : in  reg_t;
 		-- Indica se a instrução no estágio EX é uma leitura de memória (load).
@@ -83,6 +88,8 @@ entity stage_id is
 		o_sel_pc_rs1  : out std_logic;
 		-- Código de operação da ULA.
 		o_alu_op      : out alu_op_t;
+		-- Seleção one-hot do resultado de dados da ULA, decodificada do código de operação.
+		o_alu_sel     : out alu_sel_t;
 		-- Indica que a instrução pertence à extensão M (multiplicação/divisão).
 		o_is_muldiv   : out std_logic;
 		-- Indica que a instrução pertence à extensão Zicsr (acesso a registrador CSR).
@@ -136,6 +143,8 @@ architecture rtl of stage_id is
 
 	-- Operação do extensor de imediato gerada pela unidade de controle base.
 	signal cu_ext_imm_op   : ext_imm_op_t;
+	-- Código de operação da ULA gerado pela unidade de controle.
+	signal cu_alu_op       : alu_op_t;
 	-- Operação efetiva do extensor de imediato (forçada para EXT_IMM_I em instruções SYSTEM/CSR).
 	signal id_ext_imm_op   : ext_imm_op_t;
 	-- Habilitação de escrita em registrador da unidade de controle base RV32I.
@@ -183,7 +192,7 @@ begin
 			o_ext_ram_op  => o_ext_ram_op,
 			o_sel_rs2_imm => o_sel_rs2_imm,
 			o_sel_pc_rs1  => base_sel_pc_rs1,
-			o_alu_op      => o_alu_op,
+			o_alu_op      => cu_alu_op,
 			o_we_ram      => cu_we_ram,
 			o_re_ram      => cu_re_ram,
 			o_en_ram      => cu_en_ram,
@@ -238,6 +247,9 @@ begin
 			o_imm   => o_imm
 		);
 
+	o_alu_op  <= cu_alu_op;
+	o_alu_sel <= alu_result_select(cu_alu_op);
+
 	u_regfile : entity work.reg_file
 		port map (
 			i_clk    => i_clk,
@@ -259,6 +271,8 @@ begin
 			i_ifid_opcode => id_opcode,
 			i_idex_rd     => i_ex_rd,
 			i_idex_re_ram => i_ex_re_ram,
+			i_exmem_rd    => i_mem_rd,
+			i_exmem_re_ram => i_mem_re_ram,
 			i_stall       => i_pipe_stall,
 			o_pc_we       => o_pc_we,
 			o_ifid_we     => o_ifid_we,

@@ -70,10 +70,18 @@ module props (input clk);
   wire is_store = opcode == STORE && (funct3 == 3'b010 || funct3 == 3'b001 || funct3 == 3'b000);
   wire unaligned = ((funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[0]));
   wire [31:0] next_word = {ea[31:2] + 30'd1, 2'b00};
+`ifdef EXT_FLASH
+  // Memory map of the sdram platform: the flash is [0x20000000, 0x40000000) and the SDRAM [0x40000000, 0x60000000).
+  wire ram_pair  = ea >= 32'h20000000 && ea < 32'h40000000 && next_word >= 32'h20000000 && next_word < 32'h40000000;
+  wire sdram_pair = ea >= 32'h40000000 && ea < 32'h60000000 && next_word >= 32'h40000000 && next_word < 32'h60000000;
+  wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
+  wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && ea >= 32'h20000000 && ea < 32'h60000000;
+`else
   wire ram_pair  = ea >= 32'h8000 && ea < 32'h40000000 && next_word >= 32'h8000 && next_word < 32'h40000000;
   wire sdram_pair = ea >= 32'h40000000 && ea < 32'h80000000 && next_word >= 32'h40000000 && next_word < 32'h80000000;
   wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
   wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && ea >= 32'h8000 && ea < 32'h80000000;
+`endif
   wire runs     = in_word || (crosses && (ram_pair || sdram_pair));
   always @(*) begin
     if (active && !cf_misal && !illegal && (is_load || is_store) && unaligned && runs) assert (!take);
@@ -91,6 +99,12 @@ module props (input clk);
     if (active && !cf_misal && !illegal && opcode == STORE && (funct3 == 3'b010 || funct3 == 3'b001) && unaligned)
       assert (take && cause == 6 && tval == ea);
   end
+`endif
+
+`ifdef CHECK_EA_OFF
+  // The instance that does not know the effective address (the EX stage of a core that checks it in MEM) never
+  // raises a load or store address exception.
+  always @(*) assert (!(take && (cause == 4 || cause == 6)));
 `endif
 
 `ifdef COVER

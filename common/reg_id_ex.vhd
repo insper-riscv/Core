@@ -60,6 +60,8 @@ entity reg_id_ex is
 		i_sel_pc_rs1  : in  std_logic;
 		-- Código de operação da ULA.
 		i_alu_op      : in  alu_op_t;
+		-- Seleção one-hot do resultado da ULA, decodificada no estágio ID.
+		i_alu_sel     : in  alu_sel_t;
 		-- Indica instrução pertencente à extensão M (MulDiv).
 		i_is_muldiv   : in  std_logic;
 		-- Indica instrução pertencente à extensão Zicsr (acesso a registrador CSR).
@@ -108,6 +110,8 @@ entity reg_id_ex is
 		o_sel_pc_rs1  : out std_logic;
 		-- Código de operação da ULA registrado para o estágio EX.
 		o_alu_op      : out alu_op_t;
+		-- Seleção one-hot do resultado da ULA registrada para o estágio EX.
+		o_alu_sel     : out alu_sel_t;
 		-- Indicador de instrução MulDiv registrado para o estágio EX.
 		o_is_muldiv   : out std_logic;
 		-- Indicador de instrução CSR registrado para o estágio EX.
@@ -162,6 +166,8 @@ architecture rtl of reg_id_ex is
 	signal r_sel_pc_rs1  : std_logic    := '0';
 	-- Código de operação da ULA armazenado.
 	signal r_alu_op      : alu_op_t     := (others => '0');
+	-- Seleção one-hot do resultado da ULA armazenada.
+	signal r_alu_sel     : alu_sel_t    := (others => '0');
 	-- Indicador de instrução MulDiv armazenado.
 	signal r_is_muldiv   : std_logic    := '0';
 	-- Indicador de instrução CSR armazenado.
@@ -201,6 +207,7 @@ begin
 				r_sel_rs2_imm <= '0';
 				r_sel_pc_rs1  <= '0';
 				r_alu_op      <= (others => '0');
+				r_alu_sel     <= (others => '0');
 				r_is_muldiv   <= '0';
 				r_is_csr      <= '0';
 				r_illegal     <= '0';
@@ -226,6 +233,7 @@ begin
 				r_sel_rs2_imm <= i_sel_rs2_imm;
 				r_sel_pc_rs1  <= i_sel_pc_rs1;
 				r_alu_op      <= i_alu_op;
+				r_alu_sel     <= i_alu_sel;
 				r_is_muldiv   <= i_is_muldiv;
 				r_is_csr      <= i_is_csr;
 				r_illegal     <= i_illegal;
@@ -254,6 +262,7 @@ begin
 	o_sel_rs2_imm <= r_sel_rs2_imm;
 	o_sel_pc_rs1  <= r_sel_pc_rs1;
 	o_alu_op      <= r_alu_op;
+	o_alu_sel     <= r_alu_sel;
 	o_is_muldiv   <= r_is_muldiv;
 	o_is_csr      <= r_is_csr;
 	o_illegal     <= r_illegal;

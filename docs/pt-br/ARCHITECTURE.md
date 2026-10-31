@@ -30,28 +30,29 @@ O processador executa o conjunto de instruções RISC-V de 32 bits em um pipelin
 | Estágio 3 (EX) | Aplica o adiantamento de operandos (forwarding), executa operações na ULA, coordena o multiplicador/divisor multiciclo (`M`), avalia desvios e saltos (`BRANCH`, `JAL`, `JALR`), formata escritas em memória e processa CSRs, exceções e `FENCE.I` |
 | Barreira EX/MEM | Registra o resultado final de execução, o dado e a máscara de bytes de store, o índice `rd` e os sinais de controle de memória e write-back |
 | Estágio 4 (MEM) | Decodifica o endereço efetivo entre Flash de dados, RAM interna e barramento externo SDRAM/periféricos, gerando o sinal de espera `o_sdram_wait` quando o escravo externo ainda não respondeu |
-| Barreira MEM/WB | Registra `o_pc4`, o resultado de execução `o_alu_out`, o destino `o_rd` e os seletores de extensão de leitura e write-back |
+| Barreira MEM/WB | Registra o resultado de execução `o_alu_out`, o destino `o_rd` e os seletores de extensão de leitura e write-back |
 | Estágio 5 (WB) | Seleciona a palavra bruta retornada pela memória acessada, aplica o alinhamento e a extensão de sinal ou zero para bytes e meias-palavras e escolhe o dado final a gravar no banco de registradores |
 
 ## 2. Tratamento de Hazards
 
 ### 2.1. Adiantamento de Dados (RAW Forwarding)
 
-A unidade de adiantamento no estágio EX compara os registradores fonte da instrução em execução (`i_ex_rs1` e `i_ex_rs2`) com os registradores destino das instruções nos estágios MEM (`i_exmem_rd`) e WB (`i_memwb_rd`). O adiantamento ocorre apenas quando a instrução anterior é válida, habilita escrita em registrador e tem destino diferente de `x0` (`REG_ZERO`).
+A unidade de adiantamento no estágio EX compara os registradores fonte da instrução em execução (`i_ex_rs1` e `i_ex_rs2`) com os registradores destino das instruções nos estágios MEM (`i_exmem_rd`) e WB (`i_memwb_rd`) e no registrador WB2 (`i_wb2_rd`), que guarda o dado final de write-back do ciclo anterior. O adiantamento ocorre apenas quando a instrução anterior é válida, habilita escrita em registrador e tem destino diferente de `x0` (`REG_ZERO`).
 
-Quando tanto MEM quanto WB escrevem no mesmo registrador fonte, o estágio MEM tem prioridade por conter o valor mais recente na ordem do programa:
+Quando mais de um desses estágios escreve no mesmo registrador fonte, o mais próximo de EX tem prioridade por conter o valor mais recente na ordem do programa:
 
 | Código (`o_fwd_rs1` / `o_fwd_rs2`) | Fonte selecionada no mux 4x1 de EX | Condição de ativação |
 | :--- | :--- | :--- |
 | `"00"` | Valor lido do banco de registradores no estágio ID (`i_rs1_val` / `i_rs2_val`) | Nenhuma dependência ativa com MEM ou WB |
 | `"10"` | Resultado calculado no estágio EX e registrado em EX/MEM (`i_exmem_alu_out`) | `i_exmem_we_reg = '1'` e `i_exmem_valid = '1'` e `i_exmem_rd = i_ex_rs* /= x0` |
-| `"01"` | Dado final de write-back no estágio WB (`i_wb_data`) | `i_memwb_we_reg = '1'` e `i_memwb_valid = '1'` e `i_memwb_rd = i_ex_rs* /= x0` (sem conflito em EX/MEM) |
+| `"01"` | Resultado de EX registrado em MEM/WB (`i_memwb_alu_out`) | `i_memwb_we_reg = '1'` e `i_memwb_valid = '1'` e `i_memwb_rd = i_ex_rs* /= x0` (sem conflito em EX/MEM) |
+| `"11"` | Dado final de write-back registrado em WB2 (`i_wb2_data`) | `i_wb2_we_reg = '1'` e `i_wb2_rd = i_ex_rs* /= x0` (sem conflito em EX/MEM nem em MEM/WB) |
 
-Para dependências com três ciclos de distância (instrução em ID lendo o mesmo registrador que está sendo escrito por WB no mesmo ciclo), o banco de registradores possui bypass interno write-through via multiplexadores 2x1 nas portas de leitura `o_rs1` e `o_rs2`.
+O dado alinhado e estendido de um load só existe no fim do estágio WB, então ele nunca é adiantado de MEM/WB: o adiantamento do load parte do registrador WB2, e a fonte `"01"` só carrega resultados de EX, que já estão registrados. O banco de registradores é escrito a partir de WB2 e tem bypass interno write-through via multiplexadores 2x1 nas portas de leitura `o_rs1` e `o_rs2`, de modo que uma instrução em ID lê o valor escrito por WB2 no mesmo ciclo.
 
 ### 2.2. Stall por Conflito Load-Use
 
-Como a leitura da memória de dados síncrona só entrega o valor no estágio WB, uma instrução em ID que dependa imediatamente de um load no estágio EX (`i_idex_re_ram = '1'` e `i_idex_rd /= x0`) precisa aguardar um ciclo:
+Como o dado de um load só chega ao registrador WB2 dois estágios depois de MEM, uma instrução em ID que dependa de um load nos estágios EX (`i_idex_re_ram = '1'` e `i_idex_rd /= x0`) ou MEM (`i_exmem_re_ram = '1'` e `i_exmem_rd /= x0`) precisa aguardar até o load chegar a WB. Isso custa dois ciclos quando a dependência é imediata e um quando há uma instrução entre o load e o dependente:
 
 1. A unidade de detecção de hazards verifica pelo `opcode` da instrução em ID se ela efetivamente lê `rs1` (`OP`, `OP_IMM`, `LOAD`, `STORE`, `BRANCH`, `JALR`, `SYSTEM`) e se efetivamente lê `rs2` (`OP`, `STORE`, `BRANCH`), evitando paradas falsas quando os bits de `rs2` fazem parte do imediato.
 2. Quando o conflito é confirmado, a HDU desativa `o_pc_we` e `o_ifid_we` (congelando o PC e o registrador IF/ID) e ativa `o_bubble_sel = '1'`.
@@ -109,12 +110,26 @@ Quando `has_zicsr = true`, o decodificador `csr_decode` no estágio ID identific
 No estágio EX:
 
 1. O banco `csr_file` lê combinacionalmente o valor atual do CSR (`o_rdata`) e, na borda de subida com `i_commit = i_is_csr and i_valid and i_pipe_run`, atualiza atomicamente o registrador conforme `i_op(1 downto 0)` (`"01"` = escrita direta, `"10"` = set de bits, `"11"` = clear de bits). Nas operações `CSRRS`/`CSRRC` com operando fonte zero (`rs1 = x0` ou `zimm = 0`), nenhuma escrita efetiva é realizada.
-2. A unidade `trap_unit` verifica desalinhamento de endereço alvo de salto/branch (`mcause = 0`), instrução `SYSTEM` ou acesso CSR ilegal (`mcause = 2`), `EBREAK` (`mcause = 3`), endereço de load desalinhado (`mcause = 4`), endereço de store desalinhado (`mcause = 6`) e `ECALL` (`mcause = 11`), além do retorno `MRET`.
+2. A unidade `trap_unit` verifica desalinhamento de endereço alvo de salto/branch (`mcause = 0`), instrução `SYSTEM` ou acesso CSR ilegal (`mcause = 2`), `EBREAK` (`mcause = 3`) e `ECALL` (`mcause = 11`), além do retorno `MRET`. Com Zicsr, o endereço efetivo de load (`mcause = 4`) e de store (`mcause = 6`) não é conferido em EX, e sim em MEM, por outra instância da mesma unidade que lê o endereço já registrado em `EX/MEM`.
 3. Em caso de exceção (`o_trap_take = '1'`), o registrador `reg_ex_mem` sofre flush para anular os efeitos da instrução faltante, `csr_file` salva o PC em `mepc`, a causa em `mcause`, o valor informativo em `mtval`, move `MIE` para `MPIE`, zera `MIE` e redireciona o PC para `mtvec`.
+
+A exceção de endereço de load ou store é tomada no estágio MEM, no primeiro ciclo em que o acesso chega lá. Como a instrução em MEM é mais antiga que a de EX, a exceção tem prioridade sobre as de EX e descarta a instrução de EX por inteiro: nenhuma escrita de CSR, desvio, `MRET`, `FENCE.I` ou retirada dela tem efeito. O acesso faltante não chega à memória, `MEM/WB` é limpo para que ele não escreva `rd`, e `EX/MEM` carrega o PC e o `funct3` do acesso para o `mepc` e a conferência. A retirada de EX soma em `minstret` um ciclo depois, e a exceção de MEM a cancela, de modo que o acesso que falha não conta como instrução retirada; uma leitura de `instret` já enxerga a retirada pendente.
 
 ### 3.3. Extensão Zifencei
 
 Quando `has_zifencei = true`, a unidade `fencei_unit` no estágio EX detecta a instrução `FENCE.I` (`opcode = OPCODE_MISC_MEM` e `funct3 = FUNCT3_FENCE_I`). Sem cache de dados write-back (`has_dcache = false`), ela pulsa `o_take = '1'` imediatamente quando `i_run = '1'`. Com cache de dados (`has_dcache = true`), ela retém a instrução por um ciclo para que os stores anteriores cheguem à cache, requisita o flush (`o_flush_req = '1'`), mantém `o_busy = '1'` até receber `i_dc_done = '1'` e então pulsa `o_take = '1'`, invalidando a cache de instruções externa (`o_ic_inval = '1'`), descartando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$.
+
+### 3.4. Extensão Zicntr
+
+Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia três contadores de 64 bits, cada um com duas metades de 32 bits e carry registrado entre elas. A leitura soma o carry pendente à metade alta, de modo que `csrr` de `cycleh` logo depois de um estouro da metade baixa já vê o valor correto.
+
+| Contador | Incrementa | Endereços (baixa/alta) | Espelho somente leitura |
+| :--- | :--- | :--- | :--- |
+| `mcycle` | A cada ciclo de clock do core, inclusive nos ciclos de parada | `0xB00` / `0xB80` | `cycle`: `0xC00` / `0xC80` |
+| `minstret` | A cada pulso `i_retire`: instrução válida em EX, pipeline andando, sem exceção | `0xB02` / `0xB82` | `instret`: `0xC02` / `0xC82` |
+| `time` | A cada `tick_cycles` ciclos (50 dá 1 MHz a 50 MHz), por um divisor de tick | somente leitura | `time`: `0xC01` / `0xC81` |
+
+`mcycle` e `minstret` aceitam escrita em cada metade; uma escrita vence o incremento do próprio ciclo. Escrever em `cycle`, `time` ou `instret` é acesso ilegal (`mcause = 2`). Sem `has_zicntr` todos esses endereços são desconhecidos e acessá-los é ilegal.
 
 ---
 

@@ -30,28 +30,29 @@ The processor executes the 32-bit RISC-V instruction set in an in-order 5-stage 
 | Stage 3 (EX) | Applies operand forwarding, executes ALU operations, coordinates the multi-cycle multiplier/divider (`M`), evaluates branches and jumps (`BRANCH`, `JAL`, `JALR`), formats memory stores, and processes CSRs, exceptions, and `FENCE.I` |
 | EX/MEM Barrier | Registers the final execution result, store data and byte mask, destination `rd`, and memory/write-back control signals |
 | Stage 4 (MEM) | Decodes the effective address across data Flash, internal RAM, and the external SDRAM/peripheral bus, asserting `o_sdram_wait` while the external slave has not yet responded |
-| MEM/WB Barrier | Registers `o_pc4`, the execution result `o_alu_out`, destination `o_rd`, and the read-extension and write-back selectors |
+| MEM/WB Barrier | Registers the execution result `o_alu_out`, destination `o_rd`, and the read-extension and write-back selectors |
 | Stage 5 (WB) | Selects the raw word returned by the accessed memory, applies byte/halfword alignment and sign or zero extension, and chooses the final datum written to the register file |
 
 ## 2. Hazard Handling
 
 ### 2.1. Data Forwarding (RAW Forwarding)
 
-The forwarding unit in the EX stage compares the source registers of the executing instruction (`i_ex_rs1` and `i_ex_rs2`) against the destination registers of the instructions in the MEM (`i_exmem_rd`) and WB (`i_memwb_rd`) stages. Forwarding occurs only when the older instruction is valid, enables register writeback, and targets a register other than `x0` (`REG_ZERO`).
+The forwarding unit in the EX stage compares the source registers of the executing instruction (`i_ex_rs1` and `i_ex_rs2`) against the destination registers of the instructions in the MEM (`i_exmem_rd`) and WB (`i_memwb_rd`) stages and in the WB2 register (`i_wb2_rd`), which holds the final write-back datum of the previous cycle. Forwarding occurs only when the older instruction is valid, enables register writeback, and targets a register other than `x0` (`REG_ZERO`).
 
-When both MEM and WB write to the same source register, the MEM stage takes priority because it holds the most recent value in program order:
+When more than one of these stages writes the same source register, the one closest to EX takes priority because it holds the most recent value in program order:
 
 | Code (`o_fwd_rs1` / `o_fwd_rs2`) | Source selected in the EX 4x1 mux | Activation condition |
 | :--- | :--- | :--- |
 | `"00"` | Value read from the register file in the ID stage (`i_rs1_val` / `i_rs2_val`) | No active dependency with MEM or WB |
 | `"10"` | Result computed in the EX stage and registered in EX/MEM (`i_exmem_alu_out`) | `i_exmem_we_reg = '1'` and `i_exmem_valid = '1'` and `i_exmem_rd = i_ex_rs* /= x0` |
-| `"01"` | Final write-back datum in the WB stage (`i_wb_data`) | `i_memwb_we_reg = '1'` and `i_memwb_valid = '1'` and `i_memwb_rd = i_ex_rs* /= x0` (without a match in EX/MEM) |
+| `"01"` | EX result registered in MEM/WB (`i_memwb_alu_out`) | `i_memwb_we_reg = '1'` and `i_memwb_valid = '1'` and `i_memwb_rd = i_ex_rs* /= x0` (without a match in EX/MEM) |
+| `"11"` | Final write-back datum registered in WB2 (`i_wb2_data`) | `i_wb2_we_reg = '1'` and `i_wb2_rd = i_ex_rs* /= x0` (without a match in EX/MEM or MEM/WB) |
 
-For dependencies three cycles apart (an instruction in ID reading the same register being written by WB in the same cycle), the register file provides internal write-through bypass via 2x1 multiplexers on the `o_rs1` and `o_rs2` read ports.
+The aligned and extended datum of a load exists only at the end of the WB stage, so it is never forwarded from MEM/WB: the load is forwarded from the WB2 register, and source `"01"` carries only EX results, which are already registered. The register file is written from WB2 and has internal write-through bypass via 2x1 multiplexers on the `o_rs1` and `o_rs2` read ports, so an instruction in ID reads the value WB2 is writing in the same cycle.
 
 ### 2.2. Load-Use Hazard Stall
 
-Because synchronous data memory delivers read data only at the WB stage, an instruction in ID that immediately depends on a load in the EX stage (`i_idex_re_ram = '1'` and `i_idex_rd /= x0`) must wait one cycle:
+Because the datum of a load reaches the WB2 register two stages after MEM, an instruction in ID that depends on a load in the EX stage (`i_idex_re_ram = '1'` and `i_idex_rd /= x0`) or in the MEM stage (`i_exmem_re_ram = '1'` and `i_exmem_rd /= x0`) must wait until the load is in WB. That costs two cycles for an immediate dependency and one when an instruction sits between the load and its consumer:
 
 1. The hazard detection unit checks the `opcode` of the instruction in ID to determine whether it actually reads `rs1` (`OP`, `OP_IMM`, `LOAD`, `STORE`, `BRANCH`, `JALR`, `SYSTEM`) and whether it actually reads `rs2` (`OP`, `STORE`, `BRANCH`), avoiding false stalls when the `rs2` bit field is part of an immediate.
 2. When the hazard is confirmed, the HDU deasserts `o_pc_we` and `o_ifid_we` (freezing the PC and the IF/ID register) and asserts `o_bubble_sel = '1'`.
@@ -109,12 +110,26 @@ When `has_zicsr = true`, the `csr_decode` decoder in the ID stage identifies the
 In the EX stage:
 
 1. The `csr_file` bank combinationally reads the current CSR value (`o_rdata`) and, on the rising clock edge when `i_commit = i_is_csr and i_valid and i_pipe_run`, atomically updates the register according to `i_op(1 downto 0)` (`"01"` = direct write, `"10"` = bit set, `"11"` = bit clear). In `CSRRS`/`CSRRC` operations with a zero source operand (`rs1 = x0` or `zimm = 0`), no write is performed.
-2. The `trap_unit` checks for jump/branch target address misalignment (`mcause = 0`), illegal `SYSTEM` instruction or CSR access (`mcause = 2`), `EBREAK` (`mcause = 3`), misaligned load address (`mcause = 4`), misaligned store address (`mcause = 6`), and `ECALL` (`mcause = 11`), as well as `MRET` return.
+2. The `trap_unit` checks for jump/branch target address misalignment (`mcause = 0`), illegal `SYSTEM` instruction or CSR access (`mcause = 2`), `EBREAK` (`mcause = 3`), and `ECALL` (`mcause = 11`), as well as `MRET` return. With Zicsr, the effective address of loads (`mcause = 4`) and stores (`mcause = 6`) is not checked in EX but in MEM, by another instance of the same unit that reads the address already registered in `EX/MEM`.
 3. On an exception (`o_trap_take = '1'`), `reg_ex_mem` is flushed to cancel the faulting instruction's side effects, `csr_file` saves the PC in `mepc`, the cause in `mcause`, and the trap value in `mtval`, copies `MIE` into `MPIE`, clears `MIE`, and redirects the PC to `mtvec`.
+
+The load or store address exception is taken in the MEM stage, in the first cycle the access gets there. Since the instruction in MEM is older than the one in EX, the exception has priority over those of EX and discards the EX instruction entirely: none of its CSR write, branch, `MRET`, `FENCE.I` or retirement takes effect. The faulting access never reaches the memory, `MEM/WB` is cleared so that it does not write `rd`, and `EX/MEM` carries the PC and the `funct3` of the access for `mepc` and the check. The EX retirement is added to `minstret` one cycle later and the MEM exception cancels it, so the faulting access does not count as a retired instruction; a read of `instret` already sees the pending retirement.
 
 ### 3.3. Zifencei Extension
 
 When `has_zifencei = true`, the `fencei_unit` in the EX stage detects the `FENCE.I` instruction (`opcode = OPCODE_MISC_MEM` and `funct3 = FUNCT3_FENCE_I`). Without a write-back data cache (`has_dcache = false`), it pulses `o_take = '1'` immediately when `i_run = '1'`. With a data cache (`has_dcache = true`), it holds the instruction for one cycle so that the older stores reach the cache, requests a flush (`o_flush_req = '1'`), holds `o_busy = '1'` until `i_dc_done = '1'` is received, and then pulses `o_take = '1'`, invalidating the external instruction cache (`o_ic_inval = '1'`), flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$.
+
+### 3.4. Zicntr Extension
+
+When `has_zicntr = true` (which implies `has_zicsr`), `csr_file` instantiates three 64-bit counters, each made of two 32-bit halves with a registered carry between them. A read adds the pending carry to the high half, so a `csrr` of `cycleh` right after the low half wraps already sees the correct value.
+
+| Counter | Increments | Addresses (low/high) | Read-only mirror |
+| :--- | :--- | :--- | :--- |
+| `mcycle` | Every core clock cycle, stall cycles included | `0xB00` / `0xB80` | `cycle`: `0xC00` / `0xC80` |
+| `minstret` | Every `i_retire` pulse: a valid instruction in EX, pipeline running, no exception | `0xB02` / `0xB82` | `instret`: `0xC02` / `0xC82` |
+| `time` | Every `tick_cycles` cycles (50 gives 1 MHz at 50 MHz), through a tick divider | read-only | `time`: `0xC01` / `0xC81` |
+
+`mcycle` and `minstret` accept a write to each half; a write wins over the increment of its own cycle. Writing `cycle`, `time` or `instret` is an illegal access (`mcause = 2`). Without `has_zicntr` all these addresses are unknown and accessing them is illegal.
 
 ---
 

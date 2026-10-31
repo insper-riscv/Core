@@ -3,25 +3,33 @@ from cocotb.triggers import Timer
 
 
 OPCODES = {
-    "PASS_B": "00000",
-    "ADD":    "00001",
-    "XOR":    "00010",
-    "OR":     "00011",
-    "AND":    "00100",
-    "SLL":    "00101",
-    "SRL":    "00110",
-    "SRA":    "00111",
+    "ADD":    "00000",
+    "SLL":    "00001",
+    "XOR":    "00100",
+    "SRL":    "00101",
+    "OR":     "00110",
+    "AND":    "00111",
     "SUB":    "01000",
-    "SLT":    "01001",
-    "SLTU":   "01010",
-    "BEQ":    "01011",
-    "BNE":    "01100",
-    "BLT":    "01101",
-    "BGE":    "01110",
-    "BLTU":   "01111",
-    "BGEU":   "10000",
-    "JALR":   "10001"
+    "SLT":    "01010",
+    "SLTU":   "01011",
+    "SRA":    "01101",
+    "JALR":   "10000",
+    "LUI":    "10001",
+    "BEQ":    "11000",
+    "BNE":    "11001",
+    "BLT":    "11100",
+    "BGE":    "11101",
+    "BLTU":   "11110",
+    "BGEU":   "11111"
 }
+
+
+def result_select(op_bits):
+    """Seleção one-hot do resultado, como o estágio ID decodifica (alu_result_select)."""
+    op = int(op_bits, 2)
+    if op & 0b10000:
+        return 0 if op & 0b01000 else 1  # desvios: nada; JALR e LUI: soma
+    return 1 << (op & 0b111)  # 0 soma, 1 SLL, 2 SLT, 3 SLTU, 4 XOR, 5 deslocamento à direita, 6 OR, 7 AND
 
 
 def to_bits(val, width=32):
@@ -39,6 +47,7 @@ def to_signed(val, width=32):
 
 async def apply_and_check(dut, op_name, a, b, expected_data, expected_branch):
     dut.i_op.value = int(OPCODES[op_name], 2)
+    dut.i_res_sel.value = result_select(OPCODES[op_name])
     dut.i_a.value = to_bits(a)
     dut.i_b.value = to_bits(b)
     await Timer(1, units="ns")
@@ -67,9 +76,10 @@ async def apply_and_check(dut, op_name, a, b, expected_data, expected_branch):
 # === Testes separados para cada operação ===
 
 @cocotb.test()
-async def pass_b(dut):
-    a, b = 10, 20
-    await apply_and_check(dut, "PASS_B", a, b, b, 0)
+async def lui(dut):
+    # LUI carrega o imediato de B, qualquer que seja o operando A
+    for a, b in ((10, 20), (0xFFFFFFFF, 0x12345000), (0x80000000, 0)):
+        await apply_and_check(dut, "LUI", a, b, b, 0)
 
 
 @cocotb.test()
@@ -190,3 +200,37 @@ async def jalr(dut):
     await apply_and_check(dut, "JALR", a, b, sum_res, 0)
 
     dut._log.info("JALR tests OK")
+
+
+def reference(op_name, a, b):
+    """Resultado de dados e condição de desvio esperados para a operação."""
+    sa, sb = to_signed(a), to_signed(b)
+    sh = b & 0x1F
+    data = {
+        "ADD": a + b, "SUB": a - b, "XOR": a ^ b, "OR": a | b, "AND": a & b,
+        "SLL": a << sh, "SRL": a >> sh, "SRA": sa >> sh,
+        "SLT": int(sa < sb), "SLTU": int(a < b),
+        "JALR": (a + b) & ~1, "LUI": b,
+    }
+    branch = {
+        "BEQ": a == b, "BNE": a != b, "BLT": sa < sb, "BGE": sa >= sb,
+        "BLTU": a < b, "BGEU": a >= b,
+    }
+    if op_name in branch:
+        return 0, int(branch[op_name])
+    return data[op_name], 0
+
+
+@cocotb.test()
+async def every_operation_against_the_reference(dut):
+    """Cada operação confere com o modelo em valores de borda e aleatórios."""
+    import random
+    rng = random.Random(11)
+    edges = [0, 1, 2, 31, 32, 0x7FFFFFFF, 0x80000000, 0x80000001, 0xFFFFFFFE, 0xFFFFFFFF]
+    pairs = [(x, y) for x in edges for y in edges]
+    pairs += [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(300)]
+    pairs += [(v, v) for v in (0, 5, 0x80000000, 0xFFFFFFFF)]
+    for op_name in OPCODES:
+        for a, b in pairs:
+            data, branch = reference(op_name, a, b)
+            await apply_and_check(dut, op_name, a, b, data, branch)

@@ -20,8 +20,6 @@ entity stage_wb is
 	port (
 		-- Bit de validade da instrução no estágio WB.
 		i_valid        : in  std_logic;
-		-- Valor PC + 4 da instrução no estágio WB.
-		i_pc4          : in  word_t;
 		-- Resultado da ULA/execução (e bits [1:0] do endereço de load) no estágio WB.
 		i_alu_out      : in  word_t;
 		-- Índice do registrador destino rd no estágio WB.
@@ -32,6 +30,12 @@ entity stage_wb is
 		i_ext_ram_op   : in  ext_ram_op_t;
 		-- Seletor de fonte de Write-Back vindo do registrador MEM/WB.
 		i_wb_sel       : in  wb_sel_t;
+		-- O endereço do load pertence à memória FLASH (decodificado no registrador MEM/WB).
+		i_is_flash     : in  std_logic;
+		-- O endereço do load pertence ao barramento externo de SDRAM (decodificado no registrador MEM/WB).
+		i_is_sdram     : in  std_logic;
+		-- O load cruza a palavra e usa a primeira palavra retida (decodificado no registrador MEM/WB).
+		i_is_cross     : in  std_logic;
 		-- Palavra de dados lida da segunda porta da memória FLASH.
 		i_flash_data2  : in  word_t;
 		-- Palavra de dados lida da memória RAM interna.
@@ -51,16 +55,10 @@ end entity stage_wb;
 
 architecture rtl of stage_wb is
 
-	-- Indica que o endereço de load em WB aponta para a memória FLASH.
-	signal is_flash_data_wb : std_logic;
-	-- Indica que o endereço de load em WB aponta para o barramento externo de SDRAM.
-	signal is_sdram_wb      : std_logic;
 	-- Palavra bruta de 32 bits selecionada entre FLASH, SDRAM e RAM interna.
 	signal mem_read_data    : word_t;
 	-- Palavra de 32 bits alinhada e estendida pelo módulo extender_ram.
 	signal wb_ram_extended  : word_t;
-	-- Load que cruzou a palavra: a primeira palavra está retida e a segunda chega agora.
-	signal is_cross_wb      : std_logic;
 	-- Par de palavras do load que cruzou, deslocado até o primeiro byte do dado.
 	signal cross_pair       : std_logic_vector(63 downto 0);
 	-- Palavra baixa do par deslocado: o dado do load alinhado ao byte 0.
@@ -72,23 +70,16 @@ architecture rtl of stage_wb is
 
 begin
 
-	is_flash_data_wb <= '1' when unsigned(i_alu_out) < RAM_BASE_BYTES    else '0';
-	is_sdram_wb      <= '1' when unsigned(i_alu_out) >= SDRAM_BASE_BYTES else '0';
-
-	mem_read_data    <= i_flash_data2 when is_flash_data_wb = '1' else
-	                    i_sdram_rdata when is_sdram_wb      = '1' else
+	mem_read_data    <= i_flash_data2 when i_is_flash = '1' else
+	                    i_sdram_rdata when i_is_sdram = '1' else
 	                    i_ram_rdata;
-
-	is_cross_wb <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
-	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3))
-	               else '0';
 
 	cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
 	                                           8 * to_integer(unsigned(i_alu_out(1 downto 0)))));
 	cross_word <= cross_pair(31 downto 0);
 
-	ext_data   <= cross_word when is_cross_wb = '1' else mem_read_data;
-	ext_offset <= BYTE_OFFSET_0 when is_cross_wb = '1' else i_alu_out(1 downto 0);
+	ext_data   <= cross_word when i_is_cross = '1' else mem_read_data;
+	ext_offset <= BYTE_OFFSET_0 when i_is_cross = '1' else i_alu_out(1 downto 0);
 
 	u_extender_ram : entity work.extender_ram
 		port map (
@@ -98,16 +89,14 @@ begin
 			o_data        => wb_ram_extended
 		);
 
-	u_mux_wb : entity work.mux_4x1
+	u_mux_wb : entity work.mux_2x1
 		generic map (
 			data_width => 32
 		)
 		port map (
 			i_d0  => i_alu_out,
-			i_d1  => i_pc4,
-			i_d2  => wb_ram_extended,
-			i_d3  => i_alu_out,
-			i_sel => i_wb_sel,
+			i_d1  => wb_ram_extended,
+			i_sel => i_wb_sel(0),
 			o_d   => o_wb_data
 		);
 

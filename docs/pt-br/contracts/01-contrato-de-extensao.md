@@ -60,9 +60,9 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
 | `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
-| Não implementados | `cycle`, `time` e `instret` (o acesso é um acesso CSR ilegal) e interrupções (`mie` e `mip` leem zero e ignoram escritas) |
+| Não implementados | Interrupções (`mie` e `mip` leem zero e ignoram escritas); os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
 
-Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
+Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `has_zicsr = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
 
 | Código (`o_cause`) | Exceção | Valor gravado em `mtval` (`o_tval`) |
 | ---: | :--- | :--- |

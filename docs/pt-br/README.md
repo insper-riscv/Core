@@ -27,7 +27,7 @@ A construção do caminho de dados divide as instruções da base RV32I em seis 
 1. **Grupo 1 (U-type sem desvio):** `LUI` e `AUIPC` validam a busca sequencial ($\text{PC} + 4$), a extensão `EXT_IMM_U`, a passagem/soma na ULA e a escrita no banco de registradores.
 2. **Grupo 2 (I-type aritmético e lógico):** `ADDI`, `XORI`, `ORI`, `ANDI`, `SLTI`, `SLTIU`, `SLLI`, `SRLI` e `SRAI` acrescentam a leitura de `rs1`, as extensões `EXT_IMM_I` e `EXT_IMM_I_SHAMT` e os deslocadores/comparadores na ULA.
 3. **Grupo 3 (R-type completo):** `ADD`, `SUB`, `XOR`, `OR`, `AND`, `SLL`, `SRL`, `SRA`, `SLT` e `SLTU` introduzem a segunda porta de leitura (`rs2`) e a seleção `o_sel_rs2_imm` entre registrador e imediato.
-4. **Grupo 4 (Saltos incondicionais):** `JAL` e `JALR` introduzem a escrita de $\text{PC} + 4$ no registrador de retorno (`WB_SEL_PC4`) e o redirecionamento do PC (`PC_SRC_BRANCH` e `PC_SRC_JALR`).
+4. **Grupo 4 (Saltos incondicionais):** `JAL` e `JALR` introduzem a escrita de $\text{PC} + 4$ no registrador de retorno (pelo resultado de EX, com `o_sel_pc4_alu`) e o redirecionamento do PC (`PC_SRC_BRANCH` e `PC_SRC_JALR`).
 5. **Grupo 5 (Desvios condicionais):** `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU` e `BGEU` adicionam a extensão `EXT_IMM_B` e a flag `o_branch` da ULA para desvio condicional.
 6. **Grupo 6 (Loads e Stores):** `LW`, `LH`, `LHU`, `LB`, `LBU`, `SW`, `SH` e `SB` completam o acesso à memória de dados com alinhamento de escrita (`store_manager`) e extensão de leitura (`extender_ram`).
 
@@ -43,7 +43,7 @@ A construção do caminho de dados divide as instruções da base RV32I em seis 
 ![Datapath Etapa 1](../instructions/1.png)
 
 - **Extensor de imediato (`extender_imm`):** `EXT_IMM_U` produz `i_instr[31:12] & x"000"`.
-- **ULA (`alu`):** `ALU_PASS_B` (`o_d = i_b`) e `ALU_ADD` (`o_d = i_a + i_b`).
+- **ULA (`alu`):** `ALU_LUI` (soma com o operando A forçado a zero, então `o_d = i_b`) e `ALU_ADD` (`o_d = i_a + i_b`).
 - **Controle (`control_unit`):** ativa `o_we_reg = '1'` e `o_sel_rs2_imm = '1'`, selecionando `o_sel_pc_rs1 = '0'` (PC) para `AUIPC`.
 
 ### 3.2. Grupo 2: I-type Aritmético e Lógico
@@ -95,7 +95,7 @@ A construção do caminho de dados divide as instruções da base RV32I em seis 
 ![Datapath Etapa 4](../instructions/4.png)
 
 - **Extensor de imediato:** `EXT_IMM_J` para `JAL` e `EXT_IMM_I` para `JALR`.
-- **ULA e Controle:** `o_sel_pc4_alu = '1'` e `o_wb_sel = WB_SEL_PC4` selecionam $\text{PC} + 4$ como dado de retorno para `rd`, enquanto `ALU_JALR` calcula o endereço-alvo de `JALR` com o bit 0 zerado.
+- **ULA e Controle:** `o_sel_pc4_alu = '1'` seleciona $\text{PC} + 4$ como resultado de EX, que segue o write-back normal (`o_wb_sel = WB_SEL_ALU`) até `rd`, enquanto `ALU_JALR` calcula o endereço-alvo de `JALR` com o bit 0 zerado.
 
 ### 3.5. Grupo 5: Desvios Condicionais (`BRANCH`)
 

@@ -28,7 +28,11 @@ entity core is
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm  : boolean := true;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
-		has_dcache   : boolean := false
+		has_dcache   : boolean := false;
+		-- Mapa da plataforma sdram: a FLASH fica fora do núcleo (0x20000000) e, com a SDRAM, sai pela porta externa; não há RAM interna.
+		ext_flash    : boolean := false;
+		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm); exige has_zicsr.
+		hpm_counters : natural range 0 to 4 := 0
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -105,7 +109,10 @@ entity core is
 		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
 		o_trap_pc       : out word_t;
 		-- Pulso de um ciclo: uma instrução foi retirada em EX (válida, com o pipeline andando e sem exceção).
-		o_retire        : out std_logic
+		o_retire        : out std_logic;
+		-- Eventos das caches e da FLASH para os contadores do Zihpm: bit 0 falha da cache de instruções (evento 5),
+		-- bit 1 falha da cache de dados (6), bit 2 ciclo de espera por FLASH (7); pulsos de um ciclo.
+		i_hpm_ext_events : in  std_logic_vector(2 downto 0) := (others => '0')
 	);
 end entity core;
 
@@ -126,6 +133,12 @@ architecture rtl of core is
 	signal pipe_stall        : std_logic;
 	-- Habilitação de avanço para o registrador ID/EX e estágios anteriores a MEM.
 	signal pipe_run          : std_logic;
+	-- Vetor de eventos dos contadores do Zihpm, um bit por código de evento.
+	signal hpm_events        : std_logic_vector(15 downto 0);
+	-- Valor de mis_stall no ciclo anterior (para o pulso de início de um acesso desalinhado).
+	signal mis_stall_q       : std_logic := '0';
+	-- Ciclo de parada por dependência de load: a HDU parou o IF/ID sem que o pipeline estivesse parado por outro motivo.
+	signal load_use_stall    : std_logic;
 
 	-- Sinal de flush síncrono do registrador IF/ID.
 	signal flush_if_id       : std_logic;
@@ -149,6 +162,10 @@ architecture rtl of core is
 	signal mis_mask          : byte_mask_t;
 	-- Primeira palavra lida por um load desalinhado, retida para o estágio WB.
 	signal mis_first_word    : word_t;
+	-- Região e cruzamento do load em WB, decodificados na entrada do registrador MEM/WB.
+	signal memwb_is_flash    : std_logic;
+	signal memwb_is_sdram    : std_logic;
+	signal memwb_is_cross    : std_logic;
 	-- Endereço que o estágio MEM de fato apresenta às memórias.
 	signal mem_addr          : word_t;
 	-- Dado de escrita que o estágio MEM de fato apresenta às memórias.
@@ -215,6 +232,8 @@ architecture rtl of core is
 	signal id_sel_pc_rs1     : std_logic;
 	-- Código de operação da ULA gerado no estágio ID.
 	signal id_alu_op         : alu_op_t;
+	-- Seleção one-hot do resultado da ULA decodificada no estágio ID.
+	signal id_alu_sel        : alu_sel_t;
 	-- Indicador de instrução da extensão M gerado no estágio ID.
 	signal id_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr gerado no estágio ID.
@@ -267,6 +286,8 @@ architecture rtl of core is
 	signal ex_sel_pc_rs1     : std_logic;
 	-- Código de operação da ULA registrado em ID/EX.
 	signal ex_alu_op         : alu_op_t;
+	-- Seleção one-hot do resultado da ULA registrada em ID/EX.
+	signal ex_alu_sel        : alu_sel_t;
 	-- Indicador de instrução da extensão M registrado em ID/EX.
 	signal ex_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr registrado em ID/EX.
@@ -305,6 +326,16 @@ architecture rtl of core is
 	signal ex_redirect_pc    : word_t;
 	-- Pulso de tomada de exceção síncrona gerado no estágio EX.
 	signal trap_take         : std_logic;
+	-- Exceção de endereço do acesso à memória no estágio MEM (instrução mais antiga que a de EX).
+	signal mem_trap_take     : std_logic;
+	-- Causa e valor de mtval da exceção de MEM.
+	signal mem_trap_cause    : word_t;
+	signal mem_trap_tval     : word_t;
+	-- Validade da instrução em EX descontada a exceção de MEM, que a descarta.
+	signal ex_valid_live     : std_logic;
+	-- Campos da instrução em MEM trazidos de EX/MEM.
+	signal exmem_pc          : word_t;
+	signal exmem_funct3      : funct3_t;
 	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
 	signal retire_pulse      : std_logic;
 	-- Pulso de retorno de exceção (MRET) gerado no estágio EX.
@@ -317,8 +348,6 @@ architecture rtl of core is
 	-- =========================================================================
 	-- Bit de validade registrado em EX/MEM.
 	signal exmem_valid       : std_logic;
-	-- Endereço PC + 4 registrado em EX/MEM.
-	signal exmem_pc4         : word_t;
 	-- Resultado do estágio EX (endereço de memória ou dado) registrado em EX/MEM.
 	signal exmem_alu_out     : word_t;
 	-- Dado alinhado para escrita em memória registrado em EX/MEM.
@@ -345,8 +374,6 @@ architecture rtl of core is
 	-- =========================================================================
 	-- Bit de validade registrado em MEM/WB.
 	signal memwb_valid       : std_logic;
-	-- Endereço PC + 4 registrado em MEM/WB.
-	signal memwb_pc4         : word_t;
 	-- Resultado da ULA/execução registrado em MEM/WB.
 	signal memwb_alu_out     : word_t;
 	-- Índice do registrador destino rd registrado em MEM/WB.
@@ -375,6 +402,12 @@ architecture rtl of core is
 	signal wb_data_prev      : word_t;
 	-- Dado final de 32 bits do estágio WB: o primeiro ciclo da instrução, repetido enquanto ela é segurada.
 	signal wb_data           : word_t;
+	-- Escrita no banco de registradores da instrução que saiu de WB no ciclo anterior (registrador WB2).
+	signal wb2_we            : std_logic;
+	-- Registrador destino rd da instrução em WB2.
+	signal wb2_rd            : reg_t;
+	-- Dado final de write-back da instrução em WB2.
+	signal wb2_data          : word_t;
 
 begin
 
@@ -384,8 +417,32 @@ begin
 	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy or mis_stall;
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= mem_run;
+	-- Com CSRs, a exceção de endereço do load ou store é tomada em MEM (mem_trap_take): é de uma instrução mais
+	-- antiga que a de EX, então redireciona o pipeline e descarta a instrução de EX. Sem CSRs, o endereço é
+	-- conferido em EX junto das demais causas, que só são sinalizadas, e mem_trap_take fica em zero.
+	ex_valid_live <= ex_valid and (not mem_trap_take);
+
 	o_trap        <= trap_sig;
-	retire_pulse  <= ex_valid and pipe_run and (not trap_take) and (not trap_sig);
+	retire_pulse  <= ex_valid_live and pipe_run and (not trap_take) and (not trap_sig);
+
+	-- Eventos do Zihpm (códigos de csr_event_consts): 1 parada de multdiv, 2 espera externa, 3 desvio tomado,
+	-- 4 início de acesso desalinhado, 5 a 7 das caches e da FLASH, 8 parada por dependência de load.
+	load_use_stall <= (not id_pc_we) and (not pipe_stall);
+	process (i_clk)
+	begin
+		if rising_edge(i_clk) then
+			mis_stall_q <= mis_stall;
+		end if;
+	end process;
+	hpm_events <= (1 => muldiv_stall,
+	               2 => sdram_wait,
+	               3 => (ex_branch_taken or ex_jalr_taken) and pipe_run,
+	               4 => mis_stall and (not mis_stall_q),
+	               5 => i_hpm_ext_events(0),
+	               6 => i_hpm_ext_events(1),
+	               7 => i_hpm_ext_events(2),
+	               8 => load_use_stall,
+	               others => '0');
 	o_retire      <= retire_pulse;
 
 	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
@@ -394,14 +451,17 @@ begin
 		severity failure;
 
 
-	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
-	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mret_take or fencei_take;
-	flush_ex_mem  <= trap_take or trap_sig or (fencei_busy and base_run);
+	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
+	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
+	flush_ex_mem  <= trap_take or trap_sig or mem_trap_take or (fencei_busy and base_run);
 
 	-- =========================================================================
 	-- 1. Estágio IF (Instruction Fetch) + Registrador IF/ID
 	-- =========================================================================
 	u_stage_if : entity work.stage_if
+		generic map (
+			ext_flash => ext_flash
+		)
 		port map (
 			i_clk             => i_clk,
 			i_rst             => i_rst,
@@ -409,7 +469,7 @@ begin
 			i_pipe_run        => pipe_run,
 			i_ex_branch_taken => ex_branch_taken,
 			i_ex_jalr_taken   => ex_jalr_taken,
-			i_trap_take       => trap_take,
+			i_trap_take       => trap_take or mem_trap_take,
 			i_mret_take       => mret_take,
 			i_fencei_take     => fencei_take,
 			i_branch_target   => ex_branch_target,
@@ -460,9 +520,11 @@ begin
 			i_rst         => i_rst,
 			i_ifid_valid  => ifid_valid,
 			i_instr       => ifid_instr,
-			i_wb_we       => wb_we,
-			i_wb_rd       => wb_rd,
-			i_wb_data     => wb_data,
+			i_wb_we       => wb2_we,
+			i_wb_rd       => wb2_rd,
+			i_wb_data     => wb2_data,
+			i_mem_rd      => exmem_rd_idx,
+			i_mem_re_ram  => exmem_re_ram,
 			i_ex_rd       => ex_rd_idx,
 			i_ex_re_ram   => ex_re_ram,
 			i_pipe_stall  => pipe_stall,
@@ -482,6 +544,7 @@ begin
 			o_sel_rs2_imm => id_sel_rs2_imm,
 			o_sel_pc_rs1  => id_sel_pc_rs1,
 			o_alu_op      => id_alu_op,
+			o_alu_sel     => id_alu_sel,
 			o_is_muldiv   => id_is_muldiv,
 			o_is_csr      => id_is_csr,
 			o_illegal     => id_illegal,
@@ -514,6 +577,7 @@ begin
 			i_sel_rs2_imm => id_sel_rs2_imm,
 			i_sel_pc_rs1  => id_sel_pc_rs1,
 			i_alu_op      => id_alu_op,
+			i_alu_sel     => id_alu_sel,
 			i_is_muldiv   => id_is_muldiv,
 			i_is_csr      => id_is_csr,
 			i_illegal     => id_illegal,
@@ -538,6 +602,7 @@ begin
 			o_sel_rs2_imm => ex_sel_rs2_imm,
 			o_sel_pc_rs1  => ex_sel_pc_rs1,
 			o_alu_op      => ex_alu_op,
+			o_alu_sel     => ex_alu_sel,
 			o_is_muldiv   => ex_is_muldiv,
 			o_is_csr      => ex_is_csr,
 			o_illegal     => ex_illegal,
@@ -560,14 +625,20 @@ begin
 			tick_cycles  => tick_cycles,
 			has_zifencei => has_zifencei,
 			has_zicclsm  => has_zicclsm,
-			has_dcache   => has_dcache
+			has_dcache   => has_dcache,
+			hpm_counters => hpm_counters
 		)
 		port map (
+			i_hpm_events      => hpm_events,
 			i_clk             => i_clk,
 			i_rst             => i_rst,
 			i_base_run        => base_run,
 			i_pipe_run        => pipe_run,
-			i_valid           => ex_valid,
+			i_valid           => ex_valid_live,
+			i_mem_trap_take   => mem_trap_take,
+			i_mem_trap_cause  => mem_trap_cause,
+			i_mem_trap_pc     => exmem_pc,
+			i_mem_trap_tval   => mem_trap_tval,
 			i_retire          => retire_pulse,
 			i_pc              => ex_pc,
 			i_pc4             => ex_pc4,
@@ -581,6 +652,7 @@ begin
 			i_sel_rs2_imm     => ex_sel_rs2_imm,
 			i_sel_pc_rs1      => ex_sel_pc_rs1,
 			i_alu_op          => ex_alu_op,
+			i_alu_sel         => ex_alu_sel,
 			i_is_muldiv       => ex_is_muldiv,
 			i_is_csr          => ex_is_csr,
 			i_illegal         => ex_illegal,
@@ -593,7 +665,10 @@ begin
 			i_memwb_rd        => memwb_rd_idx,
 			i_memwb_we_reg    => memwb_we_reg,
 			i_memwb_valid     => memwb_valid,
-			i_wb_data         => wb_data,
+			i_memwb_alu_out   => memwb_alu_out,
+			i_wb2_rd          => wb2_rd,
+			i_wb2_we_reg      => wb2_we,
+			i_wb2_data        => wb2_data,
 			i_dc_done         => i_dc_done,
 			o_final_result    => ex_final_result,
 			o_store_data      => ex_store_data,
@@ -620,8 +695,9 @@ begin
 			i_rst        => i_rst,
 			i_en         => base_run,
 			i_flush      => flush_ex_mem,
-			i_valid      => ex_valid,
-			i_pc4        => ex_pc4,
+			i_valid      => ex_valid_live,
+			i_pc         => ex_pc,
+			i_funct3     => ex_funct3,
 			i_alu_out    => ex_final_result,
 			i_store_data => ex_store_data,
 			i_byte_mask  => ex_store_byteena,
@@ -633,7 +709,6 @@ begin
 			i_ext_ram_op => ex_ext_ram_op,
 			i_wb_sel     => ex_wb_sel,
 			o_valid      => exmem_valid,
-			o_pc4        => exmem_pc4,
 			o_alu_out    => exmem_alu_out,
 			o_store_data => exmem_store_data,
 			o_byte_mask  => exmem_byteena,
@@ -643,7 +718,9 @@ begin
 			o_re_ram     => exmem_re_ram,
 			o_en_ram     => exmem_en_ram,
 			o_ext_ram_op => exmem_ext_ram_op,
-			o_wb_sel     => exmem_wb_sel
+			o_wb_sel     => exmem_wb_sel,
+			o_pc         => exmem_pc,
+			o_funct3     => exmem_funct3
 		);
 
 	-- =========================================================================
@@ -651,12 +728,13 @@ begin
 	-- =========================================================================
 	u_misaligned_unit : entity work.misaligned_unit
 		generic map (
-			has_zicclsm => has_zicclsm
+			has_zicclsm => has_zicclsm,
+			ext_flash   => ext_flash
 		)
 		port map (
 			i_clk         => i_clk,
 			i_rst         => i_rst,
-			i_valid       => exmem_valid,
+			i_valid       => exmem_valid and (not mem_trap_take),
 			i_en          => exmem_en_ram,
 			i_re          => exmem_re_ram,
 			i_we          => exmem_we_ram,
@@ -682,9 +760,16 @@ begin
 	mem_mask  <= mis_mask when mis_cross = '1' else exmem_byteena;
 
 	u_stage_mem : entity work.stage_mem
+		generic map (
+			has_zicclsm => has_zicclsm,
+			check_ea    => has_zicsr,
+			ext_flash   => ext_flash
+		)
 		port map (
 			i_valid         => exmem_valid,
 			i_alu_out       => mem_addr,
+			i_ea            => exmem_alu_out,
+			i_funct3        => exmem_funct3,
 			i_store_data    => mem_wdata,
 			i_byte_mask     => mem_mask,
 			i_we_ram        => exmem_we_ram,
@@ -704,29 +789,36 @@ begin
 			o_sdram_byteena => o_sdram_byteena,
 			o_sdram_rden    => o_sdram_rden,
 			o_sdram_wren    => o_sdram_wren,
-			o_sdram_wait    => sdram_wait
+			o_sdram_wait    => sdram_wait,
+			o_trap_take     => mem_trap_take,
+			o_trap_cause    => mem_trap_cause,
+			o_trap_tval     => mem_trap_tval
 		);
 
 	u_reg_mem_wb : entity work.reg_mem_wb
+		generic map (
+			ext_flash => ext_flash
+		)
 		port map (
 			i_clk        => i_clk,
 			i_rst        => i_rst,
 			i_en         => base_run,
-			i_flush      => '0',
+			i_flush      => mem_trap_take,
 			i_valid      => exmem_valid,
-			i_pc4        => exmem_pc4,
 			i_alu_out    => exmem_alu_out,
 			i_rd         => exmem_rd_idx,
 			i_we_reg     => exmem_we_reg,
 			i_ext_ram_op => exmem_ext_ram_op,
 			i_wb_sel     => exmem_wb_sel,
 			o_valid      => memwb_valid,
-			o_pc4        => memwb_pc4,
 			o_alu_out    => memwb_alu_out,
 			o_rd         => memwb_rd_idx,
 			o_we_reg     => memwb_we_reg,
 			o_ext_ram_op => memwb_ext_ram_op,
-			o_wb_sel     => memwb_wb_sel
+			o_wb_sel     => memwb_wb_sel,
+			o_is_flash   => memwb_is_flash,
+			o_is_sdram   => memwb_is_sdram,
+			o_is_cross   => memwb_is_cross
 		);
 
 	-- =========================================================================
@@ -735,12 +827,14 @@ begin
 	u_stage_wb : entity work.stage_wb
 		port map (
 			i_valid       => memwb_valid,
-			i_pc4         => memwb_pc4,
 			i_alu_out     => memwb_alu_out,
 			i_rd_idx      => memwb_rd_idx,
 			i_we_reg      => memwb_we_reg,
 			i_ext_ram_op  => memwb_ext_ram_op,
 			i_wb_sel      => memwb_wb_sel,
+			i_is_flash    => memwb_is_flash,
+			i_is_sdram    => memwb_is_sdram,
+			i_is_cross    => memwb_is_cross,
 			i_flash_data2 => i_flash_data2,
 			i_ram_rdata   => i_ram_rdata,
 			i_first_word  => mis_first_word,
@@ -775,6 +869,43 @@ begin
 			i_enable => '1',
 			i_d      => wb_data,
 			o_d      => wb_data_prev
+		);
+
+	-- O banco de registradores é escrito e o adiantamento é feito a partir do registrador WB2: o dado alinhado
+	-- de um load fica pronto em WB e só sai dali para o resto do pipeline registrado, o que tira o alinhamento
+	-- do caminho de adiantamento. Um load seguido de uma instrução dependente espera por isso um ciclo a mais.
+	-- WB2 avança junto de MEM/WB (base_run), para que uma parada não troque a instrução que o adiantamento vê.
+	u_wb2_we_ff : entity work.flip_flop
+		port map (
+			i_d      => wb_we,
+			o_d      => wb2_we,
+			i_enable => base_run,
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
+	u_wb2_rd_reg : entity work.generic_register
+		generic map (
+			data_width => 5
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => base_run,
+			i_d      => wb_rd,
+			o_d      => wb2_rd
+		);
+
+	u_wb2_data_reg : entity work.generic_register
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_clk    => i_clk,
+			i_rst    => i_rst,
+			i_enable => base_run,
+			i_d      => wb_data,
+			o_d      => wb2_data
 		);
 
 	u_mux_wb_data : entity work.mux_2x1

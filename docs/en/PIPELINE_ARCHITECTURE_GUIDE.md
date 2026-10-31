@@ -15,7 +15,7 @@ The processor is divided into five stage entities located in `core/` and four ba
 | 3 | `stage_ex` | `core/stage_ex.vhd` | Operand forwarding, ALU execution, MulDiv unit, CSR file and Trap Unit, `FENCE.I` unit, branch target calculation, and store alignment |
 | Barrier 3 | `reg_ex_mem` | `common/reg_ex_mem.vhd` | Synchronous registration of EX result, store data and byte mask, destination `rd`, and memory/WB controls between EX and MEM |
 | 4 | `stage_mem` | `core/stage_mem.vhd` | Data-space decoding (Flash port 2, internal RAM, and external SDRAM/peripheral window) and wait control `o_sdram_wait` |
-| Barrier 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Synchronous registration of `o_pc4`, `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op`, and `o_wb_sel` between MEM and WB |
+| Barrier 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Synchronous registration of `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op`, and `o_wb_sel` between MEM and WB |
 | 5 | `stage_wb` | `core/stage_wb.vhd` | Selection of the word read from memory, byte/halfword extension (`extender_ram`), and selection of the final value written to the register file |
 
 ## 2. Stage-by-Stage Breakdown
@@ -64,30 +64,32 @@ The ID stage comprises six sub-blocks:
 
 In the EX stage:
 
-1. **Forwarding (`forwarding_unit`):** selects each operand (`ex_fwd_rs1_val` and `ex_fwd_rs2_val`) via `mux_4x1` from the ID/EX value (`"00"`), the final WB datum (`"01"`), or the EX/MEM result (`"10"`).
+1. **Forwarding (`forwarding_unit`):** selects each operand (`ex_fwd_rs1_val` and `ex_fwd_rs2_val`) via `mux_4x1` from the ID/EX value (`"00"`), the EX result registered in MEM/WB (`"01"`), the EX/MEM result (`"10"`), or the final WB datum registered in WB2 (`"11"`).
 2. **ALU input selection:** two `mux_2x1` multiplexers select operand A (`i_pc` when `i_sel_pc_rs1 = '0'`, or `ex_fwd_rs1_val` when `'1'`) and operand B (`ex_fwd_rs2_val` when `i_sel_rs2_imm = '0'`, or `i_imm` when `'1'`).
 3. **ALU (`alu`):** executes the operation defined in `common/alu_consts.vhd`:
 
 | Constant | Code | Operation on `o_d` | `o_branch` flag |
 | :--- | :--- | :--- | :--- |
-| `ALU_PASS_B` | `"00000"` | `i_b` | `'0'` |
-| `ALU_ADD` | `"00001"` | `unsigned(i_a) + unsigned(i_b)` | `'0'` |
-| `ALU_XOR` | `"00010"` | `i_a xor i_b` | `'0'` |
-| `ALU_OR` | `"00011"` | `i_a or i_b` | `'0'` |
-| `ALU_AND` | `"00100"` | `i_a and i_b` | `'0'` |
-| `ALU_SLL` | `"00101"` | `i_a << unsigned(i_b[4:0])` | `'0'` |
-| `ALU_SRL` | `"00110"` | `unsigned(i_a) >> unsigned(i_b[4:0])` | `'0'` |
-| `ALU_SRA` | `"00111"` | `signed(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_ADD` | `"00000"` | `unsigned(i_a) + unsigned(i_b)` | `'0'` |
+| `ALU_SLL` | `"00001"` | `i_a << unsigned(i_b[4:0])` | `'0'` |
+| `ALU_XOR` | `"00100"` | `i_a xor i_b` | `'0'` |
+| `ALU_SRL` | `"00101"` | `unsigned(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_OR` | `"00110"` | `i_a or i_b` | `'0'` |
+| `ALU_AND` | `"00111"` | `i_a and i_b` | `'0'` |
 | `ALU_SUB` | `"01000"` | `unsigned(i_a) - unsigned(i_b)` | `'0'` |
-| `ALU_SLT` | `"01001"` | `1` if `signed(i_a) < signed(i_b)`, else `0` | `'0'` |
-| `ALU_SLTU` | `"01010"` | `1` if `unsigned(i_a) < unsigned(i_b)`, else `0` | `'0'` |
-| `ALU_BEQ` | `"01011"` | `0` | `'1'` if `i_a = i_b` |
-| `ALU_BNE` | `"01100"` | `0` | `'1'` if `i_a /= i_b` |
-| `ALU_BLT` | `"01101"` | `0` | `'1'` if `signed(i_a) < signed(i_b)` |
-| `ALU_BGE` | `"01110"` | `0` | `'1'` if `signed(i_a) >= signed(i_b)` |
-| `ALU_BLTU` | `"01111"` | `0` | `'1'` if `unsigned(i_a) < unsigned(i_b)` |
-| `ALU_BGEU` | `"10000"` | `0` | `'1'` if `unsigned(i_a) >= unsigned(i_b)` |
-| `ALU_JALR` | `"10001"` | `(unsigned(i_a) + unsigned(i_b)) & ~1` | `'0'` |
+| `ALU_SLT` | `"01010"` | `1` if `signed(i_a) < signed(i_b)`, else `0` | `'0'` |
+| `ALU_SLTU` | `"01011"` | `1` if `unsigned(i_a) < unsigned(i_b)`, else `0` | `'0'` |
+| `ALU_SRA` | `"01101"` | `signed(i_a) >> unsigned(i_b[4:0])` | `'0'` |
+| `ALU_JALR` | `"10000"` | `(unsigned(i_a) + unsigned(i_b)) & ~1` | `'0'` |
+| `ALU_LUI` | `"10001"` | `i_b` (operand A forced to zero) | `'0'` |
+| `ALU_BEQ` | `"11000"` | `0` | `'1'` if `i_a = i_b` |
+| `ALU_BNE` | `"11001"` | `0` | `'1'` if `i_a /= i_b` |
+| `ALU_BLT` | `"11100"` | `0` | `'1'` if `signed(i_a) < signed(i_b)` |
+| `ALU_BGE` | `"11101"` | `0` | `'1'` if `signed(i_a) >= signed(i_b)` |
+| `ALU_BLTU` | `"11110"` | `0` | `'1'` if `unsigned(i_a) < unsigned(i_b)` |
+| `ALU_BGEU` | `"11111"` | `0` | `'1'` if `unsigned(i_a) >= unsigned(i_b)` |
+
+The encoding of the operation code and the shared adder-subtractor are described in [ALU.md](ALU.md).
 
 4. **EX result selection:** `ex_alu_mux_result` chooses between `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`), and `ex_alu_result`. Next, `u_mux_ex_final` (`mux_2x1`) selects between `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) and `i_pc4` (`i_sel_pc4_alu = '1'`, used by `JAL` and `JALR`).
 5. **Store alignment (`store_manager`):** shifts `ex_fwd_rs2_val` into the byte lanes matching `ex_alu_result(1 downto 0)` and produces the 4-bit mask `o_store_byte_mask` (`"1111"` for `SW`, `"0011"`/`"1100"` for `SH`, and `"0001"`/`"0010"`/`"0100"`/`"1000"` for `SB`).
@@ -114,13 +116,12 @@ In the WB stage, the word read in the previous cycle is selected from `i_flash_d
 | `EXT_RAM_LB` | `"011"` | Byte selected by `i_byte_offset(1 downto 0)` with sign extension |
 | `EXT_RAM_LBU` | `"100"` | Byte selected by `i_byte_offset(1 downto 0)` with zero extension |
 
-Finally, the `u_mux_wb` (`mux_4x1`) multiplexer selects `o_wb_data` according to `common/wb_sel_consts.vhd`:
+Finally, the `u_mux_wb` (`mux_2x1`) multiplexer selects `o_wb_data` according to `common/wb_sel_consts.vhd`:
 
 | Constant | Code (`i_wb_sel`) | Datum selected for register-file writeback |
 | :--- | :--- | :--- |
-| `WB_SEL_ALU` | `"00"` | `i_alu_out` (result from the ALU, MulDiv unit, or CSR read) |
-| `WB_SEL_PC4` | `"01"` | `i_pc4` (return address of `JAL` and `JALR`) |
-| `WB_SEL_RAM` | `"10"` | `wb_ram_extended` (load datum formatted by `extender_ram`) |
+| `WB_SEL_ALU` | `"0"` | `i_alu_out` (result from the ALU, MulDiv unit, or CSR read, and the return address of `JAL` and `JALR`) |
+| `WB_SEL_RAM` | `"1"` | `wb_ram_extended` (load datum formatted by `extender_ram`) |
 
 ---
 

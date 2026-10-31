@@ -20,6 +20,10 @@ use work.pc_src_consts.all;
 use work.mem_map_consts.all;
 
 entity stage_if is
+	generic (
+		-- Mapa da plataforma sdram: a cache de instruções serve a FLASH (bit 29) e a SDRAM (bit 30); não há FLASH interna.
+		ext_flash : boolean := false
+	);
 	port (
 		-- Sinal de clock principal do processador.
 		i_clk             : in  std_logic;
@@ -114,11 +118,13 @@ begin
 		);
 
 	is_boot_rom_if <= '1' when unsigned(if_pc) < BOOT_ROM_SIZE_BYTES else '0';
-	if_in_sdram    <= '1' when unsigned(if_pc) >= SDRAM_BASE_BYTES   else '0';
+	if_in_sdram    <= '1' when ((ext_flash and (if_pc(30) = '1' or if_pc(29) = '1')) or
+	                            ((not ext_flash) and unsigned(if_pc) >= SDRAM_BASE_BYTES))
+	                  else '0';
 	if_wait        <= if_in_sdram and (not i_ic_ready);
 
 	o_instr <= i_boot_rom_data when is_boot_rom_if = '1' else
-	           i_ic_data       when if_in_sdram    = '1' else
+	           i_ic_data       when (if_in_sdram = '1' or ext_flash) else
 	           i_flash_data;
 
 	o_pc          <= if_pc;

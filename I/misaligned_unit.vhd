@@ -34,7 +34,9 @@ use work.mem_map_consts.all;
 entity misaligned_unit is
 	generic (
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' desliga a unidade.
-		has_zicclsm  : boolean := true
+		has_zicclsm  : boolean := true;
+		-- Mapa da plataforma sdram: FLASH, SDRAM e periféricos saem todos pela porta externa (bits 31, 30 ou 29).
+		ext_flash    : boolean := false
 	);
 	port (
 		-- Sinal de clock principal.
@@ -131,7 +133,9 @@ begin
 
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
 
-	is_sdram <= '1' when unsigned(i_addr) >= SDRAM_BASE_BYTES else '0';
+	is_sdram <= '1' when ((ext_flash and (i_addr(31) = '1' or i_addr(30) = '1' or i_addr(29) = '1')) or
+	                      ((not ext_flash) and unsigned(i_addr) >= SDRAM_BASE_BYTES))
+	            else '0';
 	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
 
 	first_done    <= cross and (not second) and step_ok and i_advance;

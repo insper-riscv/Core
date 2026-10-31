@@ -16,15 +16,20 @@ RAM_BASE = 0x8000
 DONE_ADDR = RAM_BASE + 0x7FC
 
 
-async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, sdram=None, sdram_stall=None):
+async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, sdram=None, sdram_stall=None,
+                      imem=None, flash_port_value=None):
     """Run until the program stores 1 at DONE_ADDR; return the RAM as {address: word}.
 
     ``monitor``, when given, is called once per cycle after the memory models have settled.
+    ``imem`` (a dict {address: word}) replaces the instruction memory built from ``program``, so code can sit at
+    any address; the word also goes to the instruction cache port (``i_ic_data``). ``flash_port_value``, when
+    given, is driven on ``i_flash_data`` instead of the instruction, to show that a fetch does not use it.
     ``sdram`` (a dict {address: word}) turns on a slave for the SDRAM window; ``sdram_stall(n)`` gives the
     stall cycles of its n-th access. The slave holds ``i_sdram_ready`` until the core advances and commits
     the read data after that, the way the bridge of the board does.
     """
-    imem = {4 * i: w for i, w in enumerate(program)}
+    if imem is None:
+        imem = {4 * i: w for i, w in enumerate(program)}
     flash = flash or {}
     ram = {}
 
@@ -58,7 +63,8 @@ async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, s
 
         word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
         dut.i_boot_rom_data.value = word
-        dut.i_flash_data.value = word
+        dut.i_flash_data.value = word if flash_port_value is None else flash_port_value
+        dut.i_ic_data.value = word
 
         if int(dut.o_ram_en.value):
             addr = int(dut.o_ram_addr.value) & ~3

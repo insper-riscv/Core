@@ -20,6 +20,9 @@ package mem_map_consts is
 	-- Endereço base em bytes da janela externa de SDRAM e periféricos (0x40000000).
 	constant SDRAM_BASE_BYTES      : unsigned(31 downto 0) := to_unsigned(16#40000000#, 32);
 
+	-- Endereço base em bytes da FLASH externa no mapa da plataforma sdram (0x20000000, bit 29 = 1).
+	constant FLASH_EXT_BASE_BYTES  : unsigned(31 downto 0) := to_unsigned(16#20000000#, 32);
+
 	-- Endereço base em bytes da janela de periféricos dentro da janela externa (0x80000000, bit 31 = 1).
 	constant PERIPHERAL_BASE_BYTES : unsigned(31 downto 0) := x"80000000";
 

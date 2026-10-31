@@ -34,6 +34,10 @@ entity forwarding_unit is
 		i_memwb_rd     : in  reg_t;
 		-- Habilitação de escrita no banco de registradores da instrução no estágio WB.
 		i_memwb_we_reg : in  std_logic;
+		-- Endereço do registrador destino rd da instrução que acabou de sair do estágio WB (registrador WB2).
+		i_wb2_rd       : in  reg_t;
+		-- Habilitação de escrita no banco de registradores da instrução no registrador WB2.
+		i_wb2_we_reg   : in  std_logic;
 		-- Seletor do multiplexador de adiantamento para o operando rs1 no estágio EX.
 		o_fwd_rs1      : out std_logic_vector(1 downto 0);
 		-- Seletor do multiplexador de adiantamento para o operando rs2 no estágio EX.
@@ -49,7 +53,7 @@ begin
 	-- ===========================================================================
 	-- Adiantamento para o operando rs1
 	-- ===========================================================================
-	process(i_ex_rs1, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg)
+	process(i_ex_rs1, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg, i_wb2_rd, i_wb2_we_reg)
 	begin
 		if    i_exmem_we_reg = '1'
 		  and i_exmem_rd /= REG_ZERO
@@ -65,6 +69,13 @@ begin
 			-- Hazard MEM/WB: instrução duas posições à frente escreve em rs1.
 			o_fwd_rs1 <= "01";
 
+		elsif i_wb2_we_reg = '1'
+		  and i_wb2_rd /= REG_ZERO
+		  and i_wb2_rd  = i_ex_rs1
+		then
+			-- Hazard WB2: instrução três posições à frente escreve em rs1 (o banco ainda não tem o valor).
+			o_fwd_rs1 <= "11";
+
 		else
 			-- Sem conflito de dados: valor lido no estágio ID é válido.
 			o_fwd_rs1 <= "00";
@@ -74,7 +85,7 @@ begin
 	-- ===========================================================================
 	-- Adiantamento para o operando rs2
 	-- ===========================================================================
-	process(i_ex_rs2, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg)
+	process(i_ex_rs2, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg, i_wb2_rd, i_wb2_we_reg)
 	begin
 		if    i_exmem_we_reg = '1'
 		  and i_exmem_rd /= REG_ZERO
@@ -87,6 +98,12 @@ begin
 		  and i_memwb_rd  = i_ex_rs2
 		then
 			o_fwd_rs2 <= "01";
+
+		elsif i_wb2_we_reg = '1'
+		  and i_wb2_rd /= REG_ZERO
+		  and i_wb2_rd  = i_ex_rs2
+		then
+			o_fwd_rs2 <= "11";
 
 		else
 			o_fwd_rs2 <= "00";

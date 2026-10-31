@@ -28,6 +28,18 @@ package csr_addr_consts is
   constant ADDR_MTVEC      : std_logic_vector(11 downto 0) := x"305";
   -- Endereço do CSR mstatush (Machine Status Register Upper 32 bits).
   constant ADDR_MSTATUSH   : std_logic_vector(11 downto 0) := x"310";
+  -- Endereço do CSR mcountinhibit (inibe a soma de mcycle, minstret e dos contadores de eventos).
+  constant ADDR_MCOUNTINHIBIT : std_logic_vector(11 downto 0) := x"320";
+  -- Primeiro CSR de seleção de evento (mhpmevent3); o de índice N fica em 0x320 + N.
+  constant ADDR_MHPMEVENT_BASE   : std_logic_vector(11 downto 0) := x"320";
+  -- Primeiro contador de eventos de usuário na faixa de máquina (mhpmcounter0); o de índice N fica em 0xB00 + N.
+  constant ADDR_MHPMCOUNTER_BASE : std_logic_vector(11 downto 0) := x"B00";
+  -- Primeira metade alta de contador de eventos (mhpmcounter0h); o de índice N fica em 0xB80 + N.
+  constant ADDR_MHPMCOUNTERH_BASE : std_logic_vector(11 downto 0) := x"B80";
+  -- Primeiro espelho de leitura de contador de eventos (hpmcounter0); o de índice N fica em 0xC00 + N.
+  constant ADDR_HPMCOUNTER_BASE  : std_logic_vector(11 downto 0) := x"C00";
+  -- Primeiro espelho de leitura da metade alta (hpmcounter0h); o de índice N fica em 0xC80 + N.
+  constant ADDR_HPMCOUNTERH_BASE : std_logic_vector(11 downto 0) := x"C80";
   -- Endereço do CSR mscratch (Machine Scratch Register).
   constant ADDR_MSCRATCH   : std_logic_vector(11 downto 0) := x"340";
   -- Endereço do CSR mepc (Machine Exception Program Counter).

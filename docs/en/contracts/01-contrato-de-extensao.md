@@ -60,9 +60,9 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
 | `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; Zmmul has no bit of its own; writes are ignored |
-| Not implemented | `cycle`, `time` and `instret` (an access is an illegal CSR access) and interrupts (`mie` and `mip` read zero and ignore writes) |
+| Not implemented | Interrupts (`mie` and `mip` read zero and ignore writes); the counters `cycle`, `time` and `instret` exist only with `has_zicntr = true`, and without it an access is an illegal CSR access |
 
-Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:
+Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). Causes 4 and 6 come from the instance in the MEM stage when `has_zicsr = true`, one cycle after the others, and take precedence over the instruction in EX. The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:
 
 | Code (`o_cause`) | Exception | Value written to `mtval` (`o_tval`) |
 | ---: | :--- | :--- |

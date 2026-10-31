@@ -31,7 +31,11 @@ use work.mem_map_consts.all;
 entity trap_unit is
 	generic (
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' faz todo desalinhado gerar trap.
-		has_zicclsm   : boolean := true
+		has_zicclsm   : boolean := true;
+		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
+		check_ea      : boolean := true;
+		-- Mapa da plataforma sdram: a memória principal é a FLASH (bit 29) e a SDRAM (bit 30), sem RAM interna.
+		ext_flash     : boolean := false
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -168,7 +172,9 @@ begin
 
 	-- As fronteiras do mapa são potências de 2 (conferido nas asserções acima), então "ea >= RAM_BASE" é "algum bit
 	-- [30:15] em '1'" e "ea < PERIPHERAL_BASE" é "bit 31 em '0'", sem comparador numérico depois da ULA.
-	in_main_mem <= '1' when (i_ea(31) = '0' and i_ea(30 downto 15) /= (30 downto 15 => '0')) else '0';
+	in_main_mem <= '1' when ((ext_flash and i_ea(31) = '0' and (i_ea(30) /= i_ea(29))) or
+	                         ((not ext_flash) and i_ea(31) = '0' and i_ea(30 downto 15) /= (30 downto 15 => '0')))
+	               else '0';
 
 	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
 	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
@@ -178,12 +184,17 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	last_word <= '1' when i_ea(29 downto 2) = (29 downto 2 => '1') else '0';
+	last_word <= '1' when ((ext_flash and i_ea(28 downto 2) = (28 downto 2 => '1')) or
+	                       ((not ext_flash) and i_ea(29 downto 2) = (29 downto 2 => '1')))
+	             else '0';
 
 	-- RAM interna: bits [31:30] = "00" e algum bit [29:15] em '1'. SDRAM: bits [31:30] = "01".
-	same_region <= '1' when (((i_ea(31 downto 30) = "00" and i_ea(29 downto 15) /= (29 downto 15 => '0')) or
-	                          i_ea(31 downto 30) = "01") and
-	                         last_word = '0')
+	-- Mapa da sdram (ext_flash): FLASH é "001" e SDRAM é "010" nos bits [31:29], e cada uma acaba na palavra [28:2] toda em '1'.
+	same_region <= '1' when ((ext_flash and (i_ea(31 downto 29) = "001" or i_ea(31 downto 29) = "010") and last_word = '0') or
+	                         ((not ext_flash) and
+	                          ((i_ea(31 downto 30) = "00" and i_ea(29 downto 15) /= (29 downto 15 => '0')) or
+	                           i_ea(31 downto 30) = "01") and
+	                          last_word = '0'))
 	               else '0';
 
 	misal_exec <= '1' when (misal_in_word = '1' or
@@ -191,8 +202,8 @@ begin
 	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
 	              else '0';
 
-	ld_misal <= ld_unaligned and (not misal_exec);
-	st_misal <= st_unaligned and (not misal_exec);
+	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
+	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
 
 	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0) else '0';
 

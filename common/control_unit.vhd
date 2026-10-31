@@ -94,7 +94,7 @@ begin
 		o_ext_ram_op  <= EXT_RAM_LW;
 		o_sel_rs2_imm <= '0';
 		o_sel_pc_rs1  <= '0';
-		o_alu_op      <= ALU_PASS_B;
+		o_alu_op      <= ALU_ADD;
 		o_we_ram      <= '0';
 		o_re_ram      <= '0';
 		o_en_ram      <= '0';
@@ -224,7 +224,7 @@ begin
 					when FUNCT3_BGE  => o_alu_op <= ALU_BGE;
 					when FUNCT3_BLTU => o_alu_op <= ALU_BLTU;
 					when FUNCT3_BGEU => o_alu_op <= ALU_BGEU;
-					when others      => o_alu_op <= ALU_PASS_B;
+					when others      => o_alu_op <= ALU_ADD;
 				end case;
 
 			-- -----------------------------------------------------------------------
@@ -267,7 +267,7 @@ begin
 				o_ext_imm_op  <= EXT_IMM_U;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
-				o_alu_op      <= ALU_PASS_B;
+				o_alu_op      <= ALU_LUI;
 
 			-- -----------------------------------------------------------------------
 			-- Adição de imediato superior ao PC (U-type AUIPC)
@@ -284,7 +284,6 @@ begin
 			when OPCODE_JAL =>
 				o_sel_pc4_alu <= '1';
 				o_ext_imm_op  <= EXT_IMM_J;
-				o_wb_sel      <= WB_SEL_PC4;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
 				o_alu_op      <= ALU_ADD;
@@ -295,7 +294,6 @@ begin
 			when OPCODE_JALR =>
 				o_sel_pc4_alu <= '1';
 				o_ext_imm_op  <= EXT_IMM_I;
-				o_wb_sel      <= WB_SEL_PC4;
 				o_we_reg      <= '1';
 				o_sel_rs2_imm <= '1';
 				o_sel_pc_rs1  <= '1';

@@ -183,6 +183,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -190,6 +191,63 @@
         "test_module": "tests.python.unittests.cores.SdramStall",
         "parameters": {
             "has_m": false
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "CoreExtFlash": {
+        "toplevel": "core",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
+            "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Common-Components/src/adder.vhd",
+            "Common-Components/src/mux_2x1.vhd",
+            "Common-Components/src/mux_4x1.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/utils_pkg.vhd",
+            "I/alu.vhd",
+            "Common-Components/src/onehot_decoder.vhd",
+            "Common-Components/src/mux_tree.vhd",
+            "common/reg_file.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
+            "I/misaligned_unit.vhd",
+            "common/control_unit.vhd",
+            "common/bubble_mux.vhd",
+            "common/forwarding_unit.vhd",
+            "common/hazard_detection_unit.vhd",
+            "common/pc_fetch.vhd",
+            "common/reg_if_id.vhd",
+            "common/reg_id_ex.vhd",
+            "common/reg_ex_mem.vhd",
+            "common/reg_mem_wb.vhd",
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/core.vhd"
+        ],
+        "test_module": "tests.python.unittests.cores.ExtFlash",
+        "parameters": {
+            "has_m": false,
+            "ext_flash": true
         },
         "build_args": [
             "--std=08"
@@ -237,6 +295,7 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
@@ -251,6 +310,7 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
@@ -261,6 +321,26 @@
         },
         "test_module": "tests.python.unittests.Zicntr.csr_file_zicntr"
     },
+    "CsrFileZihpm": {
+        "toplevel": "csr_file",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
+            "Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zicntr": true,
+            "tick_cycles": 4,
+            "hpm_counters": 4
+        },
+        "test_module": "tests.python.unittests.Zicntr.csr_file_zihpm"
+    },
     "CsrFileNoZicntr": {
         "toplevel": "csr_file",
         "sources": [
@@ -269,6 +349,7 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
@@ -306,6 +387,27 @@
         "test_module": "tests.python.unittests.Zicsr.trap_unit_no_zicclsm",
         "parameters": {
             "has_zicclsm": false
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "TrapUnitExtFlash": {
+        "toplevel": "trap_unit",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/mem_map_consts.vhd",
+            "Zicsr/trap_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.trap_unit_ext_flash",
+        "parameters": {
+            "ext_flash": true
         },
         "build_args": [
             "--std=08"
@@ -354,6 +456,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -410,6 +513,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -467,6 +571,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -528,6 +633,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -587,6 +693,7 @@
             "core/stage_if.vhd",
             "core/stage_id.vhd",
             "core/stage_ex.vhd",
+            "Zicsr/trap_unit.vhd",
             "core/stage_mem.vhd",
             "core/stage_wb.vhd",
             "core/core.vhd"
@@ -641,6 +748,7 @@
             "Common-Components/src/flip_flop.vhd",
             "Common-Components/src/generic_register.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd"
@@ -686,6 +794,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -708,6 +817,75 @@
         "parameters": {
             "has_m": true,
             "has_zicsr": true
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "CoreZihpm": {
+        "toplevel": "core",
+        "sources": [
+            "common/pipeline_types.vhd",
+            "common/byte_mask_consts.vhd",
+            "common/opcode_consts.vhd",
+            "common/funct3_consts.vhd",
+            "common/funct7_consts.vhd",
+            "common/alu_consts.vhd",
+            "common/ext_imm_consts.vhd",
+            "common/ext_ram_consts.vhd",
+            "common/wb_sel_consts.vhd",
+            "common/pc_src_consts.vhd",
+            "common/mem_map_consts.vhd",
+            "Common-Components/src/generic_register.vhd",
+            "Common-Components/src/adder.vhd",
+            "Common-Components/src/mux_2x1.vhd",
+            "Common-Components/src/mux_4x1.vhd",
+            "Common-Components/src/flip_flop.vhd",
+            "Common-Components/src/utils_pkg.vhd",
+            "I/alu.vhd",
+            "Common-Components/src/onehot_decoder.vhd",
+            "Common-Components/src/mux_tree.vhd",
+            "common/reg_file.vhd",
+            "I/extender_imm.vhd",
+            "I/extender_ram.vhd",
+            "I/store_manager.vhd",
+            "I/misaligned_unit.vhd",
+            "common/control_unit.vhd",
+            "common/bubble_mux.vhd",
+            "M/m_decode.vhd",
+            "M/booth_multiplier_rv32.vhd",
+            "M/non_restoring_divider_rv32.vhd",
+            "M/multdiv.vhd",
+            "Zicsr/csr_decode.vhd",
+            "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
+            "Zicntr/counter64.vhd",
+            "Zicntr/tick_divider.vhd",
+            "Zicsr/csr_file.vhd",
+            "Zicsr/trap_unit.vhd",
+            "common/forwarding_unit.vhd",
+            "common/hazard_detection_unit.vhd",
+            "common/pc_fetch.vhd",
+            "common/reg_if_id.vhd",
+            "common/reg_id_ex.vhd",
+            "common/reg_ex_mem.vhd",
+            "common/reg_mem_wb.vhd",
+            "core/stage_if.vhd",
+            "core/stage_id.vhd",
+            "core/stage_ex.vhd",
+            "core/stage_mem.vhd",
+            "core/stage_wb.vhd",
+            "core/core.vhd"
+        ],
+        "test_module": "tests.python.unittests.cores.Zihpm",
+        "parameters": {
+            "has_m": true,
+            "has_zicsr": true,
+            "has_zicntr": true,
+            "hpm_counters": 4
         },
         "build_args": [
             "--std=08"
@@ -752,6 +930,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -818,6 +997,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -884,6 +1064,7 @@
             "Zifencei/fencei_unit.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -951,6 +1132,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -1014,6 +1196,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
@@ -1079,6 +1262,7 @@
             "M/multdiv.vhd",
             "Zicsr/csr_decode.vhd",
             "Zicsr/csr_addr_consts.vhd",
+            "Zicsr/csr_event_consts.vhd",
             "Zicntr/counter64.vhd",
             "Zicntr/tick_divider.vhd",
             "Zicsr/csr_file.vhd",
