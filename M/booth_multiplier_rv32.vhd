@@ -1,151 +1,141 @@
---------------------------------------------------------------------------------
--- Booth's Multiplication Algorithm - RISC-V RV32 Compatible
---------------------------------------------------------------------------------
--- Implements Booth's radix-2 algorithm for signed 32-bit multiplication.
--- Produces a 64-bit result (compatible with RV32M MUL/MULH instructions).
+-- =============================================================================
+-- Multiplicador sequencial de Booth Radix-2 de 32 bits (Extensão RV32M)
 --
--- Interface:
---   clk        : Clock
---   rst        : Synchronous reset (active high)
---   start      : Pulse high for 1 cycle to begin multiplication
---   multiplicand: 32-bit signed input (rs1)
---   multiplier  : 32-bit signed input (rs2)
---   result_lo  : Lower 32 bits of product  (MUL  result)
---   result_hi  : Upper 32 bits of product  (MULH result)
---   done       : Asserted when result is valid
---   busy       : Asserted while computation is in progress
+-- Implementa o algoritmo de Booth radix-2 para multiplicação com sinal de
+-- dois operandos de 32 bits (i_multiplicand e i_multiplier), produzindo um
+-- produto de 64 bits dividido em parte baixa (o_result_lo, para MUL) e parte
+-- alta (o_result_hi, para MULH/MULHSU/MULHU).
 --
--- Latency: 33 clock cycles (1 init + 32 iterations)
--- Handles full signed 32-bit range including -2^31
---------------------------------------------------------------------------------
+-- Latência: 33 ciclos de clock (1 ciclo de inicialização + 32 iterações).
+-- Suporta toda a faixa com sinal de 32 bits, incluindo -2^31.
+-- =============================================================================
 
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.pipeline_types.all;
 
 entity booth_multiplier_rv32 is
-    port (
-        clk          : in  std_logic;
-        rst          : in  std_logic;
-        start        : in  std_logic;
-        multiplicand : in  std_logic_vector(31 downto 0);  -- rs1
-        multiplier   : in  std_logic_vector(31 downto 0);  -- rs2
-        result_lo    : out std_logic_vector(31 downto 0);   -- MUL  result
-        result_hi    : out std_logic_vector(31 downto 0);   -- MULH result
-        done         : out std_logic;
-        busy         : out std_logic
-    );
+	port (
+		-- Sinal de clock do sistema.
+		i_clk          : in  std_logic;
+		-- Sinal de reset síncrono ativo em '1'.
+		i_rst          : in  std_logic;
+		-- Pulso de início da multiplicação no estágio EX.
+		i_start        : in  std_logic;
+		-- Multiplicando de 32 bits (operando A / rs1).
+		i_multiplicand : in  word_t;
+		-- Multiplicador de 32 bits (operando B / rs2).
+		i_multiplier   : in  word_t;
+		-- Parte baixa do produto (bits [31:0], resultado da instrução MUL).
+		o_result_lo    : out word_t;
+		-- Parte alta do produto (bits [63:32], base para MULH/MULHSU/MULHU).
+		o_result_hi    : out word_t;
+		-- Pulso de 1 ciclo indicando que o produto de 64 bits está pronto.
+		o_done         : out std_logic;
+		-- Indica que o multiplicador está ocupado processando uma operação.
+		o_busy         : out std_logic
+	);
 end entity booth_multiplier_rv32;
 
 architecture rtl of booth_multiplier_rv32 is
 
-    -- FSM states
-    type state_t is (S_IDLE, S_COMPUTE, S_DONE);
-    signal state : state_t := S_IDLE;
+	-- Estados da máquina de estados finitos do multiplicador de Booth.
+	type state_t is (S_IDLE, S_COMPUTE, S_DONE);
+	-- Estado atual da máquina de estados do multiplicador.
+	signal state         : state_t := S_IDLE;
 
-    -- Internal registers
-    -- Accumulator (A) : upper partial product, 33 bits (extra sign bit)
-    -- Q register      : multiplier shifted right each cycle, 32 bits
-    -- Q_minus1        : extra bit for Booth encoding
-    -- M register      : multiplicand, 33 bits (sign-extended)
-    signal A        : signed(32 downto 0);   -- 33-bit accumulator
-    signal Q        : signed(31 downto 0);   -- 32-bit multiplier register
-    signal Q_minus1 : std_logic;             -- Booth extra bit
-    signal M        : signed(32 downto 0);   -- 33-bit sign-extended multiplicand
+	-- Acumulador parcial superior de 33 bits (inclui bit extra de sinal).
+	signal acc_reg       : signed(32 downto 0);
+	-- Registrador de deslocamento do multiplicador de 32 bits.
+	signal q_reg         : signed(31 downto 0);
+	-- Bit extra à direita do multiplicador para codificação de Booth radix-2.
+	signal q_minus1_reg  : std_logic;
+	-- Multiplicando estendido com sinal para 33 bits.
+	signal m_reg         : signed(32 downto 0);
 
-    -- Iteration counter
-    signal count    : unsigned(5 downto 0);  -- counts 0..31 (32 iterations)
-    signal busy_reg      : std_logic := '0';
-    signal start_inhibit : std_logic := '0';
+	-- Contador de iterações (0 a 31, totalizando 32 passos).
+	signal iter_count    : unsigned(5 downto 0);
+	-- Registrador interno de ocupação durante os estados S_COMPUTE e S_DONE.
+	signal busy_reg      : std_logic := '0';
+	-- Inibidor que impede reinício imediato caso i_start permaneça em '1' ao final.
+	signal start_inhibit : std_logic := '0';
 
 begin
 
-    -- busy: combinacional quando start=1 em S_IDLE (eager)
-    -- Garante que muldiv_busy sobe no mesmo ciclo que o start (gerado em EX),
-    -- evitando necessidade de stall especial para o ciclo K.
-    busy <= '1' when (state = S_IDLE and start = '1' and start_inhibit = '0') else busy_reg;
+	-- Sinal o_busy sobe combinacionalmente no mesmo ciclo de i_start em S_IDLE (eager stall).
+	o_busy <= '1' when (state = S_IDLE and i_start = '1' and start_inhibit = '0') else busy_reg;
 
-    process(clk)
-        variable A_next : signed(32 downto 0);
-        variable concat : signed(65 downto 0);  -- {A, Q, Q_minus1} for shift
-    begin
-        if rising_edge(clk) then
-            if rst = '1' then
-                state    <= S_IDLE;
-                A        <= (others => '0');
-                Q        <= (others => '0');
-                Q_minus1 <= '0';
-                M        <= (others => '0');
-                count    <= (others => '0');
-                done     <= '0';
-                busy_reg <= '0';
-            else
-                case state is
+	process(i_clk)
+		variable acc_next   : signed(32 downto 0);
+		variable shift_conc : signed(65 downto 0);
+	begin
+		if rising_edge(i_clk) then
+			if i_rst = '1' then
+				state        <= S_IDLE;
+				acc_reg      <= (others => '0');
+				q_reg        <= (others => '0');
+				q_minus1_reg <= '0';
+				m_reg        <= (others => '0');
+				iter_count   <= (others => '0');
+				o_done       <= '0';
+				busy_reg     <= '0';
+			else
+				case state is
 
-                    when S_IDLE =>
-                        done <= '0';
-                        -- Clear inhibit when start falls
-                        if start = '0' then
-                            start_inhibit <= '0';
-                        end if;
-                        -- Only start new operation if inhibit is clear
-                        if start = '1' and start_inhibit = '0' then
-                            -- Initialize registers
-                            A        <= (others => '0');
-                            Q        <= signed(multiplier);
-                            Q_minus1 <= '0';
-                            -- Sign-extend multiplicand to 33 bits
-                            M <= resize(signed(multiplicand), 33);
-                            count <= (others => '0');
-                            state <= S_COMPUTE;
-                            busy_reg  <= '1';
-                        end if;
+					when S_IDLE =>
+						o_done <= '0';
+						if i_start = '0' then
+							start_inhibit <= '0';
+						end if;
+						if i_start = '1' and start_inhibit = '0' then
+							acc_reg      <= (others => '0');
+							q_reg        <= signed(i_multiplier);
+							q_minus1_reg <= '0';
+							m_reg        <= resize(signed(i_multiplicand), 33);
+							iter_count   <= (others => '0');
+							state        <= S_COMPUTE;
+							busy_reg     <= '1';
+						end if;
 
-                    when S_COMPUTE =>
-                        -- Booth encoding: examine {Q(0), Q_minus1}
-                        --   "01" -> A = A + M  (transition 0->1: end of string of 1s)
-                        --   "10" -> A = A - M  (transition 1->0: start of string of 1s)
-                        --   "00","11" -> no operation
-                        A_next := A;
+					when S_COMPUTE =>
+						-- Codificação de Booth radix-2 sobre {q_reg(0), q_minus1_reg}:
+						--   "01" -> soma o multiplicando (acc_reg + m_reg)
+						--   "10" -> subtrai o multiplicando (acc_reg - m_reg)
+						--   "00" ou "11" -> mantém o acumulador
+						if q_reg(0) = '0' and q_minus1_reg = '1' then
+							acc_next := acc_reg + m_reg;
+						elsif q_reg(0) = '1' and q_minus1_reg = '0' then
+							acc_next := acc_reg - m_reg;
+						else
+							acc_next := acc_reg;
+						end if;
 
-                        if Q(0) = '0' and Q_minus1 = '1' then
-                            A_next := A + M;
-                        elsif Q(0) = '1' and Q_minus1 = '0' then
-                            A_next := A - M;
-                        else
-                            A_next := A;
-                        end if;
+						-- Deslocamento aritmético de 1 bit à direita sobre {acc_next, q_reg, q_minus1_reg}.
+						shift_conc   := shift_right(acc_next & q_reg & q_minus1_reg, 1);
 
-                        -- Arithmetic right shift {A_next, Q, Q_minus1} by 1
-                        concat := A_next & Q & Q_minus1;
-                        -- Arithmetic shift right preserves sign (MSB of A_next)
-                        concat := shift_right(concat, 1);
+						acc_reg      <= shift_conc(65 downto 33);
+						q_reg        <= shift_conc(32 downto 1);
+						q_minus1_reg <= shift_conc(0);
 
-                        A        <= concat(65 downto 33);
-                        Q        <= concat(32 downto 1);
-                        Q_minus1 <= concat(0);
+						if iter_count = to_unsigned(31, 6) then
+							state <= S_DONE;
+						else
+							iter_count <= iter_count + 1;
+						end if;
 
-                        -- Increment counter
-                        if count = to_unsigned(31, 6) then
-                            state <= S_DONE;
-                        else
-                            count <= count + 1;
-                        end if;
+					when S_DONE =>
+						o_done        <= '1';
+						busy_reg      <= '0';
+						start_inhibit <= '1';
+						state         <= S_IDLE;
 
-                    when S_DONE =>
-                        -- Output the 64-bit product: {A[31:0], Q[31:0]}
-                        done          <= '1';
-                        busy_reg      <= '0';
-                        start_inhibit <= '1';  -- previne reinicio quando start ainda esta alto
-                        state         <= S_IDLE;
+				end case;
+			end if;
+		end if;
+	end process;
 
-                end case;
-            end if;
-        end if;
-    end process;
-
-    -- Result outputs (active when done='1')
-    result_hi <= std_logic_vector(A(31 downto 0));
-    result_lo <= std_logic_vector(Q);
+	o_result_hi <= std_logic_vector(acc_reg(31 downto 0));
+	o_result_lo <= std_logic_vector(q_reg);
 
 end architecture rtl;

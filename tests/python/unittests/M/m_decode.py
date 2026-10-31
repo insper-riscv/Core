@@ -7,11 +7,11 @@ from tests.python.unittests.common.control_unit import build_instruction
 
 OP_R = 0b0110011
 OP_IMM = 0b0010011
-OUTPUTS = ("isMulDiv", "weReg", "selPCRS1")
+OUTPUTS = ("o_is_muldiv", "o_we_reg", "o_sel_pc_rs1")
 
 
 async def _outputs(dut, instr):
-    dut.instruction.value = instr
+    dut.i_instr.value = instr
     await Timer(1, unit="ns")
     return tuple(int(getattr(dut, n).value) for n in OUTPUTS)
 

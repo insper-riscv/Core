@@ -95,7 +95,7 @@ async def test_control_unit(dut):
         funct7 = _parse_field(row["funct7[6:0]"], 7)
 
         instr = build_instruction(opcode, funct3, funct7)
-        dut.instruction.value = instr
+        dut.i_inst.value = instr
 
         await Timer(1, units="ns")
 
@@ -111,17 +111,17 @@ async def test_control_unit(dut):
         exp_eRAM            = _parse_field(row["eRAM"], 1)
         exp_weRAM           = _parse_field(row["weRAM"], 1)
 
-        got_selMuxPc4ALU    = int(dut.selMuxPc4ALU.value)
-        got_opExImm         = int(dut.opExImm.value)
-        got_selMuxALUPc4RAM = int(dut.selMuxALUPc4RAM.value)
-        got_weReg           = int(dut.weReg.value)
-        got_opExRAM         = int(dut.opExRAM.value)
-        got_selMuxRS2Imm    = int(dut.selMuxRS2Imm.value)
-        got_selPCRS1        = int(dut.selPCRS1.value)
-        got_opALU           = int(dut.opALU.value)
-        got_reRAM           = int(dut.reRAM.value)
-        got_eRAM            = int(dut.eRAM.value)
-        got_weRAM           = int(dut.weRAM.value)
+        got_selMuxPc4ALU    = int(dut.o_sel_pc4_alu.value)
+        got_opExImm         = int(dut.o_ext_imm_op.value)
+        got_selMuxALUPc4RAM = int(dut.o_wb_sel.value)
+        got_weReg           = int(dut.o_we_reg.value)
+        got_opExRAM         = int(dut.o_ext_ram_op.value)
+        got_selMuxRS2Imm    = int(dut.o_sel_rs2_imm.value)
+        got_selPCRS1        = int(dut.o_sel_pc_rs1.value)
+        got_opALU           = int(dut.o_alu_op.value)
+        got_reRAM           = int(dut.o_re_ram.value)
+        got_eRAM            = int(dut.o_en_ram.value)
+        got_weRAM           = int(dut.o_we_ram.value)
 
         assert got_selMuxPc4ALU == exp_selMuxPc4ALU, (
             f"{inst_name}: selMuxPc4ALU got={got_selMuxPc4ALU} exp={exp_selMuxPc4ALU}"
@@ -158,13 +158,13 @@ async def test_control_unit(dut):
         )
 
         # Saidas novas do pipeline
-        got_opCode = int(dut.opCode.value)
-        got_funct3 = int(dut.funct3_out.value)
+        got_opCode = int(dut.o_opcode.value)
+        got_funct3 = int(dut.o_funct3.value)
         assert got_opCode == opcode, (
-            f"{inst_name}: opCode got={got_opCode:07b} exp={opcode:07b}"
+            f"{inst_name}: o_opcode got={got_opCode:07b} exp={opcode:07b}"
         )
         assert got_funct3 == funct3, (
-            f"{inst_name}: funct3_out got={got_funct3:03b} exp={funct3:03b}"
+            f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}"
         )
 
         dut._log.info(f"{inst_name}: OK")
@@ -174,18 +174,18 @@ async def test_control_unit(dut):
 async def test_control_unit_m_is_not_decoded_here(dut):
     """
     O control_unit e' so' da base: as 8 instrucoes da extensao M (R-type com
-    funct7=0000001) nao sobem weReg aqui (quem as reivindica e' M/m_decode),
-    mas funct3_out segue a instrucao, porque a unidade M usa funct3 como
+    funct7=0000001) nao sobem o_we_reg aqui (quem as reivindica e' M/m_decode),
+    mas o_funct3 segue a instrucao, porque a unidade M usa funct3 como
     operacao.
     """
     for funct3 in range(8):
-        dut.instruction.value = build_instruction(
+        dut.i_inst.value = build_instruction(
             opcode=0b0110011, funct3=funct3, funct7=0b0000001
         )
         await Timer(1, units="ns")
 
-        assert int(dut.weReg.value) == 0, f"funct3={funct3:03b}: weReg deveria ser 0"
-        got_funct3 = int(dut.funct3_out.value)
+        assert int(dut.o_we_reg.value) == 0, f"funct3={funct3:03b}: o_we_reg deveria ser 0"
+        got_funct3 = int(dut.o_funct3.value)
         assert got_funct3 == funct3, (
-            f"funct3_out got={got_funct3:03b} exp={funct3:03b}"
+            f"o_funct3 got={got_funct3:03b} exp={funct3:03b}"
         )
