@@ -123,7 +123,71 @@ The project follows the *Design for Reuse* practice described in the *Reuse Meth
 | 6 | **Composition with `common/` primitives:** reuse the already verified leaf blocks | Simple registers instantiate `entity work.generic_register`, dedicated adders instantiate `entity work.adder`, and structural selectors use `mux_2x1`, `mux_4x1`, `mux_tree`, and `onehot_decoder`; do not reimplement with ad-hoc processes or operators what the primitive or an already computed stage signal provides |
 | 7 | **Extensions as optional blocks:** each extension lives in its own directory, enabled by a boolean generic on the `core` top level, and behaves as `NOP` when disabled | Contract in [docs/en/contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md) |
 
-## 5. Markdown Documentation Rules
+## 5. Python Standards
+
+The Python code (runner and tests under `tests/python/`) follows [PEP 8](https://peps.python.org/pep-0008) (style) and [PEP 257](https://peps.python.org/pep-0257) (docstrings); `ruff` checks both (rules `E`, `W`, `N`, and `D`).
+
+### 5.1. Code Style (PEP 8)
+
+> **Deviation from PEP 8.** PEP 8 asks for comments in English, and this project writes them in **Portuguese**. Every other PEP 8 recommendation on comments still applies, namely complete sentences, kept up to date, and never restating what the code already says. Identifiers stay in English.
+
+| Rule | Specification |
+| :--- | :--- |
+| Indentation | 4 spaces per level; tabs prohibited |
+| Encoding | UTF-8, with no encoding declaration in the file |
+| Line length | At most 79 characters for code; 72 for docstrings and comments |
+| Naming | `snake_case` for functions, methods, variables, and modules; `PascalCase` for classes; `UPPER_SNAKE_CASE` for constants; `_` prefix for internal names |
+| Imports | At the top of the file, one per line, in three groups separated by a blank line (standard library, third party, project), each group sorted alphabetically; absolute imports only (relative imports prohibited); `import *` prohibited |
+| Blank lines | Two between module-level definitions; one between methods |
+| Whitespace | One space around operators and after commas; none before a call's `(`, inside brackets, or at the end of a line |
+| Comparisons | `is` and `is not` for `None`; `if seq:` instead of `if len(seq):`; never `== True` or `== False` |
+| Exceptions | `except` always names the specific exception; bare `except:` prohibited |
+| Comments | **In Portuguese** (deviation from PEP 8); complete sentences, capitalized, on their own line or after two spaces at the end of code, starting with `# `; they explain why, not what the code does |
+| Language | Identifiers in **English**; comments in **Portuguese** |
+
+### 5.2. Docstrings (PEP 257)
+
+| Rule | Specification |
+| :--- | :--- |
+| Scope | Every public module, class, function, and method has a docstring |
+| Delimiter | Triple double quotes (`"""`), including one-line docstrings |
+| Summary | First line on the same line as the opening quotes, in the imperative mood, ending with a period |
+| One-line docstring | Closing quotes on the same line, no blank line before or after the text |
+| Multi-line docstring | Summary, blank line, detailed description; closing quotes alone on the last line |
+| Classes | Docstring on the class, not on `__init__`; blank line after the docstring |
+| Sections | NumPy style (`Parameters`, `Returns`, `Raises`, `Examples`), with the type repeating the annotation |
+| Language | Portuguese |
+
+```python
+def fetch_user(user_id: str, include_roles: bool = False) -> User:
+    """Busca um usuário pelo identificador.
+
+    Parameters
+    ----------
+    user_id : str
+        Identificador único do usuário.
+    include_roles : bool, optional
+        Inclui a lista de papéis na resposta, por padrão False.
+
+    Returns
+    -------
+    User
+        Dados do usuário.
+    """
+```
+
+### 5.3. Tooling and Process
+
+| Rule | Specification |
+| :--- | :--- |
+| Package manager | `uv` (`uv add`, `uv sync`, `uv run`); `pip`, `pip install`, and `python -m pip` are prohibited |
+| Tests | `pytest`; every new behavior comes with a test |
+| Typing | Complete annotations, checked by Pyright and Pyrefly, both in `strict` mode |
+| Style and quality | `ruff` for lint and formatting; `pylint` with a minimum score of 10; `deptry` for declared and used dependencies |
+| Complexity and duplication | `complexipy` with a maximum of 10 per function; `codeclone` for duplicated code |
+| Security | `semgrep` for static analysis; `uv audit` for dependency vulnerabilities |
+
+## 6. Markdown Documentation Rules
 
 All repository documentation maintains mirrored versions in Portuguese (`README.md`, `docs/pt-br/`) and English (`README.en.md`, `docs/en/`), following these rules:
 
@@ -135,8 +199,9 @@ All repository documentation maintains mirrored versions in Portuguese (`README.
 4. **Behavior explanation:** never cite an internal file, module, or signal name as if the name itself explained what the hardware does; always describe the operation performed.
 5. **Non-redundant tables and LaTeX:** structured data belongs in Markdown tables and mathematical/boolean equations in LaTeX blocks (`$$ ... $$` or `$ ... $`), without repeating in prose what the table or equation already states.
 6. **No changelog or open TODOs in technical docs:** architecture and contract documents describe exclusively the current state of the hardware, without historical bugfix notes or unimplemented work lists.
+7. **Usage guides only instruct:** installation and run instructions say how to do it, without justifying the choice of method.
 
-## 6. Mandatory Verification Before Opening a Pull Request
+## 7. Mandatory Verification Before Opening a Pull Request
 
 Any change to VHDL code, profile manifests, or documentation must pass all five commands below without errors before submission:
 
