@@ -123,7 +123,71 @@ O projeto segue a prática de *Design for Reuse* descrita no *Reuse Methodology 
 | 6 | **Composição com primitivos de `common/`:** reaproveitar os blocos-folha já verificados | Registradores simples instanciam `entity work.generic_register`, somadores dedicados instanciam `entity work.adder` e seletores estruturais usam `mux_2x1`, `mux_4x1`, `mux_tree` e `onehot_decoder`; não reimplementar com processos ou operadores redundantes o que o primitivo ou um sinal já calculado no estágio fornece |
 | 7 | **Extensões como blocos opcionais:** cada extensão reside em diretório próprio, habilitada por generic booleano no topo `core`, e se comporta como `NOP` quando desabilitada | Contrato em [docs/pt-br/contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md) |
 
-## 5. Regras de Documentação Markdown
+## 5. Normas Python
+
+O código Python (runner e testes em `tests/python/`) segue o [PEP 8](https://peps.python.org/pep-0008) (estilo) e o [PEP 257](https://peps.python.org/pep-0257) (docstrings); o `ruff` verifica ambos (regras `E`, `W`, `N` e `D`).
+
+### 5.1. Estilo de Código (PEP 8)
+
+> **Desvio do PEP 8:** O PEP 8 manda escrever comentários em inglês, e este projeto os escreve em **português**. Todas as demais recomendações do PEP 8 sobre comentários se mantêm, ou seja, frases completas, sempre atualizadas e sem repetir o que o código já diz. Identificadores continuam em inglês.
+
+| Regra | Especificação |
+| :--- | :--- |
+| Indentação | 4 espaços por nível; tabulações proibidas |
+| Codificação | UTF-8, sem declaração de encoding no arquivo |
+| Largura de linha | Máximo de 79 caracteres para código; 72 para docstrings e comentários |
+| Nomenclatura | `snake_case` para funções, métodos, variáveis e módulos; `PascalCase` para classes; `UPPER_SNAKE_CASE` para constantes; prefixo `_` para nomes internos |
+| Imports | No topo do arquivo, um por linha, em três grupos separados por linha em branco (biblioteca padrão, terceiros, projeto), cada grupo em ordem alfabética; imports absolutos (relativos proibidos); `import *` proibido |
+| Linhas em branco | Duas entre definições de nível de módulo; uma entre métodos |
+| Espaços | Um espaço ao redor de operadores e após vírgulas; nenhum espaço antes de `(` de chamada, dentro de colchetes ou ao final da linha |
+| Comparações | `is` e `is not` para `None`; `if seq:` em vez de `if len(seq):`; nunca `== True` ou `== False` |
+| Exceções | `except` sempre com a exceção específica; `except:` sem tipo proibido |
+| Comentários | **Em português** (desvio do PEP 8); frases completas, com inicial maiúscula, em linha própria ou após dois espaços no fim do código, iniciados por `# `; explicam o porquê, não repetem o que o código faz |
+| Idioma | Identificadores em **inglês**; comentários em **português** |
+
+### 5.2. Docstrings (PEP 257)
+
+| Regra | Especificação |
+| :--- | :--- |
+| Escopo | Todo módulo, classe, função e método públicos tem docstring |
+| Delimitador | Aspas triplas duplas (`"""`), inclusive em docstrings de uma linha |
+| Resumo | Primeira linha na mesma linha das aspas de abertura, no modo imperativo, terminada em ponto |
+| Docstring de uma linha | Aspas de fechamento na mesma linha, sem linha em branco antes ou depois do texto |
+| Docstring de várias linhas | Resumo, linha em branco, descrição detalhada; aspas de fechamento sozinhas na última linha |
+| Classes | Docstring na classe, não no `__init__`; linha em branco após a docstring |
+| Seções | Estilo NumPy (`Parameters`, `Returns`, `Raises`, `Examples`), com o tipo repetindo a anotação |
+| Idioma | Português |
+
+```python
+def fetch_user(user_id: str, include_roles: bool = False) -> User:
+    """Busca um usuário pelo identificador.
+
+    Parameters
+    ----------
+    user_id : str
+        Identificador único do usuário.
+    include_roles : bool, optional
+        Inclui a lista de papéis na resposta, por padrão False.
+
+    Returns
+    -------
+    User
+        Dados do usuário.
+    """
+```
+
+### 5.3. Ferramentas e Processo
+
+| Regra | Especificação |
+| :--- | :--- |
+| Gerenciador | `uv` (`uv add`, `uv sync`, `uv run`); `pip`, `pip install` e `python -m pip` são proibidos |
+| Testes | `pytest`; todo comportamento novo acompanha um teste |
+| Tipagem | Anotações completas, verificadas pelo Pyright e pelo Pyrefly, ambos em modo `strict` |
+| Estilo e qualidade | `ruff` para lint e formatação; `pylint` com nota mínima 10; `deptry` para dependências declaradas e usadas |
+| Complexidade e duplicação | `complexipy` com máximo de 10 por função; `codeclone` para código duplicado |
+| Segurança | `semgrep` para análise estática; `uv audit` para vulnerabilidades nas dependências |
+
+## 6. Regras de Documentação Markdown
 
 Toda documentação do repositório mantém versões espelhadas em português (`README.md`, `docs/pt-br/`) e em inglês (`README.en.md`, `docs/en/`), obedecendo às seguintes regras:
 
@@ -135,8 +199,9 @@ Toda documentação do repositório mantém versões espelhadas em português (`
 4. **Explicação de comportamento:** nunca cite o nome de um arquivo, módulo ou sinal interno como se o próprio nome explicasse o que o hardware faz; descreva sempre a operação realizada.
 5. **Tabelas e LaTeX sem redundância:** dados estruturados devem estar em tabelas Markdown e expressões matemáticas/lógicas em blocos LaTeX (`$$ ... $$` ou `$ ... $`), sem repetir em prosa o que a tabela ou equação já enuncia.
 6. **Sem histórico ou pendências na documentação técnica:** documentos de arquitetura e contratos descrevem exclusivamente o estado atual do hardware, sem changelogs internos nem listas de tarefas futuras.
+7. **Guias de uso apenas instruem:** instruções de instalação e execução dizem como fazer, sem justificar a escolha do método.
 
-## 6. Verificação Obrigatória Antes de Abrir Pull Request
+## 7. Verificação Obrigatória Antes de Abrir Pull Request
 
 Qualquer alteração em código VHDL, manifestos de perfil ou documentação deve passar sem erros pelos cinco comandos abaixo antes do envio:
 
