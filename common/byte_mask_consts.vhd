@@ -14,6 +14,9 @@ use work.pipeline_types.all;
 
 package byte_mask_consts is
 
+	-- Largura de um byte (em bits).
+	constant BYTE_WIDTH : natural := 8;
+
 	-- Posição do primeiro byte de um acesso dentro da palavra (endereço efetivo [1:0]).
 	subtype byte_offset_t is std_logic_vector(1 downto 0);
 

@@ -15,6 +15,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.pc_src_consts.all;
+use work.word_consts.all;
 
 entity pc_fetch is
 
@@ -43,9 +44,6 @@ end entity pc_fetch;
 
 architecture rtl of pc_fetch is
 
-	-- Incremento constante de 4 bytes por instrução de 32 bits.
-	constant PC_STEP_4 : word_t := x"00000004";
-
 	-- Valor atual armazenado no registrador de Program Counter.
 	signal pc_reg   : word_t;
 	-- Resultado combinacional da soma PC + 4.
@@ -60,18 +58,18 @@ begin
 	-- Somador combinacional para cálculo de PC + 4.
 	u_pc4_adder : entity work.adder
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_a => pc_reg,
-			i_b => PC_STEP_4,
+			i_b => INSTR_BYTES,
 			o_d => pc4_wire
 		);
 
 	-- Multiplexador 4x1 de seleção do próximo valor do PC.
 	u_pc_mux : entity work.mux_4x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => pc4_wire,
@@ -87,7 +85,7 @@ begin
 	-- Registrador estrutural de 32 bits do Program Counter.
 	u_pc_reg : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,

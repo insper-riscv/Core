@@ -160,98 +160,6 @@ end entity stage_ex;
 
 architecture rtl of stage_ex is
 
-	component multdiv is
-		generic (
-			has_div     : boolean := true
-		);
-		port (
-			i_clk       : in  std_logic;
-			i_rst       : in  std_logic := '0';
-			i_valid     : in  std_logic := '0';
-			i_is_muldiv : in  std_logic := '0';
-			i_funct3    : in  funct3_t;
-			i_a         : in  word_t;
-			i_b         : in  word_t;
-			o_result    : out word_t;
-			o_stall     : out std_logic;
-			o_busy      : out std_logic;
-			o_done      : out std_logic
-		);
-	end component;
-
-	component csr_file is
-		generic (
-			has_m       : boolean := true;
-			has_zicntr  : boolean := false;
-			tick_cycles : positive := 50;
-			hpm_counters : natural range 0 to 4 := 0
-		);
-		port (
-			i_clk        : in  std_logic;
-			i_rst        : in  std_logic;
-			i_commit     : in  std_logic;
-			i_addr       : in  std_logic_vector(11 downto 0);
-			i_op         : in  funct3_t;
-			i_wdata      : in  word_t;
-			i_src_zero   : in  std_logic;
-			o_rdata      : out word_t;
-			o_illegal    : out std_logic;
-			i_trap_take  : in  std_logic;
-			i_trap_cause : in  word_t;
-			i_trap_pc    : in  word_t;
-			i_trap_tval  : in  word_t;
-			i_mret_take  : in  std_logic;
-			i_retire     : in  std_logic;
-			i_retire_cancel : in std_logic;
-			i_events     : in  std_logic_vector(15 downto 0);
-			o_mtvec      : out word_t;
-			o_mepc       : out word_t
-		);
-	end component;
-
-	component trap_unit is
-		generic (
-			has_zicclsm   : boolean := true;
-			check_ea      : boolean := true
-		);
-		port (
-			i_ex_valid    : in  std_logic;
-			i_run         : in  std_logic;
-			i_opcode      : in  opcode_t;
-			i_funct3      : in  funct3_t;
-			i_rd_idx      : in  reg_t;
-			i_rs1_idx     : in  reg_t;
-			i_imm12       : in  std_logic_vector(11 downto 0);
-			i_ea          : in  word_t;
-			i_cf_taken    : in  std_logic;
-			i_cf_target   : in  word_t;
-			i_csr_illegal : in  std_logic;
-			i_illegal     : in  std_logic;
-			o_take        : out std_logic;
-			o_mret_take   : out std_logic;
-			o_cause       : out word_t;
-			o_tval        : out word_t
-		);
-	end component;
-
-	component fencei_unit is
-		generic (
-			has_dcache : boolean := false
-		);
-		port (
-			i_clk       : in  std_logic;
-			i_rst       : in  std_logic;
-			i_ex_valid  : in  std_logic;
-			i_run       : in  std_logic;
-			i_opcode    : in  opcode_t;
-			i_funct3    : in  funct3_t;
-			i_dc_done   : in  std_logic;
-			o_flush_req : out std_logic;
-			o_busy      : out std_logic;
-			o_take      : out std_logic
-		);
-	end component;
-
 	-- Habilitações efetivas de forwarding dos estágios EX/MEM e MEM/WB.
 	signal exmem_we_reg_fwd   : std_logic;
 	-- Habilitação efetiva de forwarding do estágio MEM/WB.
@@ -355,7 +263,7 @@ begin
 
 	u_mux_fwd_rs1 : entity work.mux_4x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => i_rs1_val,
@@ -368,7 +276,7 @@ begin
 
 	u_mux_fwd_rs2 : entity work.mux_4x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => i_rs2_val,
@@ -381,7 +289,7 @@ begin
 
 	u_mux_alu_a : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => i_pc,
@@ -392,7 +300,7 @@ begin
 
 	u_mux_alu_b : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => ex_fwd_rs2_val,
@@ -418,7 +326,7 @@ begin
 	-- Extensão M: Multiplicação e Divisão Inteira (multdiv)
 	-- =========================================================================
 	gen_m : if (has_m or has_zmmul) generate
-		u_muldiv : multdiv
+		u_muldiv : entity work.multdiv
 			generic map (
 				has_div => has_m
 			)
@@ -444,7 +352,7 @@ begin
 	-- Extensão Zifencei: Sincronização de Memória de Instruções (FENCE.I)
 	-- =========================================================================
 	gen_fencei : if has_zifencei generate
-		u_fencei : fencei_unit
+		u_fencei : entity work.fencei_unit
 			generic map (
 				has_dcache => has_dcache
 			)
@@ -483,7 +391,7 @@ begin
 		csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
 		                (31 downto 5 => '0') & i_rs1_idx;
 
-		u_csr_file : csr_file
+		u_csr_file : entity work.csr_file
 			generic map (
 				has_m       => has_m,
 				has_zicntr  => has_zicntr,
@@ -520,7 +428,7 @@ begin
 		sig_tval  <= (others => '0');
 		sig_mret  <= '0';
 
-		u_trap_unit : trap_unit
+		u_trap_unit : entity work.trap_unit
 			generic map (
 				has_zicclsm => has_zicclsm,
 				check_ea    => false
@@ -545,7 +453,7 @@ begin
 			);
 	else generate
 		-- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
-		u_trap_detect : trap_unit
+		u_trap_detect : entity work.trap_unit
 			generic map (
 				has_zicclsm => has_zicclsm,
 				check_ea    => true
@@ -603,7 +511,7 @@ begin
 
 	u_mux_ex_final : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => ex_alu_mux_result,
@@ -614,7 +522,7 @@ begin
 
 	u_branch_target_adder : entity work.adder
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_a => i_pc,

@@ -310,7 +310,7 @@ begin
 	begin
 		o_illegal <= '1';
 
-		if i_inst(1 downto 0) = "11" then
+		if i_inst(1 downto 0) = OPCODE_LOW_BITS then
 			case opcode is
 
 				when OPCODE_LUI | OPCODE_AUIPC | OPCODE_JAL | OPCODE_SYSTEM =>

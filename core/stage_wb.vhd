@@ -91,7 +91,7 @@ begin
 
 	u_mux_wb : entity work.mux_2x1
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_d0  => i_alu_out,

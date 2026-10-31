@@ -1,4 +1,6 @@
 # Sources of the rv32im profile (I + M), in GHDL dependency order.
+# Every extension unit that core instantiates directly is analyzed, and the disabled ones
+# are removed when the generate statements are elaborated.
 # Paths are relative to the root of this repository.
 profile: rv32im
 extensions: [I, M]
@@ -16,6 +18,13 @@ sources:
   - common/wb_sel_consts.vhd
   - common/pc_src_consts.vhd
   - common/mem_map_consts.vhd
+  - common/word_consts.vhd
+  - common/fwd_consts.vhd
+  - M/muldiv_consts.vhd
+  - Zicsr/trap_consts.vhd
+  - Zicsr/csr_addr_consts.vhd
+  - Zicsr/csr_event_consts.vhd
+  - Zicsr/csr_value_consts.vhd
   - Common-Components/src/generic_register.vhd
   - Common-Components/src/adder.vhd
   - Common-Components/src/mux_2x1.vhd
@@ -38,6 +47,12 @@ sources:
   - M/booth_multiplier_rv32.vhd
   - M/non_restoring_divider_rv32.vhd
   - M/multdiv.vhd
+  - Zicsr/csr_decode.vhd
+  - Zicntr/counter64.vhd
+  - Zicntr/tick_divider.vhd
+  - Zicsr/csr_file.vhd
+  - Zicsr/trap_unit.vhd
+  - Zifencei/fencei_unit.vhd
   - common/pc_fetch.vhd
   - common/reg_if_id.vhd
   - common/reg_id_ex.vhd
@@ -46,7 +61,6 @@ sources:
   - core/stage_if.vhd
   - core/stage_id.vhd
   - core/stage_ex.vhd
-  - Zicsr/trap_unit.vhd
   - core/stage_mem.vhd
   - core/stage_wb.vhd
   - core/core.vhd

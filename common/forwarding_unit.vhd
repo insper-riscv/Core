@@ -18,6 +18,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
+use work.fwd_consts.all;
 
 entity forwarding_unit is
 
@@ -60,25 +61,25 @@ begin
 		  and i_exmem_rd  = i_ex_rs1
 		then
 			-- Hazard EX/MEM: instrução imediatamente anterior escreve em rs1.
-			o_fwd_rs1 <= "10";
+			o_fwd_rs1 <= FWD_EXMEM;
 
 		elsif i_memwb_we_reg = '1'
 		  and i_memwb_rd /= REG_ZERO
 		  and i_memwb_rd  = i_ex_rs1
 		then
 			-- Hazard MEM/WB: instrução duas posições à frente escreve em rs1.
-			o_fwd_rs1 <= "01";
+			o_fwd_rs1 <= FWD_MEMWB;
 
 		elsif i_wb2_we_reg = '1'
 		  and i_wb2_rd /= REG_ZERO
 		  and i_wb2_rd  = i_ex_rs1
 		then
 			-- Hazard WB2: instrução três posições à frente escreve em rs1 (o banco ainda não tem o valor).
-			o_fwd_rs1 <= "11";
+			o_fwd_rs1 <= FWD_WB2;
 
 		else
 			-- Sem conflito de dados: valor lido no estágio ID é válido.
-			o_fwd_rs1 <= "00";
+			o_fwd_rs1 <= FWD_NONE;
 		end if;
 	end process;
 
@@ -91,22 +92,22 @@ begin
 		  and i_exmem_rd /= REG_ZERO
 		  and i_exmem_rd  = i_ex_rs2
 		then
-			o_fwd_rs2 <= "10";
+			o_fwd_rs2 <= FWD_EXMEM;
 
 		elsif i_memwb_we_reg = '1'
 		  and i_memwb_rd /= REG_ZERO
 		  and i_memwb_rd  = i_ex_rs2
 		then
-			o_fwd_rs2 <= "01";
+			o_fwd_rs2 <= FWD_MEMWB;
 
 		elsif i_wb2_we_reg = '1'
 		  and i_wb2_rd /= REG_ZERO
 		  and i_wb2_rd  = i_ex_rs2
 		then
-			o_fwd_rs2 <= "11";
+			o_fwd_rs2 <= FWD_WB2;
 
 		else
-			o_fwd_rs2 <= "00";
+			o_fwd_rs2 <= FWD_NONE;
 		end if;
 	end process;
 

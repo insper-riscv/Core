@@ -20,6 +20,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.word_consts.all;
 
 entity counter64 is
 	port (
@@ -76,14 +77,14 @@ begin
 	hi_nxt <= i_wdata when i_we_hi = '1' else hi_inc;
 	hi_en  <= i_we_hi or carry;
 
-	carry_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = x"FFFFFFFF") else '0';
+	carry_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = WORD_ALL_ONES) else '0';
 
 	o_lo <= lo;
 	o_hi <= hi_inc when carry = '1' else hi;
 
 	u_lo : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,
@@ -95,7 +96,7 @@ begin
 
 	u_hi : entity work.generic_register
 		generic map (
-			data_width => 32
+			data_width => word_t'length
 		)
 		port map (
 			i_clk    => i_clk,

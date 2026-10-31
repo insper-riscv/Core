@@ -1,6 +1,8 @@
 # Sources of the rv32i profile (I only), in GHDL dependency order.
-# Same top as rv32im, built with the generic HAS_M => false: no M/ files, and
-# an M instruction is a NOP. Paths are relative to the root of this repository.
+# Same top as rv32im, built with the generic HAS_M => false: the M instructions are a NOP.
+# Every extension unit that core instantiates directly is analyzed, and the disabled ones
+# are removed when the generate statements are elaborated.
+# Paths are relative to the root of this repository.
 profile: rv32i
 extensions: [I]
 top: core
@@ -17,6 +19,13 @@ sources:
   - common/wb_sel_consts.vhd
   - common/pc_src_consts.vhd
   - common/mem_map_consts.vhd
+  - common/word_consts.vhd
+  - common/fwd_consts.vhd
+  - M/muldiv_consts.vhd
+  - Zicsr/trap_consts.vhd
+  - Zicsr/csr_addr_consts.vhd
+  - Zicsr/csr_event_consts.vhd
+  - Zicsr/csr_value_consts.vhd
   - Common-Components/src/generic_register.vhd
   - Common-Components/src/adder.vhd
   - Common-Components/src/mux_2x1.vhd
@@ -35,6 +44,16 @@ sources:
   - common/bubble_mux.vhd
   - common/forwarding_unit.vhd
   - common/hazard_detection_unit.vhd
+  - M/m_decode.vhd
+  - M/booth_multiplier_rv32.vhd
+  - M/non_restoring_divider_rv32.vhd
+  - M/multdiv.vhd
+  - Zicsr/csr_decode.vhd
+  - Zicntr/counter64.vhd
+  - Zicntr/tick_divider.vhd
+  - Zicsr/csr_file.vhd
+  - Zicsr/trap_unit.vhd
+  - Zifencei/fencei_unit.vhd
   - common/pc_fetch.vhd
   - common/reg_if_id.vhd
   - common/reg_id_ex.vhd
@@ -43,7 +62,6 @@ sources:
   - core/stage_if.vhd
   - core/stage_id.vhd
   - core/stage_ex.vhd
-  - Zicsr/trap_unit.vhd
   - core/stage_mem.vhd
   - core/stage_wb.vhd
   - core/core.vhd

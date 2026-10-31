@@ -1,4 +1,6 @@
 # Sources of the rv32im_zicclsm_zicntr_zifencei profile (I + M + Zicclsm + Zicntr + Zifencei), in GHDL dependency order.
+# Every extension unit that core instantiates directly is analyzed, and the disabled ones
+# are removed when the generate statements are elaborated.
 # Paths are relative to the root of this repository.
 profile: rv32im_zicclsm_zicntr_zifencei
 extensions: [I, M, Zicclsm, Zicsr, Zicntr, Zifencei]
@@ -16,6 +18,13 @@ sources:
   - common/wb_sel_consts.vhd
   - common/pc_src_consts.vhd
   - common/mem_map_consts.vhd
+  - common/word_consts.vhd
+  - common/fwd_consts.vhd
+  - M/muldiv_consts.vhd
+  - Zicsr/trap_consts.vhd
+  - Zicsr/csr_addr_consts.vhd
+  - Zicsr/csr_event_consts.vhd
+  - Zicsr/csr_value_consts.vhd
   - Common-Components/src/generic_register.vhd
   - Common-Components/src/adder.vhd
   - Common-Components/src/mux_2x1.vhd
@@ -39,8 +48,6 @@ sources:
   - M/non_restoring_divider_rv32.vhd
   - M/multdiv.vhd
   - Zicsr/csr_decode.vhd
-  - Zicsr/csr_addr_consts.vhd
-  - Zicsr/csr_event_consts.vhd
   - Zicntr/counter64.vhd
   - Zicntr/tick_divider.vhd
   - Zicsr/csr_file.vhd

@@ -6,6 +6,8 @@ A especificação RISC-V define a semântica arquitetural de cada instrução (o
 
 Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
+Os estágios instanciam as unidades de cada extensão diretamente por `entity work`, sem declaração `component`. Por isso todo perfil analisa os arquivos de todas as extensões, e o generic em `false` retira a unidade da elaboração.
+
 ## 2. Regras de Integração no Pipeline
 
 ### 2.1. Decodificação no Estágio ID
