@@ -10,7 +10,7 @@ VHDL := $(shell find common I M Zicsr Zicntr Zifencei core -name '*.vhd' | sort)
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
 	@mkdir -p $(WDIR)
-	@$(GHDL) -a $(STD) -Wno-library --work=work --workdir=$(WDIR) $$(uv run riscv-tools vhdl-sort $(VHDL))
+	@$(GHDL) -a $(STD) -Wno-library --work=work --workdir=$(WDIR) $$(riscv-tools vhdl-sort $(VHDL))
 	@echo "VHDL syntax check passed"
 
 # Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml,
@@ -30,7 +30,7 @@ profiles: profile-matrix
 # Every profile of profiles/matrix.yaml (riscv-tools profiles) elaborates with its generics, on the
 # sources `check` analyzed.
 profile-matrix: check
-	@uv run riscv-tools profiles --spec profiles/matrix.yaml --format generics | while read -r name gens; do \
+	@riscv-tools profiles --spec profiles/matrix.yaml --format generics | while read -r name gens; do \
 	  $(GHDL) --elab-run $(STD) --workdir=$(WDIR) -o $(WDIR)/matrix core $$gens --stop-time=1ns >/dev/null 2>&1 \
 	  && echo "matrix $$name builds" || { echo "matrix $$name FAILED ($$gens)"; exit 1; }; \
 	done
@@ -41,7 +41,7 @@ test:
 
 # Every path the configuration lists exists.
 paths:
-	uv run riscv-tools --root . check-paths --manifest paths.yaml
+	riscv-tools --root . check-paths --manifest paths.yaml
 
 clean:
 	rm -rf build
