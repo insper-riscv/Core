@@ -31,7 +31,9 @@ entity core is
 		has_dcache   : boolean := false;
 		-- Mapa da plataforma sdram: a FLASH fica fora do núcleo (0x20000000) e, com a SDRAM, sai pela porta externa; não há RAM interna.
 		ext_flash    : boolean := false;
-		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm); exige has_zicsr.
+		-- Habilita a extensão Zihpm com os quatro contadores de eventos (índices 3 a 6); é o token da matriz de perfis. Exige has_zicsr.
+		has_zihpm    : boolean := false;
+		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm, salvo has_zihpm); exige has_zicsr.
 		hpm_counters : natural range 0 to 4 := 0
 	);
 	port (
@@ -117,6 +119,20 @@ entity core is
 end entity core;
 
 architecture rtl of core is
+
+	-- Quantidade efetiva de contadores de eventos: os pedidos em hpm_counters ou, com has_zihpm, os quatro.
+	function effective_hpm_count return natural is
+	begin
+		if hpm_counters > 0 then
+			return hpm_counters;
+		elsif has_zihpm then
+			return 4;
+		end if;
+		return 0;
+	end function;
+
+	-- Contadores de eventos do Zihpm instanciados no banco de CSRs.
+	constant HPM_COUNT : natural range 0 to 4 := effective_hpm_count;
 
 	-- =========================================================================
 	-- Sinais globais de avanço, stall e flush entre estágios
@@ -446,7 +462,7 @@ begin
 	o_retire      <= retire_pulse;
 
 	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not has_zicntr)
+	assert has_zicsr or (not (has_zicntr or has_zihpm or hpm_counters > 0))
 		report "has_zicntr = true exige has_zicsr"
 		severity failure;
 
@@ -626,7 +642,7 @@ begin
 			has_zifencei => has_zifencei,
 			has_zicclsm  => has_zicclsm,
 			has_dcache   => has_dcache,
-			hpm_counters => hpm_counters
+			hpm_counters => HPM_COUNT
 		)
 		port map (
 			i_hpm_events      => hpm_events,

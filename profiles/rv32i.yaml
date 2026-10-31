@@ -43,6 +43,7 @@ sources:
   - core/stage_if.vhd
   - core/stage_id.vhd
   - core/stage_ex.vhd
+  - Zicsr/trap_unit.vhd
   - core/stage_mem.vhd
   - core/stage_wb.vhd
   - core/core.vhd
