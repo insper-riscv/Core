@@ -10,13 +10,13 @@ OPEXRAM_LBU = 0b100
 
 
 async def apply_and_check(dut, opExRAM, EA, sig_in, expected, desc=""):
-    dut.signalIn.value = sig_in
-    dut.opExRAM.value = opExRAM
-    dut.EA.value = EA
+    dut.i_data.value = sig_in
+    dut.i_op.value = opExRAM
+    dut.i_byte_offset.value = EA
 
     await Timer(1, units="ns")
 
-    got = int(dut.signalOut.value.signed_integer) if opExRAM in (OPEXRAM_LH, OPEXRAM_LB) else int(dut.signalOut.value)
+    got = int(dut.o_data.value.signed_integer) if opExRAM in (OPEXRAM_LH, OPEXRAM_LB) else int(dut.o_data.value)
 
     assert got == expected, f"{desc} falhou: esperado {expected:#010x}, obtido {got:#010x}"
 
