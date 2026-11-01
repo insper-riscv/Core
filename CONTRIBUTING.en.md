@@ -213,6 +213,8 @@ make test           # Run the full unit and integration test suite (cocotb + GHD
 bash formal/run.sh  # Run the formal proofs (SymbiYosys + Z3) for csr_file and trap_unit
 ```
 
+The `python-static-analysis` CI job runs `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` and `uv audit` over the Python files, and the job name is the check the default-branch ruleset requires, so do not rename it.
+
 When adding, renaming, or removing any `.vhd` or `.md` file, immediately update:
 - `profiles/*.yaml`
 - `tests/python/tests.json`

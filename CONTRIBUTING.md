@@ -213,6 +213,8 @@ make test           # Executa a suíte completa de testes unitários e de integr
 bash formal/run.sh  # Executa as provas formais (SymbiYosys + Z3) de csr_file e trap_unit
 ```
 
+O job `python-static-analysis` do CI roda `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` e `uv audit` sobre os arquivos Python, e o nome do job é o check que o ruleset da branch padrão exige, então não o renomeie.
+
 Ao adicionar, renomear ou remover qualquer arquivo `.vhd` ou `.md`, atualize imediatamente:
 - `profiles/*.yaml`
 - `tests/python/tests.json`
