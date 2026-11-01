@@ -5,7 +5,7 @@ WDIR  := build/ghdl
 
 VHDL := $(shell find common I M Zicsr Zicntr Zifencei core -name '*.vhd' | sort) $(sort $(wildcard Common-Components/src/*.vhd))
 
-.PHONY: check profiles profile-matrix test paths clean
+.PHONY: check profiles profile-matrix test formal paths clean
 
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
@@ -35,6 +35,11 @@ profile-matrix: check
 	  $(GHDL) --elab-run $(STD) --workdir=$(WDIR) -o $(WDIR)/matrix core $$gens --stop-time=1ns >/dev/null 2>&1 \
 	  && echo "matrix $$name builds" || { echo "matrix $$name FAILED ($$gens)"; exit 1; }; \
 	done
+
+# Formal proofs of the CSR bank, the trap unit, the counters and the fusion record, with their mutants
+# (SymbiYosys, Yosys and z3 of the CI image); about three minutes.
+formal:
+	bash formal/run.sh
 
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
 test:

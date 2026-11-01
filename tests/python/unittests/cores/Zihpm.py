@@ -33,6 +33,13 @@ def bne(rs1, rs2, imm):
     return beq(rs1, rs2, imm) | (1 << 12)
 
 
+def muldiv(funct3, rd, rs1, rs2):
+    return (1 << 25) | (rs2 << 20) | (rs1 << 15) | (funct3 << 12) | (rd << 7) | 0x33
+
+
+DIV, REM = 0b100, 0b110
+
+
 def program(event, iterations, body):
     """Select `event` in mhpmevent3, run `body` `iterations` times and store the counter at RAM[0]."""
     return [
@@ -83,3 +90,23 @@ async def test_mcountinhibit_holds_the_counter(dut):
     prog[4:4] = [addi(12, 0, 1 << 3), csrrw(0, MCOUNTINHIBIT, 12)]
     ram = await run_program(dut, prog, max_cycles=3000)
     assert ram[RAM_BASE] == 0
+
+
+@cocotb.test()
+async def test_fused_pairs_are_counted(dut):
+    """Event 9 counts the REM that reuses the quotient and the remainder of the DIV before it."""
+    prog = program(9, 3, [muldiv(DIV, 12, 10, 11), muldiv(REM, 13, 10, 11)])
+    prog[4:4] = [addi(10, 0, 1000), addi(11, 0, 7)]
+    ram = await run_program(dut, prog, max_cycles=6000)
+    # the first DIV of the loop runs in full, the REM is fused; from the second iteration on the
+    # record holds the DIV again (the fused REM leaves it as it was), so every REM is fused
+    assert ram[RAM_BASE] == 3, f"one fused operation per iteration, counted {ram[RAM_BASE]}"
+
+
+@cocotb.test()
+async def test_divider_stall_is_counted(dut):
+    """Event 1 counts the cycles that a division holds the pipeline."""
+    prog = program(1, 1, [muldiv(DIV, 12, 10, 11)])
+    prog[4:4] = [addi(10, 0, 1000), addi(11, 0, 7)]
+    ram = await run_program(dut, prog, max_cycles=3000)
+    assert ram[RAM_BASE] >= 32, f"a division stalls for more than 32 cycles, counted {ram[RAM_BASE]}"
