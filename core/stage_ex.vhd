@@ -16,6 +16,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.opcode_consts.all;
+use work.fwd_consts.all;
 
 entity stage_ex is
 	generic (
@@ -59,8 +60,6 @@ entity stage_ex is
 		i_pc4             : in  word_t;
 		-- Índice do registrador fonte rs1 no estágio EX.
 		i_rs1_idx         : in  reg_t;
-		-- Índice do registrador fonte rs2 no estágio EX.
-		i_rs2_idx         : in  reg_t;
 		-- Índice do registrador destino rd no estágio EX.
 		i_rd_idx          : in  reg_t;
 		-- Valor original de rs1 vindo do registrador ID/EX.
@@ -89,26 +88,20 @@ entity stage_ex is
 		i_opcode          : in  opcode_t;
 		-- Campo funct3 da instrução no estágio EX.
 		i_funct3          : in  funct3_t;
-		-- Índice do registrador destino rd no estágio EX/MEM (para forwarding).
-		i_exmem_rd        : in  reg_t;
-		-- Habilitação de escrita em registrador no estágio EX/MEM.
-		i_exmem_we_reg    : in  std_logic;
-		-- Bit de validade da instrução no estágio EX/MEM.
-		i_exmem_valid     : in  std_logic;
+		-- Casamentos de rs1 com EX/MEM, MEM/WB e WB2, calculados no estágio ID e registrados em ID/EX.
+		i_fwd_match_rs1   : in  fwd_match_t;
+		-- Casamentos de rs2 com EX/MEM, MEM/WB e WB2, calculados no estágio ID e registrados em ID/EX.
+		i_fwd_match_rs2   : in  fwd_match_t;
+		-- A instrução em EX/MEM é válida e escreve em registrador.
+		i_exmem_ok        : in  std_logic;
+		-- A instrução em MEM/WB é válida e escreve em registrador.
+		i_memwb_ok        : in  std_logic;
+		-- A instrução em WB2 escreve em registrador.
+		i_wb2_ok          : in  std_logic;
 		-- Valor calculado no estágio EX/MEM para adiantamento (forwarding).
 		i_exmem_alu_out   : in  word_t;
-		-- Índice do registrador destino rd no estágio MEM/WB (para forwarding).
-		i_memwb_rd        : in  reg_t;
-		-- Habilitação de escrita em registrador no estágio MEM/WB.
-		i_memwb_we_reg    : in  std_logic;
-		-- Bit de validade da instrução no estágio MEM/WB.
-		i_memwb_valid     : in  std_logic;
 		-- Resultado do estágio EX da instrução em MEM/WB (registrado), para adiantamento. Um load nunca é adiantado daqui.
 		i_memwb_alu_out   : in  word_t;
-		-- Índice do registrador destino rd da instrução no registrador WB2 (para forwarding).
-		i_wb2_rd          : in  reg_t;
-		-- Habilitação de escrita em registrador da instrução no registrador WB2.
-		i_wb2_we_reg      : in  std_logic;
 		-- Dado final do estágio WB já registrado (WB2), para adiantamento (forwarding).
 		i_wb2_data        : in  word_t;
 		-- Confirmação de término do flush da cache de dados write-back (Zifencei).
@@ -164,10 +157,6 @@ end entity stage_ex;
 
 architecture rtl of stage_ex is
 
-	-- Habilitações efetivas de forwarding dos estágios EX/MEM e MEM/WB.
-	signal exmem_we_reg_fwd   : std_logic;
-	-- Habilitação efetiva de forwarding do estágio MEM/WB.
-	signal memwb_we_reg_fwd   : std_logic;
 	-- Seletor de forwarding de 2 bits para o operando rs1.
 	signal ex_forward_a       : std_logic_vector(1 downto 0);
 	-- Seletor de forwarding de 2 bits para o operando rs2.
@@ -258,21 +247,15 @@ begin
 	-- =========================================================================
 	-- Unidade de Forwarding e Muxes de Operandos
 	-- =========================================================================
-	exmem_we_reg_fwd <= i_exmem_we_reg and i_exmem_valid;
-	memwb_we_reg_fwd <= i_memwb_we_reg and i_memwb_valid;
-
 	u_forwarding_unit : entity work.forwarding_unit
 		port map (
-			i_ex_rs1       => i_rs1_idx,
-			i_ex_rs2       => i_rs2_idx,
-			i_exmem_rd     => i_exmem_rd,
-			i_exmem_we_reg => exmem_we_reg_fwd,
-			i_memwb_rd     => i_memwb_rd,
-			i_memwb_we_reg => memwb_we_reg_fwd,
-			i_wb2_rd       => i_wb2_rd,
-			i_wb2_we_reg   => i_wb2_we_reg,
-			o_fwd_rs1      => ex_forward_a,
-			o_fwd_rs2      => ex_forward_b
+			i_match_rs1 => i_fwd_match_rs1,
+			i_match_rs2 => i_fwd_match_rs2,
+			i_exmem_ok  => i_exmem_ok,
+			i_memwb_ok  => i_memwb_ok,
+			i_wb2_ok    => i_wb2_ok,
+			o_fwd_rs1   => ex_forward_a,
+			o_fwd_rs2   => ex_forward_b
 		);
 
 	u_mux_fwd_rs1 : entity work.mux_4x1

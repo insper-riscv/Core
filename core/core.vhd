@@ -10,6 +10,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
+use work.fwd_consts.all;
 
 entity core is
 	generic (
@@ -252,6 +253,10 @@ architecture rtl of core is
 	signal id_alu_op         : alu_op_t;
 	-- Seleção one-hot do resultado da ULA decodificada no estágio ID.
 	signal id_alu_sel        : alu_sel_t;
+	-- Casamentos do adiantamento de rs1 calculados no estágio ID.
+	signal id_fwd_match_rs1  : fwd_match_t;
+	-- Casamentos do adiantamento de rs2 calculados no estágio ID.
+	signal id_fwd_match_rs2  : fwd_match_t;
 	-- Indicador de instrução da extensão M gerado no estágio ID.
 	signal id_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr gerado no estágio ID.
@@ -280,8 +285,6 @@ architecture rtl of core is
 	signal ex_pc4            : word_t;
 	-- Índice do registrador fonte rs1 registrado em ID/EX.
 	signal ex_rs1_idx        : reg_t;
-	-- Índice do registrador fonte rs2 registrado em ID/EX.
-	signal ex_rs2_idx        : reg_t;
 	-- Índice do registrador destino rd registrado em ID/EX.
 	signal ex_rd_idx         : reg_t;
 	-- Valor de rs1 registrado em ID/EX.
@@ -306,6 +309,10 @@ architecture rtl of core is
 	signal ex_alu_op         : alu_op_t;
 	-- Seleção one-hot do resultado da ULA registrada em ID/EX.
 	signal ex_alu_sel        : alu_sel_t;
+	-- Casamentos do adiantamento de rs1 registrados em ID/EX.
+	signal ex_fwd_match_rs1  : fwd_match_t;
+	-- Casamentos do adiantamento de rs2 registrados em ID/EX.
+	signal ex_fwd_match_rs2  : fwd_match_t;
 	-- Indicador de instrução da extensão M registrado em ID/EX.
 	signal ex_is_muldiv      : std_logic;
 	-- Indicador de instrução da extensão Zicsr registrado em ID/EX.
@@ -384,6 +391,8 @@ architecture rtl of core is
 	signal exmem_rd_idx      : reg_t;
 	-- Habilitação de escrita em registrador registrada em EX/MEM.
 	signal exmem_we_reg      : std_logic;
+	-- A instrução em EX/MEM é válida e escreve em registrador.
+	signal exmem_ok          : std_logic;
 	-- Habilitação de escrita na memória registrada em EX/MEM.
 	signal exmem_we_ram      : std_logic;
 	-- Habilitação de leitura na memória registrada em EX/MEM.
@@ -406,6 +415,8 @@ architecture rtl of core is
 	signal memwb_rd_idx      : reg_t;
 	-- Habilitação de escrita em registrador registrada em MEM/WB.
 	signal memwb_we_reg      : std_logic;
+	-- A instrução em MEM/WB é válida e escreve em registrador.
+	signal memwb_ok          : std_logic;
 	-- Modo de extensão de leitura da memória registrado em MEM/WB.
 	signal memwb_ext_ram_op  : ext_ram_op_t;
 	-- Seletor de fonte de Write-Back registrado em MEM/WB.
@@ -553,8 +564,12 @@ begin
 			i_wb_rd       => wb2_rd,
 			i_wb_data     => wb2_data,
 			i_mem_rd      => exmem_rd_idx,
+			i_mem_we_reg  => exmem_we_reg,
+			i_memwb_rd    => memwb_rd_idx,
+			i_memwb_we_reg => memwb_we_reg,
 			i_mem_re_ram  => exmem_re_ram,
 			i_ex_rd       => ex_rd_idx,
+			i_ex_we_reg   => ex_we_reg,
 			i_ex_re_ram   => ex_re_ram,
 			i_pipe_stall  => pipe_stall,
 			o_pc_we       => id_pc_we,
@@ -574,6 +589,8 @@ begin
 			o_sel_pc_rs1  => id_sel_pc_rs1,
 			o_alu_op      => id_alu_op,
 			o_alu_sel     => id_alu_sel,
+			o_fwd_match_rs1 => id_fwd_match_rs1,
+			o_fwd_match_rs2 => id_fwd_match_rs2,
 			o_is_muldiv   => id_is_muldiv,
 			o_is_csr      => id_is_csr,
 			o_illegal     => id_illegal,
@@ -594,7 +611,6 @@ begin
 			i_pc          => ifid_pc,
 			i_pc4         => ifid_pc4,
 			i_rs1         => id_rs1_idx,
-			i_rs2         => id_rs2_idx,
 			i_rd          => id_rd_idx,
 			i_rs1_val     => id_rs1_val,
 			i_rs2_val     => id_rs2_val,
@@ -607,6 +623,8 @@ begin
 			i_sel_pc_rs1  => id_sel_pc_rs1,
 			i_alu_op      => id_alu_op,
 			i_alu_sel     => id_alu_sel,
+			i_fwd_match_rs1 => id_fwd_match_rs1,
+			i_fwd_match_rs2 => id_fwd_match_rs2,
 			i_is_muldiv   => id_is_muldiv,
 			i_is_csr      => id_is_csr,
 			i_illegal     => id_illegal,
@@ -619,7 +637,6 @@ begin
 			o_pc          => ex_pc,
 			o_pc4         => ex_pc4,
 			o_rs1         => ex_rs1_idx,
-			o_rs2         => ex_rs2_idx,
 			o_rd          => ex_rd_idx,
 			o_rs1_val     => ex_rs1_val,
 			o_rs2_val     => ex_rs2_val,
@@ -632,6 +649,8 @@ begin
 			o_sel_pc_rs1  => ex_sel_pc_rs1,
 			o_alu_op      => ex_alu_op,
 			o_alu_sel     => ex_alu_sel,
+			o_fwd_match_rs1 => ex_fwd_match_rs1,
+			o_fwd_match_rs2 => ex_fwd_match_rs2,
 			o_is_muldiv   => ex_is_muldiv,
 			o_is_csr      => ex_is_csr,
 			o_illegal     => ex_illegal,
@@ -673,7 +692,6 @@ begin
 			i_pc              => ex_pc,
 			i_pc4             => ex_pc4,
 			i_rs1_idx         => ex_rs1_idx,
-			i_rs2_idx         => ex_rs2_idx,
 			i_rd_idx          => ex_rd_idx,
 			i_rs1_val         => ex_rs1_val,
 			i_rs2_val         => ex_rs2_val,
@@ -688,16 +706,13 @@ begin
 			i_illegal         => ex_illegal,
 			i_opcode          => ex_opcode,
 			i_funct3          => ex_funct3,
-			i_exmem_rd        => exmem_rd_idx,
-			i_exmem_we_reg    => exmem_we_reg,
-			i_exmem_valid     => exmem_valid,
+			i_fwd_match_rs1   => ex_fwd_match_rs1,
+			i_fwd_match_rs2   => ex_fwd_match_rs2,
+			i_exmem_ok        => exmem_ok,
+			i_memwb_ok        => memwb_ok,
+			i_wb2_ok          => wb2_we,
 			i_exmem_alu_out   => exmem_alu_out,
-			i_memwb_rd        => memwb_rd_idx,
-			i_memwb_we_reg    => memwb_we_reg,
-			i_memwb_valid     => memwb_valid,
 			i_memwb_alu_out   => memwb_alu_out,
-			i_wb2_rd          => wb2_rd,
-			i_wb2_we_reg      => wb2_we,
 			i_wb2_data        => wb2_data,
 			i_dc_done         => i_dc_done,
 			o_final_result    => ex_final_result,
@@ -745,6 +760,7 @@ begin
 			o_byte_mask  => exmem_byteena,
 			o_rd         => exmem_rd_idx,
 			o_we_reg     => exmem_we_reg,
+			o_we_ok      => exmem_ok,
 			o_we_ram     => exmem_we_ram,
 			o_re_ram     => exmem_re_ram,
 			o_en_ram     => exmem_en_ram,
@@ -845,6 +861,7 @@ begin
 			o_alu_out    => memwb_alu_out,
 			o_rd         => memwb_rd_idx,
 			o_we_reg     => memwb_we_reg,
+			o_we_ok      => memwb_ok,
 			o_ext_ram_op => memwb_ext_ram_op,
 			o_wb_sel     => memwb_wb_sel,
 			o_is_flash   => memwb_is_flash,

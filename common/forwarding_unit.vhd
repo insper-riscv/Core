@@ -1,114 +1,66 @@
 -- =============================================================================
--- Unidade de adiantamento de dados (forwarding / bypass) do pipeline RV32IM
+-- Seleção do adiantamento no estágio EX (forwarding_unit)
 --
--- Detecta dependências de dados RAW (Read After Write) entre a instrução em
--- execução no estágio EX e as instruções anteriores nos estágios MEM e WB,
--- selecionando a fonte mais recente para os operandos rs1 e rs2 da ULA.
+-- Escolhe, para cada operando, a fonte do multiplexador de adiantamento a
+-- partir dos casamentos que o estágio ID calculou e registrou (forwarding_match)
+-- e da validade das instruções à frente, também registrada. Não compara
+-- índices de registrador: cada bit de seleção é função de seis sinais de
+-- flip-flops.
 --
--- Codificação de o_fwd_rs1 / o_fwd_rs2:
---   "00" = sem adiantamento -> utiliza o valor lido do reg_ID_EX (banco de registradores)
---   "10" = adiantamento EX/MEM -> utiliza o resultado calculado no estágio MEM
---   "01" = adiantamento MEM/WB -> utiliza o dado de write-back do estágio WB
+-- Codificação de o_fwd_rs1 / o_fwd_rs2 (constantes de fwd_consts):
+--   FWD_EXMEM = resultado de EX registrado em EX/MEM (a mais nova)
+--   FWD_MEMWB = resultado de EX registrado em MEM/WB
+--   FWD_WB2   = dado final de write-back registrado em WB2 (a mais antiga)
+--   FWD_NONE  = valor lido do banco de registradores no estágio ID
 --
--- Prioridade: EX/MEM > MEM/WB > ID/EX
---   Quando duas instruções consecutivas escrevem no mesmo registrador rd, o
---   resultado mais recente (EX/MEM) prevalece sobre o mais antigo (MEM/WB).
+-- Prioridade: EX/MEM > MEM/WB > WB2. Quando duas instruções escrevem no mesmo
+-- registrador, vale a mais nova que ainda é válida; se ela foi descartada
+-- depois do ID, a seleção cai para a seguinte.
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
-use work.pipeline_types.all;
 use work.fwd_consts.all;
 
 entity forwarding_unit is
 
 	port (
-		-- Endereço do registrador fonte rs1 da instrução no estágio EX (vindo do reg_ID_EX).
-		i_ex_rs1       : in  reg_t;
-		-- Endereço do registrador fonte rs2 da instrução no estágio EX (vindo do reg_ID_EX).
-		i_ex_rs2       : in  reg_t;
-		-- Endereço do registrador destino rd da instrução no estágio MEM (vindo do reg_EX_MEM).
-		i_exmem_rd     : in  reg_t;
-		-- Habilitação de escrita no banco de registradores da instrução no estágio MEM.
-		i_exmem_we_reg : in  std_logic;
-		-- Endereço do registrador destino rd da instrução no estágio WB (vindo do reg_MEM_WB).
-		i_memwb_rd     : in  reg_t;
-		-- Habilitação de escrita no banco de registradores da instrução no estágio WB.
-		i_memwb_we_reg : in  std_logic;
-		-- Endereço do registrador destino rd da instrução que acabou de sair do estágio WB (registrador WB2).
-		i_wb2_rd       : in  reg_t;
-		-- Habilitação de escrita no banco de registradores da instrução no registrador WB2.
-		i_wb2_we_reg   : in  std_logic;
+		-- Casamentos de rs1 com EX/MEM, MEM/WB e WB2, calculados no estágio ID, nas posições de fwd_match_t.
+		i_match_rs1  : in  fwd_match_t;
+		-- Casamentos de rs2 com EX/MEM, MEM/WB e WB2, calculados no estágio ID, nas posições de fwd_match_t.
+		i_match_rs2  : in  fwd_match_t;
+		-- A instrução em EX/MEM é válida e escreve em registrador.
+		i_exmem_ok   : in  std_logic;
+		-- A instrução em MEM/WB é válida e escreve em registrador.
+		i_memwb_ok   : in  std_logic;
+		-- A instrução em WB2 escreve em registrador.
+		i_wb2_ok     : in  std_logic;
 		-- Seletor do multiplexador de adiantamento para o operando rs1 no estágio EX.
-		o_fwd_rs1      : out std_logic_vector(1 downto 0);
+		o_fwd_rs1    : out fwd_sel_t;
 		-- Seletor do multiplexador de adiantamento para o operando rs2 no estágio EX.
-		o_fwd_rs2      : out std_logic_vector(1 downto 0)
+		o_fwd_rs2    : out fwd_sel_t
 	);
 
 end entity forwarding_unit;
 
 architecture rtl of forwarding_unit is
 
+	-- Escolhe a fonte mais nova que casa e ainda é válida.
+	function select_source(match : fwd_match_t; exmem_ok, memwb_ok, wb2_ok : std_logic) return fwd_sel_t is
+	begin
+		if match(FWD_MATCH_EXMEM) = '1' and exmem_ok = '1' then
+			return FWD_EXMEM;
+		elsif match(FWD_MATCH_MEMWB) = '1' and memwb_ok = '1' then
+			return FWD_MEMWB;
+		elsif match(FWD_MATCH_WB2) = '1' and wb2_ok = '1' then
+			return FWD_WB2;
+		end if;
+		return FWD_NONE;
+	end function;
+
 begin
 
-	-- ===========================================================================
-	-- Adiantamento para o operando rs1
-	-- ===========================================================================
-	process(i_ex_rs1, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg, i_wb2_rd, i_wb2_we_reg)
-	begin
-		if    i_exmem_we_reg = '1'
-		  and i_exmem_rd /= REG_ZERO
-		  and i_exmem_rd  = i_ex_rs1
-		then
-			-- Hazard EX/MEM: instrução imediatamente anterior escreve em rs1.
-			o_fwd_rs1 <= FWD_EXMEM;
-
-		elsif i_memwb_we_reg = '1'
-		  and i_memwb_rd /= REG_ZERO
-		  and i_memwb_rd  = i_ex_rs1
-		then
-			-- Hazard MEM/WB: instrução duas posições à frente escreve em rs1.
-			o_fwd_rs1 <= FWD_MEMWB;
-
-		elsif i_wb2_we_reg = '1'
-		  and i_wb2_rd /= REG_ZERO
-		  and i_wb2_rd  = i_ex_rs1
-		then
-			-- Hazard WB2: instrução três posições à frente escreve em rs1 (o banco ainda não tem o valor).
-			o_fwd_rs1 <= FWD_WB2;
-
-		else
-			-- Sem conflito de dados: valor lido no estágio ID é válido.
-			o_fwd_rs1 <= FWD_NONE;
-		end if;
-	end process;
-
-	-- ===========================================================================
-	-- Adiantamento para o operando rs2
-	-- ===========================================================================
-	process(i_ex_rs2, i_exmem_rd, i_exmem_we_reg, i_memwb_rd, i_memwb_we_reg, i_wb2_rd, i_wb2_we_reg)
-	begin
-		if    i_exmem_we_reg = '1'
-		  and i_exmem_rd /= REG_ZERO
-		  and i_exmem_rd  = i_ex_rs2
-		then
-			o_fwd_rs2 <= FWD_EXMEM;
-
-		elsif i_memwb_we_reg = '1'
-		  and i_memwb_rd /= REG_ZERO
-		  and i_memwb_rd  = i_ex_rs2
-		then
-			o_fwd_rs2 <= FWD_MEMWB;
-
-		elsif i_wb2_we_reg = '1'
-		  and i_wb2_rd /= REG_ZERO
-		  and i_wb2_rd  = i_ex_rs2
-		then
-			o_fwd_rs2 <= FWD_WB2;
-
-		else
-			o_fwd_rs2 <= FWD_NONE;
-		end if;
-	end process;
+	o_fwd_rs1 <= select_source(i_match_rs1, i_exmem_ok, i_memwb_ok, i_wb2_ok);
+	o_fwd_rs2 <= select_source(i_match_rs2, i_exmem_ok, i_memwb_ok, i_wb2_ok);
 
 end architecture rtl;
