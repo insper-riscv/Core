@@ -49,6 +49,7 @@ The `multdiv` unit encapsulates the radix-2 Booth multiplier (`booth_multiplier_
 | `o_busy` | `out` | Asserts combinationally on the start cycle itself (*eager stall*) and stays `'1'` throughout the iteration cycles |
 | `o_done` | `out` | 1-cycle pulse at the end of the calculation |
 | `o_stall` | `out` | Active while `o_busy = '1'` or `o_done = '1'`, keeping the pipeline held until `o_result` is captured |
+| `o_fused` | `out` | 1-cycle pulse at the end of an operation fused with the previous one (the result of the pair comes from the `muldiv_fusion` record, with no new calculation) |
 
 ### 3.2. Zicsr Extension and Exceptions (`Zicsr/csr_file.vhd` and `Zicsr/trap_unit.vhd`)
 

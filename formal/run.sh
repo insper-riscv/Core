@@ -83,6 +83,13 @@ expect "the value shown is the ideal 64-bit counter, carry and writes (induction
 expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
 expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
 
+echo "muldiv_fusion"
+fus="$root/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
+netlist "$fus" muldiv_fusion fus
+# The record mirrors the units' last full result, so this proof is bounded from reset: the fusion is a hit only on the rule and shows the full result of the earlier execution.
+expect "hit only on the same values, family and another operation; the record is the last full result (bounded, 10 cycles)" PASS "$(prove fus.v "$fus_props" bmc 10 '' fus_safety)"
+expect "cover: a hit in each family and the near misses are reachable" PASS "$(prove fus.v "$fus_props" cover 10 '-DCOVER' fus_cover)"
+
 echo "csr_file with Zicntr"
 netlist "$csr" csr_file csrc "-ghas_zicntr=true -gtick_cycles=3"
 csr_cntr_props="$root/formal/csr_cntr_props.sv"
@@ -128,6 +135,13 @@ mutant "$csr" "$csr_cntr_props" csr_file '' cntr_pending_unseen "s/unsigned'(0 =
 mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_inhibit_ignored "s/(not inhibit_reg(3 + k));/'1';/" "-ghpm_counters=4" 6
 mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_code_zero_counts "s/bool_to_sl(event_code(k) \/= std_logic_vector(to_unsigned(EVENT_NONE, EVENT_CODE_WIDTH))) and/'1' and/" "-ghpm_counters=4" 6
 mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=2' hpm_mask_wide "s/mask(3 + k) := '1';/mask(3 + k) := '1'; mask(6) := '1';/" "-ghpm_counters=2" 6
+
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_family_confused "s/i_funct3(2) = rec_funct3(2) and//" "" 10
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_sign_ignored   "s/(i_funct3(2) = '0' or i_funct3(0) = rec_funct3(0))/true/" "" 10
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_same_op        "s/i_funct3 \/= rec_funct3 and//" "" 10
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_no_check_cycle "s/hit   <= check_q and rec_valid/hit   <= rec_valid/" "" 10
+mutant "$fus" "$fus_props" muldiv_fusion '' fusion_record_on_start "0,/i_enable => i_done/s//i_enable => i_start/" "" 10
 
 mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = WORD_ALL_ONES/lo = WORD_INT_MIN/"
 mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata when/lo_nxt <= std_logic_vector(unsigned(i_wdata) + 1) when/"

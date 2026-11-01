@@ -23,6 +23,8 @@ entity booth_multiplier_rv32 is
 		i_rst          : in  std_logic;
 		-- Pulso de início da multiplicação no estágio EX.
 		i_start        : in  std_logic;
+		-- Pulso que interrompe a operação em curso e volta ao repouso, sem produzir o_done (resultado já conhecido).
+		i_abort        : in  std_logic := '0';
 		-- Multiplicando de 32 bits (operando A / rs1).
 		i_multiplicand : in  word_t;
 		-- Multiplicador de 32 bits (operando B / rs2).
@@ -82,6 +84,10 @@ begin
 				iter_count   <= (others => '0');
 				o_done       <= '0';
 				busy_reg     <= '0';
+			elsif i_abort = '1' then
+				state    <= S_IDLE;
+				busy_reg <= '0';
+				o_done   <= '0';
 			else
 				case state is
 

@@ -154,7 +154,9 @@ entity stage_ex is
 		-- Pulso de requisição de flush enviado à cache de dados write-back.
 		o_dc_flush        : out std_logic;
 		-- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
-		o_muldiv_stall    : out std_logic
+		o_muldiv_stall    : out std_logic;
+		-- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
+		o_muldiv_fused    : out std_logic
 	);
 end entity stage_ex;
 
@@ -341,10 +343,12 @@ begin
 				o_result    => ex_muldiv_result,
 				o_stall     => o_muldiv_stall,
 				o_busy      => open,
-				o_done      => open
+				o_done      => open,
+				o_fused     => o_muldiv_fused
 			);
 	else generate
 		o_muldiv_stall   <= '0';
+		o_muldiv_fused   <= '0';
 		ex_muldiv_result <= (others => '0');
 	end generate gen_m;
 

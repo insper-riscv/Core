@@ -18,6 +18,16 @@
 -- primeiro ciclo) com um flip-flop que guarda o sinal de ocupado do ciclo anterior.
 -- Esse flip-flop cobre os ciclos de cálculo e o de término, e assim o pulso de
 -- término não entra na lógica de stall do pipeline.
+--
+-- Fusão de pares (recomendação do capítulo da extensão M): ao terminar, cada
+-- operação grava num registro os dois operandos, o funct3 e o resultado completo
+-- (produto de 64 bits ou o par resto e quociente). Se a instrução seguinte tem os
+-- mesmos valores de operandos, é outra operação da mesma família (qualquer
+-- multiplicação, ou DIV/REM, ou DIVU/REMU) e o registro é válido, ela não repete o
+-- cálculo: no ciclo seguinte ao início a comparação acusa o acerto, a unidade em
+-- curso é interrompida e o resultado sai do registro um ciclo depois. O stall dura
+-- 3 ciclos (início, comparação e término). O acerto depende só dos valores, então é
+-- sempre correto, quaisquer que sejam os registradores de origem e de destino.
 -- =============================================================================
 
 library ieee;
@@ -54,7 +64,9 @@ entity multdiv is
 		-- Indica que o multiplicador ou o divisor está em execução.
 		o_busy      : out std_logic;
 		-- Pulso de 1 ciclo indicando conclusão do cálculo.
-		o_done      : out std_logic
+		o_done      : out std_logic;
+		-- Pulso de 1 ciclo no ciclo de término de uma operação fundida (resultado tirado do registro).
+		o_fused     : out std_logic
 	);
 end entity multdiv;
 
@@ -133,6 +145,29 @@ architecture rtl of multdiv is
 	-- Resultado combinacional selecionado no ciclo em que done_int pulsa.
 	signal result_mux     : word_t;
 
+	-- Metade baixa do resultado completo da última operação (MUL baixo ou quociente), guardada na fusão.
+	signal rec_lo         : word_t;
+	-- Metade alta do resultado completo da última operação (produto alto sem correção ou resto).
+	signal rec_hi         : word_t;
+	-- Metade baixa do resultado completo da operação que termina, a gravar no registro.
+	signal full_lo        : word_t;
+	-- Metade alta do resultado completo da operação que termina, a gravar no registro.
+	signal full_hi        : word_t;
+	-- Acerto registrado da fusão: '1' no ciclo de término da operação fundida.
+	signal fuse_q         : std_logic;
+	-- Próximo valor do flip-flop de ocupado (o acerto zera o ocupado do ciclo de término).
+	signal active_nxt     : std_logic;
+	-- Parte baixa do produto escolhida entre o multiplicador e o registro.
+	signal mul_lo_src     : word_t;
+	-- Parte alta do produto escolhida entre o multiplicador e o registro.
+	signal mul_hi_src     : word_t;
+	-- Quociente escolhido entre o divisor e o registro.
+	signal div_q_src      : word_t;
+	-- Resto escolhido entre o divisor e o registro.
+	signal div_r_src      : word_t;
+	-- Habilita a gravação do resultado: término normal ou término fundido.
+	signal result_we      : std_logic;
+
 begin
 
 	-- Geração de pulso único de partida por instrução M no estágio EX.
@@ -185,11 +220,14 @@ begin
 	-- O stall é o início combinacional (um ciclo) seguido de um flip-flop que cobre os ciclos de
 	-- cálculo e o de término. Assim o pulso de término não atravessa a lógica de stall do pipeline.
 	eager_stall <= start_pulse;
-	stall_int   <= eager_stall or active_q;
+	stall_int   <= eager_stall or active_q or fuse_q;
+
+	-- Num acerto a unidade em curso é interrompida no ciclo de término, e o ocupado desse ciclo não se repete.
+	active_nxt  <= busy_int and (not fuse_q);
 
 	u_active_ff : entity work.flip_flop
 		port map (
-			i_d      => busy_int,
+			i_d      => active_nxt,
 			o_d      => active_q,
 			i_enable => '1',
 			i_clk    => i_clk,
@@ -199,6 +237,7 @@ begin
 	o_busy    <= busy_int;
 	o_done    <= done_int;
 	o_stall   <= stall_int;
+	o_fused   <= fuse_q;
 
 	-- Instância única do multiplicador de Booth radix-2 de 32 bits.
 	u_booth_multiplier : entity work.booth_multiplier_rv32
@@ -206,6 +245,7 @@ begin
 			i_clk          => i_clk,
 			i_rst          => i_rst,
 			i_start        => start_mul,
+			i_abort        => fuse_q,
 			i_multiplicand => i_a,
 			i_multiplier   => i_b,
 			o_result_lo    => mul_lo,
@@ -221,6 +261,7 @@ begin
 				i_clk         => i_clk,
 				i_rst         => i_rst,
 				i_start       => start_div,
+				i_abort       => fuse_q,
 				i_is_unsigned => is_unsigned,
 				i_dividend    => i_a,
 				i_divisor     => i_b,
@@ -247,7 +288,7 @@ begin
 			data_width => word_t'length
 		)
 		port map (
-			i_a => mul_hi,
+			i_a => mul_hi_src,
 			i_b => corr_a,
 			o_d => high_plus_a
 		);
@@ -267,7 +308,7 @@ begin
 			data_width => word_t'length
 		)
 		port map (
-			i_d0  => mul_lo,
+			i_d0  => mul_lo_src,
 			i_d1  => high_corrected,
 			i_sel => is_mul_hi_lat,
 			o_d   => mul_result
@@ -278,8 +319,8 @@ begin
 			data_width => word_t'length
 		)
 		port map (
-			i_d0  => div_quotient,
-			i_d1  => div_remainder,
+			i_d0  => div_q_src,
+			i_d1  => div_r_src,
 			i_sel => is_rem_lat,
 			o_d   => div_result
 		);
@@ -303,9 +344,101 @@ begin
 		port map (
 			i_clk    => i_clk,
 			i_rst    => i_rst,
-			i_enable => done_int,
+			i_enable => result_we,
 			i_d      => result_mux,
 			o_d      => o_result
+		);
+
+	result_we <= done_int or fuse_q;
+
+	-- =========================================================================
+	-- Fusão de pares: registro da última operação e comparação por valor
+	-- =========================================================================
+
+	-- Resultado completo da operação que termina: produto de 64 bits ou o par resto e quociente.
+	u_mux_full_lo : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_quotient,
+			i_d1  => mul_lo,
+			i_sel => is_mult_lat,
+			o_d   => full_lo
+		);
+
+	u_mux_full_hi : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_remainder,
+			i_d1  => mul_hi,
+			i_sel => is_mult_lat,
+			o_d   => full_hi
+		);
+
+	u_fusion : entity work.muldiv_fusion
+		port map (
+			i_clk         => i_clk,
+			i_rst         => i_rst,
+			i_start       => start_pulse,
+			i_done        => done_int,
+			i_funct3      => i_funct3,
+			i_done_funct3 => funct3_latched,
+			i_a           => i_a,
+			i_b           => i_b,
+			i_full_lo     => full_lo,
+			i_full_hi     => full_hi,
+			o_hit         => open,
+			o_fuse        => fuse_q,
+			o_rec_lo      => rec_lo,
+			o_rec_hi      => rec_hi
+		);
+
+	-- No término fundido o resultado completo vem do registro, no lugar das unidades interrompidas.
+	u_mux_mul_lo_src : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => mul_lo,
+			i_d1  => rec_lo,
+			i_sel => fuse_q,
+			o_d   => mul_lo_src
+		);
+
+	u_mux_mul_hi_src : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => mul_hi,
+			i_d1  => rec_hi,
+			i_sel => fuse_q,
+			o_d   => mul_hi_src
+		);
+
+	u_mux_div_q_src : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_quotient,
+			i_d1  => rec_lo,
+			i_sel => fuse_q,
+			o_d   => div_q_src
+		);
+
+	u_mux_div_r_src : entity work.mux_2x1
+		generic map (
+			data_width => 32
+		)
+		port map (
+			i_d0  => div_remainder,
+			i_d1  => rec_hi,
+			i_sel => fuse_q,
+			o_d   => div_r_src
 		);
 
 end architecture rtl;

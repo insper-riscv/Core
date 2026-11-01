@@ -103,6 +103,19 @@ In the EX stage, the `multdiv` unit internally generates a single start pulse (`
 
 The `o_stall` signal stays active while the operator is busy (`busy = '1'`) and during the completion pulse cycle (`done = '1'`), ensuring that the internal output register captures the final result before releasing the pipeline.
 
+#### Pair fusion
+
+The M chapter recommends running `MULH[[S]U]` followed by `MUL`, and `DIV[U]` followed by `REM[U]`, once when they have the same operands. `multdiv` follows it through the `muldiv_fusion` entity, which keeps the last operation that ended in full: both operands, the `funct3` and the complete result (the 64-bit signed product, without the correction of the unsigned modes, or the quotient and remainder pair).
+
+| Aspect | Behavior |
+| :--- | :--- |
+| Hit rule | The same values in both operands, an operation of the same family (any multiplication, `DIV`/`REM` or `DIVU`/`REMU`) and an operation other than the recorded one. The comparison is by value, not by register name, so a hit is correct whatever the source and destination registers are |
+| When it compares | In the cycle after the start, with the operands already held in the EX stage |
+| Sequence of a hit | Start (cycle 0), comparison (cycle 1), end (cycle 2): the running unit is aborted and the result comes from the record, with the high-half correction applied for the mode of the second instruction. The stall lasts 3 cycles, against 35 for a multiplication and 37 for a division in full |
+| What does not fuse | The repeat of the same operation, other values, another family, a signed division followed by an unsigned one, and a different operation in between (the record holds the last one only) |
+| Record | Valid from the first operation that ended in full; only reset invalidates it. A fused operation does not change it |
+| Event | Zihpm counts every fused operation in event 9 |
+
 ### 3.2. Zicsr Extension and Trap Handling
 
 When `has_zicsr = true`, the `csr_decode` decoder in the ID stage identifies the `OPCODE_SYSTEM` class (`"1110011"`), forces I-type immediate extraction (`instr[31:20]`) to carry the 12-bit CSR address into EX, and asserts `o_is_csr = '1'` and `o_we_reg = '1'` for the six CSR access instructions (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
