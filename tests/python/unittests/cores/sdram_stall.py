@@ -12,7 +12,12 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from tests.python.unittests.checks import Prng, check_equal, check_true
+from tests.python.unittests.checks import (
+    Prng,
+    check_equal,
+    check_true,
+    log_info,
+)
 
 SDRAM_BASE = 0x40000000
 RAM_BASE = 0x00008000
@@ -178,7 +183,7 @@ class _SdramSlave:
         self.state = "idle"
         self.countdown = self.accesses = self.pending_read = 0
         self.held_addr = None
-        self.access = None
+        self.access: dict[str, int] | None = None
         self.advance_seen = False
 
     def _accept(self):
@@ -214,6 +219,8 @@ class _SdramSlave:
             self.countdown -= 1
             return
         access = self.access
+        if access is None:
+            raise AssertionError("the wait began without an accepted access")
         if access["we"]:
             self.memory[access["addr"]] = _bytes_merge(
                 self.memory.get(access["addr"], 0),
@@ -338,7 +345,7 @@ async def test_no_wait(dut):
 async def test_fixed_latencies(dut):
     """The same result for 1, 2, 3 and 7 stall cycles per access."""
     for s in (1, 2, 3, 7):
-        dut._log.info(f"stall cycles per access = {s}")
+        log_info(f"stall cycles per access = {s}")
         _check(*await _run(dut, lambda _n, s=s: s))
 
 
@@ -352,5 +359,5 @@ async def test_random_latencies(dut):
     for seed in range(8):
         rng = Prng(seed)
         lat = [rng.randint(0, 9) for _ in range(32)]
-        dut._log.info(f"seed {seed}: {lat[:9]}")
+        log_info(f"seed {seed}: {lat[:9]}")
         _check(*await _run(dut, lambda n, lat=lat: lat[n]))

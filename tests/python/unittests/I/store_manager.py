@@ -21,7 +21,7 @@ async def apply_and_check(dut, access, rs2, expected):
     dut.i_byte_offset.value = ea
     dut.i_rs2_data.value = rs2
 
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
 
     got_data = int(dut.o_data.value)
     got_mask = int(dut.o_byte_mask.value)
@@ -85,7 +85,7 @@ async def invalid_opcode(dut):
     dut.i_byte_offset.value = 0b00
     dut.i_rs2_data.value = 0x12345678
 
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
 
     check_equal(int(dut.o_data.value), 0)
     check_equal(int(dut.o_byte_mask.value), 0)

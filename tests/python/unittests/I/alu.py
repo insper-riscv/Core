@@ -3,7 +3,7 @@
 import cocotb
 from cocotb.triggers import Timer
 
-from tests.python.unittests.checks import Prng, check_equal
+from tests.python.unittests.checks import Prng, check_equal, log_info
 
 OPCODES = {
     "ADD": "00000",
@@ -67,7 +67,7 @@ async def apply_and_check(dut, op_name, operands, expected):
     dut.i_res_sel.value = result_select(OPCODES[op_name])
     dut.i_a.value = to_bits(a)
     dut.i_b.value = to_bits(b)
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
 
     got_data = int(dut.o_d.value)
     got_branch = int(dut.o_branch.value)
@@ -86,7 +86,7 @@ async def apply_and_check(dut, op_name, operands, expected):
         f"{op_name}: esperado branch={expected_branch}, obtido {got_branch}",
     )
 
-    dut._log.info(
+    log_info(
         f"{op_name} OK: "
         f"dA={a}, dB={b}, dataOut={to_signed(got_data)} "
         f"(hex: dA={a:#010x}, dB={b:#010x}, dataOut={got_data:#010x}), "
@@ -241,7 +241,7 @@ async def jalr(dut):
     sum_res = (a + b) & ~1  # força bit 0 = 0
     await apply_and_check(dut, "JALR", (a, b), (sum_res, 0))
 
-    dut._log.info("JALR tests OK")
+    log_info("JALR tests OK")
 
 
 def reference(op_name, a, b):

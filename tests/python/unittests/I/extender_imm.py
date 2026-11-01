@@ -3,7 +3,7 @@
 import cocotb
 from cocotb.triggers import Timer
 
-from tests.python.unittests.checks import Prng, check_equal
+from tests.python.unittests.checks import Prng, check_equal, log_info
 
 RNG = Prng(25)
 
@@ -45,7 +45,7 @@ async def apply_and_check(dut, op, inp, expected, name):
         f"{name} falhou: input={inp:#09x}, esperado={expected:#010x}, "
         f"obtido={got:#010x}",
     )
-    dut._log.info(f"{name} OK: in={inp:#09x} out={got:#010x}")
+    log_info(f"{name} OK: in={inp:#09x} out={got:#010x}")
 
 
 @cocotb.test()

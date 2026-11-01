@@ -23,7 +23,7 @@ async def apply_and_check(dut, select, sig_in, expected, desc=""):
     dut.i_op.value = op_ex_ram
     dut.i_byte_offset.value = byte_offset
 
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
 
     got = (
         int(dut.o_data.value.signed_integer)

@@ -146,8 +146,9 @@ def _crossing_program():
             NOP,
             sw(result, 7, CROSSING_SLOT + 4 * number),
         ]
+        end = offset + 4
         expected[RAM_BASE + CROSSING_SLOT + 4 * number] = int.from_bytes(
-            memory[offset : offset + 4], "little"
+            memory[offset:end], "little"
         )
     program += [
         addi(14, 0, 1),

@@ -5,9 +5,15 @@ import contextlib
 
 import cocotb
 from cocotb.clock import Clock
+from cocotb.task import Task
 from cocotb.triggers import RisingEdge, Timer
 
-from tests.python.unittests.checks import Prng, check_equal, check_true
+from tests.python.unittests.checks import (
+    Prng,
+    check_equal,
+    check_true,
+    log_info,
+)
 
 
 # ===== Helpers =====
@@ -28,7 +34,7 @@ async def _read_ports(dut, a_addr: int, b_addr: int):
     dut.i_rs1.value = a_addr
     dut.i_rs2.value = b_addr
     # Espera uma pequena janela para propagação combinacional
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     aval = int(dut.o_rs1.value)
     bval = int(dut.o_rs2.value)
     return aval, bval
@@ -41,20 +47,23 @@ async def _write_reg(dut, addr: int, data: int):
     dut.i_enable.value = 1
     await RisingEdge(dut.i_clk)
     # pequena folga de propagação para leituras combinacionais
-    # subsequentes await Timer(1, units="ns")
+    # subsequentes await Timer(1, unit="ns")
     dut.i_enable.value = 0
 
 
-def _restart_clock(dut, period_ns=10):
+_CLOCK_TASKS: list[Task[None]] = []
 
-    if hasattr(dut, "_clk_gen"):
+
+def _restart_clock(dut, period_ns=10):
+    """Kill the running clock, if any, and start a new one."""
+    while _CLOCK_TASKS:
         with contextlib.suppress(Exception):
-            dut._clk_gen.kill()
+            _CLOCK_TASKS.pop().kill()
 
     dut.i_clk.setimmediatevalue(0)
 
-    dut._clk_gen = cocotb.start_soon(
-        Clock(dut.i_clk, period_ns, units="ns").start()
+    _CLOCK_TASKS.append(
+        cocotb.start_soon(Clock(dut.i_clk, period_ns, unit="ns").start())
     )
 
 
@@ -69,7 +78,7 @@ async def inicializacao_e_x0(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     aw = len(dut.i_rs1)
@@ -96,7 +105,7 @@ async def escrita_e_leitura_basica(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     dw = len(dut.o_rs1)
@@ -126,7 +135,7 @@ async def x0_sempre_zero(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     dw = len(dut.o_rs1)
@@ -149,7 +158,7 @@ async def leituras_simultaneas(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     len(dut.i_rs1)
@@ -184,7 +193,7 @@ async def write_then_read_same_cycle(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     await RisingEdge(dut.i_clk)
@@ -204,13 +213,11 @@ async def write_then_read_same_cycle(dut):
     await RisingEdge(dut.i_clk)
     dut.i_enable.value = 0
 
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     # Log detalhado
     a = int(dut.o_rs1.value)
     b = int(dut.o_rs2.value)
-    dut._log.info(
-        f"[DEPOIS DA BORDA] addr={addr} novo={novo:#x} A={a:#x} B={b:#x}"
-    )
+    log_info(f"[DEPOIS DA BORDA] addr={addr} novo={novo:#x} A={a:#x} B={b:#x}")
 
     check_true(
         a == novo and b == novo,
@@ -242,7 +249,7 @@ async def fuzz_banco(dut):
     _restart_clock(dut, 10)
 
     dut.i_rst.value = 1
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     dut.i_rst.value = 0
 
     aw = len(dut.i_rs1)
