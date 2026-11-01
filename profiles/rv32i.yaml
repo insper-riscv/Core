@@ -48,6 +48,7 @@ sources:
   - M/m_decode.vhd
   - M/booth_multiplier_rv32.vhd
   - M/non_restoring_divider_rv32.vhd
+  - M/muldiv_fusion.vhd
   - M/multdiv.vhd
   - Zicsr/csr_decode.vhd
   - Zicntr/counter64.vhd
