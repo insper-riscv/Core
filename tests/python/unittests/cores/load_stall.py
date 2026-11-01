@@ -126,13 +126,13 @@ CROSSING_BUFFER = 0x400
 
 
 def _crossing_program():
-    """Build one crossing load per offset, each followed by a stalling mul.
+    """Build one crossing load per offset, then a stalling mul.
 
     Returns the program and the value each result slot must hold.
     """
     program = [NOP, lui(7, RAM_BASE >> 12), addi(8, 7, CROSSING_BUFFER)]
     for index, word in enumerate(CROSSING_WORDS):
-        program += load_constant(6, word) + [sw(6, 8, 4 * index)]
+        program += [*load_constant(6, word), sw(6, 8, 4 * index)]
     program += [addi(2, 0, 3), NOP, NOP, NOP]
     memory = b"".join(word.to_bytes(4, "little") for word in CROSSING_WORDS)
     expected = {}
