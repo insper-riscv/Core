@@ -15,7 +15,8 @@
 -- A etapa 1 conclui quando o escravo está pronto (a RAM interna responde em um
 -- ciclo e a SDRAM, quando i_ready = '1') e a memória avança (i_advance = '1').
 -- O dado lido da etapa 1 chega ao ciclo seguinte e é guardado em o_first_word
--- durante a etapa 2; o dado lido da etapa 2 chega no estágio WB, onde o
+-- no primeiro ciclo da etapa 2, e só nele, mesmo que um stall de EX segure a
+-- etapa por vários ciclos; o dado lido da etapa 2 chega no estágio WB, onde o
 -- stage_wb o junta com o_first_word.
 --
 -- Loads e stores que não cruzam a palavra passam sem alteração (o_cross = '0').
@@ -104,6 +105,8 @@ architecture rtl of misaligned_unit is
 	signal first_done     : std_logic;
 	-- Habilita a mudança de etapa.
 	signal second_enable  : std_logic;
+	-- Primeiro ciclo da etapa 2: o único em que a saída da memória ainda é a palavra da etapa 1.
+	signal second_start   : std_logic;
 	-- Dado do store ajustado para 32 bits, sem o deslocamento do store_manager.
 	signal raw_data       : word_t;
 	-- Máscara de bytes do store sem deslocamento (1111 para SW, 0011 para SH).
@@ -150,6 +153,18 @@ begin
 			i_rst    => i_rst
 		);
 
+	-- A RAM interna responde ao endereço do ciclo anterior, então no primeiro ciclo da etapa 2 ela ainda entrega a
+	-- palavra da etapa 1 e nos seguintes a da etapa 2. Se a etapa 2 for segurada por um stall de EX, como uma
+	-- multiplicação, o registrador não pode continuar capturando, ou perde a primeira palavra.
+	u_second_start_ff : entity work.flip_flop
+		port map (
+			i_d      => first_done,
+			o_d      => second_start,
+			i_enable => '1',
+			i_clk    => i_clk,
+			i_rst    => i_rst
+		);
+
 	raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else
 	            std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
 	raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
@@ -176,7 +191,7 @@ begin
 		port map (
 			i_clk    => i_clk,
 			i_rst    => i_rst,
-			i_enable => second,
+			i_enable => second_start,
 			i_d      => region_rdata,
 			o_d      => o_first_word
 		);
