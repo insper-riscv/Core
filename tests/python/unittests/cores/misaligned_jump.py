@@ -1,20 +1,48 @@
-"""Um salto tomado para um alvo desalinhado dispara a exceção de endereço de instrução (mcause 0).
+"""Testes do modulo.
 
-O alvo de um salto é desalinhado quando o seu bit 1 vale '1' (o bit 0 é sempre zero). No JALR esse bit
-sai da soma de rs1 com o imediato, inclusive com vai-um vindo do bit 0; no desvio, do somador de PC mais
-imediato. O tratador registra mcause e mtval de cada exceção e retoma depois da instrução; os saltos de
-alvo alinhado e o desvio não tomado não podem disparar exceção.
+Um salto tomado para um alvo desalinhado dispara a exceção de endereço
+de instrução (mcause 0).
+
+O alvo de um salto é desalinhado quando o seu bit 1 vale '1' (o bit 0 é
+sempre zero). No JALR esse bit sai da soma de rs1 com o imediato,
+inclusive com vai-um vindo do bit 0; no desvio, do somador de PC mais
+imediato. O tratador registra mcause e mtval de cada exceção e retoma
+depois da instrução; os saltos de alvo alinhado e o desvio não tomado
+não podem disparar exceção.
 """
 
 import cocotb
 
-from tests.python.unittests.cores.harness import DONE_ADDR, RAM_BASE, run_program
-from tests.python.unittests.cores.IllegalInstruction import HANDLER_WORD, LOG_BASE, MRET, NOP, csrrs, csrrw, MTVEC, MEPC, MCAUSE
-from tests.python.unittests.cores.SdramStall import _b, _i, addi, jal_self, lui, sw
+from tests.python.unittests.checks import check_equal, check_true
+from tests.python.unittests.cores.harness import (
+    DONE_ADDR,
+    RAM_BASE,
+    run_program,
+)
+from tests.python.unittests.cores.illegal_instruction import (
+    HANDLER_WORD,
+    LOG_BASE,
+    MCAUSE,
+    MEPC,
+    MRET,
+    MTVEC,
+    NOP,
+    csrrs,
+    csrrw,
+)
+from tests.python.unittests.cores.sdram_stall import (
+    _b,
+    _i,
+    addi,
+    jal_self,
+    lui,
+    sw,
+)
 
 MTVAL = 0x343
 JALR = 0x67
-# Somas rs1 + imm testadas, em relação ao endereço do JALR; o alvo é a soma com o bit 0 zerado.
+# Somas rs1 + imm testadas, em relação ao endereço do JALR; o alvo é a
+# soma com o bit 0 zerado.
 SUM_OFFSETS = (4, 5, 6, 7)
 IMMEDIATES = (0, 1, 2, 3, -1)
 BEQ, BNE = 0b000, 0b001
@@ -23,7 +51,11 @@ HEADER_WORDS = 10
 
 
 def build_program():
-    """Monta o programa e devolve também as exceções esperadas como (mcause, mtval)."""
+    """Executa build program.
+
+    Monta o programa e devolve também as exceções esperadas como
+    (mcause, mtval).
+    """
     program = [
         NOP,
         addi(5, 0, HANDLER_WORD * 4),
@@ -36,18 +68,20 @@ def build_program():
         NOP,
         NOP,
     ]
-    assert len(program) == HEADER_WORDS
+    check_equal(len(program), HEADER_WORDS)
     expected = []
     for offset in SUM_OFFSETS:
         for imm in IMMEDIATES:
-            # O addi que carrega rs1 vem antes do JALR, que fica uma palavra depois.
+            # O addi que carrega rs1 vem antes do JALR, que fica uma
+            # palavra depois.
             jalr_address = 4 * len(program) + 4
             total = jalr_address + offset
             program.append(addi(6, 0, total - imm))
             program.append(_i(JALR, 0, 0, 6, imm))
             if (total & ~1) & 2:
                 expected.append((0, total & ~1))
-    # Desvio tomado para um alvo desalinhado dispara a exceção; o mesmo desvio não tomado não dispara.
+    # Desvio tomado para um alvo desalinhado dispara a exceção; o mesmo
+    # desvio não tomado não dispara.
     branch_address = 4 * len(program)
     program.append(_b(BEQ, 0, 0, BRANCH_MISALIGNED_OFFSET))
     expected.append((0, branch_address + BRANCH_MISALIGNED_OFFSET))
@@ -57,7 +91,7 @@ def build_program():
         sw(14, 7, DONE_ADDR - RAM_BASE),
         jal_self(),
     ]
-    assert len(program) < HANDLER_WORD
+    check_true(len(program) < HANDLER_WORD)
     program += [NOP] * (HANDLER_WORD - len(program))
     program += [
         csrrs(6, MCAUSE, 0),
@@ -75,7 +109,11 @@ def build_program():
 
 @cocotb.test()
 async def test_misaligned_jump_targets_trap(dut):
-    """Cada alvo desalinhado gera uma exceção com mcause 0 e mtval igual ao alvo; os alinhados não geram."""
+    """Verifica misaligned jump targets trap.
+
+    Cada alvo desalinhado gera uma exceção com mcause 0 e mtval igual ao
+    alvo; os alinhados não geram.
+    """
     program, expected = build_program()
     ram = await run_program(dut, program, max_cycles=6000)
     seen = []
@@ -83,4 +121,6 @@ async def test_misaligned_jump_targets_trap(dut):
     while address in ram:
         seen.append((ram[address], ram[address + 4]))
         address += 8
-    assert seen == expected, f"exceções registradas {seen}, esperadas {expected}"
+    check_equal(
+        seen, expected, f"exceções registradas {seen}, esperadas {expected}"
+    )

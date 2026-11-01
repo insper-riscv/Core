@@ -1,11 +1,16 @@
 """tick_divider: one tick pulse every tick_cycles clock cycles."""
 
+import itertools
+
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
+from tests.python.unittests.checks import check_equal, check_true
+
 
 async def start(dut):
+    """Executa start."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_rst.value = 1
     for _ in range(2):
@@ -16,20 +21,24 @@ async def start(dut):
 
 @cocotb.test()
 async def test_one_tick_every_period(dut):
+    """Verifica one tick every period."""
     await start(dut)
     period = int(dut.tick_cycles.value)
     ticks = []
-    for cycle in range(period * 5):
+    for _cycle in range(period * 5):
         ticks.append(int(dut.o_tick.value))
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-    assert sum(ticks) == 5
+    check_equal(sum(ticks), 5)
     spots = [i for i, t in enumerate(ticks) if t]
-    assert all(b - a == period for a, b in zip(spots, spots[1:])), spots
+    check_true(
+        all(b - a == period for a, b in itertools.pairwise(spots)), spots
+    )
 
 
 @cocotb.test()
 async def test_reset_restarts_the_count(dut):
+    """Verifica reset restarts the count."""
     await start(dut)
     for _ in range(2):
         await RisingEdge(dut.i_clk)
@@ -43,4 +52,4 @@ async def test_reset_restarts_the_count(dut):
         seen.append(int(dut.o_tick.value))
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-    assert seen == [0] * (period - 1) + [1]
+    check_equal(seen, [0] * (period - 1) + [1])

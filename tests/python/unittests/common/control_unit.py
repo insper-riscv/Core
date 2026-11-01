@@ -1,50 +1,53 @@
+"""Testes de control unit."""
+
 import csv
 from pathlib import Path
+
 import cocotb
 from cocotb.triggers import Timer
 
+from tests.python.unittests.checks import check_equal
 
-def _parse_field(val: str, width: int) -> int:
-    """Converte campo da tabela para inteiro."""
+
+def _parse_field(val: str, _width: int) -> int:
+    """Converta o campo da tabela para inteiro."""
     val = val.strip()
     if val == "-" or all(ch == "X" for ch in val):
         return 0
 
     symbol_map = {
-        # opExImm[2:0]
-        "U":       0b000,
-        "I":       0b001,
+        # campo opExImm, 3 bits
+        "U": 0b000,
+        "I": 0b001,
         "I_shamt": 0b010,
-        "J":       0b011,
-        "S":       0b100,
-        "B":       0b101,
-
-        # opExRAM[2:0]
-        "LW":  0b000,
-        "LH":  0b001,
+        "J": 0b011,
+        "S": 0b100,
+        "B": 0b101,
+        # campo opExRAM, 3 bits
+        "LW": 0b000,
+        "LH": 0b001,
         "LHU": 0b010,
-        "LB":  0b011,
+        "LB": 0b011,
         "LBU": 0b100,
-
-        # opALU[4:0]
-        "ADD":    0b00000,
-        "SLL":    0b00001,
-        "XOR":    0b00100,
-        "SRL":    0b00101,
-        "OR":     0b00110,
-        "AND":    0b00111,
-        "SUB":    0b01000,
-        "SLT":    0b01010,
-        "SLTU":   0b01011,
-        "SRA":    0b01101,
-        "JALR":   0b10000,
-        "LUI":    0b10001,
-        "BEQ":    0b11000,
-        "BNE":    0b11001,
-        "BLT":    0b11100,
-        "BGE":    0b11101,
-        "BLTU":   0b11110,
-        "BGEU":   0b11111,
+        # campo opALU, 5 bits
+        "ADD": 0b00000,
+        "SLL": 0b00001,
+        "XOR": 0b00100,
+        "SRL": 0b00101,
+        "OR": 0b00110,
+        "AND": 0b00111,
+        "SUB": 0b01000,
+        "SLT": 0b01010,
+        "SLTU": 0b01011,
+        "SRA": 0b01101,
+        "JALR": 0b10000,
+        "LUI": 0b10001,
+        "BEQ": 0b11000,
+        "BNE": 0b11001,
+        "BLT": 0b11100,
+        "BGE": 0b11101,
+        "BLTU": 0b11110,
+        "BGEU": 0b11111,
     }
 
     if val in symbol_map:
@@ -54,10 +57,14 @@ def _parse_field(val: str, width: int) -> int:
 
 
 def load_reference():
-    """Carrega a tabela CSV de opcodes (mesma usada pelo InstructionDecoder)."""
+    """Executa load reference.
+
+    Carrega a tabela CSV de opcodes (mesma usada pelo
+    InstructionDecoder).
+    """
     data_dir = Path(__file__).resolve().parent / "data"
     csv_path = data_dir / "riscv_opcodes.csv"
-    with open(csv_path, newline="") as f:
+    with Path(csv_path).open(newline="") as f:
         return list(csv.DictReader(f))
 
 
@@ -70,7 +77,7 @@ def build_instruction(opcode: int, funct3: int, funct7: int) -> int:
     rs1, rs2, rd nao afetam a decisao do control_unit, ficam zero.
     """
     instr = 0
-    instr |= (opcode & 0x7F)
+    instr |= opcode & 0x7F
     instr |= (funct3 & 0x7) << 12
     instr |= (funct7 & 0x7F) << 25
     return instr & 0xFFFFFFFF
@@ -78,13 +85,12 @@ def build_instruction(opcode: int, funct3: int, funct7: int) -> int:
 
 @cocotb.test()
 async def test_control_unit(dut):
-    """
-    Para cada linha da tabela CSV:
-    - monta a instrucao de 32 bits a partir de opcode/funct3/funct7
-    - aplica em dut.instruction
-    - espera propagacao
-    - compara todos os sinais de saida com a tabela
-    - verifica que opCode e funct3_out (saidas novas) batem com a entrada
+    """Verifica control unit.
+
+    Para cada linha da tabela CSV: - monta a instrucao de 32 bits a
+    partir de opcode/funct3/funct7 - aplica em dut.instruction - espera
+    propagacao - compara todos os sinais de saida com a tabela -
+    verifica que opCode e funct3_out (saidas novas) batem com a entrada
     """
     ref_table = load_reference()
 
@@ -99,72 +105,103 @@ async def test_control_unit(dut):
 
         await Timer(1, units="ns")
 
-        exp_selMuxPc4ALU    = _parse_field(row["SelMuxPc4ALU"], 1)
-        exp_opExImm         = _parse_field(row["opExImm[2:0]"], 3)
-        exp_selMuxALURAM = _parse_field(row["selMuxALURAM"], 1)
-        exp_weReg           = _parse_field(row["weReg"], 1)
-        exp_opExRAM         = _parse_field(row["opExRAM[2:0]"], 3)
-        exp_selMuxRS2Imm    = _parse_field(row["selMuxRS2Imm"], 1)
-        exp_selPCRS1        = _parse_field(row["selMUXPcRS1"], 1)
-        exp_opALU           = _parse_field(row["opALU[4:0]"], 5)
-        exp_reRAM           = _parse_field(row["reRAM"], 1)
-        exp_eRAM            = _parse_field(row["eRAM"], 1)
-        exp_weRAM           = _parse_field(row["weRAM"], 1)
+        exp_sel_mux_pc4_alu = _parse_field(row["SelMuxPc4ALU"], 1)
+        exp_op_ex_imm = _parse_field(row["opExImm[2:0]"], 3)
+        exp_sel_mux_aluram = _parse_field(row["selMuxALURAM"], 1)
+        exp_we_reg = _parse_field(row["weReg"], 1)
+        exp_op_ex_ram = _parse_field(row["opExRAM[2:0]"], 3)
+        exp_sel_mux_rs2_imm = _parse_field(row["selMuxRS2Imm"], 1)
+        exp_sel_pcrs1 = _parse_field(row["selMUXPcRS1"], 1)
+        exp_op_alu = _parse_field(row["opALU[4:0]"], 5)
+        exp_re_ram = _parse_field(row["reRAM"], 1)
+        exp_e_ram = _parse_field(row["eRAM"], 1)
+        exp_we_ram = _parse_field(row["weRAM"], 1)
 
-        got_selMuxPc4ALU    = int(dut.o_sel_pc4_alu.value)
-        got_opExImm         = int(dut.o_ext_imm_op.value)
-        got_selMuxALURAM = int(dut.o_wb_sel.value)
-        got_weReg           = int(dut.o_we_reg.value)
-        got_opExRAM         = int(dut.o_ext_ram_op.value)
-        got_selMuxRS2Imm    = int(dut.o_sel_rs2_imm.value)
-        got_selPCRS1        = int(dut.o_sel_pc_rs1.value)
-        got_opALU           = int(dut.o_alu_op.value)
-        got_reRAM           = int(dut.o_re_ram.value)
-        got_eRAM            = int(dut.o_en_ram.value)
-        got_weRAM           = int(dut.o_we_ram.value)
+        got_sel_mux_pc4_alu = int(dut.o_sel_pc4_alu.value)
+        got_op_ex_imm = int(dut.o_ext_imm_op.value)
+        got_sel_mux_aluram = int(dut.o_wb_sel.value)
+        got_we_reg = int(dut.o_we_reg.value)
+        got_op_ex_ram = int(dut.o_ext_ram_op.value)
+        got_sel_mux_rs2_imm = int(dut.o_sel_rs2_imm.value)
+        got_sel_pcrs1 = int(dut.o_sel_pc_rs1.value)
+        got_op_alu = int(dut.o_alu_op.value)
+        got_re_ram = int(dut.o_re_ram.value)
+        got_e_ram = int(dut.o_en_ram.value)
+        got_we_ram = int(dut.o_we_ram.value)
 
-        assert got_selMuxPc4ALU == exp_selMuxPc4ALU, (
-            f"{inst_name}: selMuxPc4ALU got={got_selMuxPc4ALU} exp={exp_selMuxPc4ALU}"
+        check_equal(
+            got_sel_mux_pc4_alu,
+            exp_sel_mux_pc4_alu,
+            f"{inst_name}: selMuxPc4ALU got={got_sel_mux_pc4_alu} "
+            f"exp={exp_sel_mux_pc4_alu}",
         )
-        assert got_opExImm == exp_opExImm, (
-            f"{inst_name}: opExImm got={got_opExImm:03b} exp={exp_opExImm:03b}"
+        check_equal(
+            got_op_ex_imm,
+            exp_op_ex_imm,
+            f"{inst_name}: opExImm got={got_op_ex_imm:03b} "
+            f"exp={exp_op_ex_imm:03b}",
         )
-        assert got_selMuxALURAM == exp_selMuxALURAM, (
-            f"{inst_name}: selMuxALURAM got={got_selMuxALURAM:b} exp={exp_selMuxALURAM:b}"
+        check_equal(
+            got_sel_mux_aluram,
+            exp_sel_mux_aluram,
+            f"{inst_name}: selMuxALURAM got={got_sel_mux_aluram:b} "
+            f"exp={exp_sel_mux_aluram:b}",
         )
-        assert got_weReg == exp_weReg, (
-            f"{inst_name}: weReg got={got_weReg} exp={exp_weReg}"
+        check_equal(
+            got_we_reg,
+            exp_we_reg,
+            f"{inst_name}: weReg got={got_we_reg} exp={exp_we_reg}",
         )
-        assert got_opExRAM == exp_opExRAM, (
-            f"{inst_name}: opExRAM got={got_opExRAM:03b} exp={exp_opExRAM:03b}"
+        check_equal(
+            got_op_ex_ram,
+            exp_op_ex_ram,
+            f"{inst_name}: opExRAM got={got_op_ex_ram:03b} "
+            f"exp={exp_op_ex_ram:03b}",
         )
-        assert got_selMuxRS2Imm == exp_selMuxRS2Imm, (
-            f"{inst_name}: selMuxRS2Imm got={got_selMuxRS2Imm} exp={exp_selMuxRS2Imm}"
+        check_equal(
+            got_sel_mux_rs2_imm,
+            exp_sel_mux_rs2_imm,
+            f"{inst_name}: selMuxRS2Imm got={got_sel_mux_rs2_imm} "
+            f"exp={exp_sel_mux_rs2_imm}",
         )
-        assert got_selPCRS1 == exp_selPCRS1, (
-            f"{inst_name}: selPCRS1 got={got_selPCRS1} exp={exp_selPCRS1}"
+        check_equal(
+            got_sel_pcrs1,
+            exp_sel_pcrs1,
+            f"{inst_name}: selPCRS1 got={got_sel_pcrs1} exp={exp_sel_pcrs1}",
         )
-        assert got_opALU == exp_opALU, (
-            f"{inst_name}: opALU got={got_opALU:05b} exp={exp_opALU:05b}"
+        check_equal(
+            got_op_alu,
+            exp_op_alu,
+            f"{inst_name}: opALU got={got_op_alu:05b} exp={exp_op_alu:05b}",
         )
-        assert got_reRAM == exp_reRAM, (
-            f"{inst_name}: reRAM got={got_reRAM} exp={exp_reRAM}"
+        check_equal(
+            got_re_ram,
+            exp_re_ram,
+            f"{inst_name}: reRAM got={got_re_ram} exp={exp_re_ram}",
         )
-        assert got_eRAM == exp_eRAM, (
-            f"{inst_name}: eRAM got={got_eRAM} exp={exp_eRAM}"
+        check_equal(
+            got_e_ram,
+            exp_e_ram,
+            f"{inst_name}: eRAM got={got_e_ram} exp={exp_e_ram}",
         )
-        assert got_weRAM == exp_weRAM, (
-            f"{inst_name}: weRAM got={got_weRAM} exp={exp_weRAM}"
+        check_equal(
+            got_we_ram,
+            exp_we_ram,
+            f"{inst_name}: weRAM got={got_we_ram} exp={exp_we_ram}",
         )
 
         # Saidas novas do pipeline
-        got_opCode = int(dut.o_opcode.value)
+        got_op_code = int(dut.o_opcode.value)
         got_funct3 = int(dut.o_funct3.value)
-        assert got_opCode == opcode, (
-            f"{inst_name}: o_opcode got={got_opCode:07b} exp={opcode:07b}"
+        check_equal(
+            got_op_code,
+            opcode,
+            f"{inst_name}: o_opcode got={got_op_code:07b} exp={opcode:07b}",
         )
-        assert got_funct3 == funct3, (
-            f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}"
+        check_equal(
+            got_funct3,
+            funct3,
+            f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}",
         )
 
         dut._log.info(f"{inst_name}: OK")
@@ -172,11 +209,12 @@ async def test_control_unit(dut):
 
 @cocotb.test()
 async def test_control_unit_m_is_not_decoded_here(dut):
-    """
-    O control_unit e' so' da base: as 8 instrucoes da extensao M (R-type com
-    funct7=0000001) nao sobem o_we_reg aqui (quem as reivindica e' M/m_decode),
-    mas o_funct3 segue a instrucao, porque a unidade M usa funct3 como
-    operacao.
+    """Verifica control unit m is not decoded here.
+
+    O control_unit e' so' da base: as 8 instrucoes da extensao M (R-type
+    com funct7=0000001) nao sobem o_we_reg aqui (quem as reivindica e'
+    M/m_decode), mas o_funct3 segue a instrucao, porque a unidade M usa
+    funct3 como operacao.
     """
     for funct3 in range(8):
         dut.i_inst.value = build_instruction(
@@ -184,43 +222,73 @@ async def test_control_unit_m_is_not_decoded_here(dut):
         )
         await Timer(1, units="ns")
 
-        assert int(dut.o_we_reg.value) == 0, f"funct3={funct3:03b}: o_we_reg deveria ser 0"
+        check_equal(
+            int(dut.o_we_reg.value),
+            0,
+            f"funct3={funct3:03b}: o_we_reg deveria ser 0",
+        )
         got_funct3 = int(dut.o_funct3.value)
-        assert got_funct3 == funct3, (
-            f"o_funct3 got={got_funct3:03b} exp={funct3:03b}"
+        check_equal(
+            got_funct3,
+            funct3,
+            f"o_funct3 got={got_funct3:03b} exp={funct3:03b}",
         )
 
 
+OPCODE_LOW_BITS = 0b11
+OPCODE_OP_IMM = 0b0010011
+OPCODE_OP = 0b0110011
+FUNCT3_SLL = 1
+FUNCT3_SRL_SRA = 5
+FUNCT7_SUB_SRA = 0b0100000
+# LUI, AUIPC, JAL and SYSTEM: any funct3 and funct7 is legal
+OPCODES_ALWAYS_LEGAL = (0b0110111, 0b0010111, 0b1101111, 0b1110011)
+# Legal funct3 per opcode: JALR, BRANCH, LOAD, STORE and MISC-MEM
+LEGAL_FUNCT3 = {
+    0b1100111: (0,),
+    0b1100011: (0, 1, 4, 5, 6, 7),
+    0b0000011: (0, 1, 2, 4, 5),
+    0b0100011: (0, 1, 2),
+    0b0001111: (0,),
+}
+
+
+def _legal_op_imm(funct3: int, funct7: int) -> bool:
+    """Diga se o OP-IMM é válido; os deslocamentos fixam o funct7."""
+    if funct3 == FUNCT3_SLL:
+        return funct7 == 0
+    if funct3 == FUNCT3_SRL_SRA:
+        return funct7 in (0, FUNCT7_SUB_SRA)
+    return True
+
+
+def _legal_op(funct3: int, funct7: int) -> bool:
+    """Diga se o OP é válido (funct7 = 1 é a extensão M)."""
+    return funct7 == 0 or (funct7 == FUNCT7_SUB_SRA and funct3 in (0, 5))
+
+
 def _legal(opcode: int, funct3: int, funct7: int) -> bool:
-    """Whether the encoding is an instruction of RV32I, SYSTEM aside (the trap unit decides it)."""
-    if opcode & 0b11 != 0b11:
+    """Diga se a codificação é uma instrução do RV32I.
+
+    SYSTEM fica de fora, pois quem decide é a unidade de traps.
+    """
+    if opcode & OPCODE_LOW_BITS != OPCODE_LOW_BITS:
         return False
-    if opcode in (0b0110111, 0b0010111, 0b1101111, 0b1110011):   # LUI, AUIPC, JAL, SYSTEM
+    if opcode in OPCODES_ALWAYS_LEGAL:
         return True
-    if opcode == 0b1100111:                                       # JALR
-        return funct3 == 0
-    if opcode == 0b1100011:                                       # BRANCH
-        return funct3 in (0, 1, 4, 5, 6, 7)
-    if opcode == 0b0000011:                                       # LOAD
-        return funct3 in (0, 1, 2, 4, 5)
-    if opcode == 0b0100011:                                       # STORE
-        return funct3 in (0, 1, 2)
-    if opcode == 0b0010011:                                       # OP-IMM
-        if funct3 == 1:
-            return funct7 == 0
-        if funct3 == 5:
-            return funct7 in (0, 0b0100000)
-        return True
-    if opcode == 0b0110011:                                       # OP (funct7 = 1 is the M extension)
-        return funct7 == 0 or (funct7 == 0b0100000 and funct3 in (0, 5))
-    if opcode == 0b0001111:                                       # MISC-MEM: FENCE (FENCE.I is Zifencei)
-        return funct3 == 0
-    return False
+    if opcode == OPCODE_OP_IMM:
+        return _legal_op_imm(funct3, funct7)
+    if opcode == OPCODE_OP:
+        return _legal_op(funct3, funct7)
+    return funct3 in LEGAL_FUNCT3.get(opcode, ())
 
 
 @cocotb.test()
 async def test_illegal_flag(dut):
-    """o_illegal marks exactly the encodings that RV32I does not define."""
+    """Verifica illegal flag.
+
+    o_illegal marks exactly the encodings that RV32I does not define.
+    """
     for opcode in range(128):
         for funct3 in range(8):
             for funct7 in (0, 1, 2, 0b0100000, 0b0100001, 0b1000000, 0x7F):
@@ -228,15 +296,22 @@ async def test_illegal_flag(dut):
                 await Timer(1, unit="ns")
                 got = int(dut.o_illegal.value)
                 want = int(not _legal(opcode, funct3, funct7))
-                assert got == want, (
-                    f"opcode={opcode:07b} funct3={funct3:03b} funct7={funct7:07b}: "
-                    f"o_illegal got={got} exp={want}"
+                check_equal(
+                    got,
+                    want,
+                    f"opcode={opcode:07b} funct3={funct3:03b} "
+                    f"funct7={funct7:07b}: "
+                    f"o_illegal got={got} exp={want}",
                 )
 
 
 @cocotb.test()
 async def test_table_instructions_are_legal(dut):
-    """Every instruction of the reference table is legal, but the NOP row (the all-zero word, which RISC-V defines as illegal)."""
+    """Verifica table instructions are legal.
+
+    Every instruction of the reference table is legal, but the NOP row
+    (the all-zero word, which RISC-V defines as illegal).
+    """
     for row in load_reference():
         if row["INST"] == "NOP":
             continue
@@ -245,4 +320,6 @@ async def test_table_instructions_are_legal(dut):
         funct7 = _parse_field(row["funct7[6:0]"], 7)
         dut.i_inst.value = build_instruction(opcode, funct3, funct7)
         await Timer(1, unit="ns")
-        assert int(dut.o_illegal.value) == 0, f"{row['INST']} is flagged illegal"
+        check_equal(
+            int(dut.o_illegal.value), 0, f"{row['INST']} is flagged illegal"
+        )

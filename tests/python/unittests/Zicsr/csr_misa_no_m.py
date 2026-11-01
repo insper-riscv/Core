@@ -2,6 +2,7 @@
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.Zicsr.csr_file import MISA, _reset, read
 
 
@@ -9,4 +10,4 @@ from tests.python.unittests.Zicsr.csr_file import MISA, _reset, read
 async def test_misa_without_m(dut):
     """The M bit (12) is clear and the MXL and I bits stay."""
     await _reset(dut)
-    assert await read(dut, MISA) == 0x40000100
+    check_equal(await read(dut, MISA), 0x40000100)

@@ -1,13 +1,27 @@
-"""non_restoring_divider_rv32: DIV, DIVU, REM and REMU as the RISC-V ISA defines them."""
+"""Testes do modulo.
 
-import random
+non_restoring_divider_rv32: DIV, DIVU, REM and REMU as the RISC-V ISA
+defines them.
+"""
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
+from tests.python.unittests.checks import Prng, check_equal
+
 MASK = 0xFFFFFFFF
-EDGES = (0, 1, 2, 3, 0x7FFFFFFF, 0x80000000, 0x80000001, 0xFFFFFFFE, 0xFFFFFFFF)
+EDGES = (
+    0,
+    1,
+    2,
+    3,
+    0x7FFFFFFF,
+    0x80000000,
+    0x80000001,
+    0xFFFFFFFE,
+    0xFFFFFFFF,
+)
 TIMEOUT_CYCLES = 100
 
 
@@ -31,7 +45,10 @@ def expected(dividend, divisor, unsigned):
 
 
 async def divide(dut, dividend, divisor, unsigned):
-    """Run one division and return (quotient, remainder) when done rises."""
+    """Executa divide.
+
+    Run one division and return (quotient, remainder) when done rises.
+    """
     dut.i_dividend.value = dividend
     dut.i_divisor.value = divisor
     dut.i_is_unsigned.value = int(unsigned)
@@ -43,7 +60,8 @@ async def divide(dut, dividend, divisor, unsigned):
         await Timer(1, unit="ns")
         if int(dut.o_done.value):
             result = int(dut.o_quotient.value), int(dut.o_remainder.value)
-            # one idle cycle with start low releases the unit for the next division
+            # one idle cycle with start low releases the unit for the
+            # next division
             await RisingEdge(dut.i_clk)
             return result
     raise AssertionError(f"no done after {TIMEOUT_CYCLES} cycles")
@@ -67,22 +85,33 @@ async def _check(dut, pairs, unsigned):
         got = await divide(dut, dividend, divisor, unsigned)
         want = expected(dividend, divisor, unsigned)
         kind = "unsigned" if unsigned else "signed"
-        assert got == want, (
+        check_equal(
+            got,
+            want,
             f"{kind} {dividend:#010x} / {divisor:#010x}: "
-            f"got q={got[0]:#010x} r={got[1]:#010x}, want q={want[0]:#010x} r={want[1]:#010x}"
+            f"got q={got[0]:#010x} r={got[1]:#010x}, want q={want[0]:#010x} "
+            f"r={want[1]:#010x}",
         )
 
 
 @cocotb.test()
 async def test_unsigned_edges(dut):
-    """DIVU and REMU on every pair of edge values, including divisors above 2**31."""
+    """Verifica unsigned edges.
+
+    DIVU and REMU on every pair of edge values, including divisors above
+    2**31.
+    """
     await _reset(dut)
     await _check(dut, [(a, b) for a in EDGES for b in EDGES], unsigned=True)
 
 
 @cocotb.test()
 async def test_signed_edges(dut):
-    """DIV and REM on every pair of edge values, including -2**31 / -1 and x / 0."""
+    """Verifica signed edges.
+
+    DIV and REM on every pair of edge values, including -2**31 / -1 and
+    x / 0.
+    """
     await _reset(dut)
     await _check(dut, [(a, b) for a in EDGES for b in EDGES], unsigned=False)
 
@@ -91,7 +120,7 @@ async def test_signed_edges(dut):
 async def test_random(dut):
     """Random operands, in both modes."""
     await _reset(dut)
-    rng = random.Random(20261023)
+    rng = Prng(20261023)
     pairs = [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(60)]
     await _check(dut, pairs, unsigned=True)
     await _check(dut, pairs, unsigned=False)
