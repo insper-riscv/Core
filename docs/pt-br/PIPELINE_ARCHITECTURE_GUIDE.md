@@ -4,6 +4,8 @@ Este guia detalha as entradas, saídas, componentes internos e códigos de contr
 
 ## 1. Topo Estrutural e Estágios do Pipeline
 
+![Visão geral do pipeline](../figuras/pipeline.svg)
+
 O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `core/core.vhd`:
 
 | Ordem | Entidade | Arquivo | Função principal |
@@ -21,6 +23,8 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 ## 2. Detalhamento por Estágio
 
 ### 2.1. Estágio 1: Busca de Instrução (`stage_if` e `pc_fetch`)
+
+![Estágio IF](../figuras/if.svg)
 
 O estágio IF seleciona o próximo endereço de instrução por meio do código `pc_src` (`pc_src_t`) definido em `common/pc_src_consts.vhd`:
 
@@ -40,6 +44,8 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `common/
 | `>= 0x40000000` (`SDRAM_BASE_BYTES`) | Cache de instruções externa (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (congela o PC e anula `o_instr_valid` enquanto `i_ic_ready = '0'`) |
 
 ### 2.2. Estágio 2: Decodificação e Leitura de Registradores (`stage_id`)
+
+![Estágio ID](../figuras/id.svg)
 
 O estágio ID reúne sete subblocos:
 
@@ -62,6 +68,10 @@ O estágio ID reúne sete subblocos:
 7. **Comparação do adiantamento (`forwarding_match`):** compara `rs1` e `rs2` da instrução em ID com o destino `rd` das três instruções à frente (ID/EX, EX/MEM e MEM/WB), que no ciclo seguinte estarão em EX/MEM, MEM/WB e WB2. Um destino `x0` ou sem escrita habilitada nunca casa. Os três bits de casamento de cada operando são registrados em ID/EX (`fwd_match_t`, posições `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB` e `FWD_MATCH_WB2` de `common/fwd_consts.vhd`).
 
 ### 2.3. Estágio 3: Execução (`stage_ex`)
+
+![Estágio EX](../figuras/ex.svg)
+
+![Unidade multdiv](../figuras/multdiv.svg)
 
 No estágio EX:
 
@@ -97,6 +107,8 @@ A codificação do código de operação e o somador-subtrator compartilhado est
 
 ### 2.4. Estágio 4: Acesso à Memória de Dados (`stage_mem`)
 
+![Estágio MEM](../figuras/mem.svg)
+
 O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de `common/mem_map_consts.vhd`:
 
 | Faixa de endereço (`i_alu_out`) | Subsistema de memória acionado | Sinais ativos |
@@ -106,6 +118,8 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 | `>= 0x40000000` (`SDRAM_BASE_BYTES`) | Barramento externo SDRAM e periféricos | `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, `o_sdram_wren`, `o_sdram_wait = sdram_access and (not i_sdram_ready)` |
 
 ### 2.5. Estágio 5: Write-Back (`stage_wb`)
+
+![Estágio WB](../figuras/wb.svg)
 
 No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_sdram_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `common/ext_ram_consts.vhd`:
 

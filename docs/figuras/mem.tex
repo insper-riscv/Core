@@ -1,0 +1,20 @@
+\documentclass[tikz,border=4pt]{standalone}
+\input{estilo}
+\begin{document}
+\begin{tikzpicture}
+  \node[titulo] at (6,4.6) {Estágio MEM (Memory Access)};
+  \node[bloco] (in) at (0,1.5) {Entradas de EX/MEM\\\texttt{i\_alu\_out}, \texttt{i\_store\_data}\\\texttt{i\_byte\_mask}, \texttt{we/re/en\_ram}};
+  \node[ctrl] (dec) at (5.2,1.5) {Decodificação de\\\texttt{i\_alu\_out}\\(\texttt{mem\_map\_consts})};
+  \node[externo] (fl) at (10.6,3.2) {FLASH, porta 2\\\texttt{o\_flash\_addr2}, \texttt{o\_flash\_rden2}\\endereço \textless{} RAM\_BASE};
+  \node[externo] (ram) at (10.6,1.5) {RAM interna\\\texttt{o\_ram\_*}\\latência de 1 ciclo};
+  \node[externo] (sd) at (10.6,-0.4) {SDRAM e periféricos\\\texttt{o\_sdram\_*}\\endereço \textgreater= SDRAM\_BASE};
+  \node[bloco] (rdy) at (5.2,-1.8) {Handshake\\\texttt{i\_sdram\_ready}};
+
+  \draw[dado] (in) -- (dec);
+  \draw[dado] (dec.east) -- ++(0.8,0) |- (fl.west);
+  \draw[dado] (dec) -- (ram);
+  \draw[dado] (dec.east) -- ++(0.8,0) |- (sd.west);
+  \draw[sinal] (sd.south) |- node[rotulo, pos=.7, below] {pronto} (rdy.east);
+  \node[font=\scriptsize, below=2mm of rdy, align=center] {\texttt{o\_sdram\_wait} congela o pipeline\\enquanto a SDRAM não responde};
+\end{tikzpicture}
+\end{document}
