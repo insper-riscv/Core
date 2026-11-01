@@ -1,0 +1,29 @@
+\documentclass[tikz,border=4pt]{standalone}
+\input{estilo}
+\begin{document}
+\begin{tikzpicture}
+  \node[titulo] at (8,6.4) {Módulo \texttt{multdiv} (RV32M)};
+  \node[bloco] (in) at (0,2.2) {\texttt{i\_rs1}, \texttt{i\_rs2}\\\texttt{i\_funct3}};
+  \node[ctrl] (start) at (0,4.4) {Pulso de início\\\texttt{i\_valid} e \texttt{i\_is\_muldiv}};
+  \node[bloco] (booth) at (4.8,3.6) {\texttt{booth\_multiplier\_rv32}\\33 ciclos};
+  \node[opcional] (div) at (4.8,0.8) {\texttt{non\_restoring\_divider\_rv32}\\34 ciclos (\texttt{has\_div})};
+  \node[bloco] (corr) at (9.6,3.6) {\texttt{adder} de correção\\MULH, MULHSU};
+  \node[mux] (mm) at (12.2,3.6) {mux\\mul};
+  \node[mux] (dm) at (12.2,0.8) {mux\\div};
+  \node[mux] (fm) at (14.4,2.2) {mux\\final};
+  \node[bloco] (res) at (16.9,2.2) {\texttt{result\_reg}\\\texttt{o\_result}};
+  \node[ctrl] (stall) at (8,-1.4) {\texttt{o\_stall} = pulso de início OU\\flip-flop de ocupado};
+
+  \draw[dado] (in) -- ++(1.4,0) |- (booth.west);
+  \draw[dado] (in) -- ++(1.4,0) |- (div.west);
+  \draw[sinal] (start) -- (booth.north west |- start.east) -| ([xshift=-6mm]booth.north);
+  \draw[dado] (booth.east) -- (corr.west);
+  \draw[dado] (corr.east) -- (mm.west);
+  \draw[dado] (div.east) -- (dm.west);
+  \draw[dado] (mm.east) -- ++(0.4,0) |- ([yshift=2mm]fm.west);
+  \draw[dado] (dm.east) -- ++(0.4,0) |- ([yshift=-2mm]fm.west);
+  \draw[dado] (fm) -- (res);
+  \draw[sinal] (start.south) |- (stall.west);
+  \draw[sinal] (stall.east) -- ++(1.6,0) node[font=\scriptsize, right] {para o pipeline};
+\end{tikzpicture}
+\end{document}

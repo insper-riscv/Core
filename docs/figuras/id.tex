@@ -1,0 +1,33 @@
+\documentclass[tikz,border=4pt]{standalone}
+\input{estilo}
+\begin{document}
+\begin{tikzpicture}
+  \node[titulo] at (7,6.2) {Estágio ID (Instruction Decode)};
+  \node[bloco] (instr) at (0,3) {\texttt{i\_instr}\\(de IF/ID)};
+  \node[ctrl] (cu) at (4.2,4.6) {\texttt{control\_unit}\\RV32I};
+  \node[opcional] (md) at (4.2,3.2) {\texttt{m\_decode}\\(\texttt{has\_m})};
+  \node[opcional] (cd) at (4.2,1.8) {\texttt{csr\_decode}\\(\texttt{has\_zicsr})};
+  \node[bloco] (ext) at (4.2,0.4) {\texttt{extender\_imm}};
+  \node[bloco] (rf) at (4.2,-1.2) {\texttt{reg\_file}\\32 registradores};
+  \node[externo] (wb) at (4.2,-3.0) {Escrita vinda de WB\\\texttt{i\_wb\_we}, \texttt{i\_wb\_rd}, \texttt{i\_wb\_data}};
+  \node[bloco] (bub) at (9,4.6) {\texttt{bubble\_mux}};
+  \node[ctrl] (hdu) at (9,2.2) {\texttt{hazard\_detection\_unit}\\load-use e stall};
+  \node[bloco] (out) at (13,4.6) {Controle e imediato\\para ID/EX};
+  \node[bloco] (outr) at (13,-1.2) {\texttt{o\_rs1\_val}, \texttt{o\_rs2\_val}\\para ID/EX};
+
+  \draw[dado] (instr.east) -- ++(1.2,0) |- (cu.west);
+  \draw[dado] (instr.east) -- ++(1.2,0) |- (md.west);
+  \draw[dado] (instr.east) -- ++(1.2,0) |- (cd.west);
+  \draw[dado] (instr.east) -- ++(1.2,0) |- (ext.west);
+  \draw[dado] (instr.south) |- (rf.west);
+  \draw[dado] (wb) -- (rf);
+  \draw[dado] (cu) -- (bub);
+  \draw[dado] (md.east) -- (6.6,3.2);
+  \draw[dado] (cd.east) -- (6.6,1.8) -- (6.6,4.3) -- ([yshift=-3mm]bub.west);
+  \draw[dado] (bub) -- (out);
+  \draw[dado] (ext.east) -| ([xshift=-8mm]out.south);
+  \draw[dado] (rf) -- (outr);
+  \draw[sinal] (hdu) -- node[rotulo, right] {bolha} (bub);
+  \node[font=\scriptsize, align=center] at (10,-2.9) {Entradas do HDU: \texttt{i\_ex\_rd}, \texttt{i\_ex\_re\_ram}, \texttt{i\_pipe\_stall}\\Saídas: \texttt{o\_pc\_we}, \texttt{o\_ifid\_we}, \texttt{o\_idex\_valid}};
+\end{tikzpicture}
+\end{document}

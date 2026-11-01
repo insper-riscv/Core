@@ -4,6 +4,8 @@ This guide details the inputs, outputs, internal components, and control encodin
 
 ## 1. Structural Top Level and Pipeline Stages
 
+![Pipeline overview](../figuras/pipeline.svg)
+
 The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `core/core.vhd`:
 
 | Order | Entity | File | Primary function |
@@ -21,6 +23,8 @@ The processor is divided into five stage entities located in `core/` and four ba
 ## 2. Stage-by-Stage Breakdown
 
 ### 2.1. Stage 1: Instruction Fetch (`stage_if` and `pc_fetch`)
+
+![IF stage](../figuras/if.svg)
 
 The IF stage selects the next instruction address through the `pc_src` code (`pc_src_t`) defined in `common/pc_src_consts.vhd`:
 
@@ -40,6 +44,8 @@ Instruction fetch address (`if_pc`) decoding uses the bounds from `common/mem_ma
 | `>= 0x40000000` (`SDRAM_BASE_BYTES`) | External instruction cache (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (freezes the PC and clears `o_instr_valid` while `i_ic_ready = '0'`) |
 
 ### 2.2. Stage 2: Instruction Decode and Register Read (`stage_id`)
+
+![ID stage](../figuras/id.svg)
 
 The ID stage comprises seven sub-blocks:
 
@@ -62,6 +68,10 @@ The ID stage comprises seven sub-blocks:
 7. **Forwarding comparison (`forwarding_match`):** compares `rs1` and `rs2` of the instruction in ID with the destination `rd` of the three instructions ahead of it (ID/EX, EX/MEM, and MEM/WB), which will be in EX/MEM, MEM/WB, and WB2 in the next cycle. A destination of `x0`, or one without register write enabled, never matches. The three match bits of each operand are registered in ID/EX (`fwd_match_t`, positions `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB`, and `FWD_MATCH_WB2` of `common/fwd_consts.vhd`).
 
 ### 2.3. Stage 3: Execute (`stage_ex`)
+
+![EX stage](../figuras/ex.svg)
+
+![multdiv unit](../figuras/multdiv.svg)
 
 In the EX stage:
 
@@ -97,6 +107,8 @@ The encoding of the operation code and the shared adder-subtractor are described
 
 ### 2.4. Stage 4: Data Memory Access (`stage_mem`)
 
+![MEM stage](../figuras/mem.svg)
+
 The MEM stage decodes the effective address `i_alu_out` using the bounds in `common/mem_map_consts.vhd`:
 
 | Address range (`i_alu_out`) | Triggered memory subsystem | Active signals |
@@ -106,6 +118,8 @@ The MEM stage decodes the effective address `i_alu_out` using the bounds in `com
 | `>= 0x40000000` (`SDRAM_BASE_BYTES`) | External SDRAM and peripheral bus | `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, `o_sdram_wren`, `o_sdram_wait = sdram_access and (not i_sdram_ready)` |
 
 ### 2.5. Stage 5: Write-Back (`stage_wb`)
+
+![WB stage](../figuras/wb.svg)
 
 In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_sdram_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_alu_out(1 downto 0)` and applies the extension mode defined in `common/ext_ram_consts.vhd`:
 
