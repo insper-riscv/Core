@@ -139,8 +139,6 @@ architecture rtl of core is
 	-- =========================================================================
 	-- Indica que a unidade multdiv está ocupada no estágio EX.
 	signal muldiv_stall      : std_logic;
-	-- Pulso de término de uma operação M fundida com a anterior (evento 9 do Zihpm).
-	signal muldiv_fused      : std_logic;
 	-- Indica que o barramento externo SDRAM está em espera no estágio MEM.
 	signal sdram_wait        : std_logic;
 	-- Indica que a unidade FENCE.I aguarda o flush da cache de dados no estágio EX.
@@ -368,6 +366,8 @@ architecture rtl of core is
 	signal mret_take         : std_logic;
 	-- Pulso de conclusão de FENCE.I gerado no estágio EX.
 	signal fencei_take       : std_logic;
+	-- Conclusão de FENCE.I antes do descarte pela exceção de MEM, que invalida a cache de instruções.
+	signal fencei_inval      : std_logic;
 
 	-- =========================================================================
 	-- Sinais do Registrador EX/MEM -> Estágio MEM e Registrador MEM/WB
@@ -470,7 +470,6 @@ begin
 	               6 => i_hpm_ext_events(1),
 	               7 => i_hpm_ext_events(2),
 	               8 => load_use_stall,
-	               9 => muldiv_fused,
 	               others => '0');
 	o_retire      <= retire_pulse;
 
@@ -501,6 +500,7 @@ begin
 			i_trap_take       => any_trap_take,
 			i_mret_take       => mret_take,
 			i_fencei_take     => fencei_take,
+			i_ic_inval        => fencei_inval,
 			i_branch_target   => ex_branch_target,
 			i_jalr_target     => ex_jalr_target,
 			i_redirect_pc     => ex_redirect_pc,
@@ -664,6 +664,7 @@ begin
 			i_base_run        => base_run,
 			i_pipe_run        => pipe_run,
 			i_valid           => ex_valid_live,
+			i_valid_raw       => ex_valid,
 			i_mem_trap_take   => mem_trap_take,
 			i_mem_trap_cause  => mem_trap_cause,
 			i_mem_trap_pc     => exmem_pc,
@@ -713,10 +714,10 @@ begin
 			o_trap_sig_pc     => o_trap_pc,
 			o_mret_take       => mret_take,
 			o_fencei_take     => fencei_take,
+			o_fencei_inval    => fencei_inval,
 			o_fencei_busy     => fencei_busy,
 			o_dc_flush        => o_dc_flush,
-			o_muldiv_stall    => muldiv_stall,
-			o_muldiv_fused    => muldiv_fused
+			o_muldiv_stall    => muldiv_stall
 		);
 
 	u_reg_ex_mem : entity work.reg_ex_mem
