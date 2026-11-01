@@ -9,6 +9,12 @@ the load behind it in MEM keeps its read enable up and the synchronous
 memory answers for that address. The program places two independent
 loads before an M instruction, once on the internal RAM and once on the
 second port of the flash, and the M results are checked too.
+
+A load that crosses a word takes two steps in MEM and joins the two
+words in WB. When an M instruction in EX stalls the pipeline during the
+second step, the word read by the first step must still be there when
+the load reaches WB, so the joined datum is the one of the two words
+and not the second word twice.
 """
 
 import cocotb
@@ -19,6 +25,7 @@ from tests.python.unittests.cores.harness import (
     RAM_BASE,
     run_program,
 )
+from tests.python.unittests.cores.misaligned_half import load_constant
 from tests.python.unittests.cores.sdram_stall import (
     _r,
     addi,
@@ -105,6 +112,61 @@ async def test_load_in_wb_during_m_stall(dut):
     """
     ram = await run_program(dut, PROGRAM, flash=FLASH, max_cycles=1500)
     for addr, want in EXPECTED_RAM.items():
+        check_equal(
+            ram.get(addr),
+            want,
+            f"RAM[0x{addr:08X}] = {ram.get(addr, 0):#x}, expected {want:#x}",
+        )
+
+
+CROSSING_WORDS = (0x44F6A577, 0x00112233, 0x8899AABB)
+CROSSING_OFFSETS = (1, 2, 3)
+CROSSING_SLOT = 0x100
+CROSSING_BUFFER = 0x400
+
+
+def _crossing_program():
+    """Build one crossing load per offset, then a stalling mul.
+
+    Returns the program and the value each result slot must hold.
+    """
+    program = [NOP, lui(7, RAM_BASE >> 12), addi(8, 7, CROSSING_BUFFER)]
+    for index, word in enumerate(CROSSING_WORDS):
+        program += [*load_constant(6, word), sw(6, 8, 4 * index)]
+    program += [addi(2, 0, 3), NOP, NOP, NOP]
+    memory = b"".join(word.to_bytes(4, "little") for word in CROSSING_WORDS)
+    expected = {}
+    for number, offset in enumerate(CROSSING_OFFSETS):
+        result = 10 + number
+        program += [
+            lw(result, 8, offset),
+            mul(12 + number, 2, 2),
+            NOP,
+            NOP,
+            NOP,
+            sw(result, 7, CROSSING_SLOT + 4 * number),
+        ]
+        expected[RAM_BASE + CROSSING_SLOT + 4 * number] = int.from_bytes(
+            memory[offset : offset + 4], "little"
+        )
+    program += [
+        addi(14, 0, 1),
+        sw(14, 7, DONE_ADDR - RAM_BASE),
+        jal_self(),
+    ]
+    return program, expected
+
+
+@cocotb.test()
+async def test_crossing_load_in_wb_during_m_stall(dut):
+    """Verifica crossing load in wb during m stall.
+
+    The mul starts while the load is in the second step of MEM, so the
+    pipeline stays stopped with the memory answering the second word.
+    """
+    program, expected = _crossing_program()
+    ram = await run_program(dut, program, max_cycles=1500)
+    for addr, want in expected.items():
         check_equal(
             ram.get(addr),
             want,
