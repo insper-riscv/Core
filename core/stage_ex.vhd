@@ -113,6 +113,8 @@ entity stage_ex is
 		i_wb2_data        : in  word_t;
 		-- Confirmação de término do flush da cache de dados write-back (Zifencei).
 		i_dc_done         : in  std_logic;
+		-- Validade da instrução em EX antes do descarte pela exceção de MEM (usada só pelo FENCE.I sem cache de dados).
+		i_valid_raw       : in  std_logic;
 		-- Exceção de endereço do acesso à memória do estágio MEM: tem prioridade sobre a deste estágio.
 		i_mem_trap_take   : in  std_logic := '0';
 		-- Código mcause da exceção do estágio MEM.
@@ -149,14 +151,14 @@ entity stage_ex is
 		o_mret_take       : out std_logic;
 		-- Pulso que indica conclusão de instrução FENCE.I no estágio EX.
 		o_fencei_take     : out std_logic;
+		-- Pulso de invalidação da cache de instruções: a conclusão de FENCE.I sem o descarte por exceção de MEM.
+		o_fencei_inval    : out std_logic;
 		-- Indica que a instrução FENCE.I em EX aguarda término do flush da D-cache.
 		o_fencei_busy     : out std_logic;
 		-- Pulso de requisição de flush enviado à cache de dados write-back.
 		o_dc_flush        : out std_logic;
 		-- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
-		o_muldiv_stall    : out std_logic;
-		-- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
-		o_muldiv_fused    : out std_logic
+		o_muldiv_stall    : out std_logic
 	);
 end entity stage_ex;
 
@@ -236,6 +238,10 @@ architecture rtl of stage_ex is
 
 	-- Pulso interno de conclusão de FENCE.I.
 	signal fencei_take_int    : std_logic;
+	-- Conclusão de FENCE.I antes do descarte pela exceção de MEM.
+	signal fencei_take_raw    : std_logic;
+	-- Validade da instrução em EX que a unidade de FENCE.I enxerga.
+	signal fencei_valid       : std_logic;
 
 	-- Resultado selecionado entre ULA, MulDiv e CSR antes do mux de PC + 4.
 	signal ex_alu_mux_result  : word_t;
@@ -349,12 +355,10 @@ begin
 				o_result    => ex_muldiv_result,
 				o_stall     => o_muldiv_stall,
 				o_busy      => open,
-				o_done      => open,
-				o_fused     => o_muldiv_fused
+				o_done      => open
 			);
 	else generate
 		o_muldiv_stall   <= '0';
-		o_muldiv_fused   <= '0';
 		ex_muldiv_result <= (others => '0');
 	end generate gen_m;
 
@@ -369,22 +373,32 @@ begin
 			port map (
 				i_clk       => i_clk,
 				i_rst       => i_rst,
-				i_ex_valid  => i_valid,
+				i_ex_valid  => fencei_valid,
 				i_run       => i_base_run,
 				i_opcode    => i_opcode,
 				i_funct3    => i_funct3,
 				i_dc_done   => i_dc_done,
 				o_flush_req => o_dc_flush,
 				o_busy      => o_fencei_busy,
-				o_take      => fencei_take_int
+				o_take      => fencei_take_raw
 			);
 	else generate
-		fencei_take_int <= '0';
+		fencei_take_raw <= '0';
 		o_fencei_busy   <= '0';
 		o_dc_flush      <= '0';
 	end generate gen_fencei;
 
-	o_fencei_take <= fencei_take_int;
+	-- Sem cache de dados a unidade de FENCE.I é puramente combinacional, então ela pode enxergar a instrução antes
+	-- do descarte por uma exceção de MEM mais antiga. Com cache de dados ela guarda estado (flush pedido), e uma
+	-- instrução descartada não pode armá-lo; por isso ali ela só enxerga a instrução válida de fato.
+	fencei_valid <= i_valid when has_dcache else i_valid_raw;
+
+	-- Um FENCE.I descartado por uma exceção de MEM não redireciona o pipeline, mas ainda pode invalidar a cache de
+	-- instruções: uma invalidação a mais só custa misses, e assim a invalidação não espera a conferência de
+	-- endereço do estágio MEM, que vem de outro domínio de relógio.
+	fencei_take_int <= fencei_take_raw and (not i_mem_trap_take);
+	o_fencei_take   <= fencei_take_int;
+	o_fencei_inval  <= fencei_take_raw;
 
 	-- =========================================================================
 	-- Extensão Zicsr e Detecção de Traps do Modo Máquina

@@ -43,6 +43,8 @@ entity stage_if is
 		i_mret_take       : in  std_logic;
 		-- Indica conclusão de instrução FENCE.I decidida no estágio EX.
 		i_fencei_take     : in  std_logic;
+		-- Pulso de invalidação da cache de instruções (conclusão de FENCE.I, mesmo que descartada em EX).
+		i_ic_inval        : in  std_logic;
 		-- Endereço alvo calculado no estágio EX para branch condicional ou JAL.
 		i_branch_target   : in  word_t;
 		-- Endereço alvo calculado no estágio EX para salto indireto JALR.
@@ -132,6 +134,6 @@ begin
 	o_if_rden     <= '1';
 	o_instr_valid <= not if_wait;
 	o_ic_sel      <= if_in_sdram;
-	o_ic_inval    <= i_fencei_take;
+	o_ic_inval    <= i_ic_inval;
 
 end architecture rtl;
