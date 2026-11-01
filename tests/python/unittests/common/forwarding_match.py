@@ -4,10 +4,10 @@ Testes da forwarding_match: casamento dos operandos de ID com os
 destinos das três instruções à frente.
 """
 
-import random
-
 import cocotb
 from cocotb.triggers import Timer
+
+from tests.python.unittests.checks import Prng, check_equal
 
 # Posição de cada casamento no vetor (FWD_MATCH_* de fwd_consts).
 EXMEM, MEMWB, WB2 = 0, 1, 2
@@ -26,12 +26,13 @@ def expected(rs: int, ahead: list[tuple[int, int]]) -> int:
     return bits
 
 
-async def apply(dut, rs1, rs2, ex, mem, wb):
+async def apply(dut, sources, ex, mem, wb):
     """Executa apply.
 
     Aplica as entradas (destino e escrita de ID/EX, EX/MEM e MEM/WB) e
     espera a propagação.
     """
+    rs1, rs2 = sources
     dut.i_rs1.value = rs1
     dut.i_rs2.value = rs2
     dut.i_ex_rd.value, dut.i_ex_we.value = ex
@@ -40,23 +41,32 @@ async def apply(dut, rs1, rs2, ex, mem, wb):
     await Timer(1, unit="ns")
 
 
-async def check(dut, rs1, rs2, ex, mem, wb):
+async def check(dut, sources, ex, mem, wb):
     """Aplica as entradas e compara as duas saídas com o modelo."""
-    await apply(dut, rs1, rs2, ex, mem, wb)
+    rs1, rs2 = sources
+    await apply(dut, sources, ex, mem, wb)
     ahead = [ex, mem, wb]
-    assert int(dut.o_match_rs1.value) == expected(rs1, ahead), (
-        rs1,
-        rs2,
-        ex,
-        mem,
-        wb,
+    check_equal(
+        int(dut.o_match_rs1.value),
+        expected(rs1, ahead),
+        (
+            rs1,
+            rs2,
+            ex,
+            mem,
+            wb,
+        ),
     )
-    assert int(dut.o_match_rs2.value) == expected(rs2, ahead), (
-        rs1,
-        rs2,
-        ex,
-        mem,
-        wb,
+    check_equal(
+        int(dut.o_match_rs2.value),
+        expected(rs2, ahead),
+        (
+            rs1,
+            rs2,
+            ex,
+            mem,
+            wb,
+        ),
     )
 
 
@@ -71,8 +81,8 @@ async def test_every_register_matches_each_position(dut):
         for position in (EXMEM, MEMWB, WB2):
             ahead = [(0, 0), (0, 0), (0, 0)]
             ahead[position] = (reg, 1)
-            await check(dut, reg, reg, *ahead)
-            assert int(dut.o_match_rs1.value) == 1 << position
+            await check(dut, (reg, reg), *ahead)
+            check_equal(int(dut.o_match_rs1.value), 1 << position)
 
 
 @cocotb.test()
@@ -82,9 +92,9 @@ async def test_x0_never_matches(dut):
     Um destino x0 não casa, mesmo escrevendo e com o operando também em
     x0.
     """
-    await check(dut, 0, 0, (0, 1), (0, 1), (0, 1))
-    assert int(dut.o_match_rs1.value) == 0
-    assert int(dut.o_match_rs2.value) == 0
+    await check(dut, (0, 0), (0, 1), (0, 1), (0, 1))
+    check_equal(int(dut.o_match_rs1.value), 0)
+    check_equal(int(dut.o_match_rs2.value), 0)
 
 
 @cocotb.test()
@@ -94,16 +104,16 @@ async def test_no_write_never_matches(dut):
     Sem habilitação de escrita não há casamento, mesmo com o registrador
     igual.
     """
-    await check(dut, 5, 5, (5, 0), (5, 0), (5, 0))
-    assert int(dut.o_match_rs1.value) == 0
+    await check(dut, (5, 5), (5, 0), (5, 0), (5, 0))
+    check_equal(int(dut.o_match_rs1.value), 0)
 
 
 @cocotb.test()
 async def test_all_positions_can_match_together(dut):
     """Os três destinos iguais ao operando acendem os três bits."""
-    await check(dut, 9, 4, (9, 1), (9, 1), (9, 1))
-    assert int(dut.o_match_rs1.value) == 0b111
-    assert int(dut.o_match_rs2.value) == 0
+    await check(dut, (9, 4), (9, 1), (9, 1), (9, 1))
+    check_equal(int(dut.o_match_rs1.value), 0b111)
+    check_equal(int(dut.o_match_rs2.value), 0)
 
 
 @cocotb.test()
@@ -113,14 +123,13 @@ async def test_random_against_the_model(dut):
     Combinações aleatórias, com poucos registradores para forçar
     colisões, batem com o modelo.
     """
-    rng = random.Random(7)
+    rng = Prng(7)
     for _ in range(2000):
         regs = [rng.randrange(0, 5) for _ in range(5)]
         wes = [rng.randrange(2) for _ in range(3)]
         await check(
             dut,
-            regs[0],
-            regs[1],
+            (regs[0], regs[1]),
             (regs[2], wes[0]),
             (regs[3], wes[1]),
             (regs[4], wes[2]),

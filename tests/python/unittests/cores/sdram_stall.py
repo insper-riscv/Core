@@ -8,20 +8,31 @@ the read data, the way the real bridge does. Every latency must give the
 same architectural result.
 """
 
-import random
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
+from tests.python.unittests.checks import Prng, check_equal, check_true
+
 SDRAM_BASE = 0x40000000
 RAM_BASE = 0x00008000
+TAKEN_BRANCH_FLAG = 0x800C
+DATA_PORTS = (
+    "i_sdram_rdata",
+    "i_boot_rom_data",
+    "i_flash_data",
+    "i_flash_data2",
+    "i_ram_rdata",
+)
 
 
 # --- a tiny RV32I encoder: just what the program needs
 # ----------------------
-def _r(op, rd, f3, rs1, rs2, f7):
-    return (f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | op
+def _r(rd, f3, rs1, rs2, f7):
+    """Encode an OP (register-register) instruction."""
+    return (
+        (f7 << 25) | (rs2 << 20) | (rs1 << 15) | (f3 << 12) | (rd << 7) | 0x33
+    )
 
 
 def _i(op, rd, f3, rs1, imm):
@@ -64,7 +75,7 @@ def addi(rd, rs1, imm):
 
 def add(rd, rs1, rs2):
     """Executa add."""
-    return _r(0x33, rd, 0, rs1, rs2, 0)
+    return _r(rd, 0, rs1, rs2, 0)
 
 
 def lw(rd, rs1, imm):
@@ -156,133 +167,162 @@ def _bytes_merge(old, new, byteena):
     return out
 
 
-async def _run(dut, stall_for):  # complexipy: ignore
-    """Executa run.
+class _SdramSlave:
+    """Slave of the SDRAM window, as the bridge of the board answers."""
 
-    Run the program; stall_for(n) gives the stall cycles of the n-th
-    access.
+    def __init__(self, dut, memory, stall_for):
+        """Serve the dict memory, stalling access n by stall_for(n)."""
+        self.dut = dut
+        self.memory = memory
+        self.stall_for = stall_for
+        self.state = "idle"
+        self.countdown = self.accesses = self.pending_read = 0
+        self.held_addr = None
+        self.access = None
+        self.advance_seen = False
+
+    def _accept(self):
+        """Take the access that just appeared on the bus."""
+        dut = self.dut
+        self.access = {
+            "addr": int(dut.o_sdram_addr.value) & ~3,
+            "we": int(dut.o_sdram_wren.value),
+            "wdata": int(dut.o_sdram_wdata.value),
+            "be": int(dut.o_sdram_byteena.value),
+        }
+        self.held_addr = int(dut.o_sdram_addr.value)
+        stall = self.stall_for(self.accesses) if self.stall_for else 0
+        self.countdown = stall
+        self.accesses += 1
+        self.state = "wait"
+
+    def _wait(self, active):
+        """Hold the bus stalled, then commit the access."""
+        dut = self.dut
+        check_true(active, "the access left the bus before it completed")
+        check_equal(
+            int(dut.o_sdram_addr.value),
+            self.held_addr,
+            "address moved during the wait",
+        )
+        check_equal(
+            int(dut.o_mem_advance.value),
+            0,
+            "the memory advanced while not ready",
+        )
+        if self.countdown:
+            self.countdown -= 1
+            return
+        access = self.access
+        if access["we"]:
+            self.memory[access["addr"]] = _bytes_merge(
+                self.memory.get(access["addr"], 0),
+                access["wdata"],
+                access["be"],
+            )
+        else:
+            self.pending_read = self.memory.get(access["addr"], 0)
+        dut.i_sdram_ready.value = 1
+        self.state = "done"
+
+    async def step(self):
+        """Advance the slave by one cycle."""
+        dut = self.dut
+        if self.state == "done" and self.advance_seen:
+            dut.i_sdram_ready.value = 0
+            dut.i_sdram_rdata.value = self.pending_read
+            self.state, self.advance_seen = "idle", False
+            self.held_addr = None
+            await Timer(1, unit="ns")
+        active = int(dut.o_sdram_rden.value) or int(dut.o_sdram_wren.value)
+        if self.state == "idle" and active:
+            self._accept()
+        if self.state == "wait":
+            self._wait(active)
+        if self.state == "done":
+            await Timer(1, unit="ns")
+            if int(dut.o_mem_advance.value):
+                self.advance_seen = True
+
+
+def _serve_fetch(dut, imem):
+    """Answer the fetch in the cycle of its address.
+
+    On the board the instruction memory is clocked 120 degrees ahead of
+    the core, so the word is there in the same cycle.
     """
+    if dut.o_if_addr.value.is_resolvable:
+        word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
+        dut.i_boot_rom_data.value = word
+        dut.i_flash_data.value = word
+
+
+def _record_store(dut, ram):
+    """Record the store that the internal RAM sees in this cycle."""
+    if (
+        dut.o_ram_en.value.is_resolvable
+        and int(dut.o_ram_en.value)
+        and int(dut.o_ram_wren.value)
+    ):
+        addr = int(dut.o_ram_addr.value) & ~3
+        ram[addr] = _bytes_merge(
+            ram.get(addr, 0),
+            int(dut.o_ram_wdata.value),
+            int(dut.o_ram_byteena.value),
+        )
+
+
+async def _run(dut, stall_for):
+    """Run the program; stall_for(n) is the stall of the n-th access."""
     imem = {4 * i: w for i, w in enumerate(PROGRAM)}
     ram = {}
     sdram = {0x40000008: 0xAA}
 
     dut.i_rst.value = 1
     dut.i_sdram_ready.value = 0
-    dut.i_sdram_rdata.value = 0
-    dut.i_boot_rom_data.value = 0
-    dut.i_flash_data.value = 0
-    dut.i_flash_data2.value = 0
-    dut.i_ram_rdata.value = 0
+    for port in DATA_PORTS:
+        getattr(dut, port).value = 0
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
         await RisingEdge(dut.i_clk)
     dut.i_rst.value = 0
 
-    state = "idle"  # idle, wait, done
-    countdown = 0
-    access = None
-    pending_read = 0
-    rdata_q = 0
-    advance_seen = False
-    accesses = 0
-    held_addr = None
-
+    slave = _SdramSlave(dut, sdram, stall_for)
     for _ in range(4000):
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")  # outputs of this cycle have settled
-
-        # instruction memory: on the board it is clocked 120 degrees
-        # ahead of the core, so the word of the address presented in a
-        # cycle is there in the same cycle
-        if dut.o_if_addr.value.is_resolvable:
-            word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
-            dut.i_boot_rom_data.value = word
-            dut.i_flash_data.value = word
-
-        # internal RAM: record the stores
-        if (
-            dut.o_ram_en.value.is_resolvable
-            and int(dut.o_ram_en.value)
-            and int(dut.o_ram_wren.value)
-        ):
-            addr = int(dut.o_ram_addr.value) & ~3
-            ram[addr] = _bytes_merge(
-                ram.get(addr, 0),
-                int(dut.o_ram_wdata.value),
-                int(dut.o_ram_byteena.value),
-            )
-
-        # SDRAM slave: the pipeline advanced on the edge that just
-        # happened
-        if state == "done" and advance_seen:
-            dut.i_sdram_ready.value = 0
-            rdata_q = pending_read
-            dut.i_sdram_rdata.value = rdata_q
-            state = "idle"
-            advance_seen = False
-            held_addr = None
-            # let the dropped ready reach the core
-            await Timer(1, unit="ns")
-
-        active = int(dut.o_sdram_rden.value) or int(dut.o_sdram_wren.value)
-        if state == "idle" and active:
-            access = {
-                "addr": int(dut.o_sdram_addr.value) & ~3,
-                "we": int(dut.o_sdram_wren.value),
-                "wdata": int(dut.o_sdram_wdata.value),
-                "be": int(dut.o_sdram_byteena.value),
-            }
-            held_addr = int(dut.o_sdram_addr.value)
-            countdown = stall_for(accesses)
-            accesses += 1
-            state = "wait"
-
-        if state == "wait":
-            assert active, "the access left the bus before it completed"
-            assert int(dut.o_sdram_addr.value) == held_addr, (
-                "address moved during the wait"
-            )
-            assert int(dut.o_mem_advance.value) == 0, (
-                "the pipeline advanced while not ready"
-            )
-            if countdown == 0:
-                if access["we"]:
-                    sdram[access["addr"]] = _bytes_merge(
-                        sdram.get(access["addr"], 0),
-                        access["wdata"],
-                        access["be"],
-                    )
-                else:
-                    pending_read = sdram.get(access["addr"], 0)
-                dut.i_sdram_ready.value = 1
-                state = "done"
-            else:
-                countdown -= 1
-
-        if state == "done":
-            await Timer(1, unit="ns")
-            if int(dut.o_mem_advance.value):
-                advance_seen = True  # takes effect on the next edge
-
-        if ram.get(0x807C) == 1 and state == "idle":
+        _serve_fetch(dut, imem)
+        _record_store(dut, ram)
+        await slave.step()
+        if ram.get(0x807C) == 1 and slave.state == "idle":
             break
 
-    return ram, sdram, accesses
+    return ram, sdram, slave.accesses
 
 
 def _check(ram, sdram, accesses):
     for addr, want in EXPECTED_RAM.items():
-        assert ram.get(addr) == want, (
-            f"RAM[0x{addr:08X}] = {ram.get(addr)}, expected 0x{want:X}"
+        check_equal(
+            ram.get(addr),
+            want,
+            f"RAM[0x{addr:08X}] = {ram.get(addr)}, expected 0x{want:X}",
         )
     for addr, want in EXPECTED_SDRAM.items():
-        assert sdram.get(addr) == want, (
-            f"SDRAM[0x{addr:08X}] = {sdram.get(addr)}, expected 0x{want:X}"
+        check_equal(
+            sdram.get(addr),
+            want,
+            f"SDRAM[0x{addr:08X}] = {sdram.get(addr)}, expected 0x{want:X}",
         )
-    assert 0x800C in ram and ram[0x800C] == 1, (
-        "the instruction after the taken branch executed"
+    check_true(
+        TAKEN_BRANCH_FLAG in ram,
+        "the instruction after the taken branch did not run",
     )
-    assert accesses == 10, f"{accesses} external accesses, expected 10"
+    check_equal(
+        ram[TAKEN_BRANCH_FLAG],
+        1,
+        "the instruction after the taken branch executed",
+    )
+    check_equal(accesses, 10, f"{accesses} external accesses, expected 10")
 
 
 @cocotb.test()
@@ -310,7 +350,7 @@ async def test_random_latencies(dut):
     seeds.
     """
     for seed in range(8):
-        rng = random.Random(seed)
+        rng = Prng(seed)
         lat = [rng.randint(0, 9) for _ in range(32)]
         dut._log.info(f"seed {seed}: {lat[:9]}")
         _check(*await _run(dut, lambda n, lat=lat: lat[n]))

@@ -6,12 +6,13 @@ trap and the program goes on.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import (
+from tests.python.unittests.cores.illegal_instruction import (
     HANDLER_WORD,
     LOG_BASE,
     MCAUSE,
@@ -22,7 +23,7 @@ from tests.python.unittests.cores.IllegalInstruction import (
     csrrs,
     csrrw,
 )
-from tests.python.unittests.cores.SdramStall import addi, jal_self, lui, sw
+from tests.python.unittests.cores.sdram_stall import addi, jal_self, lui, sw
 
 FENCE_I = 0x0000100F
 
@@ -67,7 +68,7 @@ async def test_fence_i_is_legal_with_zifencei(dut):
     executes.
     """
     ram = await run_program(dut, build(), max_cycles=2000)
-    assert LOG_BASE not in ram, (
-        f"FENCE.I trapped with mcause {ram.get(LOG_BASE)}"
+    check_true(
+        LOG_BASE not in ram, f"FENCE.I trapped with mcause {ram.get(LOG_BASE)}"
     )
-    assert ram[RAM_BASE + 4] == 2
+    check_equal(ram[RAM_BASE + 4], 2)

@@ -10,12 +10,21 @@ result a REM uses at once.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.SdramStall import _r, addi, jal_self, lui, sw
+from tests.python.unittests.cores.sdram_stall import (
+    _r,
+    addi,
+    jal_self,
+    lui,
+    sw,
+)
+
+LOWER_SIGN = 0x800
 
 MASK = 0xFFFFFFFF
 PAIRS = (
@@ -38,7 +47,7 @@ def li(rd, value):
     lower = (value - (upper << 12)) & 0xFFF
     return [
         lui(rd, upper),
-        addi(rd, rd, lower - 0x1000 if lower >= 0x800 else lower),
+        addi(rd, rd, lower - 0x1000 if lower >= LOWER_SIGN else lower),
     ]
 
 
@@ -47,17 +56,24 @@ def signed(x):
     return x - (1 << 32) if x >> 31 else x
 
 
-def model(op, a, b):  # complexipy: ignore
-    """Return the RV32M result of the operation, as a 32-bit pattern."""
+MULTIPLY_OPS = ("mul", "mulh", "mulhsu", "mulhu")
+
+
+def _multiply(op, a, b):
+    """Return the multiply result of the operation, as 32 bits."""
     sa, sb = signed(a), signed(b)
-    if op == "mul":
-        return (a * b) & MASK
-    if op == "mulh":
-        return ((sa * sb) >> 32) & MASK
-    if op == "mulhsu":
-        return ((sa * b) >> 32) & MASK
-    if op == "mulhu":
-        return ((a * b) >> 32) & MASK
+    product = {
+        "mul": a * b,
+        "mulh": (sa * sb) >> 32,
+        "mulhsu": (sa * b) >> 32,
+        "mulhu": (a * b) >> 32,
+    }[op]
+    return product & MASK
+
+
+def _divide(op, a, b):
+    """Return the divide result of the operation, as 32 bits."""
+    sa, sb = signed(a), signed(b)
     if b == 0:
         return MASK if op in ("div", "divu") else a
     if op in ("divu", "remu"):
@@ -70,12 +86,19 @@ def model(op, a, b):  # complexipy: ignore
     return (quotient if op == "div" else sa - quotient * sb) & MASK
 
 
+def model(op, a, b):
+    """Return the RV32M result of the operation, as a 32-bit pattern."""
+    if op in MULTIPLY_OPS:
+        return _multiply(op, a, b)
+    return _divide(op, a, b)
+
+
 FUNCT3 = {op: i for i, op in enumerate(OPS)}
 
 
 def m_op(op, rd, rs1, rs2):
     """Executa m op."""
-    return _r(0x33, rd, FUNCT3[op], rs1, rs2, 1)
+    return _r(rd, FUNCT3[op], rs1, rs2, 1)
 
 
 def build():
@@ -98,7 +121,7 @@ def build():
         ]
         expected[RAM_BASE + offset] = model("rem", model("mul", a, b), b)
         offset += 4
-    assert offset < DONE_OFFSET
+    check_true(offset < DONE_OFFSET)
     program += [addi(14, 0, 1), sw(14, 7, DONE_OFFSET), jal_self()]
     return program, expected
 
@@ -113,6 +136,8 @@ async def test_every_operation(dut):
     program, expected = build()
     ram = await run_program(dut, program, max_cycles=20000)
     for addr, want in expected.items():
-        assert ram.get(addr) == want, (
-            f"RAM[0x{addr:08X}] = {ram.get(addr, 0):#x}, expected {want:#x}"
+        check_equal(
+            ram.get(addr),
+            want,
+            f"RAM[0x{addr:08X}] = {ram.get(addr, 0):#x}, expected {want:#x}",
         )

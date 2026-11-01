@@ -7,6 +7,8 @@ are CSR accesses.
 import cocotb
 from cocotb.triggers import Timer
 
+from tests.python.unittests.checks import check_equal
+
 OP_SYSTEM = 0b1110011
 OUTPUTS = ("o_is_csr", "o_we_reg", "o_use_imm_i")
 
@@ -29,7 +31,7 @@ async def test_claims_every_csr_instruction(dut):
     """
     for funct3 in (0b001, 0b010, 0b011, 0b101, 0b110, 0b111):
         got = await _outputs(dut, _instr(OP_SYSTEM, funct3))
-        assert got == (1, 1, 1), f"funct3={funct3:03b}: {got}"
+        check_equal(got, (1, 1, 1), f"funct3={funct3:03b}: {got}")
 
 
 @cocotb.test()
@@ -48,7 +50,7 @@ async def test_other_system_instructions_only_fetch_the_csr_field(dut):
     ]
     for instr in cases:
         got = await _outputs(dut, instr)
-        assert got == (0, 0, 1), f"{instr:#010x}: {got}"
+        check_equal(got, (0, 0, 1), f"{instr:#010x}: {got}")
 
 
 @cocotb.test()
@@ -61,4 +63,4 @@ async def test_leaves_everything_else_alone(dut):
     ]
     for instr in cases:
         got = await _outputs(dut, instr)
-        assert got == (0, 0, 0), f"{instr:#010x}: {got}"
+        check_equal(got, (0, 0, 0), f"{instr:#010x}: {got}")

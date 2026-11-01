@@ -2,11 +2,12 @@
 
 # tests/RegFIle.py
 import contextlib
-import random
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
+
+from tests.python.unittests.checks import Prng, check_equal, check_true
 
 
 # ===== Helpers =====
@@ -77,7 +78,7 @@ async def inicializacao_e_x0(dut):
 
     # Lê x0 simultaneamente em A e B
     a, b = await _read_ports(dut, 0, 0)
-    assert a == 0 and b == 0, f"x0 deveria ser 0; A={a}, B={b}"
+    check_true(a == 0 and b == 0, f"x0 deveria ser 0; A={a}, B={b}")
 
     # Lê dois registradores quaisquer diferentes de zero (não depende de
     # pré-inicialização)
@@ -85,7 +86,7 @@ async def inicializacao_e_x0(dut):
     a_addr, b_addr = 1, last
     a, b = await _read_ports(dut, a_addr, b_addr)
     # Não há expectativa fixa; apenas garante que são w-bit
-    assert 0 <= a <= m and 0 <= b <= m
+    check_true(0 <= a <= m and 0 <= b <= m)
 
 
 # ============== 2) Escrita e leitura simples ==============
@@ -107,8 +108,9 @@ async def escrita_e_leitura_basica(dut):
     await _write_reg(dut, addr, val)
 
     a, b = await _read_ports(dut, addr, addr)
-    assert a == val and b == val, (
-        f"Após escrita, esperado {val:#x} em A/B, obtido A={a:#x} B={b:#x}"
+    check_true(
+        a == val and b == val,
+        f"Após escrita, esperado {val:#x} em A/B, obtido A={a:#x} B={b:#x}",
     )
 
 
@@ -134,8 +136,9 @@ async def x0_sempre_zero(dut):
     await _write_reg(dut, 0, val)
 
     a, b = await _read_ports(dut, 0, 0)
-    assert a == 0 and b == 0, (
-        f"x0 deve ser 0 mesmo após escrita; A={a:#x} B={b:#x}"
+    check_true(
+        a == 0 and b == 0,
+        f"x0 deve ser 0 mesmo após escrita; A={a:#x} B={b:#x}",
     )
 
 
@@ -162,8 +165,9 @@ async def leituras_simultaneas(dut):
     await _write_reg(dut, addr_b, valb)
 
     a, b = await _read_ports(dut, addr_a, addr_b)
-    assert a == vala and b == valb, (
-        f"Esperado A={vala:#x}, B={valb:#x}; obtido A={a:#x}, B={b:#x}"
+    check_true(
+        a == vala and b == valb,
+        f"Esperado A={vala:#x}, B={valb:#x}; obtido A={a:#x}, B={b:#x}",
     )
 
 
@@ -208,22 +212,23 @@ async def write_then_read_same_cycle(dut):
         f"[DEPOIS DA BORDA] addr={addr} novo={novo:#x} A={a:#x} B={b:#x}"
     )
 
-    assert a == novo and b == novo, (
-        f"A/B deveriam refletir novo valor {novo:#x}; A={a:#x} B={b:#x}"
+    check_true(
+        a == novo and b == novo,
+        f"A/B deveriam refletir novo valor {novo:#x}; A={a:#x} B={b:#x}",
     )
 
 
-async def _check_read(dut, ref, nregs):
+async def _check_read(dut, ref, nregs, rng):
     """Lê duas portas em endereços aleatórios e confere com o modelo."""
-    a_addr = random.randrange(nregs)
-    b_addr = random.randrange(nregs)
+    a_addr = rng.randrange(nregs)
+    b_addr = rng.randrange(nregs)
     a, b = await _read_ports(dut, a_addr, b_addr)
 
     exp_a = 0 if a_addr == 0 else ref[a_addr]
     exp_b = 0 if b_addr == 0 else ref[b_addr]
 
-    assert a == exp_a, f"(R) A: end={a_addr} exp={exp_a:#x} got={a:#x}"
-    assert b == exp_b, f"(R) B: end={b_addr} exp={exp_b:#x} got={b:#x}"
+    check_equal(a, exp_a, f"(R) A: end={a_addr} exp={exp_a:#x} got={a:#x}")
+    check_equal(b, exp_b, f"(R) B: end={b_addr} exp={exp_b:#x} got={b:#x}")
 
 
 # ============== 6) Fuzz: muitos ciclos aleatórios ==============
@@ -247,19 +252,19 @@ async def fuzz_banco(dut):
 
     ref = [0] * nregs
 
-    random.seed(2025)
-    N = 200
+    rng = Prng(2025)
+    samples = 200
 
-    for _ in range(N):
-        op = random.choice(["W", "R"])
+    for _ in range(samples):
+        op = rng.choice(["W", "R"])
         if op == "W":
-            addr = random.randrange(nregs)
-            data = random.getrandbits(dw) & m
+            addr = rng.randrange(nregs)
+            data = rng.getrandbits(dw) & m
             await _write_reg(dut, addr, data)
             ref[addr] = data
         else:
-            await _check_read(dut, ref, nregs)
+            await _check_read(dut, ref, nregs, rng)
 
     # Checagem final explícita de x0
     a, b = await _read_ports(dut, 0, 0)
-    assert a == 0 and b == 0, f"x0 deve ser 0 ao final; A={a:#x} B={b:#x}"
+    check_true(a == 0 and b == 0, f"x0 deve ser 0 ao final; A={a:#x} B={b:#x}")

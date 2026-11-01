@@ -1,9 +1,11 @@
 """Testes de ExtenderImm."""
 
-import random
-
 import cocotb
 from cocotb.triggers import Timer
+
+from tests.python.unittests.checks import Prng, check_equal
+
+RNG = Prng(25)
 
 # Constantes (iguais às do pacote VHDL)
 OPEXIMM_U = 0b000
@@ -37,9 +39,11 @@ async def apply_and_check(dut, op, inp, expected, name):
     await Timer(1, "ns")
 
     got = int(dut.o_imm.value)
-    assert got == expected, (
+    check_equal(
+        got,
+        expected,
         f"{name} falhou: input={inp:#09x}, esperado={expected:#010x}, "
-        f"obtido={got:#010x}"
+        f"obtido={got:#010x}",
     )
     dut._log.info(f"{name} OK: in={inp:#09x} out={got:#010x}")
 
@@ -47,7 +51,7 @@ async def apply_and_check(dut, op, inp, expected, name):
 @cocotb.test()
 async def u(dut):
     """Testa extensão U-type (instr[31:12] << 12)."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     upper = (inp >> 5) & ((1 << 20) - 1)
     expected = (upper << 12) & 0xFFFFFFFF
     await apply_and_check(dut, OPEXIMM_U, inp, expected, "U-type")
@@ -56,7 +60,7 @@ async def u(dut):
 @cocotb.test()
 async def i(dut):
     """Testa extensão I-type (sext(instr[31:20]))."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     imm12 = (inp >> 13) & 0xFFF
     expected = sext(imm12, 12)
     await apply_and_check(dut, OPEXIMM_I, inp, expected, "I-type")
@@ -65,7 +69,7 @@ async def i(dut):
 @cocotb.test()
 async def i_shamt(dut):
     """Testa extensão I-shamt (zext(instr[24:20]))."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     shamt = (inp >> 13) & 0x1F
     expected = zext(shamt, 5)
     await apply_and_check(dut, OPEXIMM_I_SHAMT, inp, expected, "I-shamt")
@@ -74,7 +78,7 @@ async def i_shamt(dut):
 @cocotb.test()
 async def jal(dut):
     """Testa extensão JAL-type (sext(offset))."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     imm20 = (inp >> 24) & 0x1
     imm10_1 = (inp >> 14) & 0x3FF
     imm11 = (inp >> 13) & 0x1
@@ -87,7 +91,7 @@ async def jal(dut):
 @cocotb.test()
 async def jalr(dut):
     """Testa extensão JALR-type (sext(instr[31:20]))."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     imm12 = (inp >> 13) & 0xFFF
     expected = sext(imm12, 12)
     await apply_and_check(dut, OPEXIMM_I, inp, expected, "JALR")
@@ -96,7 +100,7 @@ async def jalr(dut):
 @cocotb.test()
 async def s(dut):
     """Testa extensão S-type (sext(instr[31:25] & instr[11:7]))."""
-    inp = random.getrandbits(25)
+    inp = RNG.getrandbits(25)
     imm_high = (inp >> 18) & 0x7F
     imm_low = inp & 0x1F
     imm12 = (imm_high << 5) | imm_low

@@ -12,12 +12,13 @@ which the CoreMisaligned test covers.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import (
+from tests.python.unittests.cores.illegal_instruction import (
     HANDLER_WORD,
     LOG_BASE,
     MCAUSE,
@@ -28,7 +29,7 @@ from tests.python.unittests.cores.IllegalInstruction import (
     csrrs,
     csrrw,
 )
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.cores.sdram_stall import (
     _i,
     _s,
     addi,
@@ -132,7 +133,7 @@ def build():
         sw(14, 7, DONE_ADDR - RAM_BASE),
         jal_self(),
     ]
-    assert len(program) < HANDLER_WORD, len(program)
+    check_true(len(program) < HANDLER_WORD, len(program))
     program += [NOP] * (HANDLER_WORD - len(program))
     program += [
         csrrs(6, MCAUSE, 0),
@@ -154,34 +155,51 @@ async def test_halfword_at_offset_one_runs_and_the_rest_traps(dut):
     outside the main memory traps once and changes nothing.
     """
     ram = await run_program(dut, build(), max_cycles=6000)
-    assert ram[RAM_BASE + slot("lh")] == 0xFFFFF6A5, hex(
-        ram[RAM_BASE + slot("lh")]
+    check_equal(
+        ram[RAM_BASE + slot("lh")], 0xFFFFF6A5, hex(ram[RAM_BASE + slot("lh")])
     )
-    assert ram[RAM_BASE + slot("lhu")] == 0x0000F6A5, hex(
-        ram[RAM_BASE + slot("lhu")]
+    check_equal(
+        ram[RAM_BASE + slot("lhu")],
+        0x0000F6A5,
+        hex(ram[RAM_BASE + slot("lhu")]),
     )
-    assert ram[RAM_BASE + slot("lw_word1")] == 0x00BEEF33, hex(
-        ram[RAM_BASE + slot("lw_word1")]
+    check_equal(
+        ram[RAM_BASE + slot("lw_word1")],
+        0x00BEEF33,
+        hex(ram[RAM_BASE + slot("lw_word1")]),
     )
-    assert ram[RAM_BASE + slot("lw_word0")] == WORD0, (
-        "the store at offset 1 touched the neighbour word"
+    check_equal(
+        ram[RAM_BASE + slot("lw_word0")],
+        WORD0,
+        "the store at offset 1 touched the neighbour word",
     )
     for i, (_, cause) in enumerate(TRAPPING):
-        assert ram.get(LOG_BASE + 4 * i) == cause, (
-            f"trap {i}: mcause {ram.get(LOG_BASE + 4 * i)}"
+        check_equal(
+            ram.get(LOG_BASE + 4 * i),
+            cause,
+            f"trap {i}: mcause {ram.get(LOG_BASE + 4 * i)}",
         )
-    assert LOG_BASE + 4 * len(TRAPPING) not in ram, (
-        "an access that should run trapped"
+    check_true(
+        LOG_BASE + 4 * len(TRAPPING) not in ram,
+        "an access that should run trapped",
     )
-    assert ram[RAM_BASE + slot("untouched")] == UNTOUCHED, (
-        "a trapped load wrote its destination"
+    check_equal(
+        ram[RAM_BASE + slot("untouched")],
+        UNTOUCHED,
+        "a trapped load wrote its destination",
     )
-    assert ram[RAM_BASE + slot("resumed")] == len(TRAPPING), (
-        "the program did not resume after each trap"
+    check_equal(
+        ram[RAM_BASE + slot("resumed")],
+        len(TRAPPING),
+        "the program did not resume after each trap",
     )
-    assert ram[RAM_BASE + slot("word0_after")] == WORD0, (
-        "a trapped store changed the buffer"
+    check_equal(
+        ram[RAM_BASE + slot("word0_after")],
+        WORD0,
+        "a trapped store changed the buffer",
     )
-    assert ram[RAM_BASE + slot("word1_after")] == 0x00BEEF33, (
-        "a trapped store changed the buffer"
+    check_equal(
+        ram[RAM_BASE + slot("word1_after")],
+        0x00BEEF33,
+        "a trapped store changed the buffer",
     )

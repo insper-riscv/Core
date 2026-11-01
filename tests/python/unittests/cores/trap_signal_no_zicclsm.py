@@ -12,14 +12,17 @@ aligned access in the same program still works.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import NOP
-from tests.python.unittests.cores.MisalignedHalf import lw
-from tests.python.unittests.cores.SdramStall import addi, jal_self, lui, sw
+from tests.python.unittests.cores.illegal_instruction import NOP
+from tests.python.unittests.cores.misaligned_half import lw
+from tests.python.unittests.cores.sdram_stall import addi, jal_self, lui, sw
+
+MIN_TRAP_CYCLE = 4
 
 ECALL = 0x00000073
 SENTINEL = 0x55
@@ -80,15 +83,17 @@ async def test_misaligned_access_in_ram_traps_without_effect(dut):
         """Executa watch."""
         trap = int(dut.o_trap.value)
         cycles[0] += 1
-        if trap and cycles[0] > 4:
+        if trap and cycles[0] > MIN_TRAP_CYCLE:
             seen.append(
                 (int(dut.o_trap_pc.value), int(dut.o_trap_cause.value))
             )
 
     ram = await run_program(dut, build(), monitor=watch, max_cycles=2000)
-    assert seen == EXPECTED, f"signalled {seen}, expected {EXPECTED}"
-    assert ram[RAM_BASE + 8] == SENTINEL, (
+    check_equal(seen, EXPECTED, f"signalled {seen}, expected {EXPECTED}")
+    check_equal(
+        ram[RAM_BASE + 8],
+        SENTINEL,
         "a trapped load wrote its destination, or the aligned store did not "
-        "run"
+        "run",
     )
-    assert ram.get(RAM_BASE, 0) == 0, "a trapped store reached the memory"
+    check_equal(ram.get(RAM_BASE, 0), 0, "a trapped store reached the memory")

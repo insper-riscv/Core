@@ -10,13 +10,12 @@ holds ic_data/ic_ready while the address stays. Every latency must give
 the same architectural result as no wait at all.
 """
 
-import random
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.checks import Prng, check_equal, check_true
+from tests.python.unittests.cores.sdram_stall import (
     RAM_BASE,
     SDRAM_BASE,
     _b,
@@ -98,15 +97,69 @@ EXPECTED_RAM = {
 }
 
 
-async def run(dut, latency_for):  # complexipy: ignore
-    """Executa run.
+class _Model:
+    """Boot ROM, stalled instruction fetch and RAM around the core."""
+
+    def __init__(self, latency_for):
+        """Wait latency_for(n) cycles on the n-th new fetch address."""
+        self.boot = {4 * i: w for i, w in enumerate(BOOT)}
+        self.code = {CODE_BASE + 4 * i: w for i, w in enumerate(CODE)}
+        self.latency_for = latency_for
+        self.ram = {}
+        self.read_pending = 0
+        self.last_addr = None
+        self.wait = 0
+        self.fetches = 0
+        self.waited_cycles = 0
+
+    def serve_fetch(self, dut):
+        """Answer the fetch, stalling the instruction cache port."""
+        addr = int(dut.o_if_addr.value) & ~3
+        # the RAM has a registered read: the word of a load in MEM is
+        # there while it is in WB
+        dut.i_ram_rdata.value = self.read_pending
+
+        word = self.boot.get(addr, 0)
+        dut.i_boot_rom_data.value = word
+        dut.i_flash_data.value = word
+
+        if int(dut.o_ic_sel.value) != 1:
+            self.last_addr = None
+            dut.i_ic_ready.value = 1
+            return
+        if addr != self.last_addr:
+            self.wait = self.latency_for(self.fetches)
+            self.fetches += 1
+            self.last_addr = addr
+        dut.i_ic_data.value = self.code.get(addr, 0)
+        if self.wait == 0:
+            dut.i_ic_ready.value = 1
+        else:
+            dut.i_ic_ready.value = 0
+            self.wait -= 1
+            self.waited_cycles += 1
+
+    def serve_ram(self, dut):
+        """Latch the RAM read and record the RAM store of this cycle."""
+        if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
+            addr = int(dut.o_ram_addr.value) & ~3
+            self.read_pending = self.ram.get(addr, 0)
+        if int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
+            a = int(dut.o_ram_addr.value) & ~3
+            self.ram[a] = _bytes_merge(
+                self.ram.get(a, 0),
+                int(dut.o_ram_wdata.value),
+                int(dut.o_ram_byteena.value),
+            )
+
+
+async def run(dut, latency_for):
+    """Run the program; return (RAM, fetches, cycles waited).
 
     latency_for(n): cycles the n-th new fetch address in the SDRAM waits
     for.
     """
-    boot = {4 * i: w for i, w in enumerate(BOOT)}
-    code = {CODE_BASE + 4 * i: w for i, w in enumerate(CODE)}
-    ram = {}
+    model = _Model(latency_for)
 
     dut.i_rst.value = 1
     dut.i_boot_rom_data.value = 0
@@ -120,58 +173,21 @@ async def run(dut, latency_for):  # complexipy: ignore
         await RisingEdge(dut.i_clk)
     dut.i_rst.value = 0
 
-    read_pending = 0
-    last_addr = None
-    wait = 0
-    fetches = 0
-    waited_cycles = 0
     for _ in range(6000):
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
-        addr = int(dut.o_if_addr.value) & ~3
-        # the RAM has a registered read: the word of a load in MEM is
-        # there while it is in WB
-        dut.i_ram_rdata.value = read_pending
-
-        word = boot.get(addr, 0)
-        dut.i_boot_rom_data.value = word
-        dut.i_flash_data.value = word
-
-        if int(dut.o_ic_sel.value) == 1:
-            if addr != last_addr:
-                wait = latency_for(fetches)
-                fetches += 1
-                last_addr = addr
-            dut.i_ic_data.value = code.get(addr, 0)
-            if wait == 0:
-                dut.i_ic_ready.value = 1
-            else:
-                dut.i_ic_ready.value = 0
-                wait -= 1
-                waited_cycles += 1
-        else:
-            last_addr = None
-            dut.i_ic_ready.value = 1
-
-        if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
-            read_pending = ram.get(int(dut.o_ram_addr.value) & ~3, 0)
-        if int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
-            a = int(dut.o_ram_addr.value) & ~3
-            ram[a] = _bytes_merge(
-                ram.get(a, 0),
-                int(dut.o_ram_wdata.value),
-                int(dut.o_ram_byteena.value),
-            )
-        if ram.get(0x807C) == 1:
+        model.serve_fetch(dut)
+        model.serve_ram(dut)
+        if model.ram.get(0x807C) == 1:
             break
-    return ram, fetches, waited_cycles
+    return model.ram, model.fetches, model.waited_cycles
 
 
 def check(ram):
     """Executa check."""
     for a, want in EXPECTED_RAM.items():
-        assert ram.get(a) == want, (
-            f"RAM[{a:#x}] = {ram.get(a)}, expected {want:#x}"
+        check_equal(
+            ram.get(a), want, f"RAM[{a:#x}] = {ram.get(a)}, expected {want:#x}"
         )
 
 
@@ -180,7 +196,7 @@ async def test_no_wait(dut):
     """Verifica no wait."""
     ram, _, waited = await run(dut, lambda _n: 0)
     check(ram)
-    assert waited == 0
+    check_equal(waited, 0)
 
 
 @cocotb.test()
@@ -190,17 +206,17 @@ async def test_fixed_latencies(dut):
     for lat in (1, 2, 3, 7):
         ram, _fetches, waited = await run(dut, lambda _n, lat=lat: lat)
         check(ram)
-        assert waited > 0
+        check_true(waited > 0)
         cycles[lat] = waited
-    assert cycles[7] > cycles[1]
+    check_true(cycles[7] > cycles[1])
 
 
 @cocotb.test()
 async def test_random_latencies(dut):
     """Verifica random latencies."""
-    rng = random.Random(20261024)
+    rng = Prng(20261024)
     for _ in range(6):
         seed = rng.getrandbits(32)
-        r = random.Random(seed)
+        r = Prng(seed)
         ram, _, _ = await run(dut, lambda _n, r=r: r.choice([0, 0, 1, 2, 5]))
         check(ram)

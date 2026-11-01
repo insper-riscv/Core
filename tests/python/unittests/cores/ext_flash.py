@@ -11,8 +11,15 @@ addresses.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import DONE_ADDR, run_program
-from tests.python.unittests.cores.SdramStall import addi, jal_self, lui, lw, sw
+from tests.python.unittests.cores.sdram_stall import (
+    addi,
+    jal_self,
+    lui,
+    lw,
+    sw,
+)
 
 FLASH_BASE = 0x20000000
 SDRAM_BASE = 0x40000000
@@ -48,14 +55,15 @@ async def _run(dut, stall_for=None):
 
 
 def _check(ram, external):
-    assert ram[0x8000] == W0
-    assert ram[0x8004] == ((W0 >> 8) | (W1 << 24)) & 0xFFFFFFFF
+    check_equal(ram[0x8000], W0)
+    check_equal(ram[0x8004], ((W0 >> 8) | (W1 << 24)) & 0xFFFFFFFF)
     # SDRAM[0] = W0 and SDRAM[4] = W1 were stored, so the read across
     # them is the same pair
-    assert ram[0x8008] == ((W0 >> 24) | (W1 << 8)) & 0xFFFFFFFF
-    assert external[SDRAM_BASE] == W0 and external[SDRAM_BASE + 4] == W1
-    assert external[FLASH_BASE] == W0 and external[FLASH_BASE + 4] == W1, (
-        "the program did not store to the flash"
+    check_equal(ram[0x8008], ((W0 >> 24) | (W1 << 8)) & 0xFFFFFFFF)
+    check_true(external[SDRAM_BASE] == W0 and external[SDRAM_BASE + 4] == W1)
+    check_true(
+        external[FLASH_BASE] == W0 and external[FLASH_BASE + 4] == W1,
+        "the program did not store to the flash",
     )
 
 
@@ -94,7 +102,7 @@ async def test_code_in_the_flash_is_fetched_through_the_instruction_cache(dut):
     imem = {4 * i: w for i, w in enumerate(boot)}
     imem.update({FLASH_BASE + 4 * i: w for i, w in enumerate(flash_code)})
     ram = await run_program(dut, [], imem=imem, flash_port_value=0xFFFFFFFF)
-    assert ram[0x8000] == 0x55
+    check_equal(ram[0x8000], 0x55)
 
 
 def _jalr(rd, rs1, imm):

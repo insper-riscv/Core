@@ -10,12 +10,13 @@ each one.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import (
+from tests.python.unittests.cores.illegal_instruction import (
     HANDLER_WORD,
     LOG_BASE,
     MCAUSE,
@@ -26,7 +27,13 @@ from tests.python.unittests.cores.IllegalInstruction import (
     csrrs,
     csrrw,
 )
-from tests.python.unittests.cores.SdramStall import _r, addi, jal_self, lui, sw
+from tests.python.unittests.cores.sdram_stall import (
+    _r,
+    addi,
+    jal_self,
+    lui,
+    sw,
+)
 
 MULDIV_FUNCT7 = 0x01
 MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU = range(8)
@@ -59,10 +66,10 @@ def build():
         addi(10, 0, 0),
     ]
     for funct3 in DIVISIONS:
-        program += [_r(0x33, 9, funct3, 2, 3, MULDIV_FUNCT7), addi(10, 10, 1)]
+        program += [_r(9, funct3, 2, 3, MULDIV_FUNCT7), addi(10, 10, 1)]
     for funct3 in PRODUCTS:
         program += [
-            _r(0x33, 4, funct3, 2, 3, MULDIV_FUNCT7),
+            _r(4, funct3, 2, 3, MULDIV_FUNCT7),
             sw(4, 7, 4 * RESULT_WORD[funct3]),
         ]
     program += [
@@ -72,7 +79,7 @@ def build():
         sw(14, 7, DONE_ADDR - RAM_BASE),
         jal_self(),
     ]
-    assert len(program) < HANDLER_WORD
+    check_true(len(program) < HANDLER_WORD)
     program += [NOP] * (HANDLER_WORD - len(program))
     program += [
         csrrs(6, MCAUSE, 0),
@@ -95,16 +102,24 @@ async def test_zmmul_multiplies_and_traps_on_division(dut):
     """
     ram = await run_program(dut, build(), max_cycles=4000)
     for i in range(len(DIVISIONS)):
-        assert ram.get(LOG_BASE + 4 * i) == 2, (
-            f"division {i}: mcause {ram.get(LOG_BASE + 4 * i)}"
+        check_equal(
+            ram.get(LOG_BASE + 4 * i),
+            2,
+            f"division {i}: mcause {ram.get(LOG_BASE + 4 * i)}",
         )
-    assert LOG_BASE + 4 * len(DIVISIONS) not in ram, "a multiplication trapped"
-    assert ram[RAM_BASE] == UNTOUCHED, "a division wrote its destination"
-    assert ram[RAM_BASE + 4] == len(DIVISIONS), (
-        "the program did not resume after each trap"
+    check_true(
+        LOG_BASE + 4 * len(DIVISIONS) not in ram, "a multiplication trapped"
+    )
+    check_equal(ram[RAM_BASE], UNTOUCHED, "a division wrote its destination")
+    check_equal(
+        ram[RAM_BASE + 4],
+        len(DIVISIONS),
+        "the program did not resume after each trap",
     )
     for funct3 in PRODUCTS:
         got = ram[RAM_BASE + 4 * RESULT_WORD[funct3]]
-        assert got == EXPECTED[funct3], (
-            f"funct3 {funct3}: {got:#x} != {EXPECTED[funct3]:#x}"
+        check_equal(
+            got,
+            EXPECTED[funct3],
+            f"funct3 {funct3}: {got:#x} != {EXPECTED[funct3]:#x}",
         )

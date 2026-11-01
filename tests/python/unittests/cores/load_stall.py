@@ -13,12 +13,13 @@ second port of the flash, and the M results are checked too.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.cores.sdram_stall import (
     _r,
     addi,
     jal_self,
@@ -32,17 +33,17 @@ FLASH_DATA = 0x200
 
 def mul(rd, rs1, rs2):
     """Executa mul."""
-    return _r(0x33, rd, 0, rs1, rs2, 1)
+    return _r(rd, 0, rs1, rs2, 1)
 
 
 def divu(rd, rs1, rs2):
     """Executa divu."""
-    return _r(0x33, rd, 5, rs1, rs2, 1)
+    return _r(rd, 5, rs1, rs2, 1)
 
 
 def remu(rd, rs1, rs2):
     """Executa remu."""
-    return _r(0x33, rd, 7, rs1, rs2, 1)
+    return _r(rd, 7, rs1, rs2, 1)
 
 
 NOP = addi(0, 0, 0)
@@ -102,8 +103,10 @@ async def test_load_in_wb_during_m_stall(dut):
 
     Registers hold the loaded words and the M results after the stalls.
     """
-    ram = await run_program(dut, PROGRAM, FLASH, max_cycles=1500)
+    ram = await run_program(dut, PROGRAM, flash=FLASH, max_cycles=1500)
     for addr, want in EXPECTED_RAM.items():
-        assert ram.get(addr) == want, (
-            f"RAM[0x{addr:08X}] = {ram.get(addr, 0):#x}, expected {want:#x}"
+        check_equal(
+            ram.get(addr),
+            want,
+            f"RAM[0x{addr:08X}] = {ram.get(addr, 0):#x}, expected {want:#x}",
         )

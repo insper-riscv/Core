@@ -9,7 +9,7 @@
             "Common-Components/src/mux_tree.vhd",
             "common/reg_file.vhd"
         ],
-        "test_module": "tests.python.unittests.common.bancoRegistradores",
+        "test_module": "tests.python.unittests.common.banco_registradores",
         "build_args": [
             "--std=08"
         ],
@@ -27,7 +27,7 @@
             "common/alu_consts.vhd",
             "I/alu.vhd"
         ],
-        "test_module": "tests.python.unittests.I.ALU",
+        "test_module": "tests.python.unittests.I.alu",
         "build_args": [
             "--std=08"
         ],
@@ -43,7 +43,7 @@
             "common/ext_ram_consts.vhd",
             "I/extender_ram.vhd"
         ],
-        "test_module": "tests.python.unittests.I.ExtenderRAM"
+        "test_module": "tests.python.unittests.I.extender_ram"
     },
     "ExtenderImm": {
         "toplevel": "extender_imm",
@@ -53,7 +53,7 @@
             "common/ext_imm_consts.vhd",
             "I/extender_imm.vhd"
         ],
-        "test_module": "tests.python.unittests.I.ExtenderImm"
+        "test_module": "tests.python.unittests.I.extender_imm"
     },
     "StoreManager": {
         "toplevel": "store_manager",
@@ -64,7 +64,7 @@
             "common/funct3_consts.vhd",
             "I/store_manager.vhd"
         ],
-        "test_module": "tests.python.unittests.I.StoreManager"
+        "test_module": "tests.python.unittests.I.store_manager"
     },
     "ControlUnit": {
         "toplevel": "control_unit",
@@ -127,7 +127,7 @@
             "common/opcode_consts.vhd",
             "common/hazard_detection_unit.vhd"
         ],
-        "test_module": "tests.python.unittests.common.HazardDetectionUnit"
+        "test_module": "tests.python.unittests.common.hazard_detection_unit"
     },
     "ForwardingMatch": {
         "toplevel": "forwarding_match",
@@ -137,7 +137,7 @@
             "common/fwd_consts.vhd",
             "common/forwarding_match.vhd"
         ],
-        "test_module": "tests.python.unittests.common.ForwardingMatch"
+        "test_module": "tests.python.unittests.common.forwarding_match"
     },
     "ForwardingUnit": {
         "toplevel": "forwarding_unit",
@@ -147,14 +147,14 @@
             "common/fwd_consts.vhd",
             "common/forwarding_unit.vhd"
         ],
-        "test_module": "tests.python.unittests.common.ForwardingUnit"
+        "test_module": "tests.python.unittests.common.forwarding_unit"
     },
     "BubbleMux": {
         "toplevel": "bubble_mux",
         "sources": [
             "common/bubble_mux.vhd"
         ],
-        "test_module": "tests.python.unittests.common.BubbleMux"
+        "test_module": "tests.python.unittests.common.bubble_mux"
     },
     "CoreSdramStall": {
         "toplevel": "core",
@@ -219,7 +219,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.SdramStall",
+        "test_module": "tests.python.unittests.cores.sdram_stall",
         "parameters": {
             "has_m": false
         },
@@ -293,7 +293,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.ExtFlash",
+        "test_module": "tests.python.unittests.cores.ext_flash",
         "parameters": {
             "has_m": false,
             "ext_flash": true
@@ -540,7 +540,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.FetchStall",
+        "test_module": "tests.python.unittests.cores.fetch_stall",
         "parameters": {
             "has_m": false
         },
@@ -614,7 +614,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.FenceI",
+        "test_module": "tests.python.unittests.cores.fence_i",
         "parameters": {
             "has_m": false,
             "has_zifencei": true
@@ -689,7 +689,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.FenceIDcache",
+        "test_module": "tests.python.unittests.cores.fence_i_dcache",
         "parameters": {
             "has_m": false,
             "has_zifencei": true,
@@ -765,7 +765,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.LoadStall",
+        "test_module": "tests.python.unittests.cores.load_stall",
         "parameters": {
             "has_m": true
         },
@@ -839,7 +839,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.MulDiv",
+        "test_module": "tests.python.unittests.cores.mul_div",
         "parameters": {
             "has_m": true
         },
@@ -966,7 +966,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.MisalignedJump",
+        "test_module": "tests.python.unittests.cores.misaligned_jump",
         "parameters": {
             "has_m": true,
             "has_zicsr": true
@@ -1041,7 +1041,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.IllegalInstruction",
+        "test_module": "tests.python.unittests.cores.illegal_instruction",
         "parameters": {
             "has_m": true,
             "has_zicsr": true
@@ -1116,7 +1116,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.Zihpm",
+        "test_module": "tests.python.unittests.cores.zihpm",
         "parameters": {
             "has_m": true,
             "has_zicsr": true,
@@ -1193,7 +1193,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.Zmmul",
+        "test_module": "tests.python.unittests.cores.zmmul",
         "parameters": {
             "has_zmmul": true,
             "has_zicsr": true
@@ -1268,7 +1268,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.MisalignedHalf",
+        "test_module": "tests.python.unittests.cores.misaligned_half",
         "parameters": {
             "has_zicsr": true
         },
@@ -1342,7 +1342,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.FenceILegal",
+        "test_module": "tests.python.unittests.cores.fence_i_legal",
         "parameters": {
             "has_m": true,
             "has_zicsr": true,
@@ -1418,7 +1418,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.TrapSignal",
+        "test_module": "tests.python.unittests.cores.trap_signal",
         "parameters": {},
         "build_args": [
             "--std=08"
@@ -1490,7 +1490,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.TrapSignalNoZicclsm",
+        "test_module": "tests.python.unittests.cores.trap_signal_no_zicclsm",
         "parameters": {
             "has_zicclsm": false
         },
@@ -1564,7 +1564,7 @@
             "core/stage_wb.vhd",
             "core/core.vhd"
         ],
-        "test_module": "tests.python.unittests.cores.Misaligned",
+        "test_module": "tests.python.unittests.cores.misaligned",
         "parameters": {},
         "build_args": [
             "--std=08"

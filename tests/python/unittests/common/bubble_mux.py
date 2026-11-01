@@ -3,6 +3,8 @@
 import cocotb
 from cocotb.triggers import Timer
 
+from tests.python.unittests.checks import check_equal
+
 
 @cocotb.test()
 async def test_passthrough(dut):
@@ -16,10 +18,10 @@ async def test_passthrough(dut):
     dut.i_re_ram.value = 1
     dut.i_en_ram.value = 1
     await Timer(1, units="ns")
-    assert int(dut.o_we_reg.value) == 1
-    assert int(dut.o_we_ram.value) == 1
-    assert int(dut.o_re_ram.value) == 1
-    assert int(dut.o_en_ram.value) == 1
+    check_equal(int(dut.o_we_reg.value), 1)
+    check_equal(int(dut.o_we_ram.value), 1)
+    check_equal(int(dut.o_re_ram.value), 1)
+    check_equal(int(dut.o_en_ram.value), 1)
     dut._log.info("test_passthrough: OK")
 
 
@@ -35,10 +37,10 @@ async def test_bubble_zeros_all(dut):
     dut.i_re_ram.value = 1
     dut.i_en_ram.value = 1
     await Timer(1, units="ns")
-    assert int(dut.o_we_reg.value) == 0
-    assert int(dut.o_we_ram.value) == 0
-    assert int(dut.o_re_ram.value) == 0
-    assert int(dut.o_en_ram.value) == 0
+    check_equal(int(dut.o_we_reg.value), 0)
+    check_equal(int(dut.o_we_ram.value), 0)
+    check_equal(int(dut.o_re_ram.value), 0)
+    check_equal(int(dut.o_en_ram.value), 0)
     dut._log.info("test_bubble_zeros_all: OK")
 
 
@@ -56,5 +58,5 @@ async def test_toggle_sel(dut):
         dut.i_sel.value = sel
         await Timer(1, units="ns")
         expected = 1 - sel
-        assert int(dut.o_we_reg.value) == expected, f"sel={sel}"
+        check_equal(int(dut.o_we_reg.value), expected, f"sel={sel}")
     dut._log.info("test_toggle_sel: OK")

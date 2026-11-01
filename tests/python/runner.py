@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,82 +15,81 @@ from pathlib import Path
 from cocotb_tools.runner import get_results, get_runner
 
 
-def run_cocotb_test(  # complexipy: ignore
-    toplevel: str,
-    sources: list,
-    test_module: str,
-    parameters: dict | None = None,
-    build_args: list | None = None,
-    test_args: list | None = None,
-):
-    """Executa run cocotb test."""
-    tests_root = Path(__file__).resolve().parents[1]
-    repo_root = Path(__file__).resolve().parents[2]
-    sys.path.append(str(repo_root))
-
-    sim = os.getenv("SIM", "ghdl")
-    vhdl_sources = [repo_root / src for src in sources]
-
-    runner = get_runner(sim)
-
+def _build_dir(tests_root, test_module, toplevel):
+    """Return the build directory of a test, created if missing."""
     if ".entities." in test_module:
         group = "entities"
     elif ".instructions." in test_module:
         group = "instructions"
     else:
         group = "misc"
-
-    if group == "instructions":
-        test_name = test_module.rsplit(".", maxsplit=1)[-1]
-        build_dir = tests_root / "python/sim_build" / group / test_name
-    else:
-        build_dir = tests_root / "python/sim_build" / group / toplevel
+    name = test_module.rsplit(".", maxsplit=1)[-1]
+    leaf = name if group == "instructions" else toplevel
+    build_dir = tests_root / "python/sim_build" / group / leaf
     build_dir.mkdir(parents=True, exist_ok=True)
+    return build_dir
 
-    if parameters:
-        abs_params = {}
-        for k, v in parameters.items():
-            if isinstance(v, bool):
-                abs_params[k] = "true" if v else "false"
-            elif isinstance(v, int):
-                abs_params[k] = str(v)
-            else:
-                # tenta resolver como caminho absoluto relativo ao
-                # ambiente atual
-                vpath = Path(v)
-                if vpath.exists():
-                    abs_params[k] = str(vpath.resolve())
-                else:
-                    # se não existe no cwd atual, tente relative ao
-                    # repo_root
-                    candidate = repo_root / v
-                    if candidate.exists():
-                        abs_params[k] = str(candidate.resolve())
-                    else:
-                        # fallback: mantenha o original (para flags não-
-                        # caminho)
-                        abs_params[k] = str(v)
-        parameters = abs_params
+
+def _resolve_parameter(value, repo_root):
+    """Turn one generic of tests.json into the text the simulator takes.
+
+    A text that names an existing file becomes its absolute path, first
+    looking in the current directory and then in the repository root.
+    Anything else is kept as it came, for the flags that are no path.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    for candidate in (Path(value), repo_root / value):
+        if candidate.exists():
+            return str(candidate.resolve())
+    return str(value)
+
+
+def run_cocotb_test(
+    toplevel: str,
+    sources: list,
+    test_module: str,
+    parameters: dict | None = None,
+    **simulator_args: list,
+):
+    """Build a toplevel and run a cocotb module on it.
+
+    The simulator arguments come by name: build_args goes to the
+    build and test_args to the run.
+    """
+    unknown = simulator_args.keys() - {"build_args", "test_args"}
+    if unknown:
+        raise TypeError(f"unknown simulator arguments: {sorted(unknown)}")
+    tests_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
+    sys.path.append(str(repo_root))
+
+    runner = get_runner(os.getenv("SIM", "ghdl"))
+    build_dir = _build_dir(tests_root, test_module, toplevel)
+    resolved = {
+        key: _resolve_parameter(value, repo_root)
+        for key, value in (parameters or {}).items()
+    }
 
     runner.build(
-        vhdl_sources=vhdl_sources,
+        vhdl_sources=[repo_root / src for src in sources],
         hdl_toplevel=toplevel,
         always=True,
         build_dir=build_dir,
-        parameters=parameters or {},
-        build_args=build_args or [],
+        parameters=resolved,
+        build_args=simulator_args.get("build_args") or [],
     )
 
     wave_file = build_dir / "waves.ghw"
-    plusargs = [f"--wave={wave_file}"]
-
     results_xml = runner.test(
         hdl_toplevel=toplevel,
         hdl_toplevel_lang="vhdl",
         test_module=test_module,
         build_dir=build_dir,
-        plusargs=plusargs,
-        test_args=test_args or [],
+        plusargs=[f"--wave={wave_file}"],
+        test_args=simulator_args.get("test_args") or [],
     )
 
     print(f"Waves: {wave_file} (gerado)")
@@ -159,7 +159,7 @@ if __name__ == "__main__":
                     f"{'-' * 20} TESTE {name.upper()} FINALIZADO COM SUCESSO "
                     f"{'-' * 20}"
                 )
-            except Exception as e:  # noqa: BLE001
+            except (RuntimeError, OSError, subprocess.SubprocessError) as e:
                 failures.append(name)
                 print(f"[ERRO] O teste '{name}' falhou: {e}")
         print("\nTodos os testes foram executados.")

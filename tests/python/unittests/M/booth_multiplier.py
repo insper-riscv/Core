@@ -4,11 +4,11 @@ booth_multiplier_rv32: the signed 64-bit product of two 32-bit operands,
 in 33 cycles.
 """
 
-import random
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
+
+from tests.python.unittests.checks import Prng, check_equal
 
 MASK = 0xFFFFFFFF
 EDGES = (
@@ -72,9 +72,11 @@ async def _check(dut, pairs):
     for a, b in pairs:
         hi, lo, _ = await multiply(dut, a, b)
         product = (_signed(a) * _signed(b)) & ((1 << 64) - 1)
-        assert (hi, lo) == (product >> 32, product & MASK), (
+        check_equal(
+            (hi, lo),
+            (product >> 32, product & MASK),
             f"{a:#010x} * {b:#010x}: got hi={hi:#010x} lo={lo:#010x}, "
-            f"expected hi={product >> 32:#010x} lo={product & MASK:#010x}"
+            f"expected hi={product >> 32:#010x} lo={product & MASK:#010x}",
         )
 
 
@@ -97,7 +99,7 @@ async def test_random_operands(dut):
     is the plain MUL.
     """
     await _reset(dut)
-    rng = random.Random(1)
+    rng = Prng(1)
     await _check(
         dut, [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(300)]
     )
@@ -114,4 +116,4 @@ async def test_latency_is_constant(dut):
         (await multiply(dut, a, b))[2]
         for a, b in ((0, 0), (MASK, MASK), (0x80000000, 3), (5, 7))
     }
-    assert len(cycles) == 1, f"latencies differ: {sorted(cycles)}"
+    check_equal(len(cycles), 1, f"latencies differ: {sorted(cycles)}")

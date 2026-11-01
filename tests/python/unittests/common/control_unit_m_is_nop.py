@@ -10,6 +10,7 @@ it (the rv32i profile) the instruction passes with no effect.
 import cocotb
 from cocotb.triggers import Timer
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.common.control_unit import build_instruction
 
 OP_R = 0b0110011
@@ -39,8 +40,8 @@ async def test_m_instructions_are_nops(dut):
         await Timer(1, unit="ns")
         for name in CONTROL_OUTPUTS:
             got = int(getattr(dut, name).value)
-            assert got == 0, (
-                f"M funct3={funct3}: {name}={got}, expected NOP (0)"
+            check_equal(
+                got, 0, f"M funct3={funct3}: {name}={got}, expected NOP (0)"
             )
 
 
@@ -53,4 +54,4 @@ async def test_base_r_type_still_decodes(dut):
     for funct7 in (0b0000000, 0b0100000):
         dut.i_inst.value = build_instruction(OP_R, 0b000, funct7)
         await Timer(1, unit="ns")
-        assert int(dut.o_we_reg.value) == 1
+        check_equal(int(dut.o_we_reg.value), 1)

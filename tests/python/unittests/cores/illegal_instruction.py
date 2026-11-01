@@ -10,12 +10,13 @@ MUL) must not trap.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.cores.sdram_stall import (
     _b,
     _i,
     _r,
@@ -55,18 +56,18 @@ ILLEGAL = [
     _i(0x67, 1, 0b001, 0, 0),  # jalr with funct3 = 001
     _i(0x13, 1, 0b001, 2, 0x400),  # slli with funct7 = 0100000
     _i(0x13, 1, 0b101, 2, 0x200),  # srli/srai with funct7 = 0010000
-    _r(0x33, 1, 0b001, 2, 3, 0x20),  # sll with funct7 = 0100000
-    _r(0x33, 1, 0b000, 2, 3, 0x02),  # add with funct7 = 0000010
+    _r(1, 0b001, 2, 3, 0x20),  # sll with funct7 = 0100000
+    _r(1, 0b000, 2, 3, 0x02),  # add with funct7 = 0000010
     0x0000200F,  # misc-mem with funct3 = 010
     0x0000100F,  # fence.i, which needs the Zifencei extension
     0x0000007F,  # an opcode no extension uses
 ]
 LEGAL = [
-    _r(0x33, 4, 0b000, 2, 3, 0x20),  # sub
-    _r(0x33, 4, 0b101, 2, 3, 0x20),  # sra
+    _r(4, 0b000, 2, 3, 0x20),  # sub
+    _r(4, 0b101, 2, 3, 0x20),  # sra
     _i(0x13, 4, 0b101, 2, 0x401),  # srai
     0x0FF0000F,  # fence
-    _r(0x33, 4, 0b000, 2, 3, 0x01),  # mul
+    _r(4, 0b000, 2, 3, 0x01),  # mul
 ]
 
 
@@ -95,7 +96,7 @@ def build():
         sw(14, 7, DONE_ADDR - RAM_BASE),
         jal_self(),
     ]
-    assert len(program) < HANDLER_WORD
+    check_true(len(program) < HANDLER_WORD)
     program += [NOP] * (HANDLER_WORD - len(program))
     program += [
         csrrs(6, MCAUSE, 0),
@@ -118,15 +119,19 @@ async def test_illegal_instructions_trap(dut):
     """
     ram = await run_program(dut, build(), max_cycles=4000)
     for i in range(len(ILLEGAL)):
-        assert ram.get(LOG_BASE + 4 * i) == 2, (
-            f"trap {i}: mcause {ram.get(LOG_BASE + 4 * i)}"
+        check_equal(
+            ram.get(LOG_BASE + 4 * i),
+            2,
+            f"trap {i}: mcause {ram.get(LOG_BASE + 4 * i)}",
         )
-    assert LOG_BASE + 4 * len(ILLEGAL) not in ram, (
-        "a legal instruction trapped"
+    check_true(
+        LOG_BASE + 4 * len(ILLEGAL) not in ram, "a legal instruction trapped"
     )
-    assert ram[RAM_BASE] == 0x55, (
-        "an illegal instruction wrote its destination"
+    check_equal(
+        ram[RAM_BASE], 0x55, "an illegal instruction wrote its destination"
     )
-    assert ram[RAM_BASE + 4] == len(ILLEGAL) + len(LEGAL), (
-        "the program did not resume after each trap"
+    check_equal(
+        ram[RAM_BASE + 4],
+        len(ILLEGAL) + len(LEGAL),
+        "the program did not resume after each trap",
     )

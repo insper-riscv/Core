@@ -4,6 +4,8 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
+from tests.python.unittests.checks import check_equal
+
 RS = 0b010
 ADDRS = (0xB00, 0xB02, 0xB80, 0xB82, 0xC00, 0xC01, 0xC02, 0xC80, 0xC81, 0xC82)
 
@@ -24,7 +26,9 @@ async def test_counter_addresses_are_illegal(dut):
     for addr in ADDRS:
         dut.i_addr.value = addr
         await Timer(1, unit="ns")
-        assert int(dut.o_illegal.value) == 1, (
-            f"{addr:#x} must be illegal without Zicntr"
+        check_equal(
+            int(dut.o_illegal.value),
+            1,
+            f"{addr:#x} must be illegal without Zicntr",
         )
-        assert int(dut.o_rdata.value) == 0
+        check_equal(int(dut.o_rdata.value), 0)

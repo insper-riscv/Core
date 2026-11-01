@@ -12,14 +12,17 @@ access.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import NOP
-from tests.python.unittests.cores.MisalignedHalf import lw
-from tests.python.unittests.cores.SdramStall import addi, jal_self, lui, sw
+from tests.python.unittests.cores.illegal_instruction import NOP
+from tests.python.unittests.cores.misaligned_half import lw
+from tests.python.unittests.cores.sdram_stall import addi, jal_self, lui, sw
+
+MIN_TRAP_CYCLE = 4
 
 ECALL = 0x00000073
 EBREAK = 0x00100073
@@ -67,16 +70,20 @@ async def test_trap_is_signalled_without_effect(dut):
         cycles[0] += 1
         # The first fetch answers with an empty word before the program
         # memory has been read.
-        if trap and cycles[0] > 4:
+        if trap and cycles[0] > MIN_TRAP_CYCLE:
             seen.append(
                 (int(dut.o_trap_pc.value), int(dut.o_trap_cause.value))
             )
-        assert not int(dut.o_sdram_rden.value) and not int(
-            dut.o_sdram_wren.value
-        ), "a trapped access reached the bus"
+        check_true(
+            not int(dut.o_sdram_rden.value)
+            and not int(dut.o_sdram_wren.value),
+            "a trapped access reached the bus",
+        )
 
     ram = await run_program(dut, build(), monitor=watch, max_cycles=2000)
-    assert seen == EXPECTED, f"signalled {seen}, expected {EXPECTED}"
-    assert ram[RAM_BASE + 8] == SENTINEL, (
-        "a trapped instruction wrote its destination register"
+    check_equal(seen, EXPECTED, f"signalled {seen}, expected {EXPECTED}")
+    check_equal(
+        ram[RAM_BASE + 8],
+        SENTINEL,
+        "a trapped instruction wrote its destination register",
     )

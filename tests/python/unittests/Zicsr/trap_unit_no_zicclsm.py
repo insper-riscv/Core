@@ -6,6 +6,7 @@ traps.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.Zicsr.trap_unit import (
     CAUSE_LOAD_MISALIGNED,
     CAUSE_STORE_MISALIGNED,
@@ -34,12 +35,16 @@ async def test_every_misaligned_access_traps(dut):
     for opcode, funct3, offsets, cause in CASES:
         for base in MAIN_MEMORY:
             for offset in offsets:
-                assert await probe(dut, opcode, funct3, ea=base + offset) == (
-                    1,
-                    0,
-                    cause,
-                    base + offset,
-                ), (opcode, funct3, offset, hex(base))
+                check_equal(
+                    await probe(dut, opcode, funct3, ea=base + offset),
+                    (
+                        1,
+                        0,
+                        cause,
+                        base + offset,
+                    ),
+                    (opcode, funct3, offset, hex(base)),
+                )
 
 
 @cocotb.test()
@@ -54,6 +59,8 @@ async def test_aligned_accesses_do_not_trap(dut):
             (OP_STORE, 0b001, 2),
             (OP_STORE, 0b000, 1),
         ]:
-            assert (await probe(dut, opcode, funct3, ea=base + offset))[
-                0
-            ] == 0, (opcode, funct3, offset)
+            check_equal(
+                (await probe(dut, opcode, funct3, ea=base + offset))[0],
+                0,
+                (opcode, funct3, offset),
+            )

@@ -7,6 +7,7 @@ m_decode: the M extension claims R-type instructions with funct7 =
 import cocotb
 from cocotb.triggers import Timer
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.common.control_unit import build_instruction
 
 OP_R = 0b0110011
@@ -28,7 +29,7 @@ async def test_claims_every_m_instruction(dut):
     """
     for funct3 in range(8):
         got = await _outputs(dut, build_instruction(OP_R, funct3, 0b0000001))
-        assert got == (1, 1, 1), f"funct3={funct3}: {got}"
+        check_equal(got, (1, 1, 1), f"funct3={funct3}: {got}")
 
 
 @cocotb.test()
@@ -52,4 +53,6 @@ async def test_leaves_everything_else_alone(dut):
     ]
     for opcode, funct3, funct7 in cases:
         got = await _outputs(dut, build_instruction(opcode, funct3, funct7))
-        assert got == (0, 0, 0), f"{opcode:07b}/{funct3}/{funct7:07b}: {got}"
+        check_equal(
+            got, (0, 0, 0), f"{opcode:07b}/{funct3}/{funct7:07b}: {got}"
+        )

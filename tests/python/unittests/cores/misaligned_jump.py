@@ -13,12 +13,13 @@ não podem disparar exceção.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import (
+from tests.python.unittests.cores.illegal_instruction import (
     HANDLER_WORD,
     LOG_BASE,
     MCAUSE,
@@ -29,7 +30,7 @@ from tests.python.unittests.cores.IllegalInstruction import (
     csrrs,
     csrrw,
 )
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.cores.sdram_stall import (
     _b,
     _i,
     addi,
@@ -67,7 +68,7 @@ def build_program():
         NOP,
         NOP,
     ]
-    assert len(program) == HEADER_WORDS
+    check_equal(len(program), HEADER_WORDS)
     expected = []
     for offset in SUM_OFFSETS:
         for imm in IMMEDIATES:
@@ -90,7 +91,7 @@ def build_program():
         sw(14, 7, DONE_ADDR - RAM_BASE),
         jal_self(),
     ]
-    assert len(program) < HANDLER_WORD
+    check_true(len(program) < HANDLER_WORD)
     program += [NOP] * (HANDLER_WORD - len(program))
     program += [
         csrrs(6, MCAUSE, 0),
@@ -120,6 +121,6 @@ async def test_misaligned_jump_targets_trap(dut):
     while address in ram:
         seen.append((ram[address], ram[address + 4]))
         address += 8
-    assert seen == expected, (
-        f"exceções registradas {seen}, esperadas {expected}"
+    check_equal(
+        seen, expected, f"exceções registradas {seen}, esperadas {expected}"
     )

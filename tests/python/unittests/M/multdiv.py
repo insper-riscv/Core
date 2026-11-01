@@ -8,11 +8,17 @@ in which the stall is already down, and the next instruction replaces it
 on the following edge.
 """
 
-import random
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
+
+from tests.python.unittests.checks import Prng, check_equal, check_true
+
+FIRST_DIV_FUNCT3 = 4
+SIGNED_DIV_FUNCT3 = (4, 6)
+INT_MIN = 0x80000000
+ALL_ONES = 0xFFFFFFFF
+MIN_FUSED_PAIRS = 10
 
 MASK = 0xFFFFFFFF
 TIMEOUT_CYCLES = 100
@@ -24,18 +30,24 @@ def _signed(value):
     return value - (1 << 32) if value >> 31 else value
 
 
-def model(funct3, a, b):  # complexipy: ignore
-    """Return the RV32M result of the operation, as a 32-bit pattern."""
-    op = OPS[funct3]
+MULTIPLY_OPS = ("mul", "mulh", "mulhsu", "mulhu")
+
+
+def _multiply(op, a, b):
+    """Return the multiply result of the operation, as 32 bits."""
     sa, sb = _signed(a), _signed(b)
-    if op == "mul":
-        return (a * b) & MASK
-    if op == "mulh":
-        return ((sa * sb) >> 32) & MASK
-    if op == "mulhsu":
-        return ((sa * b) >> 32) & MASK
-    if op == "mulhu":
-        return ((a * b) >> 32) & MASK
+    product = {
+        "mul": a * b,
+        "mulh": (sa * sb) >> 32,
+        "mulhsu": (sa * b) >> 32,
+        "mulhu": (a * b) >> 32,
+    }[op]
+    return product & MASK
+
+
+def _divide(op, a, b):
+    """Return the divide result of the operation, as 32 bits."""
+    sa, sb = _signed(a), _signed(b)
     if b == 0:
         return MASK if op in ("div", "divu") else a
     if op in ("divu", "remu"):
@@ -46,6 +58,14 @@ def model(funct3, a, b):  # complexipy: ignore
     if (sa < 0) != (sb < 0):
         quotient = -quotient
     return (quotient if op == "div" else sa - quotient * sb) & MASK
+
+
+def model(funct3, a, b):
+    """Return the RV32M result of the operation, as a 32-bit pattern."""
+    op = OPS[funct3]
+    if op in MULTIPLY_OPS:
+        return _multiply(op, a, b)
+    return _divide(op, a, b)
 
 
 RECORD = [None]
@@ -83,13 +103,13 @@ async def execute(dut, funct3, a, b):
     dut.i_a.value = a
     dut.i_b.value = b
     await Timer(1, unit="ns")
-    assert int(dut.o_stall.value) == 1, (
-        "the stall must rise in the first cycle"
+    check_equal(
+        int(dut.o_stall.value), 1, "the stall must rise in the first cycle"
     )
     stalled = 0
     while int(dut.o_stall.value):
         stalled += 1
-        assert stalled < TIMEOUT_CYCLES, "the stall never fell"
+        check_true(stalled < TIMEOUT_CYCLES, "the stall never fell")
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
     return int(dut.o_result.value), stalled
@@ -113,9 +133,11 @@ async def _check(dut, funct3, pairs, gap):
     for a, b in pairs:
         got, _ = await execute(dut, funct3, a, b)
         want = model(funct3, a, b)
-        assert got == want, (
+        check_equal(
+            got,
+            want,
             f"{OPS[funct3]} {a:#010x}, {b:#010x}: got {got:#010x}, expected "
-            f"{want:#010x}"
+            f"{want:#010x}",
         )
         await retire(dut, gap)
 
@@ -142,7 +164,7 @@ async def test_back_to_back(dut):
     no bubble.
     """
     await _reset(dut)
-    rng = random.Random(7)
+    rng = Prng(7)
     for _ in range(100):
         funct3 = rng.randrange(8)
         await _check(
@@ -160,8 +182,10 @@ async def test_stall_length(dut):
     await _reset(dut)
     for i, (funct3, want) in enumerate(((0, 35), (3, 35), (4, 37), (7, 37))):
         _, stalled = await execute(dut, funct3, 12345 + i, 678)
-        assert stalled == want, (
-            f"{OPS[funct3]} stalled {stalled} cycles, expected {want}"
+        check_equal(
+            stalled,
+            want,
+            f"{OPS[funct3]} stalled {stalled} cycles, expected {want}",
         )
         await retire(dut, 1)
 
@@ -176,7 +200,7 @@ async def test_no_stall_without_a_valid_m_instruction(dut):
         for _ in range(5):
             await RisingEdge(dut.i_clk)
             await Timer(1, unit="ns")
-            assert int(dut.o_stall.value) == 0
+            check_equal(int(dut.o_stall.value), 0)
 
 
 FUSED_STALL = 3
@@ -184,7 +208,7 @@ FUSED_STALL = 3
 
 def is_mult(funct3):
     """Executa is mult."""
-    return funct3 < 4
+    return funct3 < FIRST_DIV_FUNCT3
 
 
 def full_stall(funct3, a, b):
@@ -196,7 +220,7 @@ def full_stall(funct3, a, b):
     if is_mult(funct3):
         return 35
     special = b == 0 or (
-        funct3 in (4, 6) and a == 0x80000000 and b == 0xFFFFFFFF
+        funct3 in SIGNED_DIV_FUNCT3 and a == INT_MIN and b == ALL_ONES
     )
     return 4 if special else 37
 
@@ -227,14 +251,18 @@ async def run_sequence(dut, ops, gap):
     for funct3, a, b in ops:
         want_fused = fuses(RECORD[0], funct3, a, b)
         got, stalled = await execute(dut, funct3, a, b)
-        assert got == model(funct3, a, b), (
+        check_equal(
+            got,
+            model(funct3, a, b),
             f"{OPS[funct3]} {a:#010x}, {b:#010x}: got {got:#010x}, expected "
-            f"{model(funct3, a, b):#010x}"
+            f"{model(funct3, a, b):#010x}",
         )
         want_stall = FUSED_STALL if want_fused else full_stall(funct3, a, b)
-        assert stalled == want_stall, (
+        check_equal(
+            stalled,
+            want_stall,
             f"{OPS[funct3]} {a:#010x}, {b:#010x} stalled {stalled} cycles, "
-            f"expected {want_stall}"
+            f"expected {want_stall}",
         )
         if want_fused:
             fused_count += 1
@@ -288,9 +316,11 @@ async def test_every_recommended_pair_fuses(dut):
                 count = await run_sequence(
                     dut, [(first, a, b), (second, a, b)], gap
                 )
-                assert count == 1, (
+                check_equal(
+                    count,
+                    1,
                     f"{OPS[first]} then {OPS[second]} {a:#x}, {b:#x} did not "
-                    f"fuse"
+                    f"fuse",
                 )
                 await retire(dut, 0)
 
@@ -319,7 +349,7 @@ async def test_what_does_not_fuse(dut):
         # an unrelated operation first, so that the record of the
         # previous case is gone
         await run_sequence(dut, [(0, 0x1111, 0x2222)], 1)
-        assert await run_sequence(dut, ops, 1) == 0, ops
+        check_equal(await run_sequence(dut, ops, 1), 0, ops)
         await retire(dut, 0)
 
 
@@ -332,9 +362,9 @@ async def test_another_operation_in_between_breaks_the_pair(dut):
     """
     await _reset(dut)
     ops = [(4, 1000, 7), (0, 1000, 7), (6, 1000, 7)]
-    assert await run_sequence(dut, ops, 1) == 0
+    check_equal(await run_sequence(dut, ops, 1), 0)
     ops = [(4, 55, 7), (0, 1000, 9), (6, 55, 7)]
-    assert await run_sequence(dut, ops, 1) == 0
+    check_equal(await run_sequence(dut, ops, 1), 0)
 
 
 @cocotb.test()
@@ -350,7 +380,7 @@ async def test_fused_operation_keeps_the_record(dut):
         (0, 0x89ABCDEF, 0x1234567),
         (2, 0x89ABCDEF, 0x1234567),
     ]
-    assert await run_sequence(dut, ops, 1) == 2
+    check_equal(await run_sequence(dut, ops, 1), 2)
 
 
 @cocotb.test()
@@ -361,16 +391,19 @@ async def test_random_sequences_repeat_values(dut):
     value and in stall length.
     """
     await _reset(dut)
-    rng = random.Random(11)
+    rng = Prng(11)
     pool = [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(3)] + [
         (EDGES[3], EDGES[4]),
         (9, 0),
     ]
     fused = 0
-    for _ in range(25):
+    for _ in range(100):
         ops = []
         for _ in range(8):
             a, b = rng.choice(pool)
             ops.append((rng.randrange(8), a, b))
         fused += await run_sequence(dut, ops, rng.choice((0, 1)))
-    assert fused > 10, "the random sequences never reached the fusion"
+    check_true(
+        fused > MIN_FUSED_PAIRS,
+        "the random sequences never reached the fusion",
+    )

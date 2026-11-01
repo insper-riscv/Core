@@ -10,20 +10,23 @@ the right counter with the right count.
 
 import cocotb
 
+from tests.python.unittests.checks import check_equal, check_true
 from tests.python.unittests.cores.harness import (
     DONE_ADDR,
     RAM_BASE,
     run_program,
 )
-from tests.python.unittests.cores.IllegalInstruction import NOP
-from tests.python.unittests.cores.MisalignedHalf import lw
-from tests.python.unittests.cores.SdramStall import (
+from tests.python.unittests.cores.illegal_instruction import NOP
+from tests.python.unittests.cores.misaligned_half import lw
+from tests.python.unittests.cores.sdram_stall import (
     addi,
     beq,
     jal_self,
     lui,
     sw,
 )
+
+MIN_DIV_STALL = 32
 
 MHPMEVENT3, MHPMEVENT4 = 0x323, 0x324
 MHPMCOUNTER3, MHPMCOUNTER4 = 0xB03, 0xB04
@@ -96,8 +99,8 @@ async def test_taken_branches_are_counted(dut):
     """Verifica taken branches are counted."""
     ram = await run_program(dut, program(3, 10, [NOP]), max_cycles=3000)
     # the loop branch is taken nine times and falls through on the tenth
-    assert ram[RAM_BASE] == 9
-    assert ram[RAM_BASE + 4] == 9, "the user mirror reads the same counter"
+    check_equal(ram[RAM_BASE], 9)
+    check_equal(ram[RAM_BASE + 4], 9, "the user mirror reads the same counter")
 
 
 @cocotb.test()
@@ -108,8 +111,10 @@ async def test_load_use_stalls_are_counted(dut):
     ram = await run_program(dut, program(8, 6, body), max_cycles=3000)
     # the use waits two cycles for the load: one with the load in EX and
     # one with it in MEM
-    assert ram[RAM_BASE] == 12, (
-        f"two stall cycles per iteration, counted {ram[RAM_BASE]}"
+    check_equal(
+        ram[RAM_BASE],
+        12,
+        f"two stall cycles per iteration, counted {ram[RAM_BASE]}",
     )
 
 
@@ -117,7 +122,7 @@ async def test_load_use_stalls_are_counted(dut):
 async def test_event_zero_counts_nothing(dut):
     """Verifica event zero counts nothing."""
     ram = await run_program(dut, program(0, 10, [NOP]), max_cycles=3000)
-    assert ram[RAM_BASE] == 0
+    check_equal(ram[RAM_BASE], 0)
 
 
 @cocotb.test()
@@ -127,7 +132,7 @@ async def test_mcountinhibit_holds_the_counter(dut):
     # inhibit the counter before the loop: bit 3 of mcountinhibit
     prog[4:4] = [addi(12, 0, 1 << 3), csrrw(0, MCOUNTINHIBIT, 12)]
     ram = await run_program(dut, prog, max_cycles=3000)
-    assert ram[RAM_BASE] == 0
+    check_equal(ram[RAM_BASE], 0)
 
 
 @cocotb.test()
@@ -143,8 +148,10 @@ async def test_fused_pairs_are_counted(dut):
     # the first DIV of the loop runs in full, the REM is fused; from the
     # second iteration on the record holds the DIV again (the fused REM
     # leaves it as it was), so every REM is fused
-    assert ram[RAM_BASE] == 3, (
-        f"one fused operation per iteration, counted {ram[RAM_BASE]}"
+    check_equal(
+        ram[RAM_BASE],
+        3,
+        f"one fused operation per iteration, counted {ram[RAM_BASE]}",
     )
 
 
@@ -154,6 +161,8 @@ async def test_divider_stall_is_counted(dut):
     prog = program(1, 1, [muldiv(DIV, 12, 10, 11)])
     prog[4:4] = [addi(10, 0, 1000), addi(11, 0, 7)]
     ram = await run_program(dut, prog, max_cycles=3000)
-    assert ram[RAM_BASE] >= 32, (
-        f"a division stalls for more than 32 cycles, counted {ram[RAM_BASE]}"
+    check_true(
+        ram[RAM_BASE] >= MIN_DIV_STALL,
+        f"a division stalls for more than {MIN_DIV_STALL} cycles, "
+        f"counted {ram[RAM_BASE]}",
     )

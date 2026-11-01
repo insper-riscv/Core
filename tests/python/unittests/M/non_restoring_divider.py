@@ -4,11 +4,11 @@ non_restoring_divider_rv32: DIV, DIVU, REM and REMU as the RISC-V ISA
 defines them.
 """
 
-import random
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
+
+from tests.python.unittests.checks import Prng, check_equal
 
 MASK = 0xFFFFFFFF
 EDGES = (
@@ -85,10 +85,12 @@ async def _check(dut, pairs, unsigned):
         got = await divide(dut, dividend, divisor, unsigned)
         want = expected(dividend, divisor, unsigned)
         kind = "unsigned" if unsigned else "signed"
-        assert got == want, (
+        check_equal(
+            got,
+            want,
             f"{kind} {dividend:#010x} / {divisor:#010x}: "
             f"got q={got[0]:#010x} r={got[1]:#010x}, want q={want[0]:#010x} "
-            f"r={want[1]:#010x}"
+            f"r={want[1]:#010x}",
         )
 
 
@@ -118,7 +120,7 @@ async def test_signed_edges(dut):
 async def test_random(dut):
     """Random operands, in both modes."""
     await _reset(dut)
-    rng = random.Random(20261023)
+    rng = Prng(20261023)
     pairs = [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(60)]
     await _check(dut, pairs, unsigned=True)
     await _check(dut, pairs, unsigned=False)
