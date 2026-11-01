@@ -66,6 +66,8 @@ entity reg_ex_mem is
 		o_rd         : out reg_t;
 		-- Habilitação de escrita em registrador registrada para o estágio MEM.
 		o_we_reg     : out std_logic;
+		-- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
+		o_we_ok      : out std_logic;
 		-- Habilitação de escrita na RAM registrada para o estágio MEM.
 		o_we_ram     : out std_logic;
 		-- Habilitação de leitura da RAM registrada para o estágio MEM.
@@ -102,6 +104,8 @@ architecture rtl of reg_ex_mem is
 	signal r_rd         : reg_t        := (others => '0');
 	-- Habilitação de escrita em registrador armazenada.
 	signal r_we_reg     : std_logic    := '0';
+	-- Validade e escrita em registrador armazenadas juntas.
+	signal r_we_ok      : std_logic    := '0';
 	-- Habilitação de escrita na RAM armazenada.
 	signal r_we_ram     : std_logic    := '0';
 	-- Habilitação de leitura da RAM armazenada.
@@ -127,6 +131,7 @@ begin
 				r_byte_mask  <= (others => '0');
 				r_rd         <= (others => '0');
 				r_we_reg     <= '0';
+				r_we_ok      <= '0';
 				r_we_ram     <= '0';
 				r_re_ram     <= '0';
 				r_en_ram     <= '0';
@@ -141,6 +146,7 @@ begin
 				r_byte_mask  <= i_byte_mask;
 				r_rd         <= i_rd;
 				r_we_reg     <= i_we_reg;
+				r_we_ok      <= i_we_reg and i_valid;
 				r_we_ram     <= i_we_ram;
 				r_re_ram     <= i_re_ram;
 				r_en_ram     <= i_en_ram;
@@ -158,6 +164,7 @@ begin
 	o_byte_mask  <= r_byte_mask;
 	o_rd         <= r_rd;
 	o_we_reg     <= r_we_reg;
+	o_we_ok      <= r_we_ok;
 	o_we_ram     <= r_we_ram;
 	o_re_ram     <= r_re_ram;
 	o_en_ram     <= r_en_ram;

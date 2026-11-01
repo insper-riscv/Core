@@ -54,6 +54,8 @@ entity reg_mem_wb is
 		o_rd         : out reg_t;
 		-- Habilitação de escrita no banco de registradores registrada para o estágio WB.
 		o_we_reg     : out std_logic;
+		-- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
+		o_we_ok      : out std_logic;
 		-- Modo de extensão de leitura da RAM registrado para o estágio WB.
 		o_ext_ram_op : out ext_ram_op_t;
 		-- Seletor de write-back registrado para o estágio WB.
@@ -78,6 +80,8 @@ architecture rtl of reg_mem_wb is
 	signal r_rd         : reg_t        := (others => '0');
 	-- Habilitação de escrita em registrador armazenada.
 	signal r_we_reg     : std_logic    := '0';
+	-- Validade e escrita em registrador armazenadas juntas.
+	signal r_we_ok      : std_logic    := '0';
 	-- Modo de extensão da RAM armazenado.
 	signal r_ext_ram_op : ext_ram_op_t := (others => '0');
 	-- Seletor de write-back armazenado.
@@ -114,6 +118,7 @@ begin
 				r_alu_out    <= (others => '0');
 				r_rd         <= (others => '0');
 				r_we_reg     <= '0';
+				r_we_ok      <= '0';
 				r_ext_ram_op <= (others => '0');
 				r_wb_sel     <= (others => '0');
 				r_is_flash   <= '0';
@@ -124,6 +129,7 @@ begin
 				r_alu_out    <= i_alu_out;
 				r_rd         <= i_rd;
 				r_we_reg     <= i_we_reg;
+				r_we_ok      <= i_we_reg and i_valid;
 				r_ext_ram_op <= i_ext_ram_op;
 				r_wb_sel     <= i_wb_sel;
 				r_is_flash   <= in_is_flash;
@@ -137,6 +143,7 @@ begin
 	o_alu_out    <= r_alu_out;
 	o_rd         <= r_rd;
 	o_we_reg     <= r_we_reg;
+	o_we_ok      <= r_we_ok;
 	o_ext_ram_op <= r_ext_ram_op;
 	o_wb_sel     <= r_wb_sel;
 	o_is_flash   <= r_is_flash;

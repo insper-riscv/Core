@@ -22,4 +22,14 @@ package fwd_consts is
 	-- Adiantamento do estágio WB2 (instrução três posições à frente).
 	constant FWD_WB2   : fwd_sel_t := "11";
 
+	-- Casamentos de um operando com as três instruções à frente, um bit por fonte de adiantamento.
+	subtype fwd_match_t is std_logic_vector(2 downto 0);
+
+	-- Posição, em fwd_match_t, do casamento com a instrução que estará em EX/MEM quando o operando for usado.
+	constant FWD_MATCH_EXMEM : natural := 0;
+	-- Posição, em fwd_match_t, do casamento com a instrução que estará em MEM/WB quando o operando for usado.
+	constant FWD_MATCH_MEMWB : natural := 1;
+	-- Posição, em fwd_match_t, do casamento com a instrução que estará em WB2 quando o operando for usado.
+	constant FWD_MATCH_WB2   : natural := 2;
+
 end package fwd_consts;

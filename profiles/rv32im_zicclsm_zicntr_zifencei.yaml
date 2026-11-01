@@ -41,12 +41,12 @@ sources:
   - I/misaligned_unit.vhd
   - common/control_unit.vhd
   - common/bubble_mux.vhd
+  - common/forwarding_match.vhd
   - common/forwarding_unit.vhd
   - common/hazard_detection_unit.vhd
   - M/m_decode.vhd
   - M/booth_multiplier_rv32.vhd
   - M/non_restoring_divider_rv32.vhd
-  - M/muldiv_fusion.vhd
   - M/multdiv.vhd
   - Zicsr/csr_decode.vhd
   - Zicntr/counter64.vhd

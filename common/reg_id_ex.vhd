@@ -16,6 +16,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
+use work.fwd_consts.all;
 
 entity reg_id_ex is
 
@@ -36,8 +37,6 @@ entity reg_id_ex is
 		i_pc4         : in  word_t;
 		-- Endereço do registrador fonte rs1.
 		i_rs1         : in  reg_t;
-		-- Endereço do registrador fonte rs2.
-		i_rs2         : in  reg_t;
 		-- Endereço do registrador destino rd.
 		i_rd          : in  reg_t;
 		-- Valor lido da porta rs1 do banco de registradores.
@@ -62,6 +61,10 @@ entity reg_id_ex is
 		i_alu_op      : in  alu_op_t;
 		-- Seleção one-hot do resultado da ULA, decodificada no estágio ID.
 		i_alu_sel     : in  alu_sel_t;
+		-- Casamentos de rs1 com as três instruções à frente, calculados no estágio ID (forwarding_match).
+		i_fwd_match_rs1 : in fwd_match_t;
+		-- Casamentos de rs2 com as três instruções à frente, calculados no estágio ID.
+		i_fwd_match_rs2 : in fwd_match_t;
 		-- Indica instrução pertencente à extensão M (MulDiv).
 		i_is_muldiv   : in  std_logic;
 		-- Indica instrução pertencente à extensão Zicsr (acesso a registrador CSR).
@@ -86,8 +89,6 @@ entity reg_id_ex is
 		o_pc4         : out word_t;
 		-- Endereço de rs1 registrado para o estágio EX (usado pela Forwarding Unit).
 		o_rs1         : out reg_t;
-		-- Endereço de rs2 registrado para o estágio EX (usado pela Forwarding Unit).
-		o_rs2         : out reg_t;
 		-- Endereço de rd registrado para o estágio EX (usado pela HDU e estágios seguintes).
 		o_rd          : out reg_t;
 		-- Valor de rs1 registrado para o estágio EX.
@@ -112,6 +113,10 @@ entity reg_id_ex is
 		o_alu_op      : out alu_op_t;
 		-- Seleção one-hot do resultado da ULA registrada para o estágio EX.
 		o_alu_sel     : out alu_sel_t;
+		-- Casamentos de rs1 registrados para a seleção do adiantamento no estágio EX.
+		o_fwd_match_rs1 : out fwd_match_t;
+		-- Casamentos de rs2 registrados para a seleção do adiantamento no estágio EX.
+		o_fwd_match_rs2 : out fwd_match_t;
 		-- Indicador de instrução MulDiv registrado para o estágio EX.
 		o_is_muldiv   : out std_logic;
 		-- Indicador de instrução CSR registrado para o estágio EX.
@@ -142,8 +147,6 @@ architecture rtl of reg_id_ex is
 	signal r_pc4         : word_t       := (others => '0');
 	-- Endereço de rs1 armazenado.
 	signal r_rs1         : reg_t        := (others => '0');
-	-- Endereço de rs2 armazenado.
-	signal r_rs2         : reg_t        := (others => '0');
 	-- Endereço de rd armazenado.
 	signal r_rd          : reg_t        := (others => '0');
 	-- Valor de rs1 armazenado.
@@ -168,6 +171,10 @@ architecture rtl of reg_id_ex is
 	signal r_alu_op      : alu_op_t     := (others => '0');
 	-- Seleção one-hot do resultado da ULA armazenada.
 	signal r_alu_sel     : alu_sel_t    := (others => '0');
+	-- Casamentos de adiantamento de rs1 armazenados.
+	signal r_fwd_match_rs1 : fwd_match_t := (others => '0');
+	-- Casamentos de adiantamento de rs2 armazenados.
+	signal r_fwd_match_rs2 : fwd_match_t := (others => '0');
 	-- Indicador de instrução MulDiv armazenado.
 	signal r_is_muldiv   : std_logic    := '0';
 	-- Indicador de instrução CSR armazenado.
@@ -195,7 +202,6 @@ begin
 				r_pc          <= (others => '0');
 				r_pc4         <= (others => '0');
 				r_rs1         <= (others => '0');
-				r_rs2         <= (others => '0');
 				r_rd          <= (others => '0');
 				r_rs1_val     <= (others => '0');
 				r_rs2_val     <= (others => '0');
@@ -208,6 +214,8 @@ begin
 				r_sel_pc_rs1  <= '0';
 				r_alu_op      <= (others => '0');
 				r_alu_sel     <= (others => '0');
+				r_fwd_match_rs1 <= (others => '0');
+				r_fwd_match_rs2 <= (others => '0');
 				r_is_muldiv   <= '0';
 				r_is_csr      <= '0';
 				r_illegal     <= '0';
@@ -221,7 +229,6 @@ begin
 				r_pc          <= i_pc;
 				r_pc4         <= i_pc4;
 				r_rs1         <= i_rs1;
-				r_rs2         <= i_rs2;
 				r_rd          <= i_rd;
 				r_rs1_val     <= i_rs1_val;
 				r_rs2_val     <= i_rs2_val;
@@ -234,6 +241,8 @@ begin
 				r_sel_pc_rs1  <= i_sel_pc_rs1;
 				r_alu_op      <= i_alu_op;
 				r_alu_sel     <= i_alu_sel;
+				r_fwd_match_rs1 <= i_fwd_match_rs1;
+				r_fwd_match_rs2 <= i_fwd_match_rs2;
 				r_is_muldiv   <= i_is_muldiv;
 				r_is_csr      <= i_is_csr;
 				r_illegal     <= i_illegal;
@@ -250,7 +259,6 @@ begin
 	o_pc          <= r_pc;
 	o_pc4         <= r_pc4;
 	o_rs1         <= r_rs1;
-	o_rs2         <= r_rs2;
 	o_rd          <= r_rd;
 	o_rs1_val     <= r_rs1_val;
 	o_rs2_val     <= r_rs2_val;
@@ -263,6 +271,8 @@ begin
 	o_sel_pc_rs1  <= r_sel_pc_rs1;
 	o_alu_op      <= r_alu_op;
 	o_alu_sel     <= r_alu_sel;
+	o_fwd_match_rs1 <= r_fwd_match_rs1;
+	o_fwd_match_rs2 <= r_fwd_match_rs2;
 	o_is_muldiv   <= r_is_muldiv;
 	o_is_csr      <= r_is_csr;
 	o_illegal     <= r_illegal;
