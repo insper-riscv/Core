@@ -1,13 +1,28 @@
 """Shared helpers for the cocotb tests."""
 
+import logging
 
-def check_equal(actual, expected, message=""):
-    """Raise AssertionError when actual differs from expected."""
+_LOG = logging.getLogger("cocotb.tests")
+
+
+def log_info(message: str) -> None:
+    """Log an informational message through the cocotb logger tree."""
+    _LOG.info("%s", message)
+
+
+def check_equal(
+    actual: object, expected: object, message: object = ""
+) -> None:
+    """Raise AssertionError when actual differs from expected.
+
+    The message may be any value (a tuple of the inputs, for example);
+    it is only formatted into the failure text.
+    """
     if actual != expected:
         raise AssertionError(f"{actual!r} != {expected!r}: {message}")
 
 
-def check_true(condition, message=""):
+def check_true(condition: object, message: object = "") -> None:
     """Raise AssertionError when condition is false."""
     if not condition:
         raise AssertionError(message)

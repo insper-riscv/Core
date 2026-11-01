@@ -3,7 +3,7 @@
 import cocotb
 from cocotb.triggers import Timer
 
-from tests.python.unittests.checks import check_equal
+from tests.python.unittests.checks import check_equal, log_info
 
 # Entrada -> (porta, máscara de bits)
 INPUTS = {
@@ -65,9 +65,9 @@ async def test_no_hazard(dut):
     set_inputs(
         dut, ifid_rs1=1, ifid_rs2=2, idex_rd=5, idex_reram=0, muldiv_busy=0
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)
-    dut._log.info("test_no_hazard: OK")
+    log_info("test_no_hazard: OK")
 
 
 @cocotb.test()
@@ -79,9 +79,9 @@ async def test_load_use_hazard_rs1(dut):
     set_inputs(
         dut, ifid_rs1=5, ifid_rs2=2, idex_rd=5, idex_reram=1, muldiv_busy=0
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1)
-    dut._log.info("test_load_use_hazard_rs1: OK")
+    log_info("test_load_use_hazard_rs1: OK")
 
 
 @cocotb.test()
@@ -93,9 +93,9 @@ async def test_load_use_hazard_rs2(dut):
     set_inputs(
         dut, ifid_rs1=1, ifid_rs2=10, idex_rd=10, idex_reram=1, muldiv_busy=0
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1)
-    dut._log.info("test_load_use_hazard_rs2: OK")
+    log_info("test_load_use_hazard_rs2: OK")
 
 
 @cocotb.test()
@@ -107,9 +107,9 @@ async def test_muldiv_busy(dut):
     set_inputs(
         dut, ifid_rs1=1, ifid_rs2=2, idex_rd=5, idex_reram=0, muldiv_busy=1
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1)
-    dut._log.info("test_muldiv_busy: OK")
+    log_info("test_muldiv_busy: OK")
 
 
 @cocotb.test()
@@ -122,9 +122,9 @@ async def test_no_hazard_x0_destination(dut):
     set_inputs(
         dut, ifid_rs1=0, ifid_rs2=0, idex_rd=0, idex_reram=1, muldiv_busy=0
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)
-    dut._log.info("test_no_hazard_x0_destination: OK")
+    log_info("test_no_hazard_x0_destination: OK")
 
 
 @cocotb.test()
@@ -142,11 +142,11 @@ async def test_all_registers(dut):
             idex_reram=1,
             muldiv_busy=0,
         )
-        await Timer(1, units="ns")
+        await Timer(1, unit="ns")
         check_outputs(
             dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1, msg=f"rd=rs1={rd}"
         )
-    dut._log.info("test_all_registers: OK")
+    log_info("test_all_registers: OK")
 
 
 @cocotb.test()
@@ -166,7 +166,7 @@ async def test_load_in_mem_stage_also_stalls(dut):
         exmem_rd=3,
         exmem_reram=1,
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1, msg="rs1")
     set_inputs(
         dut,
@@ -178,7 +178,7 @@ async def test_load_in_mem_stage_also_stalls(dut):
         exmem_rd=4,
         exmem_reram=1,
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=0, exp_ifid_we=0, exp_bubble=1, msg="rs2")
 
 
@@ -198,7 +198,7 @@ async def test_non_load_in_mem_stage_does_not_stall(dut):
         exmem_rd=3,
         exmem_reram=0,
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)
 
 
@@ -215,5 +215,5 @@ async def test_load_in_mem_stage_with_x0_destination(dut):
         exmem_rd=0,
         exmem_reram=1,
     )
-    await Timer(1, units="ns")
+    await Timer(1, unit="ns")
     check_outputs(dut, exp_pc_we=1, exp_ifid_we=1, exp_bubble=0)

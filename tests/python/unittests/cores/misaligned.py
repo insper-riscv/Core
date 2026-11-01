@@ -49,7 +49,8 @@ def _bytes(words):
 
 
 def _read(memory, address, size, signed):
-    value = int.from_bytes(bytes(memory[address : address + size]), "little")
+    end = address + size
+    value = int.from_bytes(bytes(memory[address:end]), "little")
     if signed and value >> (8 * size - 1):
         value -= 1 << (8 * size)
     return value & 0xFFFFFFFF
@@ -110,13 +111,16 @@ class _Builder:
                 for offset in OFFSETS:
                     address = base + offset
                     memory = _bytes(WORDS)
-                    memory[address : address + size] = list(
+                    end = address + size
+                    memory[address:end] = list(
                         STORED.to_bytes(4, "little")[:size]
                     )
                     self.reset_buffer()
                     self.program.append(encode(13, self.base_reg, address))
                     for word in range(3):
-                        chunk = bytes(memory[4 * word : 4 * word + 4])
+                        first = 4 * word
+                        last = first + 4
+                        chunk = bytes(memory[first:last])
                         value = int.from_bytes(chunk, "little")
                         self.program += [
                             lw(20, self.base_reg, 4 * word),

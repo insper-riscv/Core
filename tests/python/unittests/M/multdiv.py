@@ -68,7 +68,7 @@ def model(funct3, a, b):
     return _divide(op, a, b)
 
 
-RECORD = [None]
+RECORD: list[tuple[int, int, int] | None] = [None]
 
 
 async def _reset(dut):

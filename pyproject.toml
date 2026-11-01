@@ -91,3 +91,52 @@ docstring-code-line-length = 72
 [tool.complexipy]
 paths = ["tests"]
 max-complexity-allowed = 10
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.14"
+typeCheckingMode = "standard"
+include = ["tests"]
+
+[tool.pyrefly]
+preset = "basic"
+project-includes = ["tests"]
+search-path = ["."]
+python-version = "3.14"
+
+[tool.pylint.main]
+ignore = [".venv", "Common-Components", "build", "sim_build"]
+fail-under = 10
+init-hook = "import sys; sys.path.append('.')"
+
+[tool.pylint.basic]
+# The test packages are named after the ISA extensions (I, M, Zicsr, Zicntr).
+module-naming-style = "any"
+
+[tool.pylint.design]
+# The simulation models keep their whole state in one object.
+max-attributes = 15
+min-public-methods = 1
+
+[tool.pylint.messages_control]
+# Duplication is gated by codeclone (baseline + --fail-on-new), as the
+# CONTRIBUTING says; pylint's own check would count the same clones twice.
+disable = ["duplicate-code"]
+
+[tool.deptry]
+# The default exclude list also skips tests/, which is the only Python of
+# this repository.
+exclude = [
+    "venv",
+    "\\.venv",
+    "\\.direnv",
+    "\\.git",
+    "Common-Components",
+    "build",
+    "sim_build",
+]
+
+# cocotb_tools (the runner) ships inside the cocotb distribution.
+[tool.deptry.package_module_name_map]
+cocotb = ["cocotb", "cocotb_tools"]

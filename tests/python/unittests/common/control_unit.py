@@ -6,7 +6,7 @@ from pathlib import Path
 import cocotb
 from cocotb.triggers import Timer
 
-from tests.python.unittests.checks import check_equal
+from tests.python.unittests.checks import check_equal, log_info
 
 
 def _parse_field(val: str, _width: int) -> int:
@@ -64,7 +64,7 @@ def load_reference():
     """
     data_dir = Path(__file__).resolve().parent / "data"
     csv_path = data_dir / "riscv_opcodes.csv"
-    with Path(csv_path).open(newline="") as f:
+    with Path(csv_path).open(newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
@@ -81,6 +81,22 @@ def build_instruction(opcode: int, funct3: int, funct7: int) -> int:
     instr |= (funct3 & 0x7) << 12
     instr |= (funct7 & 0x7F) << 25
     return instr & 0xFFFFFFFF
+
+
+# (rotulo, coluna do CSV, largura do campo, sinal do DUT, formato)
+OUTPUT_CHECKS = (
+    ("selMuxPc4ALU", "SelMuxPc4ALU", 1, "o_sel_pc4_alu", ""),
+    ("opExImm", "opExImm[2:0]", 3, "o_ext_imm_op", "03b"),
+    ("selMuxALURAM", "selMuxALURAM", 1, "o_wb_sel", "b"),
+    ("weReg", "weReg", 1, "o_we_reg", ""),
+    ("opExRAM", "opExRAM[2:0]", 3, "o_ext_ram_op", "03b"),
+    ("selMuxRS2Imm", "selMuxRS2Imm", 1, "o_sel_rs2_imm", ""),
+    ("selPCRS1", "selMUXPcRS1", 1, "o_sel_pc_rs1", ""),
+    ("opALU", "opALU[4:0]", 5, "o_alu_op", "05b"),
+    ("reRAM", "reRAM", 1, "o_re_ram", ""),
+    ("eRAM", "eRAM", 1, "o_en_ram", ""),
+    ("weRAM", "weRAM", 1, "o_we_ram", ""),
+)
 
 
 @cocotb.test()
@@ -103,92 +119,16 @@ async def test_control_unit(dut):
         instr = build_instruction(opcode, funct3, funct7)
         dut.i_inst.value = instr
 
-        await Timer(1, units="ns")
+        await Timer(1, unit="ns")
 
-        exp_sel_mux_pc4_alu = _parse_field(row["SelMuxPc4ALU"], 1)
-        exp_op_ex_imm = _parse_field(row["opExImm[2:0]"], 3)
-        exp_sel_mux_aluram = _parse_field(row["selMuxALURAM"], 1)
-        exp_we_reg = _parse_field(row["weReg"], 1)
-        exp_op_ex_ram = _parse_field(row["opExRAM[2:0]"], 3)
-        exp_sel_mux_rs2_imm = _parse_field(row["selMuxRS2Imm"], 1)
-        exp_sel_pcrs1 = _parse_field(row["selMUXPcRS1"], 1)
-        exp_op_alu = _parse_field(row["opALU[4:0]"], 5)
-        exp_re_ram = _parse_field(row["reRAM"], 1)
-        exp_e_ram = _parse_field(row["eRAM"], 1)
-        exp_we_ram = _parse_field(row["weRAM"], 1)
-
-        got_sel_mux_pc4_alu = int(dut.o_sel_pc4_alu.value)
-        got_op_ex_imm = int(dut.o_ext_imm_op.value)
-        got_sel_mux_aluram = int(dut.o_wb_sel.value)
-        got_we_reg = int(dut.o_we_reg.value)
-        got_op_ex_ram = int(dut.o_ext_ram_op.value)
-        got_sel_mux_rs2_imm = int(dut.o_sel_rs2_imm.value)
-        got_sel_pcrs1 = int(dut.o_sel_pc_rs1.value)
-        got_op_alu = int(dut.o_alu_op.value)
-        got_re_ram = int(dut.o_re_ram.value)
-        got_e_ram = int(dut.o_en_ram.value)
-        got_we_ram = int(dut.o_we_ram.value)
-
-        check_equal(
-            got_sel_mux_pc4_alu,
-            exp_sel_mux_pc4_alu,
-            f"{inst_name}: selMuxPc4ALU got={got_sel_mux_pc4_alu} "
-            f"exp={exp_sel_mux_pc4_alu}",
-        )
-        check_equal(
-            got_op_ex_imm,
-            exp_op_ex_imm,
-            f"{inst_name}: opExImm got={got_op_ex_imm:03b} "
-            f"exp={exp_op_ex_imm:03b}",
-        )
-        check_equal(
-            got_sel_mux_aluram,
-            exp_sel_mux_aluram,
-            f"{inst_name}: selMuxALURAM got={got_sel_mux_aluram:b} "
-            f"exp={exp_sel_mux_aluram:b}",
-        )
-        check_equal(
-            got_we_reg,
-            exp_we_reg,
-            f"{inst_name}: weReg got={got_we_reg} exp={exp_we_reg}",
-        )
-        check_equal(
-            got_op_ex_ram,
-            exp_op_ex_ram,
-            f"{inst_name}: opExRAM got={got_op_ex_ram:03b} "
-            f"exp={exp_op_ex_ram:03b}",
-        )
-        check_equal(
-            got_sel_mux_rs2_imm,
-            exp_sel_mux_rs2_imm,
-            f"{inst_name}: selMuxRS2Imm got={got_sel_mux_rs2_imm} "
-            f"exp={exp_sel_mux_rs2_imm}",
-        )
-        check_equal(
-            got_sel_pcrs1,
-            exp_sel_pcrs1,
-            f"{inst_name}: selPCRS1 got={got_sel_pcrs1} exp={exp_sel_pcrs1}",
-        )
-        check_equal(
-            got_op_alu,
-            exp_op_alu,
-            f"{inst_name}: opALU got={got_op_alu:05b} exp={exp_op_alu:05b}",
-        )
-        check_equal(
-            got_re_ram,
-            exp_re_ram,
-            f"{inst_name}: reRAM got={got_re_ram} exp={exp_re_ram}",
-        )
-        check_equal(
-            got_e_ram,
-            exp_e_ram,
-            f"{inst_name}: eRAM got={got_e_ram} exp={exp_e_ram}",
-        )
-        check_equal(
-            got_we_ram,
-            exp_we_ram,
-            f"{inst_name}: weRAM got={got_we_ram} exp={exp_we_ram}",
-        )
+        for label, column, width, signal, fmt in OUTPUT_CHECKS:
+            expected = _parse_field(row[column], width)
+            got = int(getattr(dut, signal).value)
+            check_equal(
+                got,
+                expected,
+                f"{inst_name}: {label} got={got:{fmt}} exp={expected:{fmt}}",
+            )
 
         # Saidas novas do pipeline
         got_op_code = int(dut.o_opcode.value)
@@ -204,7 +144,7 @@ async def test_control_unit(dut):
             f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}",
         )
 
-        dut._log.info(f"{inst_name}: OK")
+        log_info(f"{inst_name}: OK")
 
 
 @cocotb.test()
@@ -220,7 +160,7 @@ async def test_control_unit_m_is_not_decoded_here(dut):
         dut.i_inst.value = build_instruction(
             opcode=0b0110011, funct3=funct3, funct7=0b0000001
         )
-        await Timer(1, units="ns")
+        await Timer(1, unit="ns")
 
         check_equal(
             int(dut.o_we_reg.value),
