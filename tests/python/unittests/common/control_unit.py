@@ -99,6 +99,35 @@ OUTPUT_CHECKS = (
 )
 
 
+def _check_outputs(dut, row):
+    """Compare every output signal with its column of the CSV row."""
+    inst_name = row["INST"]
+    for label, column, width, signal, fmt in OUTPUT_CHECKS:
+        expected = _parse_field(row[column], width)
+        got = int(getattr(dut, signal).value)
+        check_equal(
+            got,
+            expected,
+            f"{inst_name}: {label} got={got:{fmt}} exp={expected:{fmt}}",
+        )
+
+
+def _check_passthrough(dut, inst_name, opcode, funct3):
+    """Check the pipeline outputs that echo the instruction fields."""
+    got_op_code = int(dut.o_opcode.value)
+    got_funct3 = int(dut.o_funct3.value)
+    check_equal(
+        got_op_code,
+        opcode,
+        f"{inst_name}: o_opcode got={got_op_code:07b} exp={opcode:07b}",
+    )
+    check_equal(
+        got_funct3,
+        funct3,
+        f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}",
+    )
+
+
 @cocotb.test()
 async def test_control_unit(dut):
     """Verifica control unit.
@@ -121,28 +150,8 @@ async def test_control_unit(dut):
 
         await Timer(1, unit="ns")
 
-        for label, column, width, signal, fmt in OUTPUT_CHECKS:
-            expected = _parse_field(row[column], width)
-            got = int(getattr(dut, signal).value)
-            check_equal(
-                got,
-                expected,
-                f"{inst_name}: {label} got={got:{fmt}} exp={expected:{fmt}}",
-            )
-
-        # Saidas novas do pipeline
-        got_op_code = int(dut.o_opcode.value)
-        got_funct3 = int(dut.o_funct3.value)
-        check_equal(
-            got_op_code,
-            opcode,
-            f"{inst_name}: o_opcode got={got_op_code:07b} exp={opcode:07b}",
-        )
-        check_equal(
-            got_funct3,
-            funct3,
-            f"{inst_name}: o_funct3 got={got_funct3:03b} exp={funct3:03b}",
-        )
+        _check_outputs(dut, row)
+        _check_passthrough(dut, inst_name, opcode, funct3)
 
         log_info(f"{inst_name}: OK")
 
