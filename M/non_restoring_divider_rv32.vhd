@@ -27,6 +27,8 @@ entity non_restoring_divider_rv32 is
 		i_rst         : in  std_logic;
 		-- Pulso de início da divisão no estágio EX.
 		i_start       : in  std_logic;
+		-- Pulso que interrompe a operação em curso e volta ao repouso, sem produzir o_done (resultado já conhecido).
+		i_abort       : in  std_logic := '0';
 		-- Modo de sinal da operação ('0' = DIV/REM com sinal, '1' = DIVU/REMU sem sinal).
 		i_is_unsigned : in  std_logic;
 		-- Dividendo de 32 bits (operando A / rs1).
@@ -119,6 +121,10 @@ begin
 				busy_reg     <= '0';
 				q_result     <= (others => '0');
 				r_result     <= (others => '0');
+			elsif i_abort = '1' then
+				state    <= S_IDLE;
+				busy_reg <= '0';
+				o_done   <= '0';
 			else
 				case state is
 

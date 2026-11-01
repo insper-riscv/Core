@@ -103,6 +103,19 @@ No estágio EX, a unidade `multdiv` gera internamente um pulso único de início
 
 O sinal `o_stall` permanece ativo enquanto o operador está ocupado (`busy = '1'`) e durante o ciclo de pulso de conclusão (`done = '1'`), garantindo que o registrador interno de saída capture o resultado final antes da liberação do pipeline.
 
+#### Fusão de pares
+
+O capítulo da extensão M recomenda executar uma só vez `MULH[[S]U]` seguido de `MUL` e `DIV[U]` seguido de `REM[U]` com os mesmos operandos. A `multdiv` cumpre a recomendação pela entidade `muldiv_fusion`, que guarda a última operação concluída por inteiro: os dois operandos, o `funct3` e o resultado completo (o produto de 64 bits com sinal, sem a correção dos modos sem sinal, ou o par quociente e resto).
+
+| Aspecto | Comportamento |
+| :--- | :--- |
+| Critério de acerto | Os mesmos valores nos dois operandos, uma operação da mesma família (qualquer multiplicação, `DIV`/`REM` ou `DIVU`/`REMU`) e outra operação que não a registrada. A comparação é por valor, não por nome de registrador, então o acerto é correto quaisquer que sejam os registradores de origem e de destino |
+| Quando compara | No ciclo seguinte ao início, com os operandos já travados no estágio EX |
+| Sequência do acerto | Início (ciclo 0), comparação (ciclo 1), término (ciclo 2): a unidade em curso é interrompida e o resultado sai do registro, com a correção da parte alta aplicada ao modo da segunda instrução. O stall dura 3 ciclos, contra 35 da multiplicação e 37 da divisão por inteiro |
+| O que não funde | A repetição da mesma operação, valores diferentes, outra família, divisão com sinal seguida de divisão sem sinal e uma operação diferente no meio (o registro guarda só a última) |
+| Registro | Válido a partir da primeira operação concluída; só o reset o invalida. Uma operação fundida não o altera |
+| Evento | O Zihpm conta cada operação fundida no evento 9 |
+
 ### 3.2. Extensão Zicsr e Tratamento de Traps
 
 Quando `has_zicsr = true`, o decodificador `csr_decode` no estágio ID identifica a classe `OPCODE_SYSTEM` (`"1110011"`), força a extração do imediato I-type (`instr[31:20]`) para transportar o endereço de 12 bits do CSR até EX e ativa `o_is_csr = '1'` e `o_we_reg = '1'` para as seis instruções de acesso a CSR (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).

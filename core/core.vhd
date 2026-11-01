@@ -139,6 +139,8 @@ architecture rtl of core is
 	-- =========================================================================
 	-- Indica que a unidade multdiv está ocupada no estágio EX.
 	signal muldiv_stall      : std_logic;
+	-- Pulso de término de uma operação M fundida com a anterior (evento 9 do Zihpm).
+	signal muldiv_fused      : std_logic;
 	-- Indica que o barramento externo SDRAM está em espera no estágio MEM.
 	signal sdram_wait        : std_logic;
 	-- Indica que a unidade FENCE.I aguarda o flush da cache de dados no estágio EX.
@@ -468,6 +470,7 @@ begin
 	               6 => i_hpm_ext_events(1),
 	               7 => i_hpm_ext_events(2),
 	               8 => load_use_stall,
+	               9 => muldiv_fused,
 	               others => '0');
 	o_retire      <= retire_pulse;
 
@@ -712,7 +715,8 @@ begin
 			o_fencei_take     => fencei_take,
 			o_fencei_busy     => fencei_busy,
 			o_dc_flush        => o_dc_flush,
-			o_muldiv_stall    => muldiv_stall
+			o_muldiv_stall    => muldiv_stall,
+			o_muldiv_fused    => muldiv_fused
 		);
 
 	u_reg_ex_mem : entity work.reg_ex_mem

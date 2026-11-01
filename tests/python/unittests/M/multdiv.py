@@ -45,7 +45,11 @@ def model(funct3, a, b):
     return (quotient if op == "div" else sa - quotient * sb) & MASK
 
 
+RECORD = [None]
+
+
 async def _reset(dut):
+    RECORD[0] = None
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_rst.value = 1
     dut.i_valid.value = 0
@@ -120,10 +124,10 @@ async def test_back_to_back(dut):
 
 @cocotb.test()
 async def test_stall_length(dut):
-    """The stall is 35 cycles for a multiplication and 37 for a division."""
+    """The stall is 35 cycles for a multiplication and 37 for a division (operands never repeat)."""
     await _reset(dut)
-    for funct3, want in ((0, 35), (3, 35), (4, 37), (7, 37)):
-        _, stalled = await execute(dut, funct3, 12345, 678)
+    for i, (funct3, want) in enumerate(((0, 35), (3, 35), (4, 37), (7, 37))):
+        _, stalled = await execute(dut, funct3, 12345 + i, 678)
         assert stalled == want, f"{OPS[funct3]} stalled {stalled} cycles, expected {want}"
         await retire(dut, 1)
 
@@ -139,3 +143,136 @@ async def test_no_stall_without_a_valid_m_instruction(dut):
             await RisingEdge(dut.i_clk)
             await Timer(1, unit="ns")
             assert int(dut.o_stall.value) == 0
+
+
+FUSED_STALL = 3
+
+
+def is_mult(funct3):
+    return funct3 < 4
+
+
+def full_stall(funct3, a, b):
+    """Stall cycles of an operation that runs in full: a division by zero or an overflow is short."""
+    if is_mult(funct3):
+        return 35
+    special = b == 0 or (funct3 in (4, 6) and a == 0x80000000 and b == 0xFFFFFFFF)
+    return 4 if special else 37
+
+
+def fuses(record, funct3, a, b):
+    """The model of the fusion rule: same values, same family, another operation."""
+    if record is None:
+        return False
+    ra, rb, rf = record
+    if (a, b) != (ra, rb) or funct3 == rf:
+        return False
+    if is_mult(funct3) != is_mult(rf):
+        return False
+    return is_mult(funct3) or (funct3 & 1) == (rf & 1)
+
+
+async def run_sequence(dut, ops, gap):
+    """Run (funct3, a, b) in order, checking the value and the length of every stall."""
+    fused_count = 0
+    for funct3, a, b in ops:
+        want_fused = fuses(RECORD[0], funct3, a, b)
+        got, stalled = await execute(dut, funct3, a, b)
+        assert got == model(funct3, a, b), (
+            f"{OPS[funct3]} {a:#010x}, {b:#010x}: got {got:#010x}, expected {model(funct3, a, b):#010x}"
+        )
+        want_stall = FUSED_STALL if want_fused else full_stall(funct3, a, b)
+        assert stalled == want_stall, (
+            f"{OPS[funct3]} {a:#010x}, {b:#010x} stalled {stalled} cycles, expected {want_stall}"
+        )
+        if want_fused:
+            fused_count += 1
+        else:
+            RECORD[0] = (a, b, funct3)
+        await retire(dut, gap)
+    return fused_count
+
+
+PAIRS = (
+    (1, 0), (0, 1), (2, 0), (0, 2), (3, 0), (0, 3), (1, 2), (2, 1), (1, 3), (3, 1), (2, 3), (3, 2),
+    (4, 6), (6, 4), (5, 7), (7, 5),
+)
+VALUES = (
+    (0x12345678, 0x9ABCDEF0),
+    (0xFFFFFFFB, 7),
+    (7, 0xFFFFFFFB),
+    (0x80000000, 0xFFFFFFFF),
+    (0x80000000, 0x80000000),
+    (0xFFFFFFFF, 0xFFFFFFFF),
+    (100, 0),
+    (0, 100),
+)
+
+
+@cocotb.test()
+async def test_every_recommended_pair_fuses(dut):
+    """Each pair of a family, in both orders, runs once: the second costs 3 stall cycles."""
+    await _reset(dut)
+    for gap in (0, 1):
+        for first, second in PAIRS:
+            for a, b in VALUES:
+                count = await run_sequence(dut, [(first, a, b), (second, a, b)], gap)
+                assert count == 1, f"{OPS[first]} then {OPS[second]} {a:#x}, {b:#x} did not fuse"
+                await retire(dut, 0)
+
+
+@cocotb.test()
+async def test_what_does_not_fuse(dut):
+    """A repeat of the same operation, other values, another family or another sign mode runs in full."""
+    await _reset(dut)
+    a, b = 0xFFFFFFF1, 7
+    cases = [
+        [(4, a, b), (4, a, b)],
+        [(0, a, b), (0, a, b)],
+        [(4, a, b), (6, a, b + 1)],
+        [(4, a, b), (6, a + 1, b)],
+        [(4, a, b), (7, a, b)],
+        [(5, a, b), (6, a, b)],
+        [(0, a, b), (4, a, b)],
+        [(4, a, b), (1, a, b)],
+        [(1, a, b), (6, a, b)],
+    ]
+    for ops in cases:
+        # an unrelated operation first, so that the record of the previous case is gone
+        await run_sequence(dut, [(0, 0x1111, 0x2222)], 1)
+        assert await run_sequence(dut, ops, 1) == 0, ops
+        await retire(dut, 0)
+
+
+@cocotb.test()
+async def test_another_operation_in_between_breaks_the_pair(dut):
+    """The record holds the last operation only: DIV, MUL, REM with the same values runs the REM in full."""
+    await _reset(dut)
+    ops = [(4, 1000, 7), (0, 1000, 7), (6, 1000, 7)]
+    assert await run_sequence(dut, ops, 1) == 0
+    ops = [(4, 55, 7), (0, 1000, 9), (6, 55, 7)]
+    assert await run_sequence(dut, ops, 1) == 0
+
+
+@cocotb.test()
+async def test_fused_operation_keeps_the_record(dut):
+    """After a fused pair the record still holds the first operation: three operations fuse twice."""
+    await _reset(dut)
+    ops = [(1, 0x89ABCDEF, 0x1234567), (0, 0x89ABCDEF, 0x1234567), (2, 0x89ABCDEF, 0x1234567)]
+    assert await run_sequence(dut, ops, 1) == 2
+
+
+@cocotb.test()
+async def test_random_sequences_repeat_values(dut):
+    """Random operations over a few repeated values match the model, in value and in stall length."""
+    await _reset(dut)
+    rng = random.Random(11)
+    pool = [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(3)] + [(EDGES[3], EDGES[4]), (9, 0)]
+    fused = 0
+    for _ in range(25):
+        ops = []
+        for _ in range(8):
+            a, b = rng.choice(pool)
+            ops.append((rng.randrange(8), a, b))
+        fused += await run_sequence(dut, ops, rng.choice((0, 1)))
+    assert fused > 10, "the random sequences never reached the fusion"

@@ -35,5 +35,7 @@ package csr_event_consts is
 	constant EVENT_FLASH_WAIT    : natural := 7;
 	-- Ciclo de parada por dependência de load.
 	constant EVENT_LOAD_USE      : natural := 8;
+	-- Operação de multiplicação ou divisão fundida com a anterior (resultado reaproveitado, sem repetir o cálculo).
+	constant EVENT_MULDIV_FUSED  : natural := 9;
 
 end package csr_event_consts;
