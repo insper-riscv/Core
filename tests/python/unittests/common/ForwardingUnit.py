@@ -1,4 +1,8 @@
-"""Testes da forwarding_unit: seleção da fonte a partir dos casamentos registrados e da validade."""
+"""Testes do modulo.
+
+Testes da forwarding_unit: seleção da fonte a partir dos casamentos
+registrados e da validade.
+"""
 
 import itertools
 
@@ -12,7 +16,10 @@ NONE, SEL_MEMWB, SEL_EXMEM, SEL_WB2 = 0, 1, 2, 3
 
 
 def expected(match: int, exmem_ok: int, memwb_ok: int, wb2_ok: int) -> int:
-    """Modelo de referência: a fonte mais nova que casa e ainda é válida."""
+    """Executa expected.
+
+    Modelo de referência: a fonte mais nova que casa e ainda é válida.
+    """
     if (match >> EXMEM) & 1 and exmem_ok:
         return SEL_EXMEM
     if (match >> MEMWB) & 1 and memwb_ok:
@@ -34,16 +41,38 @@ async def apply(dut, match_rs1, match_rs2, exmem_ok, memwb_ok, wb2_ok):
 
 @cocotb.test()
 async def test_exhaustive_truth_table(dut):
-    """Todas as combinações de casamentos e validades dos dois operandos batem com o modelo."""
-    for m1, m2, e_ok, m_ok, w_ok in itertools.product(range(8), range(8), range(2), range(2), range(2)):
+    """Verifica exhaustive truth table.
+
+    Todas as combinações de casamentos e validades dos dois operandos
+    batem com o modelo.
+    """
+    for m1, m2, e_ok, m_ok, w_ok in itertools.product(
+        range(8), range(8), range(2), range(2), range(2)
+    ):
         await apply(dut, m1, m2, e_ok, m_ok, w_ok)
-        assert int(dut.o_fwd_rs1.value) == expected(m1, e_ok, m_ok, w_ok), (m1, m2, e_ok, m_ok, w_ok)
-        assert int(dut.o_fwd_rs2.value) == expected(m2, e_ok, m_ok, w_ok), (m1, m2, e_ok, m_ok, w_ok)
+        assert int(dut.o_fwd_rs1.value) == expected(m1, e_ok, m_ok, w_ok), (
+            m1,
+            m2,
+            e_ok,
+            m_ok,
+            w_ok,
+        )
+        assert int(dut.o_fwd_rs2.value) == expected(m2, e_ok, m_ok, w_ok), (
+            m1,
+            m2,
+            e_ok,
+            m_ok,
+            w_ok,
+        )
 
 
 @cocotb.test()
 async def test_no_match_selects_register_file(dut):
-    """Sem casamento o operando vem do banco de registradores, mesmo com tudo válido."""
+    """Verifica no match selects register file.
+
+    Sem casamento o operando vem do banco de registradores, mesmo com
+    tudo válido.
+    """
     await apply(dut, 0, 0, 1, 1, 1)
     assert int(dut.o_fwd_rs1.value) == NONE
     assert int(dut.o_fwd_rs2.value) == NONE
@@ -51,7 +80,11 @@ async def test_no_match_selects_register_file(dut):
 
 @cocotb.test()
 async def test_newest_valid_match_wins(dut):
-    """Com os três casamentos, vale EX/MEM; descartada a mais nova, cai para a seguinte."""
+    """Verifica newest valid match wins.
+
+    Com os três casamentos, vale EX/MEM; descartada a mais nova, cai
+    para a seguinte.
+    """
     await apply(dut, 0b111, 0b111, 1, 1, 1)
     assert int(dut.o_fwd_rs1.value) == SEL_EXMEM
     await apply(dut, 0b111, 0b111, 0, 1, 1)
@@ -64,7 +97,10 @@ async def test_newest_valid_match_wins(dut):
 
 @cocotb.test()
 async def test_operands_are_independent(dut):
-    """Os dois operandos escolhem a fonte cada um com os seus casamentos."""
+    """Verifica operands are independent.
+
+    Os dois operandos escolhem a fonte cada um com os seus casamentos.
+    """
     await apply(dut, 1 << EXMEM, 1 << WB2, 1, 1, 1)
     assert int(dut.o_fwd_rs1.value) == SEL_EXMEM
     assert int(dut.o_fwd_rs2.value) == SEL_WB2

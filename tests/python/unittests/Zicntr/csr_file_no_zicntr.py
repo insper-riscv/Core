@@ -10,6 +10,7 @@ ADDRS = (0xB00, 0xB02, 0xB80, 0xB82, 0xC00, 0xC01, 0xC02, 0xC80, 0xC81, 0xC82)
 
 @cocotb.test()
 async def test_counter_addresses_are_illegal(dut):
+    """Verifica counter addresses are illegal."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_rst.value = 1
     dut.i_commit.value = 0
@@ -23,5 +24,7 @@ async def test_counter_addresses_are_illegal(dut):
     for addr in ADDRS:
         dut.i_addr.value = addr
         await Timer(1, unit="ns")
-        assert int(dut.o_illegal.value) == 1, f"{addr:#x} must be illegal without Zicntr"
+        assert int(dut.o_illegal.value) == 1, (
+            f"{addr:#x} must be illegal without Zicntr"
+        )
         assert int(dut.o_rdata.value) == 0

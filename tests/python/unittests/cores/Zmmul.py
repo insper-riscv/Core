@@ -1,14 +1,30 @@
-"""With only the Zmmul extension the four multiplications run and the four divisions trap.
+"""Testes do modulo.
 
-DIV, DIVU, REM and REMU have no owner, so they are illegal instructions: mcause 2, the
-destination is not written, and the program resumes after each one.
+With only the Zmmul extension the four multiplications run and the four
+divisions trap.
+
+DIV, DIVU, REM and REMU have no owner, so they are illegal instructions:
+mcause 2, the destination is not written, and the program resumes after
+each one.
 """
 
 import cocotb
 
-from tests.python.unittests.cores.harness import DONE_ADDR, RAM_BASE, run_program
+from tests.python.unittests.cores.harness import (
+    DONE_ADDR,
+    RAM_BASE,
+    run_program,
+)
 from tests.python.unittests.cores.IllegalInstruction import (
-    HANDLER_WORD, LOG_BASE, MCAUSE, MEPC, MRET, MTVEC, NOP, csrrs, csrrw,
+    HANDLER_WORD,
+    LOG_BASE,
+    MCAUSE,
+    MEPC,
+    MRET,
+    MTVEC,
+    NOP,
+    csrrs,
+    csrrw,
 )
 from tests.python.unittests.cores.SdramStall import _r, addi, jal_self, lui, sw
 
@@ -29,6 +45,7 @@ UNTOUCHED = 0x55
 
 
 def build():
+    """Executa build."""
     program = [
         NOP,
         addi(5, 0, HANDLER_WORD * 4),
@@ -44,7 +61,10 @@ def build():
     for funct3 in DIVISIONS:
         program += [_r(0x33, 9, funct3, 2, 3, MULDIV_FUNCT7), addi(10, 10, 1)]
     for funct3 in PRODUCTS:
-        program += [_r(0x33, 4, funct3, 2, 3, MULDIV_FUNCT7), sw(4, 7, 4 * RESULT_WORD[funct3])]
+        program += [
+            _r(0x33, 4, funct3, 2, 3, MULDIV_FUNCT7),
+            sw(4, 7, 4 * RESULT_WORD[funct3]),
+        ]
     program += [
         sw(9, 7, 0),
         sw(10, 7, 4),
@@ -68,13 +88,23 @@ def build():
 
 @cocotb.test()
 async def test_zmmul_multiplies_and_traps_on_division(dut):
-    """The products are exact, each division traps once with cause 2 and writes nothing."""
+    """Verifica zmmul multiplies and traps on division.
+
+    The products are exact, each division traps once with cause 2 and
+    writes nothing.
+    """
     ram = await run_program(dut, build(), max_cycles=4000)
     for i in range(len(DIVISIONS)):
-        assert ram.get(LOG_BASE + 4 * i) == 2, f"division {i}: mcause {ram.get(LOG_BASE + 4 * i)}"
+        assert ram.get(LOG_BASE + 4 * i) == 2, (
+            f"division {i}: mcause {ram.get(LOG_BASE + 4 * i)}"
+        )
     assert LOG_BASE + 4 * len(DIVISIONS) not in ram, "a multiplication trapped"
     assert ram[RAM_BASE] == UNTOUCHED, "a division wrote its destination"
-    assert ram[RAM_BASE + 4] == len(DIVISIONS), "the program did not resume after each trap"
+    assert ram[RAM_BASE + 4] == len(DIVISIONS), (
+        "the program did not resume after each trap"
+    )
     for funct3 in PRODUCTS:
         got = ram[RAM_BASE + 4 * RESULT_WORD[funct3]]
-        assert got == EXPECTED[funct3], f"funct3 {funct3}: {got:#x} != {EXPECTED[funct3]:#x}"
+        assert got == EXPECTED[funct3], (
+            f"funct3 {funct3}: {got:#x} != {EXPECTED[funct3]:#x}"
+        )

@@ -1,43 +1,57 @@
+"""Testes de ALU."""
+
+import random
+
 import cocotb
 from cocotb.triggers import Timer
 
-
 OPCODES = {
-    "ADD":    "00000",
-    "SLL":    "00001",
-    "XOR":    "00100",
-    "SRL":    "00101",
-    "OR":     "00110",
-    "AND":    "00111",
-    "SUB":    "01000",
-    "SLT":    "01010",
-    "SLTU":   "01011",
-    "SRA":    "01101",
-    "JALR":   "10000",
-    "LUI":    "10001",
-    "BEQ":    "11000",
-    "BNE":    "11001",
-    "BLT":    "11100",
-    "BGE":    "11101",
-    "BLTU":   "11110",
-    "BGEU":   "11111"
+    "ADD": "00000",
+    "SLL": "00001",
+    "XOR": "00100",
+    "SRL": "00101",
+    "OR": "00110",
+    "AND": "00111",
+    "SUB": "01000",
+    "SLT": "01010",
+    "SLTU": "01011",
+    "SRA": "01101",
+    "JALR": "10000",
+    "LUI": "10001",
+    "BEQ": "11000",
+    "BNE": "11001",
+    "BLT": "11100",
+    "BGE": "11101",
+    "BLTU": "11110",
+    "BGEU": "11111",
 }
 
 
 def result_select(op_bits):
-    """Seleção one-hot do resultado, como o estágio ID decodifica (alu_result_select)."""
+    """Executa result select.
+
+    Seleção one-hot do resultado, como o estágio ID decodifica
+    (alu_result_select).
+    """
     op = int(op_bits, 2)
     if op & 0b10000:
-        return 0 if op & 0b01000 else 1  # desvios: nada; JALR e LUI: soma
-    return 1 << (op & 0b111)  # 0 soma, 1 SLL, 2 SLT, 3 SLTU, 4 XOR, 5 deslocamento à direita, 6 OR, 7 AND
+        # desvios: nada; JALR e LUI: soma
+        return 0 if op & 0b01000 else 1
+    return (
+        1 << (op & 0b111)
+        # 0 soma, 1 SLL, 2 SLT, 3 SLTU, 4 XOR,
+        # 5 deslocamento à direita, 6 OR, 7 AND
+    )
 
 
 def to_bits(val, width=32):
+    """Executa to bits."""
     mask = (1 << width) - 1
     return val & mask
 
 
 def to_signed(val, width=32):
+    """Executa to signed."""
     mask = (1 << width) - 1
     val &= mask
     if val & (1 << (width - 1)):
@@ -46,6 +60,7 @@ def to_signed(val, width=32):
 
 
 async def apply_and_check(dut, op_name, a, b, expected_data, expected_branch):
+    """Executa apply and check."""
     dut.i_op.value = int(OPCODES[op_name], 2)
     dut.i_res_sel.value = result_select(OPCODES[op_name])
     dut.i_a.value = to_bits(a)
@@ -75,75 +90,90 @@ async def apply_and_check(dut, op_name, a, b, expected_data, expected_branch):
 
 # === Testes separados para cada operação ===
 
+
 @cocotb.test()
 async def lui(dut):
     # LUI carrega o imediato de B, qualquer que seja o operando A
+    """Executa lui."""
     for a, b in ((10, 20), (0xFFFFFFFF, 0x12345000), (0x80000000, 0)):
         await apply_and_check(dut, "LUI", a, b, b, 0)
 
 
 @cocotb.test()
 async def add(dut):
+    """Executa add."""
     a, b = 15, 7
     await apply_and_check(dut, "ADD", a, b, a + b, 0)
 
 
 @cocotb.test()
 async def sub(dut):
+    """Executa sub."""
     a, b = 50, 20
     await apply_and_check(dut, "SUB", a, b, a - b, 0)
 
 
 @cocotb.test()
 async def xor(dut):
+    """Executa xor."""
     a, b = 0b1010, 0b1100
     await apply_and_check(dut, "XOR", a, b, a ^ b, 0)
 
 
 @cocotb.test()
 async def or_(dut):
+    """Executa or."""
     a, b = 0b1010, 0b1100
     await apply_and_check(dut, "OR", a, b, a | b, 0)
 
 
 @cocotb.test()
 async def and_(dut):
+    """Executa and."""
     a, b = 0b1010, 0b1100
     await apply_and_check(dut, "AND", a, b, a & b, 0)
 
 
 @cocotb.test()
 async def sll(dut):
+    """Executa sll."""
     a, b = 1, 3
     await apply_and_check(dut, "SLL", a, b, to_bits(a << (b & 0x1F)), 0)
 
 
 @cocotb.test()
 async def srl(dut):
+    """Executa srl."""
     a, b = 16, 2
     await apply_and_check(dut, "SRL", a, b, a >> (b & 0x1F), 0)
 
 
 @cocotb.test()
 async def sra(dut):
+    """Executa sra."""
     a, b = -16, 2
     await apply_and_check(dut, "SRA", a, b, to_signed(a) >> (b & 0x1F), 0)
 
 
 @cocotb.test()
 async def slt(dut):
+    """Executa slt."""
     a, b = -5, 7
-    await apply_and_check(dut, "SLT", a, b, 1 if to_signed(a) < to_signed(b) else 0, 0)
+    await apply_and_check(
+        dut, "SLT", a, b, 1 if to_signed(a) < to_signed(b) else 0, 0
+    )
 
 
 @cocotb.test()
 async def sltu(dut):
+    """Executa sltu."""
     a, b = 5, 7
     await apply_and_check(dut, "SLTU", a, b, 1 if a < b else 0, 0)
 
 
 @cocotb.test()
 async def beq(dut):
+    """Executa beq."""
     a, b = 10, 10
     await apply_and_check(dut, "BEQ", a, b, 0, 1)
     a, b = 10, 5
@@ -152,69 +182,90 @@ async def beq(dut):
 
 @cocotb.test()
 async def bne(dut):
+    """Executa bne."""
     a, b = 10, 20
     await apply_and_check(dut, "BNE", a, b, 0, 1)
 
 
 @cocotb.test()
 async def blt(dut):
+    """Executa blt."""
     a, b = -5, 7
     await apply_and_check(dut, "BLT", a, b, 0, 1)
 
 
 @cocotb.test()
 async def bge(dut):
+    """Executa bge."""
     a, b = 10, 5
     await apply_and_check(dut, "BGE", a, b, 0, 1)
 
 
 @cocotb.test()
 async def bltu(dut):
+    """Executa bltu."""
     a, b = 1, 2
     await apply_and_check(dut, "BLTU", a, b, 0, 1)
 
 
 @cocotb.test()
 async def bgeu(dut):
+    """Executa bgeu."""
     a, b = 2, 1
     await apply_and_check(dut, "BGEU", a, b, 0, 1)
 
-    
+
 @cocotb.test()
 async def jalr(dut):
-    """
-    Testa JALR: target = (rs1 + imm) with least-significant bit cleared.
+    """Testa JALR.
+
+    O alvo é (rs1 + imm) com o bit menos significativo zerado.
     Verifica dois casos: LSB já zero e LSB = 1 (deve ser forçado a 0).
     Espera branch = 1 (ajuste se seu ALU usar outro comportamento).
     """
     # caso 1: soma com LSB já zero
-    a = 0x1003   # rs1
-    b = 0x0005   # imm (exemplo)
+    a = 0x1003  # rs1
+    b = 0x0005  # imm (exemplo)
     sum_res = (a + b) & ~1
     await apply_and_check(dut, "JALR", a, b, sum_res, 0)
 
     # caso 2: soma com LSB = 1 -> deve ficar com LSB = 0
     a = 0x1002
     b = 0x0001
-    sum_res = (a + b) & ~1   # força bit 0 = 0
+    sum_res = (a + b) & ~1  # força bit 0 = 0
     await apply_and_check(dut, "JALR", a, b, sum_res, 0)
 
     dut._log.info("JALR tests OK")
 
 
 def reference(op_name, a, b):
-    """Resultado de dados e condição de desvio esperados para a operação."""
+    """Executa reference.
+
+    Resultado de dados e condição de desvio esperados para a operação.
+    """
     sa, sb = to_signed(a), to_signed(b)
     sh = b & 0x1F
     data = {
-        "ADD": a + b, "SUB": a - b, "XOR": a ^ b, "OR": a | b, "AND": a & b,
-        "SLL": a << sh, "SRL": a >> sh, "SRA": sa >> sh,
-        "SLT": int(sa < sb), "SLTU": int(a < b),
-        "JALR": (a + b) & ~1, "LUI": b,
+        "ADD": a + b,
+        "SUB": a - b,
+        "XOR": a ^ b,
+        "OR": a | b,
+        "AND": a & b,
+        "SLL": a << sh,
+        "SRL": a >> sh,
+        "SRA": sa >> sh,
+        "SLT": int(sa < sb),
+        "SLTU": int(a < b),
+        "JALR": (a + b) & ~1,
+        "LUI": b,
     }
     branch = {
-        "BEQ": a == b, "BNE": a != b, "BLT": sa < sb, "BGE": sa >= sb,
-        "BLTU": a < b, "BGEU": a >= b,
+        "BEQ": a == b,
+        "BNE": a != b,
+        "BLT": sa < sb,
+        "BGE": sa >= sb,
+        "BLTU": a < b,
+        "BGEU": a >= b,
     }
     if op_name in branch:
         return 0, int(branch[op_name])
@@ -223,10 +274,23 @@ def reference(op_name, a, b):
 
 @cocotb.test()
 async def every_operation_against_the_reference(dut):
-    """Cada operação confere com o modelo em valores de borda e aleatórios."""
-    import random
+    """Executa every operation against the reference.
+
+    Cada operação confere com o modelo em valores de borda e aleatórios.
+    """
     rng = random.Random(11)
-    edges = [0, 1, 2, 31, 32, 0x7FFFFFFF, 0x80000000, 0x80000001, 0xFFFFFFFE, 0xFFFFFFFF]
+    edges = [
+        0,
+        1,
+        2,
+        31,
+        32,
+        0x7FFFFFFF,
+        0x80000000,
+        0x80000001,
+        0xFFFFFFFE,
+        0xFFFFFFFF,
+    ]
     pairs = [(x, y) for x in edges for y in edges]
     pairs += [(rng.getrandbits(32), rng.getrandbits(32)) for _ in range(300)]
     pairs += [(v, v) for v in (0, 5, 0x80000000, 0xFFFFFFFF)]

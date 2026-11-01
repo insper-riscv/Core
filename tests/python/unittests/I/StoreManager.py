@@ -1,3 +1,5 @@
+"""Testes de StoreManager."""
+
 import cocotb
 from cocotb.triggers import Timer
 
@@ -9,18 +11,25 @@ FUNCT3_SB = 0b000
 
 
 async def apply_and_check(dut, funct3, ea, rs2, exp_data, exp_mask):
-    dut.i_opcode.value      = OPCODE_STORE
-    dut.i_funct3.value      = funct3
+    """Executa apply and check."""
+    dut.i_opcode.value = OPCODE_STORE
+    dut.i_funct3.value = funct3
     dut.i_byte_offset.value = ea
-    dut.i_rs2_data.value    = rs2
+    dut.i_rs2_data.value = rs2
 
     await Timer(1, units="ns")
 
     got_data = int(dut.o_data.value)
     got_mask = int(dut.o_byte_mask.value)
 
-    assert got_data == exp_data, f"funct3={funct3:03b}, EA={ea:02b}: esperado data=0x{exp_data:08X}, obtido 0x{got_data:08X}"
-    assert got_mask == exp_mask, f"funct3={funct3:03b}, EA={ea:02b}: esperado mask={exp_mask:04b}, obtido {got_mask:04b}"
+    assert got_data == exp_data, (
+        f"funct3={funct3:03b}, EA={ea:02b}: esperado data=0x{exp_data:08X}, "
+        f"obtido 0x{got_data:08X}"
+    )
+    assert got_mask == exp_mask, (
+        f"funct3={funct3:03b}, EA={ea:02b}: esperado mask={exp_mask:04b}, "
+        f"obtido {got_mask:04b}"
+    )
 
 
 @cocotb.test()
@@ -63,10 +72,10 @@ async def sb(dut):
 @cocotb.test()
 async def invalid_opcode(dut):
     """Testa opcode inválido."""
-    dut.i_opcode.value      = 0b0000000
-    dut.i_funct3.value      = 0b111
+    dut.i_opcode.value = 0b0000000
+    dut.i_funct3.value = 0b111
     dut.i_byte_offset.value = 0b00
-    dut.i_rs2_data.value    = 0x12345678
+    dut.i_rs2_data.value = 0x12345678
 
     await Timer(1, units="ns")
 

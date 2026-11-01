@@ -1,11 +1,16 @@
+"""Testes de BubbleMux."""
+
 import cocotb
 from cocotb.triggers import Timer
 
 
 @cocotb.test()
 async def test_passthrough(dut):
-    """i_sel='0': todos os sinais passam direto da entrada para a saida."""
-    dut.i_sel.value    = 0
+    """Verifica passthrough.
+
+    i_sel='0': todos os sinais passam direto da entrada para a saida.
+    """
+    dut.i_sel.value = 0
     dut.i_we_reg.value = 1
     dut.i_we_ram.value = 1
     dut.i_re_ram.value = 1
@@ -20,9 +25,11 @@ async def test_passthrough(dut):
 
 @cocotb.test()
 async def test_bubble_zeros_all(dut):
-    """i_sel='1': todos os sinais sao zerados, mesmo se as entradas
-    estiverem em '1'."""
-    dut.i_sel.value    = 1
+    """Zera todos os sinais com i_sel='1'.
+
+    Vale mesmo se as entradas estiverem em '1'.
+    """
+    dut.i_sel.value = 1
     dut.i_we_reg.value = 1
     dut.i_we_ram.value = 1
     dut.i_re_ram.value = 1
@@ -37,7 +44,10 @@ async def test_bubble_zeros_all(dut):
 
 @cocotb.test()
 async def test_toggle_sel(dut):
-    """Alterna i_sel com entradas constantes em 1: deve seguir o i_sel."""
+    """Verifica toggle sel.
+
+    Alterna i_sel com entradas constantes em 1: deve seguir o i_sel.
+    """
     dut.i_we_reg.value = 1
     dut.i_we_ram.value = 1
     dut.i_re_ram.value = 1

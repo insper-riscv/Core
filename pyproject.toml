@@ -87,7 +87,13 @@ max-locals = 15
 max-public-methods = 10
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR2004"]
+# Test modules are named after the VHDL entity they exercise (N999), mirror
+# its signals (N803, N806), draw stimuli from a seeded PRNG (S311) and take
+# one argument per stimulus (PLR09xx).
+"tests/**" = [
+    "S101", "PLR2004", "N999", "N803", "N806", "S311",
+    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917",
+]
 "tests/fixtures/**" = ["B011", "ARG001"]
 
 [tool.ruff.format]

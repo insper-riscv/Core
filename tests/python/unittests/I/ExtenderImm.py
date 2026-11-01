@@ -1,14 +1,18 @@
-import cocotb
-from cocotb.triggers import Timer
+"""Testes de ExtenderImm."""
+
 import random
 
+import cocotb
+from cocotb.triggers import Timer
+
 # Constantes (iguais às do pacote VHDL)
-OPEXIMM_U       = 0b000
-OPEXIMM_I       = 0b001
+OPEXIMM_U = 0b000
+OPEXIMM_I = 0b001
 OPEXIMM_I_SHAMT = 0b010
-OPEXIMM_J       = 0b011
-OPEXIMM_S       = 0b100
-OPEXIMM_B       = 0b101
+OPEXIMM_J = 0b011
+OPEXIMM_S = 0b100
+OPEXIMM_B = 0b101
+
 
 # === Helpers ===
 def sext(val, bits, width=32):
@@ -20,22 +24,25 @@ def sext(val, bits, width=32):
     return val & ((1 << width) - 1)
 
 
-def zext(val, bits, width=32):
+def zext(val, bits, _width=32):
     """Zero-extend de 'bits' para 'width' bits."""
     mask = (1 << bits) - 1
     return val & mask
 
 
 async def apply_and_check(dut, op, inp, expected, name):
+    """Executa apply and check."""
     dut.i_instr.value = inp & ((1 << len(dut.i_instr)) - 1)
     dut.i_op.value = op
     await Timer(1, "ns")
 
     got = int(dut.o_imm.value)
     assert got == expected, (
-        f"{name} falhou: input={inp:#09x}, esperado={expected:#010x}, obtido={got:#010x}"
+        f"{name} falhou: input={inp:#09x}, esperado={expected:#010x}, "
+        f"obtido={got:#010x}"
     )
     dut._log.info(f"{name} OK: in={inp:#09x} out={got:#010x}")
+
 
 @cocotb.test()
 async def u(dut):

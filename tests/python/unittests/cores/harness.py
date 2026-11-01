@@ -1,9 +1,12 @@
-"""Run a program on the core against synchronous models of the instruction memory, the
-internal RAM and flash port 2.
+"""Testes do modulo.
 
-The data memories answer in the cycle after the address and keep their output while the
-read enable is down, the way the block RAMs of the board do. The instruction memory
-answers in the same cycle (it is clocked ahead of the core on the board).
+Run a program on the core against synchronous models of the instruction
+memory, the internal RAM and flash port 2.
+
+The data memories answer in the cycle after the address and keep their
+output while the read enable is down, the way the block RAMs of the
+board do. The instruction memory answers in the same cycle (it is
+clocked ahead of the core on the board).
 """
 
 import cocotb
@@ -16,17 +19,33 @@ RAM_BASE = 0x8000
 DONE_ADDR = RAM_BASE + 0x7FC
 
 
-async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, sdram=None, sdram_stall=None,
-                      imem=None, flash_port_value=None):
-    """Run until the program stores 1 at DONE_ADDR; return the RAM as {address: word}.
+async def run_program(  # complexipy: ignore
+    dut,
+    program,
+    flash=None,
+    max_cycles=4000,
+    monitor=None,
+    sdram=None,
+    sdram_stall=None,
+    imem=None,
+    flash_port_value=None,
+):
+    """Executa run program.
 
-    ``monitor``, when given, is called once per cycle after the memory models have settled.
-    ``imem`` (a dict {address: word}) replaces the instruction memory built from ``program``, so code can sit at
-    any address; the word also goes to the instruction cache port (``i_ic_data``). ``flash_port_value``, when
-    given, is driven on ``i_flash_data`` instead of the instruction, to show that a fetch does not use it.
-    ``sdram`` (a dict {address: word}) turns on a slave for the SDRAM window; ``sdram_stall(n)`` gives the
-    stall cycles of its n-th access. The slave holds ``i_sdram_ready`` until the core advances and commits
-    the read data after that, the way the bridge of the board does.
+    Run until the program stores 1 at DONE_ADDR; return the RAM as
+    {address: word}.
+
+    ``monitor``, when given, is called once per cycle after the memory
+    models have settled. ``imem`` (a dict {address: word}) replaces the
+    instruction memory built from ``program``, so code can sit at any
+    address; the word also goes to the instruction cache port
+    (``i_ic_data``). ``flash_port_value``, when given, is driven on
+    ``i_flash_data`` instead of the instruction, to show that a fetch
+    does not use it. ``sdram`` (a dict {address: word}) turns on a slave
+    for the SDRAM window; ``sdram_stall(n)`` gives the stall cycles of
+    its n-th access. The slave holds ``i_sdram_ready`` until the core
+    advances and commits the read data after that, the way the bridge of
+    the board does.
     """
     if imem is None:
         imem = {4 * i: w for i, w in enumerate(program)}
@@ -34,7 +53,13 @@ async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, s
     ram = {}
 
     dut.i_rst.value = 1
-    for port in ("i_sdram_rdata", "i_boot_rom_data", "i_flash_data", "i_flash_data2", "i_ram_rdata"):
+    for port in (
+        "i_sdram_rdata",
+        "i_boot_rom_data",
+        "i_flash_data",
+        "i_flash_data2",
+        "i_ram_rdata",
+    ):
         getattr(dut, port).value = 0
     dut.i_sdram_ready.value = 0 if sdram is not None else 1
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
@@ -63,14 +88,18 @@ async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, s
 
         word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
         dut.i_boot_rom_data.value = word
-        dut.i_flash_data.value = word if flash_port_value is None else flash_port_value
+        dut.i_flash_data.value = (
+            word if flash_port_value is None else flash_port_value
+        )
         dut.i_ic_data.value = word
 
         if int(dut.o_ram_en.value):
             addr = int(dut.o_ram_addr.value) & ~3
             if int(dut.o_ram_wren.value):
                 ram[addr] = _bytes_merge(
-                    ram.get(addr, 0), int(dut.o_ram_wdata.value), int(dut.o_ram_byteena.value)
+                    ram.get(addr, 0),
+                    int(dut.o_ram_wdata.value),
+                    int(dut.o_ram_byteena.value),
                 )
             if int(dut.o_ram_rden.value):
                 ram_next = ram.get(addr, 0)
@@ -97,12 +126,18 @@ async def run_program(dut, program, flash=None, max_cycles=4000, monitor=None, s
                 slave = "wait"
             if slave == "wait":
                 assert active, "the access left the bus before it completed"
-                assert int(dut.o_sdram_addr.value) == held_addr, "address moved during the wait"
-                assert int(dut.o_mem_advance.value) == 0, "the memory advanced while not ready"
+                assert int(dut.o_sdram_addr.value) == held_addr, (
+                    "address moved during the wait"
+                )
+                assert int(dut.o_mem_advance.value) == 0, (
+                    "the memory advanced while not ready"
+                )
                 if countdown == 0:
                     if access["we"]:
                         sdram[access["addr"]] = _bytes_merge(
-                            sdram.get(access["addr"], 0), access["wdata"], access["be"]
+                            sdram.get(access["addr"], 0),
+                            access["wdata"],
+                            access["be"],
                         )
                     else:
                         pending_read = sdram.get(access["addr"], 0)

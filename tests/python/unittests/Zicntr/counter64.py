@@ -1,4 +1,8 @@
-"""counter64: a 64-bit counter in two halves, the carry registered, the read always coherent."""
+"""Testes do modulo.
+
+counter64: a 64-bit counter in two halves, the carry registered, the
+read always coherent.
+"""
 
 import cocotb
 from cocotb.clock import Clock
@@ -8,6 +12,7 @@ MASK32 = 0xFFFFFFFF
 
 
 async def start(dut):
+    """Executa start."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_inc.value = 0
     dut.i_we_lo.value = 0
@@ -21,11 +26,16 @@ async def start(dut):
 
 
 def value(dut):
+    """Executa value."""
     return (int(dut.o_hi.value) << 32) | int(dut.o_lo.value)
 
 
 async def step(dut, inc=0, we_lo=None, we_hi=None):
-    """One clock edge with the inputs given; returns the 64-bit value after it."""
+    """Executa step.
+
+    One clock edge with the inputs given; returns the 64-bit value after
+    it.
+    """
     dut.i_inc.value = inc
     dut.i_we_lo.value = int(we_lo is not None)
     dut.i_we_hi.value = int(we_hi is not None)
@@ -40,6 +50,7 @@ async def step(dut, inc=0, we_lo=None, we_hi=None):
 
 @cocotb.test()
 async def test_reset_and_hold(dut):
+    """Verifica reset and hold."""
     await start(dut)
     assert value(dut) == 0
     for _ in range(3):
@@ -48,6 +59,7 @@ async def test_reset_and_hold(dut):
 
 @cocotb.test()
 async def test_counts_one_per_enabled_cycle(dut):
+    """Verifica counts one per enabled cycle."""
     await start(dut)
     for n in range(1, 20):
         assert await step(dut, inc=1) == n
@@ -55,7 +67,11 @@ async def test_counts_one_per_enabled_cycle(dut):
 
 @cocotb.test()
 async def test_the_read_is_coherent_across_the_carry(dut):
-    """The value read at every cycle is the ideal 64-bit counter, also the cycle after the wrap."""
+    """Verifica the read is coherent across the carry.
+
+    The value read at every cycle is the ideal 64-bit counter, also the
+    cycle after the wrap.
+    """
     await start(dut)
     await step(dut, we_lo=0xFFFFFFFD)
     await step(dut, we_hi=0x00000007)
@@ -69,7 +85,11 @@ async def test_the_read_is_coherent_across_the_carry(dut):
 
 @cocotb.test()
 async def test_the_carry_crosses_idle_cycles(dut):
-    """A wrap followed by cycles without increment still ends with the high half summed."""
+    """Verifica the carry crosses idle cycles.
+
+    A wrap followed by cycles without increment still ends with the high
+    half summed.
+    """
     await start(dut)
     await step(dut, we_lo=MASK32)
     assert await step(dut, inc=1) == 1 << 32
@@ -79,6 +99,7 @@ async def test_the_carry_crosses_idle_cycles(dut):
 
 @cocotb.test()
 async def test_a_write_wins_over_the_increment(dut):
+    """Verifica a write wins over the increment."""
     await start(dut)
     assert await step(dut, inc=1, we_lo=0x1234) == 0x1234
     assert await step(dut, inc=1, we_hi=0x55) >> 32 == 0x55
@@ -87,6 +108,7 @@ async def test_a_write_wins_over_the_increment(dut):
 
 @cocotb.test()
 async def test_a_low_write_on_the_wrap_cycle_makes_no_carry(dut):
+    """Verifica a low write on the wrap cycle makes no carry."""
     await start(dut)
     await step(dut, we_lo=MASK32)
     assert await step(dut, inc=1, we_lo=0) == 0
@@ -95,16 +117,20 @@ async def test_a_low_write_on_the_wrap_cycle_makes_no_carry(dut):
 
 @cocotb.test()
 async def test_a_high_write_drops_the_pending_carry(dut):
+    """Verifica a high write drops the pending carry."""
     await start(dut)
     await step(dut, we_lo=MASK32)
     await step(dut, inc=1)  # wraps: the carry is pending now
     assert value(dut) == 1 << 32
-    assert await step(dut, we_hi=0x20) == 0x20 << 32, "the write wins over the pending carry"
+    assert await step(dut, we_hi=0x20) == 0x20 << 32, (
+        "the write wins over the pending carry"
+    )
     assert await step(dut) == 0x20 << 32
 
 
 @cocotb.test()
 async def test_reset_clears_both_halves_and_the_carry(dut):
+    """Verifica reset clears both halves and the carry."""
     await start(dut)
     await step(dut, we_lo=MASK32)
     await step(dut, inc=1)

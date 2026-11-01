@@ -1,15 +1,34 @@
-"""With the Zifencei extension FENCE.I is a legal instruction: it does not trap and the program goes on."""
+"""Testes do modulo.
+
+With the Zifencei extension FENCE.I is a legal instruction: it does not
+trap and the program goes on.
+"""
 
 import cocotb
 
-from tests.python.unittests.cores.harness import DONE_ADDR, RAM_BASE, run_program
-from tests.python.unittests.cores.IllegalInstruction import HANDLER_WORD, LOG_BASE, MRET, NOP, MCAUSE, MEPC, MTVEC, csrrs, csrrw
+from tests.python.unittests.cores.harness import (
+    DONE_ADDR,
+    RAM_BASE,
+    run_program,
+)
+from tests.python.unittests.cores.IllegalInstruction import (
+    HANDLER_WORD,
+    LOG_BASE,
+    MCAUSE,
+    MEPC,
+    MRET,
+    MTVEC,
+    NOP,
+    csrrs,
+    csrrw,
+)
 from tests.python.unittests.cores.SdramStall import addi, jal_self, lui, sw
 
 FENCE_I = 0x0000100F
 
 
 def build():
+    """Executa build."""
     program = [
         NOP,
         addi(5, 0, HANDLER_WORD * 4),
@@ -18,8 +37,10 @@ def build():
         lui(11, LOG_BASE >> 12),
         addi(11, 11, LOG_BASE & 0xFFF),
         addi(10, 0, 0),
-        FENCE_I, addi(10, 10, 1),
-        FENCE_I, addi(10, 10, 1),
+        FENCE_I,
+        addi(10, 10, 1),
+        FENCE_I,
+        addi(10, 10, 1),
         sw(10, 7, 4),
         addi(14, 0, 1),
         sw(14, 7, DONE_ADDR - RAM_BASE),
@@ -40,7 +61,13 @@ def build():
 
 @cocotb.test()
 async def test_fence_i_is_legal_with_zifencei(dut):
-    """Two FENCE.I run without a trap and the instruction after each one executes."""
+    """Verifica fence i is legal with zifencei.
+
+    Two FENCE.I run without a trap and the instruction after each one
+    executes.
+    """
     ram = await run_program(dut, build(), max_cycles=2000)
-    assert LOG_BASE not in ram, f"FENCE.I trapped with mcause {ram.get(LOG_BASE)}"
+    assert LOG_BASE not in ram, (
+        f"FENCE.I trapped with mcause {ram.get(LOG_BASE)}"
+    )
     assert ram[RAM_BASE + 4] == 2
