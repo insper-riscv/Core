@@ -37,6 +37,9 @@ jobs:
       - name: Per-entity cocotb tests
         run: make test
 
+      - name: Formal proofs and their mutants (SymbiYosys)
+        run: make formal
+
       - name: Upload waveforms
         if: failure()
         uses: actions/upload-artifact@v7
