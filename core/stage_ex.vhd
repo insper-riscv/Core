@@ -154,9 +154,7 @@ entity stage_ex is
 		-- Pulso de requisição de flush enviado à cache de dados write-back.
 		o_dc_flush        : out std_logic;
 		-- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
-		o_muldiv_stall    : out std_logic;
-		-- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
-		o_muldiv_fused    : out std_logic
+		o_muldiv_stall    : out std_logic
 	);
 end entity stage_ex;
 
@@ -227,6 +225,12 @@ architecture rtl of stage_ex is
 	signal ex_cf_taken        : std_logic;
 	-- Endereço alvo do desvio ou salto tomado em EX.
 	signal ex_cf_target       : word_t;
+	-- Bit 1 do alvo de JALR, calculado só dos dois bits baixos dos operandos (sem esperar a soma de 32 bits da ULA).
+	signal jalr_target_bit1   : std_logic;
+	-- Bit 1 do alvo do desvio ou salto tomado, disponível cedo.
+	signal ex_cf_bit1         : std_logic;
+	-- Bits de 31 a 2 do alvo do desvio ou salto tomado.
+	signal ex_cf_target_hi    : std_logic_vector(31 downto 2);
 
 	-- Pulso interno de conclusão de FENCE.I.
 	signal fencei_take_int    : std_logic;
@@ -343,12 +347,10 @@ begin
 				o_result    => ex_muldiv_result,
 				o_stall     => o_muldiv_stall,
 				o_busy      => open,
-				o_done      => open,
-				o_fused     => o_muldiv_fused
+				o_done      => open
 			);
 	else generate
 		o_muldiv_stall   <= '0';
-		o_muldiv_fused   <= '0';
 		ex_muldiv_result <= (others => '0');
 	end generate gen_m;
 
@@ -424,8 +426,15 @@ begin
 				o_mepc       => csr_mepc
 			);
 
+		-- O alvo desalinhado depende só do bit 1 do alvo, porque o bit 0 é zero: no JALR ele sai da soma dos dois
+		-- bits baixos de rs1 e do imediato, e no desvio e no JAL, do somador de PC mais imediato. O alvo completo
+		-- (a soma da ULA) só alimenta mtval, então a causa 0 não espera a ULA.
+		jalr_target_bit1 <= ex_alu_op_a(1) xor ex_alu_op_b(1) xor (ex_alu_op_a(0) and ex_alu_op_b(0));
+		ex_cf_bit1       <= jalr_target_bit1 when jalr_taken_int = '1' else branch_target_int(1);
+		ex_cf_target_hi  <= ex_alu_result(31 downto 2) when jalr_taken_int = '1' else branch_target_int(31 downto 2);
+
 		ex_cf_taken  <= branch_taken_int or jalr_taken_int;
-		ex_cf_target <= ex_alu_result when jalr_taken_int = '1' else branch_target_int;
+		ex_cf_target <= ex_cf_target_hi & ex_cf_bit1 & '0';
 
 		sig_take  <= '0';
 		sig_cause <= (others => '0');
