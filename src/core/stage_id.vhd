@@ -6,7 +6,7 @@
 --   1. Unidade de controle base RV32I (control_unit) e decodificadores opcionais
 --      das extensões M (m_decode) e Zicsr (csr_decode).
 --   2. Extensor de imediatos de 32 bits (extender_imm).
---   3. Banco de 32 registradores de uso geral (reg_file), recebendo a escrita
+--   3. Banco de 32 (RV32I) ou 16 (RV32E) registradores de uso geral (reg_file), recebendo a escrita
 --      vinda do estágio WB.
 --   4. Unidade de detecção de hazards de load-use e stall de unidades
 --      multiciclo (hazard_detection_unit) e mux de inserção de bolha (bubble_mux).
@@ -30,7 +30,9 @@ entity stage_id is
 		-- Habilita o decodificador da extensão Zicsr (csr_decode).
 		has_zicsr : boolean := false;
 		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
-		has_zifencei : boolean := false
+		has_zifencei : boolean := false;
+		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E, x0 a x15).
+		num_regs  : natural := 32
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -157,6 +159,18 @@ architecture rtl of stage_id is
 	signal cu_we_ram       : std_logic;
 	-- Habilitação de leitura na RAM antes do bubble_mux.
 	signal cu_re_ram       : std_logic;
+	-- Largura do endereço do banco de registradores: 5 bits para 32 registradores, 4 bits para 16.
+	function addr_bits_for(count : natural) return natural is
+	begin
+		if count = 32 then
+			return 5;
+		end if;
+		return 4;
+	end function addr_bits_for;
+
+	-- Largura do endereço do banco de registradores desta instância.
+	constant REG_ADDR_WIDTH : natural := addr_bits_for(num_regs);
+
 	-- Habilitação geral da RAM antes do bubble_mux.
 	signal cu_en_ram       : std_logic;
 	-- Seletor de inserção de bolha gerado pela HDU.
@@ -167,8 +181,19 @@ architecture rtl of stage_id is
 	signal id_is_muldiv    : std_logic;
 	-- Indica FENCE.I decodificado no estágio ID e legal porque a extensão Zifencei existe.
 	signal id_is_fencei    : std_logic;
+	-- Indica instrução que usa, como rd, rs1 ou rs2, um registrador x16 a x31 que o RV32E não tem.
+	signal id_bad_reg      : std_logic;
+	-- Indica que o campo rd da instrução é um registrador de destino de fato.
+	signal id_uses_rd      : std_logic;
+	-- Indica que o campo rs1 da instrução é um registrador de origem de fato.
+	signal id_uses_rs1     : std_logic;
+	-- Indica que o campo rs2 da instrução é um registrador de origem de fato.
+	signal id_uses_rs2     : std_logic;
 
 begin
+
+	assert num_regs = 16 or num_regs = 32
+		report "num_regs deve ser 16 (RV32E) ou 32 (RV32I)" severity failure;
 
 	o_rs1_idx <= id_rs1_idx;
 	o_rs2_idx <= id_rs2_idx;
@@ -227,7 +252,23 @@ begin
 
 	o_is_muldiv   <= id_is_muldiv;
 	id_is_fencei  <= '1' when (has_zifencei and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
-	o_illegal     <= cu_illegal and (not id_is_muldiv) and (not id_is_fencei);
+	-- No RV32E o bit mais alto de cada campo de registrador usado precisa ser zero.
+	id_uses_rd  <= '1' when (id_opcode = OPCODE_LUI or id_opcode = OPCODE_AUIPC or id_opcode = OPCODE_JAL or
+	                         id_opcode = OPCODE_JALR or id_opcode = OPCODE_LOAD or id_opcode = OPCODE_OP_IMM or
+	                         id_opcode = OPCODE_OP or (id_opcode = OPCODE_SYSTEM and i_instr(14 downto 12) /= FUNCT3_PRIV))
+	               else '0';
+	id_uses_rs1 <= '1' when (id_opcode = OPCODE_JALR or id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_LOAD or
+	                         id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP_IMM or id_opcode = OPCODE_OP or
+	                         (id_opcode = OPCODE_SYSTEM and i_instr(14) = '0' and i_instr(14 downto 12) /= FUNCT3_PRIV))
+	               else '0';
+	id_uses_rs2 <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP)
+	               else '0';
+	id_bad_reg  <= '1' when (num_regs = 16 and
+	                         ((id_uses_rd = '1' and id_rd_idx(4) = '1') or
+	                          (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
+	                          (id_uses_rs2 = '1' and id_rs2_idx(4) = '1')))
+	               else '0';
+	o_illegal     <= (cu_illegal and (not id_is_muldiv) and (not id_is_fencei)) or id_bad_reg;
 	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg;
 	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;
@@ -257,13 +298,16 @@ begin
 	o_alu_sel <= alu_result_select(cu_alu_op);
 
 	u_regfile : entity work.reg_file
+		generic map (
+			addr_width => REG_ADDR_WIDTH
+		)
 		port map (
 			i_clk    => i_clk,
 			i_rst    => i_rst,
 			i_enable => i_wb_we,
-			i_rs1    => id_rs1_idx,
-			i_rs2    => id_rs2_idx,
-			i_rd     => i_wb_rd,
+			i_rs1    => id_rs1_idx(REG_ADDR_WIDTH - 1 downto 0),
+			i_rs2    => id_rs2_idx(REG_ADDR_WIDTH - 1 downto 0),
+			i_rd     => i_wb_rd(REG_ADDR_WIDTH - 1 downto 0),
 			i_d      => i_wb_data,
 			o_rs1    => o_rs1_val,
 			o_rs2    => o_rs2_val
