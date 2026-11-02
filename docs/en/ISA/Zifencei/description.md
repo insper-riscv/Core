@@ -1,6 +1,6 @@
-# FENCE.I Instruction (Zifencei)
+# Zifencei: Core Implementation
 
-The `FENCE.I` instruction synchronises the instruction stream with the earlier stores of the same hart. After it, an instruction fetch sees everything the program wrote to memory before. This document describes what it is for, how the Core executes it and what happens in the pipeline and in the caches.
+The `FENCE.I` instruction synchronises the instruction stream with the earlier stores of the same hart. After it, an instruction fetch sees everything the program wrote to memory before. What the RISC-V manual requires is in [instructions.md](instructions.md). This document describes what it is for, how the Core executes it and what happens in the pipeline and in the caches.
 
 ## 1. What It Is For
 
@@ -15,23 +15,17 @@ Typical cases are a loader that copies a program into memory, code generation at
 
 ## 2. Where the Instruction Has Effect
 
-Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal RAM is not a fetch region. The regions that go through the cache depend on the Core memory map, chosen by the `rom_external` generic.
+Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_ROM is external: it belongs to the external window from `ext_base_kib`, to a ROM flagged `rom_external`, or to a RAM flagged `ram_external`. The limits come from the generics described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
-In the default map the FLASH is internal and read directly, so only code written to SDRAM changes its result with `FENCE.I`.
+| Fetch region | Goes through the instruction cache |
+| :--- | :--- |
+| BOOT_ROM | No |
+| ROM with `rom_external` false | No |
+| ROM with `rom_external` true | Yes |
+| RAM with `ram_external` true | Yes |
+| External window from `ext_base_kib` | Yes |
 
-| Fetch region | Range | Goes through the instruction cache |
-| :--- | :--- | :--- |
-| BOOT_ROM | `0x00000000` to `0x000007FF` | No |
-| Internal FLASH | `0x00000800` to `0x3FFFFFFF` | No |
-| SDRAM | `0x40000000` onwards | Yes |
-
-In the map with external FLASH the FLASH sits behind the caches, and `FENCE.I` applies to code written to either of the two regions.
-
-| Fetch region | Range | Goes through the instruction cache |
-| :--- | :--- | :--- |
-| BOOT_ROM | `0x00000000` to `0x000007FF` | No |
-| External FLASH | `0x20000000` to `0x3FFFFFFF` | Yes |
-| SDRAM | `0x40000000` onwards | Yes |
+In the default map (`rom_external` false) the ROM is internal and read directly, so only code written to the external window (from `0x40000000`) changes its result with `FENCE.I`. With an external ROM, `FENCE.I` also applies to code written to it.
 
 ## 3. Configuration
 
@@ -48,6 +42,8 @@ Two Core parameters decide the behaviour.
 | True | Executes as in sections 4 and 5 |
 
 The ordinary `FENCE` instruction, with `funct3 = 000`, is not handled by this unit and behaves as a `NOP`.
+
+The decoder recognises `FENCE.I` by the `MISC-MEM` opcode and `funct3 = 001`, and ignores the `rd`, `rs1` and `funct12` fields, as the manual requires of base implementations.
 
 ## 4. Execution Without a Data Cache
 
@@ -93,7 +89,7 @@ The two discarded instructions are fetched again from $\text{PC} + 4$, with the 
 | Write-back data | One flush request | Every dirty line is written to memory. The lines stay valid and become clean |
 | Write-through data | One flush request | The memory already has every completed store and no line is dirty, so the flush writes nothing |
 
-The flush walks the 256 lines of the cache, with three cycles for each clean line, and adds the write time of each dirty line. The data cache signals completion with a pulse, which the Core uses as the acknowledgement.
+The duration of the flush depends on the data cache, which is external to the Core. It signals completion with a pulse, which the Core uses as the acknowledgement and which may arrive in the cycle of the request or in any later cycle.
 
 ## 8. Use in a Program
 
@@ -111,11 +107,11 @@ An instruction between the store and `FENCE.I` does not change the guarantee. Th
 
 | Configuration | Cost of `FENCE.I` |
 | :--- | :--- |
-| Without a data cache | Two discarded instructions, plus the cache miss on the first SDRAM fetch after the invalidation |
-| With a data cache | About 768 cycles walking the 256 lines, plus the write of each dirty line, plus the cost above |
+| Without a data cache | Two discarded instructions, plus the cache miss on the first external fetch after the invalidation |
+| With a data cache | The cache flush time, which the Core waits for with the pipeline stalled, plus the cost above |
 
-The walking cost exists even without dirty lines, so `FENCE.I` is an expensive instruction with a data cache and should be used rarely.
+The flush happens even without dirty lines, so `FENCE.I` is an expensive instruction with a data cache and should be used rarely.
 
 ---
 
-Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../../LICENSE).
