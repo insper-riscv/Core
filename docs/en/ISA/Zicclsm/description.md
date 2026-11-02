@@ -22,25 +22,22 @@ An access that crosses the word occupies the last bytes of a 32-bit word and the
 
 ## 2. When the Hardware Executes the Access
 
-For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map generics (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). The `rom_external` generic chooses between the two map forms below.
+For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map generics (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). 
 
-In the default map the main memory is the internal RAM and the SDRAM window.
+The start of the main memory is `ext_base_kib * 1024` when `rom_external` is true and `rom_end_kib` is 0, and `rom_end_kib * 1024` otherwise. The end is `periph_base_kib * 1024`, where the peripheral window starts. The intervals below are half-open and hold for any value of the generics.
 
-| Region | Range | Misaligned access in hardware |
+| Region | Range as a function of the generics | Misaligned access in hardware |
 | :--- | :--- | :--- |
-| BOOT_ROM and internal FLASH | below `0x00008000` | No, raises an exception |
-| Internal RAM | `0x00008000` to `0x3FFFFFFF` | Yes |
-| SDRAM | `0x40000000` to `0x7FFFFFFF` | Yes |
-| Peripherals | `0x80000000` onwards | No, raises an exception |
+| Below the main memory (BOOT_ROM, internal ROM and unmapped range) | `[0, start)` | No, raises an exception |
+| Main memory | `[start, periph_base_kib * 1024)` | Yes |
+| Peripherals | `[periph_base_kib * 1024, 2**32)` | No, raises an exception |
 
-In the map of the platform with external FLASH (`rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` and `periph_base_kib => 1572864`) there is no internal RAM. The main memory is the FLASH, which sits behind the caches, and the SDRAM window.
+Each platform fixes the generics in its `config.yml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
 
-| Region | Range | Misaligned access in hardware |
-| :--- | :--- | :--- |
-| BOOT_ROM and unmapped range | below `0x20000000` | No, raises an exception |
-| External FLASH | `0x20000000` to `0x3FFFFFFF` | Yes |
-| SDRAM | `0x40000000` to `0x5FFFFFFF` | Yes |
-| Peripherals | `0x60000000` onwards | No, raises an exception |
+| Map | `rom_external` | `rom_end_kib` | `ext_base_kib` | `periph_base_kib` | Main memory | Peripherals |
+| :--- | :---: | :---: | :---: | :---: | :--- | :--- |
+| Default, with internal RAM | `false` | 32 | 1048576 | 2097152 | `0x00008000` to `0x7FFFFFFF` | `0x80000000` onwards |
+| Platform with external FLASH | `true` | 0 | 524288 | 1572864 | `0x20000000` to `0x5FFFFFFF` | `0x60000000` onwards |
 
 A misaligned access that fits in one word (`LH`, `LHU` and `SH` with $o = 1$) is executed when the address is in the main memory. An access that crosses the word is executed only when it meets the two conditions below.
 
