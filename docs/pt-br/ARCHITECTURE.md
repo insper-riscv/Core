@@ -118,6 +118,8 @@ O capítulo da extensão M recomenda executar uma só vez `MULH[[S]U]` seguido d
 
 ### 3.2. Extensão Zicsr e Tratamento de Traps
 
+A especificação das instruções e a descrição completa da implementação estão em [instructions.md](ISA/Zicsr/instructions.md) e [description.md](ISA/Zicsr/description.md).
+
 Quando `has_zicsr = true`, o decodificador `csr_decode` no estágio ID identifica a classe `OPCODE_SYSTEM` (`"1110011"`), força a extração do imediato I-type (`instr[31:20]`) para transportar o endereço de 12 bits do CSR até EX e ativa `o_is_csr = '1'` e `o_we_reg = '1'` para as seis instruções de acesso a CSR (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
 
 No estágio EX:

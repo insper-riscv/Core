@@ -118,6 +118,8 @@ The M chapter recommends running `MULH[[S]U]` followed by `MUL`, and `DIV[U]` fo
 
 ### 3.2. Zicsr Extension and Trap Handling
 
+The instruction specification and the full implementation description are in [instructions.md](ISA/Zicsr/instructions.md) and [description.md](ISA/Zicsr/description.md).
+
 When `has_zicsr = true`, the `csr_decode` decoder in the ID stage identifies the `OPCODE_SYSTEM` class (`"1110011"`), forces I-type immediate extraction (`instr[31:20]`) to carry the 12-bit CSR address into EX, and asserts `o_is_csr = '1'` and `o_we_reg = '1'` for the six CSR access instructions (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
 
 In the EX stage:
