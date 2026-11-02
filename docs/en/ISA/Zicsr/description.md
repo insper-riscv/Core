@@ -164,7 +164,7 @@ With `has_zicsr = false`, `csr_file` and `csr_decode` are not instantiated and t
 
 In this mode, every CSR access instruction is illegal (cause 2), `ECALL` raises cause 11 and `EBREAK` cause 3, and load and store misalignment (causes 4 and 6) is checked in the EX stage itself. Branch target misalignment is not checked, and `MRET` has no effect. The faulting instruction is annulled in EX, with no `rd` write and no memory access, and the program continues at the next instruction. The instruction that raised the exception does not count as retired. The environment around the Core decides what to do with the signal.
 
-A profile requires `Zicsr` or `Zicclsm`, because without both a misaligned access would have neither a trap nor hardware execution, and elaboration fails. `Zicntr` and `Zihpm` require `Zicsr`.
+A core with neither `Zicsr` nor `Zicclsm` is valid: the misaligned access is only signalled on `o_trap`. `Zicntr` and `Zihpm` require `Zicsr`, and elaboration fails without it.
 
 ---
 

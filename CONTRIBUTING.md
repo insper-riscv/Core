@@ -208,7 +208,7 @@ Qualquer alteração em código VHDL, manifestos de perfil ou documentação dev
 ```bash
 make check          # Verifica a sintaxe VHDL-2008 de todos os arquivos em ordem topológica
 make profiles       # Compila e elabora cada perfil em profiles/*.yaml no GHDL
-make paths          # Confere que todos os caminhos referenciados em paths.yaml existem
+make paths          # Confere os caminhos de paths.yaml e a árvore do repositório (riscv-tools check-tree)
 make test           # Executa a suíte completa de testes unitários e de integração (cocotb + GHDL)
 make formal         # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
 ```

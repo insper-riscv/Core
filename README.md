@@ -28,7 +28,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [ISA/Zmmul/instructions.md](docs/pt-br/ISA/Zmmul/instructions.md): instruções da extensão `Zmmul` (só multiplicação, seção 11.1.3 do manual): codificação e semântica.
 - [ISA/Zmmul/description.md](docs/pt-br/ISA/Zmmul/description.md): como o Core executa a `Zmmul`: configuração, decodificação sem divisão e multiplicador de Booth.
 - [ISA/Zifencei/instructions.md](docs/pt-br/ISA/Zifencei/instructions.md) e [ISA/Zifencei/description.md](docs/pt-br/ISA/Zifencei/description.md): extensão Zifencei (`FENCE.I`), exigências do manual, regiões que passam pela cache de instruções, execução com e sem cache de dados write-back, efeito no pipeline e nas caches e custo.
-- [LARGURA_DA_MEMORIA.md](docs/pt-br/LARGURA_DA_MEMORIA.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
+- [MEMORY_WIDTH.md](docs/pt-br/MEMORY_WIDTH.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/pt-br/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): análise matemática da faixa do resto parcial na divisão não-restauradora e do uso de 34 bits internos para divisores sem sinal acima de $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/pt-br/bugs/FLUSH_COM_PIPELINE_PARADO.md): análise da interação entre redirecionamento de desvio em EX e parada global do pipeline por espera de memória em MEM.
 - [bugs/LOAD_EM_WB_DURANTE_STALL.md](docs/pt-br/bugs/LOAD_EM_WB_DURANTE_STALL.md): análise do load segurado em WB que era sobrescrito pelo load seguinte enquanto a unidade M para o pipeline.
@@ -56,13 +56,13 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 
 | Extensão | Generic | Padrão | Com o generic desligado |
 | :--- | :--- | :--- | :--- |
-| M | `has_m` | `false` | As instruções M comportam-se como `NOP` |
-| Zmmul | `has_zmmul` | `false` | As instruções de multiplicação comportam-se como `NOP` |
+| M | `has_m` | `false` | As instruções M são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zmmul | `has_zmmul` | `false` | As instruções de multiplicação são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zicsr | `has_zicsr` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
-| Zifencei | `has_zifencei` | `false` | `FENCE.I` comporta-se como `NOP` |
+| Zifencei | `has_zifencei` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
 
-Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e o core precisa de Zicsr ou de Zicclsm, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. A base é o RV32I (`num_regs` 32) ou o RV32E (`num_regs` 16, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`:
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`num_regs` 32) ou o RV32E (`num_regs` 16, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
@@ -70,7 +70,7 @@ riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e fla
 make profile-matrix                                                        # elabora cada perfil com seus generics
 ```
 
-Quando uma extensão está desabilitada pelo seu generic, as instruções correspondentes comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Quando uma extensão está desabilitada pelo seu generic, as instruções correspondentes são ilegais: com Zicsr geram a causa 2 do `mcause`, e sem Zicsr geram um pulso em `o_trap`, e em qualquer dos dois casos não escrevem registrador nem acessam a memória.
 
 ## 4. Verificação e Execução
 

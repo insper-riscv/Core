@@ -208,7 +208,7 @@ Any change to VHDL code, profile manifests, or documentation must pass all five 
 ```bash
 make check          # Check VHDL-2008 syntax of all files in topological order
 make profiles       # Compile and elaborate every profile in profiles/*.yaml under GHDL
-make paths          # Verify that all paths referenced in paths.yaml exist
+make paths          # Verify the paths of paths.yaml and the repository tree (riscv-tools check-tree)
 make test           # Run the full unit and integration test suite (cocotb + GHDL)
 make formal         # Run the formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
