@@ -56,13 +56,13 @@ The structural top level `core` takes one boolean generic per extension, which e
 
 | Extension | Generic | Default | With the generic off |
 | :--- | :--- | :--- | :--- |
-| M | `has_m` | `false` | M instructions behave as `NOP` |
-| Zmmul | `has_zmmul` | `false` | Multiplication instructions behave as `NOP` |
+| M | `has_m` | `false` | M instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| Zmmul | `has_zmmul` | `false` | Multiplication instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 | Zicsr | `has_zicsr` | `false` | No CSRs and no traps; the core signals the exception on `o_trap` |
-| Zifencei | `has_zifencei` | `false` | `FENCE.I` behaves as `NOP` |
+| Zifencei | `has_zifencei` | `false` | `FENCE.I` is illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 | Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
@@ -70,7 +70,7 @@ riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and G
 make profile-matrix                                                        # elaborate each profile with its generics
 ```
 
-When an extension is disabled by its generic, the corresponding instructions behave as `NOP` (no register write, no memory access, and no pipeline stall).
+When an extension is disabled by its generic, the corresponding instructions are illegal: with Zicsr they raise cause 2 of `mcause`, and without Zicsr they pulse `o_trap`, and in both cases they write no register and access no memory.
 
 ## 4. Verification and Execution
 

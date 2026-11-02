@@ -85,7 +85,7 @@ The store manager, in EX, replicates the data position and generates the byte ma
 | `SH` | $x[rs2][15{:}0]$ shifted by $8 \cdot \text{offset}$ bits (16 bits for offset 3) | `0011`, `0110`, `1100`, `1100` |
 | `SB` | $x[rs2][7{:}0]$ shifted by $8 \cdot \text{offset}$ bits | `0001`, `0010`, `0100`, `1000` |
 
-At offset 3 of `SH`, the access crosses the word and its handling is described in [MISALIGNED_ACCESS.md](../Zicclsm/description.md). The same holds for `SW` at an offset other than 0.
+At offset 3 of `SH`, the access crosses the word and its handling is described in [Zicclsm/description.md](../Zicclsm/description.md). The same holds for `SW` at an offset other than 0.
 
 ### 6.2. Loads
 
@@ -99,7 +99,7 @@ The load extender, in WB, receives the word read and the byte offset.
 | `LB` | Byte of the selected lane, sign-extended |
 | `LBU` | Byte of the selected lane, zero-extended |
 
-The final data of a load exists only at the end of WB. For this reason load forwarding starts from the WB2 register, and not from MEM/WB. Misaligned accesses, memory width, and the map regions have their own documents ([MISALIGNED_ACCESS.md](../Zicclsm/description.md) and [MEMORY_WIDTH.md](../../MEMORY_WIDTH.md)).
+The final data of a load exists only at the end of WB. For this reason load forwarding starts from the WB2 register, and not from MEM/WB. Misaligned accesses, memory width, and the map regions have their own documents ([Zicclsm/description.md](../Zicclsm/description.md) and [MEMORY_WIDTH.md](../../MEMORY_WIDTH.md)).
 
 ## 7. Register File
 
@@ -109,7 +109,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | `x0` | Constant zero, without a register; a write never enables it |
 | Reset | Asynchronous, on registers `x1` to `x31` |
 | Read in the write cycle | A multiplexer delivers the data being written when the register read is the same one, except `x0` |
-| Size | 32 registers; the `num_regs` generic equal to 16 selects RV32E ([RV32E.md](../E/description.md)) |
+| Size | 32 registers; the `num_regs` generic equal to 16 selects RV32E ([E/description.md](../E/description.md)) |
 
 ## 8. Forwarding and Hazards
 

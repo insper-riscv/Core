@@ -47,9 +47,10 @@ formal:
 test:
 	uv run python tests/python/runner.py $(TEST)
 
-# Every path the configuration lists exists.
+# Every path the configuration lists exists, and the tree has the shape the Capstone defines (riscv-tools check-tree).
 paths:
 	riscv-tools --root . check-paths --manifest paths.yaml
+	riscv-tools --root . check-tree --kind core
 
 clean:
 	rm -rf build

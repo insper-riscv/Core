@@ -85,7 +85,7 @@ O gerenciador de stores, em EX, replica a posição do dado e gera a máscara de
 | `SH` | $x[rs2][15{:}0]$ deslocado de $8 \cdot \text{offset}$ bits (16 bits para o deslocamento 3) | `0011`, `0110`, `1100`, `1100` |
 | `SB` | $x[rs2][7{:}0]$ deslocado de $8 \cdot \text{offset}$ bits | `0001`, `0010`, `0100`, `1000` |
 
-No deslocamento 3 de `SH`, o acesso cruza a palavra e seu tratamento está em [ACESSO_DESALINHADO.md](../Zicclsm/description.md). O mesmo vale para `SW` com deslocamento diferente de 0.
+No deslocamento 3 de `SH`, o acesso cruza a palavra e seu tratamento está em [Zicclsm/description.md](../Zicclsm/description.md). O mesmo vale para `SW` com deslocamento diferente de 0.
 
 ### 6.2. Loads
 
@@ -99,7 +99,7 @@ O extensor de leitura, em WB, recebe a palavra lida e o deslocamento de bytes.
 | `LB` | Byte da faixa escolhida, com extensão de sinal |
 | `LBU` | Byte da faixa escolhida, com extensão de zero |
 
-O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um load parte do registrador WB2, e não de MEM/WB. Acessos desalinhados, a largura da memória e as regiões do mapa têm documentos próprios ([ACESSO_DESALINHADO.md](../Zicclsm/description.md) e [LARGURA_DA_MEMORIA.md](../../LARGURA_DA_MEMORIA.md)).
+O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um load parte do registrador WB2, e não de MEM/WB. Acessos desalinhados, a largura da memória e as regiões do mapa têm documentos próprios ([Zicclsm/description.md](../Zicclsm/description.md) e [MEMORY_WIDTH.md](../../MEMORY_WIDTH.md)).
 
 ## 7. Banco de Registradores
 
@@ -109,7 +109,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | `x0` | Constante zero, sem registrador; a escrita nunca o habilita |
 | Reset | Assíncrono, nos registradores `x1` a `x31` |
 | Leitura no ciclo da escrita | Um multiplexador entrega o dado que está sendo escrito quando o registrador lido é o mesmo, exceto `x0` |
-| Tamanho | 32 registradores; o genérico `num_regs` igual a 16 seleciona o RV32E ([RV32E.md](../E/description.md)) |
+| Tamanho | 32 registradores; o genérico `num_regs` igual a 16 seleciona o RV32E ([E/description.md](../E/description.md)) |
 
 ## 8. Adiantamento e Hazards
 

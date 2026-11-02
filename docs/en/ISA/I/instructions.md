@@ -111,7 +111,7 @@ Manual section 1.1.6.
 
 The Core uses little-endian order. In the 32-bit word, the byte at address $4k + i$ occupies bits $[8i + 7 : 8i]$, and the store manager and the load extender use the two low bits of the effective address to select the byte lane. A load with destination `x0` accesses memory and goes through the same alignment check; it only skips writing the result.
 
-Misaligned accesses within main memory run in hardware when the `has_zicclsm` generic is enabled (default); all others raise the misaligned load or store exception (causes 4 and 6). The cases are in [MISALIGNED_ACCESS.md](../Zicclsm/description.md).
+Misaligned accesses within main memory run in hardware when the `has_zicclsm` generic is enabled (default); all others raise the misaligned load or store exception (causes 4 and 6). The cases are in [Zicclsm/description.md](../Zicclsm/description.md).
 
 ## 5. `FENCE`, `ECALL`, and `EBREAK`
 
@@ -124,7 +124,7 @@ Manual section 1.1.7. The instruction orders device I/O and memory operations, a
 | Decoding | Legal when `opcode` is `0001111` and `funct3` is `000`, without examining `fm`, predecessor, successor, `rs1`, or `rd` |
 | Effect | None; the decoder delivers the signals of a `NOP` (no register write and no memory access) |
 | `FENCE.TSO` and reserved values | Execute as the plain `FENCE`, because the decoder examines only `opcode` and `funct3` |
-| `FENCE.I` | Belongs to the Zifencei extension and is illegal when the `has_zifencei` generic is disabled ([FENCE_I.md](../Zifencei/description.md)) |
+| `FENCE.I` | Belongs to the Zifencei extension and is illegal when the `has_zifencei` generic is disabled ([Zifencei/description.md](../Zifencei/description.md)) |
 
 ### 5.2. `ECALL` and `EBREAK`
 
