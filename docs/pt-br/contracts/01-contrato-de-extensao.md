@@ -83,7 +83,7 @@ Registradores CSR implementados no modo máquina:
 | Endereço | Nome | Acesso | Valor de Reset | Máscara / Campos implementados |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Leitura e escrita | `0x00001800` | `MPP` (bits `[12:11]`) fixo em `"11"`; bits `MIE` (bit 3) e `MPIE` (bit 7) graváveis |
-| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M` |
+| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `num_regs = 16` a base é a `E` e o valor é `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Todos os bits fixos em zero |
 | `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` (modo direto) |
 | `0x310` | `mstatush` | Leitura e escrita | `0x00000000` | Todos os bits fixos em zero |

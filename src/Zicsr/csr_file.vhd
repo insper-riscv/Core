@@ -15,8 +15,8 @@
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
---   - O misa anuncia RV32I e, quando has_m = true, a extensão M. mie e mip leem
---     zero porque não há interrupções.
+--   - O misa anuncia RV32I (RV32E quando base_e = true) e, quando has_m = true, a
+--     extensão M. mie e mip leem zero porque não há interrupções.
 --   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
 --     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
 --     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
@@ -52,6 +52,8 @@ entity csr_file is
 	generic (
 		-- Faz o misa anunciar a extensão M (bit 12), para o perfil que a inclui.
 		has_m : boolean := true;
+		-- Faz o misa anunciar a base E (bit 4) no lugar da I (bit 8), para o perfil de 16 registradores.
+		base_e : boolean := false;
 		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time e seus espelhos).
 		has_zicntr : boolean := false;
 		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
@@ -263,7 +265,10 @@ architecture rtl of csr_file is
 begin
 
 	-- Montagem da palavra mstatus: MPP (bits [12:11]) fixo em "11" (Machine Mode).
-	misa_value    <= MISA_WITH_M when has_m else MISA_BASE;
+	misa_value    <= MISA_E_WITH_M when (base_e and has_m) else
+	                 MISA_E_BASE   when base_e else
+	                 MISA_WITH_M   when has_m else
+	                 MISA_BASE;
 
 	mstatus_value <= (12 => '1', 11 => '1', 7 => mstatus_mpie, 3 => mstatus_mie, others => '0');
 

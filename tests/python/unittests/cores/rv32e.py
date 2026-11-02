@@ -2,7 +2,8 @@
 
 With num_regs = 16 the core is an RV32E: x0 to x15 work, and an
 instruction that uses x16 to x31 as rd, rs1 or rs2 traps with mcause 2
-and has no effect.
+and has no effect. The misa register announces the E base (bit 4) in
+place of the I base (bit 8).
 
 The handler logs mcause of each trap and resumes after the instruction.
 """
@@ -30,6 +31,7 @@ from tests.python.unittests.cores.sdram_stall import (
 LOG_BASE = RAM_BASE + 0x100
 HANDLER_WORD = 64
 MTVEC, MEPC, MCAUSE = 0x305, 0x341, 0x342
+MISA = 0x301
 SYSTEM = 0x73
 MRET = 0x30200073
 NOP = addi(0, 0, 0)
@@ -126,3 +128,26 @@ async def test_registers_above_x15_trap(dut):
         "the program did not resume after each trap",
     )
     check_equal(ram[RAM_BASE + 8], 9, "x13 = x15 + x14 = 3 + 6 is wrong")
+
+
+@cocotb.test()
+async def test_misa_announces_the_e_base(dut):
+    """Verifica misa announces the e base.
+
+    The E bit is set, the I bit is clear (the E bit is the complement of
+    the I bit) and the M bit is set because the core has M.
+    """
+    program = [
+        NOP,
+        lui(7, RAM_BASE >> 12),
+        csrrs(6, MISA, 0),
+        sw(6, 7, 0),
+        addi(9, 0, 1),
+        sw(9, 7, DONE_ADDR - RAM_BASE),
+        jal_self(),
+    ]
+    ram = await run_program(dut, program, max_cycles=400)
+    misa = ram[RAM_BASE]
+    check_equal(misa, 0x40001010, f"misa {misa:#010x}")
+    check_true(misa & (1 << 4), "the E bit is clear")
+    check_true(not misa & (1 << 8), "the I bit is set")

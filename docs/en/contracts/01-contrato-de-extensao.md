@@ -83,7 +83,7 @@ Machine-mode CSRs implemented:
 | Address | Name | Access | Reset Value | Mask / Implemented fields |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Read-write | `0x00001800` | `MPP` (bits `[12:11]`) hardwired to `"11"`; `MIE` (bit 3) and `MPIE` (bit 7) writable |
-| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions |
+| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `num_regs = 16` the base is `E` and the value is `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | All bits hardwired to zero |
 | `0x305` | `mtvec` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` (direct mode) |
 | `0x310` | `mstatush` | Read-write | `0x00000000` | All bits hardwired to zero |

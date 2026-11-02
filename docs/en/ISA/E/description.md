@@ -9,8 +9,9 @@ The `num_regs` generic of the `core` chooses how many general-purpose registers 
 | Registers | `x0` to `x31` | `x0` to `x15` |
 | `reg_file` address | 5 bits | 4 bits |
 | Instruction using `x16` to `x31` | Runs | Illegal, `mcause` 2 with `has_zicsr` |
+| Base bit of `misa` with `has_zicsr` | `I` (bit 8) | `E` (bit 4), and the `I` bit is zero |
 
-Only the values 16 and 32 are accepted, and any other value fails the elaboration. The ID stage computes the register file address width as the number of bits needed to index `num_regs` registers and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
+The `misa` follows the privileged manual ([section 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), which sets the `E` bit in the RV32E and defines it as reading as the complement of the `I` bit. Only the values 16 and 32 are accepted, and any other value fails the elaboration. The ID stage computes the register file address width as the number of bits needed to index `num_regs` registers and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
 
 ## 2. Illegal Instruction
 

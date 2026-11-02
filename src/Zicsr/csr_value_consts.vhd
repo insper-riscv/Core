@@ -16,6 +16,10 @@ package csr_value_consts is
 	constant MISA_BASE   : word_t := x"40000100";
 	-- Valor do registrador misa com MXL = 1 (RV32) e as extensões I e M.
 	constant MISA_WITH_M : word_t := x"40001100";
+	-- Valor do registrador misa com MXL = 1 (RV32) e a base E (bit 4) no lugar da I; a extensão M soma o bit 12.
+	constant MISA_E_BASE   : word_t := x"40000010";
+	-- Valor do registrador misa com MXL = 1 (RV32), a base E (bit 4) e a extensão M.
+	constant MISA_E_WITH_M : word_t := x"40001010";
 
 	-- Operação de um acesso a CSR, bits [1:0] do funct3 (2 bits).
 	subtype csr_op_t is std_logic_vector(1 downto 0);
