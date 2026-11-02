@@ -695,6 +695,7 @@ begin
 		generic map (
 			has_m           => has_m,
 			has_zmmul       => has_zmmul,
+			base_e          => num_regs = 16,
 			has_zicsr       => has_zicsr,
 			has_zicntr      => has_zicntr,
 			tick_cycles     => tick_cycles,

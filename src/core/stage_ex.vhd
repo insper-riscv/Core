@@ -24,6 +24,8 @@ entity stage_ex is
 		has_m           : boolean := false;
 		-- Habilita a multiplicação sem o divisor (extensão Zmmul); has_m já a inclui.
 		has_zmmul       : boolean := false;
+		-- Faz o misa anunciar a base E (16 registradores) no lugar da I.
+		base_e          : boolean := false;
 		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
 		has_zicsr       : boolean := false;
 		-- Habilita os contadores da extensão Zicntr no banco de CSRs; exige has_zicsr.
@@ -419,6 +421,7 @@ begin
 		u_csr_file : entity work.csr_file
 			generic map (
 				has_m        => has_m,
+				base_e       => base_e,
 				has_zicntr   => has_zicntr,
 				tick_cycles  => tick_cycles,
 				hpm_counters => hpm_counters

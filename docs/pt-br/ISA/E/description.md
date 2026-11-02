@@ -9,8 +9,9 @@ O genérico `num_regs` do `core` escolhe quantos registradores de uso geral o pr
 | Registradores | `x0` a `x31` | `x0` a `x15` |
 | Endereço do `reg_file` | 5 bits | 4 bits |
 | Instrução com `x16` a `x31` | Executa | Ilegal, causa 2 do `mcause` com `has_zicsr` |
+| Bit de base do `misa` com `has_zicsr` | `I` (bit 8) | `E` (bit 4), e o bit `I` fica em zero |
 
-Só os valores 16 e 32 são aceitos, e outro valor para a elaboração com erro. O estágio ID calcula a largura do endereço do banco como o número de bits necessário para indexar `num_regs` registradores e liga ao banco apenas esses bits baixos dos índices `rs1`, `rs2` e `rd`.
+O `misa` segue o manual privilegiado ([seção 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), que liga o bit `E` na RV32E e define que ele lê como o complemento do bit `I`. Só os valores 16 e 32 são aceitos, e outro valor para a elaboração com erro. O estágio ID calcula a largura do endereço do banco como o número de bits necessário para indexar `num_regs` registradores e liga ao banco apenas esses bits baixos dos índices `rs1`, `rs2` e `rd`.
 
 ## 2. Instrução Ilegal
 

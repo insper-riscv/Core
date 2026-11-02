@@ -993,6 +993,27 @@
         },
         "test_module": "tests.python.unittests.Zicsr.csr_misa_no_m"
     },
+    "CsrFileRveNoM": {
+        "toplevel": "csr_file",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_m": false,
+            "base_e": true
+        },
+        "test_module": "tests.python.unittests.Zicsr.csr_misa_rve"
+    },
     "CoreMisalignedJump": {
         "toplevel": "core",
         "sources": [
