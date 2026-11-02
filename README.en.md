@@ -18,8 +18,10 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [FORMAL.md](docs/en/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
 - [RV32E.md](docs/en/RV32E.md): the `num_regs` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
 - [FENCE_I.md](docs/en/FENCE_I.md): the `FENCE.I` instruction (Zifencei), regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
-- [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): `M` and `Zmmul` instructions as the RISC-V manual defines them (chapter 11): encoding, semantics, division by zero, overflow and pair fusion.
-- [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M` and `Zmmul`: decoder, Booth multiplier, non-restoring divider, pipeline stall, pair fusion and formal verification.
+- [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): instructions of the `M` extension according to the RISC-V manual (chapter 11): encoding, division, division by zero and overflow.
+- [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
+- [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.
+- [ISA/Zmmul/description.md](docs/en/ISA/Zmmul/description.md): how the Core executes `Zmmul`: configuration, decoding without division and the Booth multiplier.
 - [MEMORY_WIDTH.md](docs/en/MEMORY_WIDTH.md): rules for the adapter between the Core's 32-bit word and a narrower or wider memory, covering address, byte mask, read, ready signal and interaction with misaligned access.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/en/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): mathematical analysis of the partial remainder range in non-restoring division and the use of 34 internal bits for unsigned divisors above $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/en/bugs/FLUSH_COM_PIPELINE_PARADO.md): analysis of the interaction between branch redirection in EX and global pipeline stall caused by memory wait in MEM.

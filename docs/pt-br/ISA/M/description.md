@@ -1,17 +1,16 @@
-# Extensão M e Zmmul: Implementação no Core
+# Extensão M: Implementação no Core
 
-Este documento descreve como o Core executa as instruções da `M` e da `Zmmul`. O que o manual exige (codificação e semântica) está em [instructions.md](instructions.md).
+Este documento descreve como o Core executa as instruções da `M`. O que o manual exige (codificação e semântica) está em [instructions.md](instructions.md). A multiplicação é compartilhada com a `Zmmul`, e o multiplicador de Booth está descrito em [Zmmul](../Zmmul/description.md).
 
 ## 1. Configuração
 
-Dois parâmetros genéricos do `core` escolhem o que é instanciado.
+O genérico `has_m` do `core` escolhe o que é instanciado.
 
 | Genérico | Padrão | Efeito |
 | :--- | :--- | :--- |
 | `has_m` | `false` | Instancia o decodificador, o multiplicador e o divisor (8 instruções) |
-| `has_zmmul` | `false` | Instancia o decodificador e o multiplicador, sem o divisor (4 instruções) |
 
-O decodificador e a unidade de execução são gerados quando `has_m` ou `has_zmmul` vale `true`, e o divisor só quando `has_m` vale `true`. Assim, `has_m` já inclui a multiplicação, e `has_zmmul = true` com `has_m = false` dá o perfil sem divisão. Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
+O decodificador e a unidade de execução são gerados quando `has_m` ou `has_zmmul` vale `true`, e o divisor só quando `has_m` vale `true`. Assim, `has_m` já inclui a multiplicação, e o perfil sem divisão usa só o genérico `has_zmmul`, descrito em [Zmmul](../Zmmul/description.md). Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
 
 ## 2. Estrutura
 
@@ -51,27 +50,9 @@ O código de sinal derivado do `funct3` guardado diz quais operandos têm sinal.
 | `MULHSU` | Com sinal | Sem sinal |
 | `MULHU`, `DIVU`, `REMU` | Sem sinal | Sem sinal |
 
-### 4.1. Multiplicador de Booth Radix-2
+A multiplicação usa o multiplicador de Booth radix-2 descrito em [Zmmul](../Zmmul/description.md), que produz o produto de 64 bits e entrega as metades baixa e alta.
 
-O multiplicador faz a multiplicação com sinal de 32 por 32 bits e produz o produto de 64 bits. Mantém um acumulador de 33 bits, o multiplicador de 32 bits, um bit auxiliar à direita e o multiplicando estendido com sinal para 33 bits. A cada passo examina o par formado pelo bit menos significativo do multiplicador e pelo bit auxiliar.
-
-| Par | Operação sobre o acumulador |
-| :--- | :--- |
-| `01` | Soma o multiplicando |
-| `10` | Subtrai o multiplicando |
-| `00` ou `11` | Mantém o acumulador |
-
-Em seguida o conjunto é deslocado um bit à direita, de forma aritmética. Após 32 passos, o acumulador e o multiplicador formam as metades alta e baixa do produto. A latência é de 33 ciclos (1 de inicialização e 32 passos), e a faixa com sinal inclui $-2^{31}$.
-
-A metade baixa vale para qualquer interpretação de sinal. A metade alta sai interpretada como com sinal nos dois operandos, e a `multdiv` a corrige para os modos sem sinal com dois somadores de 32 bits.
-
-$$
-\text{alta}_{\text{corrigida}} = \text{alta} + (A_{31} \land \neg s_A) \cdot B + (B_{31} \land \neg s_B) \cdot A \pmod{2^{32}}
-$$
-
-Nessa expressão, $s_A$ e $s_B$ valem 1 quando o respectivo operando tem sinal. Para `MULH` a correção é nula, para `MULHSU` só vale o termo que soma $A$ e para `MULHU` valem os dois termos.
-
-### 4.2. Divisor Não-Restaurador
+### 4.1. Divisor Não-Restaurador
 
 O divisor opera sobre o módulo dos operandos nas divisões com sinal e sobre os próprios valores nas sem sinal. O resto parcial e o divisor têm 34 bits, o que comporta divisores sem sinal acima de $2^{31}$ (ver [DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](../../bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md)). Os estados do caso normal são os da tabela.
 
@@ -91,14 +72,14 @@ Os casos especiais do manual são detectados antes do cálculo e dispensam as 32
 | Divisor igual a zero (com ou sem sinal) | `0xFFFFFFFF` | Dividendo |
 | Dividendo $-2^{31}$ e divisor $-1$ (com sinal) | `0x80000000` | `0` |
 
-### 4.3. Resultado
+### 4.2. Resultado
 
 Cada operador sinaliza ocupado e concluído. O resultado final é escolhido pelo `funct3` guardado.
 
 | Instrução | Fonte |
 | :--- | :--- |
 | `MUL` | Metade baixa do produto |
-| `MULH`, `MULHSU`, `MULHU` | Metade alta do produto, com a correção da seção 4.1 |
+| `MULH`, `MULHSU`, `MULHU` | Metade alta do produto, com a correção descrita em [Zmmul](../Zmmul/description.md) |
 | `DIV`, `DIVU` | Quociente |
 | `REM`, `REMU` | Resto |
 

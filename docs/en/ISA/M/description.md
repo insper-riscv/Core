@@ -1,17 +1,16 @@
-# M and Zmmul Extensions: Implementation in the Core
+# M Extension: Implementation in the Core
 
-This document describes how the Core executes the `M` and `Zmmul` instructions. What the manual requires (encoding and semantics) is in [instructions.md](instructions.md).
+This document describes how the Core executes the `M` instructions. What the manual requires (encoding and semantics) is in [instructions.md](instructions.md). Multiplication is shared with `Zmmul`, and the Booth multiplier is described in [Zmmul](../Zmmul/description.md).
 
 ## 1. Configuration
 
-Two generics of the `core` choose what is instantiated.
+The `has_m` generic of `core` chooses what is instantiated.
 
 | Generic | Default | Effect |
 | :--- | :--- | :--- |
 | `has_m` | `false` | Instantiates the decoder, the multiplier and the divider (8 instructions) |
-| `has_zmmul` | `false` | Instantiates the decoder and the multiplier, without the divider (4 instructions) |
 
-The decoder and the execution unit are generated when `has_m` or `has_zmmul` is `true`, and the divider only when `has_m` is `true`. Hence `has_m` already includes multiplication, and `has_zmmul = true` with `has_m = false` gives the profile without division. Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
+The decoder and the execution unit are generated when `has_m` or `has_zmmul` is `true`, and the divider only when `has_m` is `true`. So `has_m` already includes multiplication, and the profile without division uses only the `has_zmmul` generic, described in [Zmmul](../Zmmul/description.md). Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
 
 ## 2. Structure
 
@@ -51,27 +50,9 @@ The sign code derived from the kept `funct3` says which operands are signed.
 | `MULHSU` | Signed | Unsigned |
 | `MULHU`, `DIVU`, `REMU` | Unsigned | Unsigned |
 
-### 4.1. Radix-2 Booth Multiplier
+Multiplication uses the radix-2 Booth multiplier described in [Zmmul](../Zmmul/description.md), which produces the 64-bit product and delivers the low and high halves.
 
-The multiplier performs the signed 32 by 32-bit multiplication and produces the 64-bit product. It keeps a 33-bit accumulator, the 32-bit multiplier, an auxiliary bit on the right and the multiplicand sign-extended to 33 bits. At each step it examines the pair formed by the least significant bit of the multiplier and the auxiliary bit.
-
-| Pair | Operation on the accumulator |
-| :--- | :--- |
-| `01` | Adds the multiplicand |
-| `10` | Subtracts the multiplicand |
-| `00` or `11` | Keeps the accumulator |
-
-The whole is then shifted one bit to the right, arithmetically. After 32 steps, the accumulator and the multiplier form the high and low halves of the product. The latency is 33 cycles (1 of initialization and 32 steps), and the signed range includes $-2^{31}$.
-
-The low half holds for any sign interpretation. The high half comes out interpreted as signed in both operands, and `multdiv` corrects it for the unsigned modes with two 32-bit adders.
-
-$$
-\text{high}_{\text{corrected}} = \text{high} + (A_{31} \land \neg s_A) \cdot B + (B_{31} \land \neg s_B) \cdot A \pmod{2^{32}}
-$$
-
-In this expression, $s_A$ and $s_B$ are 1 when the respective operand is signed. For `MULH` the correction is null, for `MULHSU` only the term that adds $A$ applies and for `MULHU` both terms apply.
-
-### 4.2. Non-Restoring Divider
+### 4.1. Non-Restoring Divider
 
 The divider works on the magnitude of the operands in signed divisions and on the values themselves in unsigned ones. The partial remainder and the divisor have 34 bits, which accommodates unsigned divisors above $2^{31}$ (see [DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](../../bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md)). The states of the normal case are those in the table.
 
@@ -91,14 +72,14 @@ The manual special cases are detected before the computation and skip the 32 ite
 | Divisor equal to zero (signed or unsigned) | `0xFFFFFFFF` | Dividend |
 | Dividend $-2^{31}$ and divisor $-1$ (signed) | `0x80000000` | `0` |
 
-### 4.3. Result
+### 4.2. Result
 
 Each operator signals busy and done. The final result is selected by the kept `funct3`.
 
 | Instruction | Source |
 | :--- | :--- |
 | `MUL` | Low half of the product |
-| `MULH`, `MULHSU`, `MULHU` | High half of the product, with the correction of section 4.1 |
+| `MULH`, `MULHSU`, `MULHU` | High half of the product, with the correction described in [Zmmul](../Zmmul/description.md) |
 | `DIV`, `DIVU` | Quotient |
 | `REM`, `REMU` | Remainder |
 

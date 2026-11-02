@@ -90,7 +90,7 @@ $$
 
 ### 3.1. M Extension (Integer Multiplication and Division)
 
-Instructions, semantics and implementation details: [ISA/M/instructions.md](ISA/M/instructions.md) and [ISA/M/description.md](ISA/M/description.md).
+Instructions, semantics and implementation details of `M`: [ISA/M/instructions.md](ISA/M/instructions.md) and [ISA/M/description.md](ISA/M/description.md). Multiplication alone (`Zmmul`) is in [ISA/Zmmul/instructions.md](ISA/Zmmul/instructions.md) and [ISA/Zmmul/description.md](ISA/Zmmul/description.md).
 
 When `has_m = true`, the `m_decode` decoder in the ID stage recognizes R-type instructions with `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`), asserting `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'`.
 
