@@ -1,11 +1,10 @@
 -- =============================================================================
--- Constantes do mapa de memória do processador RV32
+-- Funções do mapa de memória do processador RV32
 --
--- Centraliza os limites de endereço das regiões de memória de instruções e de
--- dados (BOOT_ROM, FLASH, RAM interna e janela externa de SDRAM/periféricos).
--- As fronteiras das regiões são potências de 2: cada *_BIT é o índice do único
--- bit em '1' do endereço base correspondente, e a região sai de testes desse
--- bit no endereço, sem comparador numérico.
+-- O mapa é recebido pelo núcleo por genéricos de elaboração, e este pacote
+-- reúne as conversões de que os pontos de decodificação precisam (BOOT_ROM,
+-- ROM interna, janela externa e janela de periféricos). Cada projeto fixa os
+-- limites no `config.yml` da sua plataforma.
 -- =============================================================================
 
 library ieee;
@@ -14,28 +13,46 @@ use ieee.numeric_std.all;
 
 package mem_map_consts is
 
-	-- Tamanho em bytes da janela de endereços da BOOT_ROM (0x00000000 .. 0x000007FF, 2 KiB).
-	constant BOOT_ROM_SIZE_BYTES   : unsigned(31 downto 0) := to_unsigned(16#00000800#, 32);
+	-- Converte um endereço dado em KiB para o endereço em bytes de 32 bits.
+	function kib_to_addr(arg : natural) return unsigned;
 
-	-- Índice do bit do endereço base da memória RAM interna de dados (2**15 = 0x00008000).
-	constant RAM_BASE_BIT          : natural := 15;
-	-- Índice do bit do endereço base da FLASH externa no mapa da plataforma sdram (2**29 = 0x20000000).
-	constant FLASH_EXT_BASE_BIT    : natural := 29;
-	-- Índice do bit do endereço base da janela externa de SDRAM e periféricos (2**30 = 0x40000000).
-	constant SDRAM_BASE_BIT        : natural := 30;
-	-- Índice do bit do endereço base da janela de periféricos dentro da janela externa (2**31 = 0x80000000).
-	constant PERIPHERAL_BASE_BIT   : natural := 31;
+	-- Endereço exclusivo do fim da BOOT_ROM, que ocupa [0, 2**bits).
+	function boot_rom_end(bits : natural) return unsigned;
 
-	-- Endereço base em bytes da memória RAM interna de dados (0x00008000).
-	constant RAM_BASE_BYTES        : unsigned(31 downto 0) := shift_left(to_unsigned(1, 32), RAM_BASE_BIT);
+	-- Endereço exclusivo do fim da ROM interna, ou zero quando a ROM é externa.
+	function internal_rom_end(end_kib : natural; external : boolean) return unsigned;
 
-	-- Endereço base em bytes da janela externa de SDRAM e periféricos (0x40000000).
-	constant SDRAM_BASE_BYTES      : unsigned(31 downto 0) := shift_left(to_unsigned(1, 32), SDRAM_BASE_BIT);
-
-	-- Endereço base em bytes da FLASH externa no mapa da plataforma sdram (0x20000000, bit 29 = 1).
-	constant FLASH_EXT_BASE_BYTES  : unsigned(31 downto 0) := shift_left(to_unsigned(1, 32), FLASH_EXT_BASE_BIT);
-
-	-- Endereço base em bytes da janela de periféricos dentro da janela externa (0x80000000, bit 31 = 1).
-	constant PERIPHERAL_BASE_BYTES : unsigned(31 downto 0) := shift_left(to_unsigned(1, 32), PERIPHERAL_BASE_BIT);
+	-- Início da memória principal: logo depois da ROM interna, ou a base externa quando a ROM é externa.
+	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean) return unsigned;
 
 end package mem_map_consts;
+
+package body mem_map_consts is
+
+	function kib_to_addr(arg : natural) return unsigned is
+	begin
+		return shift_left(to_unsigned(arg, 32), 10);
+	end function kib_to_addr;
+
+	function boot_rom_end(bits : natural) return unsigned is
+	begin
+		return shift_left(to_unsigned(1, 32), bits);
+	end function boot_rom_end;
+
+	function internal_rom_end(end_kib : natural; external : boolean) return unsigned is
+	begin
+		if external then
+			return to_unsigned(0, 32);
+		end if;
+		return kib_to_addr(end_kib);
+	end function internal_rom_end;
+
+	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean) return unsigned is
+	begin
+		if external then
+			return kib_to_addr(ext_kib);
+		end if;
+		return kib_to_addr(end_kib);
+	end function main_mem_base;
+
+end package body mem_map_consts;

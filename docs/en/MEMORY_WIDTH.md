@@ -20,7 +20,7 @@ The two data paths of the Core have different timing contracts, and that decides
 | Internal RAM | `0x00008000` to `0x3FFFFFFF` | None. The answer always arrives one cycle after the address |
 | External bus | `0x40000000` onwards | By the ready signal, of variable length |
 
-In the map with external FLASH, chosen by the `ext_flash` parameter, there is no internal RAM, and the FLASH at `0x20000000` also answers through the external bus.
+In the map with external FLASH, chosen by the `rom_external` generic, there is no internal RAM, and the FLASH at `0x20000000` also answers through the external bus.
 
 ## 2. Relation Between the Widths
 

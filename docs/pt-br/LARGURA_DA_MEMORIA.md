@@ -20,7 +20,7 @@ Os dois caminhos de dados do Core têm contratos de tempo diferentes, e isso dec
 | RAM interna | `0x00008000` a `0x3FFFFFFF` | Nenhuma. A resposta chega sempre um ciclo depois do endereço |
 | Barramento externo | `0x40000000` em diante | Pelo sinal de pronto, de duração variável |
 
-No mapa com FLASH externa, escolhido pelo parâmetro `ext_flash`, não há RAM interna, e a FLASH em `0x20000000` também responde pelo barramento externo.
+No mapa com FLASH externa, escolhido pelo genérico `rom_external`, não há RAM interna, e a FLASH em `0x20000000` também responde pelo barramento externo.
 
 ## 2. Relação Entre as Larguras
 

@@ -39,9 +39,9 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/sha
 
 | Faixa de endereço (`if_pc`) | Região selecionada | Palavra entregue em `o_instr` |
 | :--- | :--- | :--- |
-| `< 0x00000800` (`BOOT_ROM_SIZE_BYTES`) | Boot ROM | `i_boot_rom_data` |
+| `< 0x00000800` (`boot_rom_bits`) | Boot ROM | `i_boot_rom_data` |
 | `0x00000800 .. 0x3FFFFFFF` | Memória Flash (porta 1) | `i_flash_data` |
-| `>= 0x40000000` (`SDRAM_BASE_BYTES`) | Cache de instruções externa (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (congela o PC e anula `o_instr_valid` enquanto `i_ic_ready = '0'`) |
+| `>= 0x40000000` (`ext_base_kib`) | Cache de instruções externa (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (congela o PC e anula `o_instr_valid` enquanto `i_ic_ready = '0'`) |
 
 ### 2.2. Estágio 2: Decodificação e Leitura de Registradores (`stage_id`)
 
@@ -113,9 +113,9 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 
 | Faixa de endereço (`i_alu_out`) | Subsistema de memória acionado | Sinais ativos |
 | :--- | :--- | :--- |
-| `< 0x00008000` (`RAM_BASE_BYTES`) | Memória Flash (porta 2, somente leitura) | `o_flash_addr2`, `o_flash_rden2 = i_re_ram and i_valid` |
+| `< 0x00008000` (`rom_end_kib`) | Memória Flash (porta 2, somente leitura) | `o_flash_addr2`, `o_flash_rden2 = i_re_ram and i_valid` |
 | `0x00008000 .. 0x3FFFFFFF` | Memória RAM interna (1 ciclo de latência) | `o_ram_addr`, `o_ram_wdata`, `o_ram_byteena`, `o_ram_en`, `o_ram_wren`, `o_ram_rden` |
-| `>= 0x40000000` (`SDRAM_BASE_BYTES`) | Barramento externo SDRAM e periféricos | `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, `o_sdram_wren`, `o_sdram_wait = sdram_access and (not i_sdram_ready)` |
+| `>= 0x40000000` (`ext_base_kib`) | Barramento externo SDRAM e periféricos | `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, `o_sdram_wren`, `o_sdram_wait = sdram_access and (not i_sdram_ready)` |
 
 ### 2.5. Estágio 5: Write-Back (`stage_wb`)
 

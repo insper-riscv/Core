@@ -2,24 +2,18 @@
 
 ## 1. Processor Address Map
 
-The bounds of the instruction address space (IF stage) and data address space (MEM and WB stages) are centralized in the `src/shared/mem_map_consts.vhd` package:
+The limits of the instruction address space (IF stage) and of the data address space (MEM and WB stages) reach the `core` as elaboration generics, which each platform fixes in its `config.yml`. The package `src/shared/mem_map_consts.vhd` holds the functions the stages use to turn these generics into addresses.
 
-| Constant (`mem_map_consts`) | Value | Demarcated region |
+| `core` generic | Default | Region it delimits |
 | :--- | :--- | :--- |
-| `BOOT_ROM_SIZE_BYTES` | `0x00000800` (2 KiB) | End of the Boot ROM window (`0x00000000 .. 0x000007FF`) in the IF stage |
-| `RAM_BASE_BYTES` | `0x00008000` (32 KiB) | Base of internal data RAM (`0x00008000 .. 0x3FFFFFFF`); data addresses below this bound access port 2 of Flash memory |
-| `SDRAM_BASE_BYTES` | `0x40000000` (1 GiB) | Base of the external SDRAM and memory-mapped peripheral window (`0x40000000 .. 0xFFFFFFFF`) |
-| `FLASH_EXT_BASE_BYTES` | `0x20000000` | Base of the external FLASH in the sdram platform map |
-| `PERIPHERAL_BASE_BYTES` | `0x80000000` | Base of the peripheral window inside the external window |
+| `boot_rom_bits` | 11 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x000007FF` by default |
+| `rom_end_kib` | 32 | Exclusive end, in KiB, of the internal ROM read through the second Flash port (`0x00000800 .. 0x00007FFF` by default); 0 when the ROM is external |
+| `rom_external` | `false` | The ROM sits outside the core and the instruction comes through the instruction cache |
+| `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM, external ROM and peripherals (`0x40000000` by default) |
+| `periph_base_kib` | 2097152 | Base, in KiB, of the peripheral window (`0x80000000` by default), which ends the main memory |
+| `region_bits` | 30 | Exponent of the alignment of the external regions, used so that an access does not cross into the neighbouring region |
 
-The bounds are powers of 2. Each base is computed from the index of its single bit set to `'1'`, and the stages decode the region by testing that address bit, without a numeric comparator.
-
-| Constant (`mem_map_consts`) | Value | Derived base |
-| :--- | :--- | :--- |
-| `RAM_BASE_BIT` | 15 | `RAM_BASE_BYTES` |
-| `FLASH_EXT_BASE_BIT` | 29 | `FLASH_EXT_BASE_BYTES` |
-| `SDRAM_BASE_BIT` | 30 | `SDRAM_BASE_BYTES` |
-| `PERIPHERAL_BASE_BIT` | 31 | `PERIPHERAL_BASE_BYTES` |
+The internal RAM is what remains between the end of the internal ROM and the external base. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The platform map with external FLASH uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `periph_base_kib => 1572864` and `region_bits => 29`.
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 
