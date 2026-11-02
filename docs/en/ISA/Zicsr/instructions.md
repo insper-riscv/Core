@@ -1,5 +1,7 @@
 # Zicsr: Extension Instructions
 
+Chapter 5 of the manual ([Zicsr Extension for Control and Status Register (CSR) Instructions](https://docs.riscv.org/reference/isa/v20260120/unpriv/zicsr.html)).
+
 This document summarizes what the RISC-V manual requires of the `Zicsr` extension (instructions that access control and status registers, CSRs). The reference is the unprivileged ISA manual v20260120, Chapter 5, "Zicsr" Extension for Control and Status Register (CSR) Instructions, Version 2.0, section 5.1 and its subsections. The Core implementation is in [description.md](description.md).
 
 ## 1. Extension Scope
