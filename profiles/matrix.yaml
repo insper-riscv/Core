@@ -1,4 +1,5 @@
-# The extensions of the core and the rules between them; `riscv-tools profiles` expands this file
+# The bases (RV32I with 32 registers, RV32E with 16) and the extensions of the core and the rules
+# between them; `riscv-tools profiles` expands this file
 # into every valid profile. Each extension names the generic of `core` that turns it on, and the
 # order is the order of the tokens in the name of a profile.
 #
@@ -7,7 +8,9 @@
 # together, in the name as `zicntr_zihpm`. Every combination is valid: a core
 # with neither Zicsr nor Zicclsm signals a misaligned access, an ecall, an ebreak and an illegal
 # instruction on its trap output instead of running or handling it.
-base: rv32i
+bases:
+  - {name: rv32i, generics: {num_regs: 32}}
+  - {name: rv32e, generics: {num_regs: 16}}
 extensions:
   - {name: Zicclsm,  generic: has_zicclsm}
   - {name: Zicsr,    generic: has_zicsr}

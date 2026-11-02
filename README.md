@@ -16,6 +16,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [contracts/02-barramento-e-memoria.md](docs/pt-br/contracts/02-barramento-e-memoria.md): protocolo de barramento de instruções e de dados (endereçamento em byte, habilitação por byte, handshake de espera por memória lenta e cache de instruções).
 - [ACESSO_DESALINHADO.md](docs/pt-br/ACESSO_DESALINHADO.md): execução em hardware dos loads e stores desalinhados (Zicclsm), classificação dos acessos, regiões cobertas em cada mapa de memória e o acesso em duas etapas que cruza a palavra.
 - [FORMAL.md](docs/pt-br/FORMAL.md): provas formais, engines de solver, arquivo de resultado por engine e a regra do agregador que decide o check `formal` do CI.
+- [RV32E.md](docs/pt-br/RV32E.md): o genérico `num_regs` que escolhe o banco de 32 registradores (RV32I) ou de 16 (RV32E), a instrução ilegal com `x16` a `x31` e a ABI `ilp32e`.
 - [FENCE_I.md](docs/pt-br/FENCE_I.md): instrução `FENCE.I` (Zifencei), regiões que passam pela cache de instruções, execução com e sem cache de dados write-back, efeito no pipeline e nas caches e custo.
 - [LARGURA_DA_MEMORIA.md](docs/pt-br/LARGURA_DA_MEMORIA.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/pt-br/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): análise matemática da faixa do resto parcial na divisão não-restauradora e do uso de 34 bits internos para divisores sem sinal acima de $2^{31}$.
@@ -35,7 +36,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `src/Zicclsm/` | Unidade de acesso desalinhado à memória principal (`misaligned_unit`), que divide em duas etapas o acesso que cruza a palavra |
 | `src/Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
 | `src/core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
-| `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
+| `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/FORMAL.md)) |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
 
@@ -51,7 +52,7 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` comporta-se como `NOP` |
 | Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
 
-Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e o core precisa de Zicsr ou de Zicclsm, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. A lista de perfis vem de `profiles/matrix.yaml`:
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e o core precisa de Zicsr ou de Zicclsm, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. A base é o RV32I (`num_regs` 32) ou o RV32E (`num_regs` 16, ver [RV32E.md](docs/pt-br/RV32E.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha

@@ -16,6 +16,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
 - [MISALIGNED_ACCESS.md](docs/en/MISALIGNED_ACCESS.md): hardware execution of misaligned loads and stores (Zicclsm), access classification, regions covered in each memory map, and the two-step access that crosses a word.
 - [FORMAL.md](docs/en/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
+- [RV32E.md](docs/en/RV32E.md): the `num_regs` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
 - [FENCE_I.md](docs/en/FENCE_I.md): the `FENCE.I` instruction (Zifencei), regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
 - [MEMORY_WIDTH.md](docs/en/MEMORY_WIDTH.md): rules for the adapter between the Core's 32-bit word and a narrower or wider memory, covering address, byte mask, read, ready signal and interaction with misaligned access.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/en/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): mathematical analysis of the partial remainder range in non-restoring division and the use of 34 internal bits for unsigned divisors above $2^{31}$.
@@ -35,7 +36,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 | `src/Zicclsm/` | Unit for misaligned access to the main memory (`misaligned_unit`), which splits an access that crosses a word into two steps |
 | `src/Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
 | `src/core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
-| `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
+| `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`) in dependency order |
 | `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, formal verification script via GHDL + Yosys + SymbiYosys, and the aggregator of the engines ([documentation](docs/en/FORMAL.md)) |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
 
@@ -51,7 +52,7 @@ The structural top level `core` takes one boolean generic per extension, which e
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` behaves as `NOP` |
 | Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The list of profiles comes from `profiles/matrix.yaml`:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [RV32E.md](docs/en/RV32E.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
