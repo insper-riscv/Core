@@ -1,5 +1,7 @@
 # Zicntr e Zihpm, o que o manual exige
 
+Capítulo 6 do manual ([Zicntr and Zihpm Extensions for Counters](https://docs.riscv.org/reference/isa/v20260120/unpriv/counters.html)).
+
 Este documento resume o que o manual de ISA não privilegiada (versão 20260120) exige das extensões de contadores. A fonte é o Capítulo 6, "Zicntr and Zihpm Extensions for Counters, Version 2.0", e o texto abaixo é uma paráfrase. Como o Core implementa cada ponto está em [description.md](description.md), e o acesso aos CSRs em si (`CSRRW`, `CSRRS`, `CSRRC` e variantes) está em [Zicsr](../Zicsr/instructions.md).
 
 ## 1. Visão geral (Capítulo 6, Seção 6.1)
