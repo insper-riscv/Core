@@ -22,10 +22,16 @@ use work.mem_map_consts.all;
 
 entity reg_mem_wb is
 	generic (
-		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib  : natural := 32;
-		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
 		rom_external : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib  : natural := 1048576;
+		-- A RAM fica fora do núcleo e o dado sai pela porta externa.
+		ram_external : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib : natural := 1048576
 	);
@@ -107,7 +113,7 @@ begin
 
 	-- A região sai da comparação do endereço com os limites constantes do mapa.
 	in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
-	in_is_sdram <= '1' when unsigned(i_alu_out) >= kib_to_addr(ext_base_kib) else '0';
+	in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
 	in_is_cross <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
 	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3))
 	               else '0';

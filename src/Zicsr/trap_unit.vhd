@@ -35,16 +35,20 @@ entity trap_unit is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
 		check_ea        : boolean := true;
-		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
-		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
 		rom_external    : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib    : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib     : natural := 1048576;
+		-- A RAM fica fora do núcleo e o dado sai pela porta externa.
+		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		periph_base_kib : natural := 2097152;
-		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
-		region_bits     : natural := 30
+		periph_base_kib : natural := 2097152
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -167,7 +171,7 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	last_word <= '1' when i_ea(region_bits - 1 downto BYTE_OFFSET_0'length) = (region_bits - 1 downto BYTE_OFFSET_0'length => '1')
+	last_word <= '1' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib)
 	             else '0';
 
 	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal

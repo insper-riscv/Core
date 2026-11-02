@@ -7,13 +7,14 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 | Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |
 | `boot_rom_bits` | 11 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x000007FF` por padrão |
-| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM interna lida pela segunda porta da Flash (`0x00000800 .. 0x00007FFF` por padrão); 0 quando a ROM é externa |
-| `rom_external` | `false` | A ROM fica fora do núcleo e a instrução sai pela cache de instruções |
-| `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM, ROM externa e periféricos (`0x40000000` por padrão) |
+| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00000800 .. 0x00007FFF` por padrão) |
+| `rom_external` | `false` | A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa |
+| `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Faixa da RAM em KiB (`0x00008000 .. 0x3FFFFFFF` por padrão) |
+| `ram_external` | `false` | A RAM fica fora do núcleo e o dado sai pela porta externa |
+| `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM e periféricos (`0x40000000` por padrão), que sai sempre pela porta externa |
 | `periph_base_kib` | 2097152 | Base, em KiB, da janela de periféricos (`0x80000000` por padrão), que encerra a memória principal |
-| `region_bits` | 30 | Expoente do alinhamento das regiões externas, usado para não deixar um acesso cruzar para a região vizinha |
 
-A RAM interna é o que sobra entre o fim da ROM interna e a base externa. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O mapa da plataforma com FLASH externa usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `periph_base_kib => 1572864` e `region_bits => 29`.
+O que não é BOOT_ROM, ROM interna nem externo é a RAM interna. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O acesso desalinhado em hardware atende a memória principal, de onde a RAM começa até `periph_base_kib`, e não atravessa o fim de uma região. O mapa da plataforma com FLASH externa em `0x20000000` usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` e `periph_base_kib => 1572864`. Uma ROM externa logo depois da Boot ROM usa `rom_external => true` e `rom_end_kib => 32`.
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 
