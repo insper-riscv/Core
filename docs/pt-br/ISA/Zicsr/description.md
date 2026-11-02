@@ -94,6 +94,7 @@ Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret
 ### 5.1. Causas Geradas
 
 A `trap_unit` avalia a instrução no estágio EX e sinaliza no máximo uma exceção por instrução, apenas quando a instrução é válida e o pipeline avança.
+
 | `mcause` | Exceção | Condição | `mtval` |
 | :---: | :--- | :--- | :--- |
 | 0 | Endereço de instrução desalinhado | Desvio, `JAL` ou `JALR` tomado com alvo de bits `[1:0]` diferentes de `00` | Endereço alvo |
@@ -163,7 +164,7 @@ Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e 
 
 Nesse modo, toda instrução de acesso a CSR é ilegal (causa 2), `ECALL` gera a causa 11 e `EBREAK` a causa 3, e o desalinhamento de load e store (causas 4 e 6) é conferido no próprio estágio EX. O desalinhamento do alvo de desvio não é conferido, e `MRET` não tem efeito. A instrução faltante é anulada em EX, sem escrita em `rd` e sem acesso à memória, e o programa segue na instrução seguinte. A instrução que gerou a exceção não conta como retirada. O ambiente em volta do Core decide o que fazer com o sinal.
 
-Um core sem `Zicsr` e sem `Zicclsm` é válido: o acesso desalinhado só é sinalizado em `o_trap`. `Zicntr` e `Zihpm` exigem `Zicsr`, e a elaboração falha sem ele.
+Um perfil exige `Zicsr` ou `Zicclsm`, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. `Zicntr` e `Zihpm` exigem `Zicsr`.
 
 ---
 

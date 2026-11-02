@@ -17,7 +17,6 @@ The instructions use the R-type format and the register-register `opcode` `01100
 | `MULHSU` | `010` | Multiplication | 11.1.1 |
 | `MULHU` | `011` | Multiplication | 11.1.1 |
 
-
 ## 3. Multiplication (section 11.1.1)
 
 The full product of two 32-bit operands has 64 bits. Each instruction returns one half of it.

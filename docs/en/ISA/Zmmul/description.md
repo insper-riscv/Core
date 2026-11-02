@@ -8,7 +8,6 @@ This document describes how the Core executes the `Zmmul` instructions. What the
 | :--- | :--- | :--- |
 | `has_zmmul` | `false` | Instantiates the decoder and the multiplier, without the divider (4 instructions) |
 
-
 The divider is instantiated only with `has_m`, so `has_zmmul = true` with `has_m = false` gives the profile without division. Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
 
 ## 2. Decoding without Division
@@ -37,7 +36,7 @@ In this expression, $s_A$ and $s_B$ are 1 when the respective operand is signed.
 
 ## 4. Pipeline Stall
 
-Multiplication stalls the pipeline for 35 cycles. The stall logic and the cost of the other operations are in [M](../M/description.md).
+Multiplication has a latency of 33 cycles in the unit, and the pipeline stalls for 35, because the stall also covers the final state and the cycle in which the result is captured. The stall logic and the cost of the other operations are in [M](../M/description.md).
 
 ---
 

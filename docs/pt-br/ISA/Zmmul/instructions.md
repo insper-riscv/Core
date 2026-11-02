@@ -17,7 +17,6 @@ As instruções são do formato R-type e usam o `opcode` `0110011` das operaçõ
 | `MULHSU` | `010` | Multiplicação | 11.1.1 |
 | `MULHU` | `011` | Multiplicação | 11.1.1 |
 
-
 ## 3. Multiplicação (seção 11.1.1)
 
 O produto completo de dois operandos de 32 bits tem 64 bits. Cada instrução devolve uma metade dele.

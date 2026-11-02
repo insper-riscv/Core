@@ -36,7 +36,7 @@ An illegal instruction writes no register and takes the same exception path as a
 
 The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `num_regs`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
 
-RV32E programs use the `ilp32e` ABI, defined in the RISC-V psABI specification (outside the ISA manual), which allocates registers only up to `x15`.
+RV32E programs use the `ilp32e` ABI, defined in the [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (outside the ISA manual), which allocates registers only up to `x15`.
 
 ---
 

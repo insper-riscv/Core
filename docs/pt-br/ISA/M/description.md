@@ -63,7 +63,7 @@ O divisor opera sobre o módulo dos operandos nas divisões com sinal e sobre os
 | Correção | 1 | Soma o divisor ao resto se ele terminou negativo |
 | Ajuste de sinal | 1 | Aplica os sinais: o quociente é negado se os sinais dos operandos diferem, e o resto é negado se o dividendo é negativo |
 
-Na divisão sem sinal o ajuste copia quociente e resto sem alteração. A latência é de 34 ciclos no caso normal.
+Na divisão sem sinal o ajuste copia quociente e resto sem alteração. A latência é de 35 ciclos no caso normal, a soma dos ciclos da tabela.
 
 Os casos especiais do manual são detectados antes do cálculo e dispensam as 32 iterações; a latência é de 2 ciclos.
 
@@ -91,12 +91,14 @@ A `multdiv` mantém sua saída de parada ativa desde o ciclo do pulso de início
 
 O `core` combina essa parada com as demais condições (ver a seção 2.4 de [ARCHITECTURE.md](../../ARCHITECTURE.md)) e a conta no evento 1 do Zihpm. O custo por instrução, em ciclos de parada, é o da tabela.
 
-| Caso | Ciclos de parada |
-| :--- | :--- |
-| Multiplicação | 35 |
-| Divisão normal | 37 |
-| Divisão por zero ou estouro | 4 |
-| Operação fundida (seção 6) | 3 |
+| Caso | Latência da unidade | Ciclos de parada |
+| :--- | :---: | :---: |
+| Multiplicação | 33 | 35 |
+| Divisão normal | 35 | 37 |
+| Divisão por zero ou estouro | 2 | 4 |
+| Operação fundida (seção 6) | Não se aplica | 3 |
+
+Em todos os casos a parada dura a latência do operador mais 2 ciclos. O ocupado do operador sobe de forma combinacional no ciclo do pulso de início e só cai depois do estado de término, e a parada usa o ocupado registrado, de modo que ela cobre também o ciclo em que o resultado é capturado. A multiplicação tem latência de 33 ciclos (1 de carga e 32 passos) e para por 35. A divisão normal tem latência de 35 ciclos (1 de início, 32 iterações, 1 de correção e 1 de ajuste de sinal) e para por 37. Nos casos especiais a latência é de 2 ciclos (início e detecção) e a parada dura 4.
 
 O efeito da parada registrada no caminho crítico está em [STALL_REGISTRADO_DO_MULTDIV.md](../../timing/STALL_REGISTRADO_DO_MULTDIV.md).
 

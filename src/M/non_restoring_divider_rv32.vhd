@@ -9,7 +9,7 @@
 --   - Divisão por zero (signed e unsigned): o_quotient = 0xFFFFFFFF, o_remainder = i_dividend
 --   - Overflow com sinal (-2^31 / -1):      o_quotient = 0x80000000, o_remainder = 0x00000000
 --
--- Latência: 34 ciclos para casos normais (1 init + 32 iterações + 1 correção + 1 ajuste de sinal)
+-- Latência: 35 ciclos para casos normais (1 init + 32 iterações + 1 correção + 1 ajuste de sinal)
 --           e 2 ciclos para casos especiais (divisão por zero ou overflow).
 -- =============================================================================
 
