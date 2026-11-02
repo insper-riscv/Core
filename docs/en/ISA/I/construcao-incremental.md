@@ -1,6 +1,6 @@
 # Incremental Implementation of the RV32I Base Instructions
 
-This document describes the six basic 32-bit RISC-V instruction formats ([RISC-V green card](../instructions/greencardRISCV.pdf)) and the incremental datapath and control progression for the 37 base RV32I integer instructions.
+This document describes the six basic 32-bit RISC-V instruction formats ([RISC-V green card](../../../instructions/greencardRISCV.pdf)) and the incremental datapath and control progression for the 37 base RV32I integer instructions.
 
 ## 1. RV32I Instruction Formats
 
@@ -15,10 +15,10 @@ This document describes the six basic 32-bit RISC-V instruction formats ([RISC-V
 | **SYSTEM / MISC-MEM** | Environment, CSR, and instruction-memory synchronization instructions (`ECALL`, `EBREAK`, `MRET`, `CSRR*`, `FENCE`, `FENCE.I`) |
 
 ### 1.1. General Format of the Types
-![General format of the types](../instructions/types.webp)
+![General format of the types](../../../instructions/types.webp)
 
 ### 1.2. Individual Format of the Instructions
-![Individual format of the instructions](../instructions/individual.png)
+![Individual format of the instructions](../../../instructions/individual.png)
 
 ## 2. Datapath Construction Order
 
@@ -40,7 +40,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **LUI** | `imm[31:12]` | `rd` | `0110111` | `lui rd, imm` | `x[rd] = imm << 12` | Load upper immediate (U-type) |
 | **AUIPC** | `imm[31:12]` | `rd` | `0010111` | `auipc rd, imm` | `x[rd] = pc + (imm << 12)` | Add upper immediate to PC (U-type) |
 
-![Datapath Stage 1](../instructions/1.png)
+![Datapath Stage 1](../../../instructions/1.png)
 
 - **Immediate extender (`extender_imm`):** `EXT_IMM_U` produces `i_instr[31:12] & x"000"`.
 - **ALU (`alu`):** `ALU_LUI` (sum with operand A forced to zero, so `o_d = i_b`) and `ALU_ADD` (`o_d = i_a + i_b`).
@@ -60,7 +60,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **SRLI** | `0000000` | `shamt[4:0]` | `rs1` | `101` | `rd` | `0010011` | `srli rd, rs1, shamt` | `x[rd] = x[rs1] >>u shamt` | Shift right logical immediate |
 | **SRAI** | `0100000` | `shamt[4:0]` | `rs1` | `101` | `rd` | `0010011` | `srai rd, rs1, shamt` | `x[rd] = x[rs1] >>s shamt` | Shift right arithmetic immediate |
 
-![Datapath Stage 2](../instructions/2.png)
+![Datapath Stage 2](../../../instructions/2.png)
 
 - **Immediate extender:** `EXT_IMM_I` sign-extends `i_instr[31:20]`; `EXT_IMM_I_SHAMT` zero-extends `i_instr[24:20]`.
 - **ALU:** adds `ALU_XOR`, `ALU_OR`, `ALU_AND`, `ALU_SLT`, `ALU_SLTU`, `ALU_SLL`, `ALU_SRL`, and `ALU_SRA` (`signed(i_a) >> unsigned(i_b[4:0])`).
@@ -80,7 +80,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **OR** | `0000000` | `rs2` | `rs1` | `110` | `rd` | `0110011` | `or rd, rs1, rs2` | `x[rd] = x[rs1] \| x[rs2]` | Bitwise OR |
 | **AND** | `0000000` | `rs2` | `rs1` | `111` | `rd` | `0110011` | `and rd, rs1, rs2` | `x[rd] = x[rs1] & x[rs2]` | Bitwise AND |
 
-![Datapath Stage 3](../instructions/3.png)
+![Datapath Stage 3](../../../instructions/3.png)
 
 - **ALU:** adds `ALU_SUB` (`o_d = i_a - i_b`).
 - **Control:** keeps `o_sel_pc_rs1 = '1'` (`rs1`) and `o_sel_rs2_imm = '0'` (`rs2`) only when `funct7` equals `FUNCT7_DEFAULT` (`"0000000"`) or `FUNCT7_ALT` (`"0100000"`).
@@ -92,7 +92,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **JAL** | `imm[20\|10:5]` | `imm[4:1\|11]` | `imm[19:15]` | `imm[14:12]` | `rd` | `1101111` | `jal rd, off` | `x[rd] = pc + 4; pc = pc + sext(off)` | PC-relative jump (J-type) |
 | **JALR** | `imm[11:5]` | `imm[4:0]` | `rs1` | `000` | `rd` | `1100111` | `jalr rd, rs1, off` | `t = pc + 4; pc = (x[rs1] + sext(off)) & ~1; x[rd] = t` | Indirect jump via `rs1` (I-type) |
 
-![Datapath Stage 4](../instructions/4.png)
+![Datapath Stage 4](../../../instructions/4.png)
 
 - **Immediate extender:** `EXT_IMM_J` for `JAL` and `EXT_IMM_I` for `JALR`.
 - **ALU and Control:** `o_sel_pc4_alu = '1'` selects $\text{PC} + 4$ as the EX result, which follows the normal write-back (`o_wb_sel = WB_SEL_ALU`) to `rd`, while `ALU_JALR` computes the `JALR` target address with bit 0 cleared.
@@ -108,7 +108,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **BLTU** | `imm[12\|10:5]` | `rs2` | `rs1` | `110` | `imm[4:1\|11]` | `1100011` | `bltu rs1, rs2, off` | `if (x[rs1] <u x[rs2]) pc += sext(off)` | Branch if less than (unsigned) |
 | **BGEU** | `imm[12\|10:5]` | `rs2` | `rs1` | `111` | `imm[4:1\|11]` | `1100011` | `bgeu rs1, rs2, off` | `if (x[rs1] >=u x[rs2]) pc += sext(off)` | Branch if greater or equal (unsigned) |
 
-![Datapath Stage 5](../instructions/5.png)
+![Datapath Stage 5](../../../instructions/5.png)
 
 - **Immediate extender:** `EXT_IMM_B` reconstructs the signed 13-bit branch offset.
 - **ALU and Branch Target:** the ALU compares `rs1` and `rs2` (`ALU_BEQ`..`ALU_BGEU`) driving `o_branch`, while the dedicated adder `u_branch_target_adder` in the EX stage computes $\text{PC} + \text{imm}$.
@@ -126,7 +126,7 @@ The datapath construction divides the base RV32I instructions into six progressi
 | **SH** | `imm[11:5]` | `rs2` | `rs1` | `001` | `imm[4:0]` | `0100011` | `sh rs2, off(rs1)` | `M[x[rs1] + sext(off)][15:0] = x[rs2][15:0]` | Store halfword (16 bits) |
 | **SB** | `imm[11:5]` | `rs2` | `rs1` | `000` | `imm[4:0]` | `0100011` | `sb rs2, off(rs1)` | `M[x[rs1] + sext(off)][7:0] = x[rs2][7:0]` | Store byte (8 bits) |
 
-![Datapath Stage 6](../instructions/6.png)
+![Datapath Stage 6](../../../instructions/6.png)
 
 - **Effective address calculation:** `ALU_ADD` adds `rs1` to the `EXT_IMM_I` (loads) or `EXT_IMM_S` (stores) immediate.
 - **Store alignment (`store_manager` in the EX stage):** positions `rs2` into the byte lanes selected by `ea[1:0]` and drives `o_byte_mask`.
@@ -134,4 +134,4 @@ The datapath construction divides the base RV32I instructions into six progressi
 
 ---
 
-Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../../LICENSE).

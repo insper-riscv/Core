@@ -112,3 +112,7 @@ Nas duas operações, o campo de seleção do resultado é ignorado e a soma é 
 | `ALU` | Cada operação isoladamente (com a seleção one-hot que o ID geraria) e, para todas as 18, um modelo de referência em valores de borda (`0`, `1`, `31`, `32`, `0x7FFFFFFF`, `0x80000000`, `0xFFFFFFFF`) e 300 pares aleatórios |
 | `control_unit` | O código que o decodificador gera para cada instrução, conforme a tabela de sinais de controle |
 | Testes do core | Programas de instruções, traps, parada e `fence.i` que exercitam a ULA no pipeline |
+
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../../LICENSE).

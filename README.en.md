@@ -8,16 +8,26 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 - [AUTHORS.en.md](AUTHORS.en.md): authors with commits in the repository, with name and GitHub account.
 - [CONTRIBUTING.en.md](CONTRIBUTING.en.md): mandatory contribution rules, VHDL-2008 standard (`--std=08`), naming conventions, `i_`/`o_` port prefixes, file headers, docstrings, and documentation rules.
-- [README.md](docs/en/README.md): 32-bit RISC-V instruction formats, immediate generation table, and incremental datapath progression for the 37 base RV32I instructions.
+- [ISA/I/instructions.md](docs/en/ISA/I/instructions.md): RISC-V manual requirements for the RV32I base (programmer state, formats, the 37 instructions with encoding and semantics, `FENCE`, `ECALL`, `EBREAK`) and the Core behavior in each case.
+- [ISA/I/description.md](docs/en/ISA/I/description.md): how the Core implements the RV32I base, with stages, control decoder, ALU, immediate and load extenders, store manager, forwarding and hazards.
+- [ISA/I/construcao-incremental.md](docs/en/ISA/I/construcao-incremental.md): 32-bit RISC-V instruction formats and incremental datapath progression for the 37 base RV32I instructions.
+- [ISA/I/ULA.md](docs/en/ISA/I/ULA.md): operation code, shared adder-subtractor, branches, shifters, and result selection of the ALU.
 - [ARCHITECTURE.md](docs/en/ARCHITECTURE.md): 5-stage pipeline microarchitecture, per-stage responsibilities, forwarding paths, load-use hazard detection, stall, flush, and support for the `M`, `Zicsr`, and `Zifencei` extensions.
 - [PIPELINE_ARCHITECTURE_GUIDE.md](docs/en/PIPELINE_ARCHITECTURE_GUIDE.md): detailed reference of inter-stage interconnect signals, synchronous barriers (`IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB`), stall and flush equations, and branch resolution.
-- [DECODER.md](docs/en/DECODER.md): specification of the 21-bit RV32I base control word, dedicated decoding for `RV32M`, `Zicsr`, and `Zifencei`, register-file writeback selection, and illegal-instruction detection.
+- [ISA/I/DECODER.md](docs/en/ISA/I/DECODER.md): decoding table of the base control unit, with the control signals of the 37 base RV32I instructions and the behavior of any other instruction as a `NOP`.
 - [contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md): extension directory contract, profile manifests (`profiles/*.yaml`), and single integration point for new extensions in the top-level entity.
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
-- [MISALIGNED_ACCESS.md](docs/en/MISALIGNED_ACCESS.md): hardware execution of misaligned loads and stores (Zicclsm), access classification, regions covered in each memory map, and the two-step access that crosses a word.
+- [ISA/Zicclsm/instructions.md](docs/en/ISA/Zicclsm/instructions.md) and [ISA/Zicclsm/description.md](docs/en/ISA/Zicclsm/description.md): what the profiles specification requires of Zicclsm and the hardware execution of misaligned loads and stores, access classification, regions covered in each memory map, and the two-step access that crosses a word.
 - [FORMAL.md](docs/en/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
-- [RV32E.md](docs/en/RV32E.md): the `num_regs` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
-- [FENCE_I.md](docs/en/FENCE_I.md): the `FENCE.I` instruction (Zifencei), regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
+- [ISA/E/description.md](docs/en/ISA/E/description.md): the `num_regs` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
+- [ISA/Zicsr/instructions.md](docs/en/ISA/Zicsr/instructions.md) and [ISA/Zicsr/description.md](docs/en/ISA/Zicsr/description.md): the Zicsr extension, with the instructions, encoding and read/write rules required by the manual, and the Core implementation (CSR file, synchronous exceptions, `MRET`, redirection and behavior without Zicsr).
+- [ISA/Zicntr](docs/en/ISA/Zicntr/description.md): the base counters `cycle`, `time` and `instret` (Zicntr), with what the manual requires, the 64-bit counter block, instruction retirement, the tick divider and `mcountinhibit`.
+- [ISA/Zihpm](docs/en/ISA/Zihpm/description.md): the `hpmcounter` performance counters (Zihpm), with what the manual requires, the organization of the event counters, the counting rule and the event table.
+- [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): instructions of the `M` extension according to the RISC-V manual (chapter 11): encoding, division, division by zero and overflow.
+- [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
+- [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.
+- [ISA/Zmmul/description.md](docs/en/ISA/Zmmul/description.md): how the Core executes `Zmmul`: configuration, decoding without division and the Booth multiplier.
+- [ISA/Zifencei/instructions.md](docs/en/ISA/Zifencei/instructions.md) and [ISA/Zifencei/description.md](docs/en/ISA/Zifencei/description.md): the Zifencei extension (`FENCE.I`), manual requirements, regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
 - [MEMORY_WIDTH.md](docs/en/MEMORY_WIDTH.md): rules for the adapter between the Core's 32-bit word and a narrower or wider memory, covering address, byte mask, read, ready signal and interaction with misaligned access.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/en/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): mathematical analysis of the partial remainder range in non-restoring division and the use of 34 internal bits for unsigned divisors above $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/en/bugs/FLUSH_COM_PIPELINE_PARADO.md): analysis of the interaction between branch redirection in EX and global pipeline stall caused by memory wait in MEM.
@@ -52,7 +62,7 @@ The structural top level `core` takes one boolean generic per extension, which e
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` behaves as `NOP` |
 | Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [RV32E.md](docs/en/RV32E.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and the core needs Zicsr or Zicclsm, because without both a misaligned access would neither trap nor run in hardware, and elaboration fails. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
