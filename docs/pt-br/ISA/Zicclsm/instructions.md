@@ -1,5 +1,7 @@
 # Zicclsm: O Que o RISC-V Exige
 
+Fontes ([especificação de perfis do RISC-V](https://github.com/riscv/riscv-profiles) e [Load and Store Instructions](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html) do Capítulo 1 do manual).
+
 A Zicclsm não faz parte do manual de ISA não privilegiada. Ela é definida na especificação de perfis do RISC-V, como um dos requisitos que um perfil impõe à memória principal. Este documento reúne o que essa especificação exige, o que o manual de ISA diz sobre acessos desalinhados em geral e como isso se relaciona com as exceções de endereço desalinhado. A implementação no Core está em [description.md](description.md).
 
 ## 1. Requisito do Perfil

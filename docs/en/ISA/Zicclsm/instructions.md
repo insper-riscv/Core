@@ -1,5 +1,7 @@
 # Zicclsm: What RISC-V Requires
 
+Sources ([RISC-V profiles specification](https://github.com/riscv/riscv-profiles) and [Load and Store Instructions](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html) of Chapter 1 of the manual).
+
 Zicclsm is not part of the unprivileged ISA manual. It is defined in the RISC-V profiles specification, as one of the requirements that a profile places on main memory. This document gathers what that specification requires, what the ISA manual says about misaligned accesses in general, and how this relates to the misaligned address exceptions. The Core implementation is in [description.md](description.md).
 
 ## 1. Profile Requirement
