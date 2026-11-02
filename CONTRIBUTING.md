@@ -210,7 +210,7 @@ make check          # Verifica a sintaxe VHDL-2008 de todos os arquivos em ordem
 make profiles       # Compila e elabora cada perfil em profiles/*.yaml no GHDL
 make paths          # Confere que todos os caminhos referenciados em paths.yaml existem
 make test           # Executa a suíte completa de testes unitários e de integração (cocotb + GHDL)
-bash formal/run.sh  # Executa as provas formais (SymbiYosys + Z3) de csr_file e trap_unit
+make formal         # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
 ```
 
 O job `python-static-analysis` do CI roda `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` e `uv audit` sobre os arquivos Python, e o nome do job é o check que o ruleset da branch padrão exige, então não o renomeie.

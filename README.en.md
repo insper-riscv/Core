@@ -15,6 +15,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md): extension directory contract, profile manifests (`profiles/*.yaml`), and single integration point for new extensions in the top-level entity.
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
 - [MISALIGNED_ACCESS.md](docs/en/MISALIGNED_ACCESS.md): hardware execution of misaligned loads and stores (Zicclsm), access classification, regions covered in each memory map, and the two-step access that crosses a word.
+- [FORMAL.md](docs/en/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
 - [FENCE_I.md](docs/en/FENCE_I.md): the `FENCE.I` instruction (Zifencei), regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
 - [MEMORY_WIDTH.md](docs/en/MEMORY_WIDTH.md): rules for the adapter between the Core's 32-bit word and a narrower or wider memory, covering address, byte mask, read, ready signal and interaction with misaligned access.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/en/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): mathematical analysis of the partial remainder range in non-restoring division and the use of 34 internal bits for unsigned divisors above $2^{31}$.
@@ -35,7 +36,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 | `src/Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
 | `src/core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
 | `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
-| `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, and formal verification script via GHDL + Yosys + SymbiYosys |
+| `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, formal verification script via GHDL + Yosys + SymbiYosys, and the aggregator of the engines ([documentation](docs/en/FORMAL.md)) |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
 
 ## 3. ISA Profiles
@@ -73,16 +74,16 @@ make check          # VHDL syntax check of all sources in topological order
 make profiles       # Independent compilation and elaboration of each profile in profiles/*.yaml
 make test           # Run the full cocotb test suite (or make test TEST=ALU for a single target)
 make paths          # Validate that all file paths listed in the manifests exist
-bash formal/run.sh  # Run formal proofs (SymbiYosys + Z3) for csr_file and trap_unit
+make formal         # Run formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
 
 ### 4.2. Execution via Docker
 
-The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, Z3, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
+The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, the Yices, Bitwuzla and Boolector solvers, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \
-  bash -c "uv sync && make check && make profiles && make test && bash formal/run.sh"
+  bash -c "uv sync && make check && make profiles && make test && make formal"
 ```
 
 ---
