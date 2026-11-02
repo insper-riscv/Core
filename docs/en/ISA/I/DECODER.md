@@ -1,10 +1,10 @@
-# Tabela de Decodificação da Unidade de Controle Base (RV32I)
+# Base Control Unit Decoding Table (RV32I)
 
-A unidade de controle base (`src/shared/control_unit.vhd`) decodifica combinacionalmente os campos `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`) e `funct7` (`i_inst[31:25]`) das 37 instruções do conjunto RV32I. Qualquer instrução fora desta tabela (incluindo instruções das extensões `M`, `Zicsr` e `Zifencei`) recebe os sinais padrão de um `NOP` sem efeitos colaterais nesta unidade (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
+The base control unit (`src/shared/control_unit.vhd`) combinationally decodes the `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`), and `funct7` (`i_inst[31:25]`) fields of the 37 RV32I instructions. Any instruction outside this table (including instructions from the `M`, `Zicsr`, and `Zifencei` extensions) receives the default side-effect-free `NOP` control word in this unit (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
 
-## 1. Sinais de Controle por Instrução
+## 1. Control Signals per Instruction
 
-| Instrução | Semântica arquitetural | `opcode` | `funct3` | `funct7` | `o_sel_pc4_alu` | `o_ext_imm_op` | `o_wb_sel` | `o_we_reg` | `o_ext_ram_op` | `o_sel_rs2_imm` | `o_sel_pc_rs1` | `o_alu_op` | `o_re_ram` | `o_we_ram` | `o_en_ram` |
+| Instruction | Architectural semantics | `opcode` | `funct3` | `funct7` | `o_sel_pc4_alu` | `o_ext_imm_op` | `o_wb_sel` | `o_we_reg` | `o_ext_ram_op` | `o_sel_rs2_imm` | `o_sel_pc_rs1` | `o_alu_op` | `o_re_ram` | `o_we_ram` | `o_en_ram` |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `LUI` | `x[rd] = imm_u` | `0110111` | `-` | `-` | `0` | `EXT_IMM_U` | `WB_SEL_ALU` | `1` | `EXT_RAM_LW` | `1` | `0` | `ALU_LUI` | `0` | `0` | `0` |
 | `AUIPC` | `x[rd] = pc + imm_u` | `0010111` | `-` | `-` | `0` | `EXT_IMM_U` | `WB_SEL_ALU` | `1` | `EXT_RAM_LW` | `1` | `0` | `ALU_ADD` | `0` | `0` | `0` |
@@ -43,8 +43,8 @@ A unidade de controle base (`src/shared/control_unit.vhd`) decodifica combinacio
 | `SB` | `M[x[rs1] + imm_s][7:0] = x[rs2][7:0]` | `0100011` | `000` | `-` | `0` | `EXT_IMM_S` | `WB_SEL_ALU` | `0` | `EXT_RAM_LW` | `1` | `1` | `ALU_ADD` | `0` | `1` | `1` |
 | `SH` | `M[x[rs1] + imm_s][15:0] = x[rs2][15:0]` | `0100011` | `001` | `-` | `0` | `EXT_IMM_S` | `WB_SEL_ALU` | `0` | `EXT_RAM_LW` | `1` | `1` | `ALU_ADD` | `0` | `1` | `1` |
 | `SW` | `M[x[rs1] + imm_s][31:0] = x[rs2][31:0]` | `0100011` | `010` | `-` | `0` | `EXT_IMM_S` | `WB_SEL_ALU` | `0` | `EXT_RAM_LW` | `1` | `1` | `ALU_ADD` | `0` | `1` | `1` |
-| `NOP` / outros | Sem operação na base RV32I | outros | `-` | `-` | `0` | `EXT_IMM_U` | `WB_SEL_ALU` | `0` | `EXT_RAM_LW` | `0` | `0` | `ALU_ADD` | `0` | `0` | `0` |
+| `NOP` / others | No operation in base RV32I | others | `-` | `-` | `0` | `EXT_IMM_U` | `WB_SEL_ALU` | `0` | `EXT_RAM_LW` | `0` | `0` | `ALU_ADD` | `0` | `0` | `0` |
 
 ---
 
-Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../../LICENSE).

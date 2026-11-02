@@ -1,0 +1,44 @@
+# Zmmul: Implementação no Core
+
+Este documento descreve como o Core executa as instruções da `Zmmul`. O que o manual exige está em [instructions.md](instructions.md). O decodificador, a unidade de execução, a parada do pipeline e a fusão de pares são compartilhados com a `M` e estão em [M](../M/description.md).
+
+## 1. Configuração
+
+| Genérico | Padrão | Efeito |
+| :--- | :--- | :--- |
+| `has_zmmul` | `false` | Instancia o decodificador e o multiplicador, sem o divisor (4 instruções) |
+
+
+O divisor só é instanciado com `has_m`, de modo que `has_zmmul = true` com `has_m = false` dá o perfil sem divisão. Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
+
+## 2. Decodificação sem Divisão
+
+O parâmetro de divisão do decodificador recebe o valor de `has_m`. Sem divisão, só os `funct3` com o bit 2 em zero são reivindicados, ou seja, as quatro multiplicações. Uma instrução com `funct7 = 0000001` e `funct3` de divisão não é reivindicada, e a unidade de controle a marca como ilegal. O restante da decodificação está em [M](../M/description.md).
+
+## 3. Multiplicador de Booth Radix-2
+
+O multiplicador faz a multiplicação com sinal de 32 por 32 bits e produz o produto de 64 bits. Mantém um acumulador de 33 bits, o multiplicador de 32 bits, um bit auxiliar à direita e o multiplicando estendido com sinal para 33 bits. A cada passo examina o par formado pelo bit menos significativo do multiplicador e pelo bit auxiliar.
+
+| Par | Operação sobre o acumulador |
+| :--- | :--- |
+| `01` | Soma o multiplicando |
+| `10` | Subtrai o multiplicando |
+| `00` ou `11` | Mantém o acumulador |
+
+Em seguida o conjunto é deslocado um bit à direita, de forma aritmética. Após 32 passos, o acumulador e o multiplicador formam as metades alta e baixa do produto. A latência é de 33 ciclos (1 de inicialização e 32 passos), e a faixa com sinal inclui $-2^{31}$.
+
+A metade baixa vale para qualquer interpretação de sinal. A metade alta sai interpretada como com sinal nos dois operandos, e a `multdiv` a corrige para os modos sem sinal com dois somadores de 32 bits.
+
+$$
+\text{alta}_{\text{corrigida}} = \text{alta} + (A_{31} \land \neg s_A) \cdot B + (B_{31} \land \neg s_B) \cdot A \pmod{2^{32}}
+$$
+
+Nessa expressão, $s_A$ e $s_B$ valem 1 quando o respectivo operando tem sinal. Para `MULH` a correção é nula, para `MULHSU` só vale o termo que soma $A$ e para `MULHU` valem os dois termos.
+
+## 4. Parada do Pipeline
+
+A multiplicação para o pipeline por 35 ciclos. A lógica de parada e o custo das demais operações estão em [M](../M/description.md).
+
+---
+
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../../LICENSE).

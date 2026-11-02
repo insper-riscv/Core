@@ -100,7 +100,7 @@ In the EX stage:
 | `ALU_BLTU` | `"11110"` | `0` | `'1'` if `unsigned(i_a) < unsigned(i_b)` |
 | `ALU_BGEU` | `"11111"` | `0` | `'1'` if `unsigned(i_a) >= unsigned(i_b)` |
 
-The encoding of the operation code and the shared adder-subtractor are described in [ALU.md](ALU.md).
+The encoding of the operation code and the shared adder-subtractor are described in [ULA.md](ISA/I/ULA.md).
 
 4. **EX result selection:** `ex_alu_mux_result` chooses between `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`), and `ex_alu_result`. Next, `u_mux_ex_final` (`mux_2x1`) selects between `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) and `i_pc4` (`i_sel_pc4_alu = '1'`, used by `JAL` and `JALR`).
 5. **Store alignment (`store_manager`):** shifts `ex_fwd_rs2_val` into the byte lanes matching `ex_alu_result(1 downto 0)` and produces the 4-bit mask `o_store_byte_mask` (`"1111"` for `SW`, `"0011"`/`"1100"` for `SH`, and `"0001"`/`"0010"`/`"0100"`/`"1000"` for `SB`).
