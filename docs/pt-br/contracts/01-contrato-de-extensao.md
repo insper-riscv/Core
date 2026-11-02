@@ -4,7 +4,7 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `src/core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
 Os estágios instanciam as unidades de cada extensão diretamente por `entity work`, sem declaração `component`. Por isso todo perfil analisa os arquivos de todas as extensões, e o generic em `false` retira a unidade da elaboração.
 
@@ -12,18 +12,18 @@ Os estágios instanciam as unidades de cada extensão diretamente por `entity wo
 
 ### 2.1. Decodificação no Estágio ID
 
-A unidade de controle base (`common/control_unit.vhd`) decodifica exclusivamente o conjunto RV32I. Instruções de extensões opcionais são reivindicadas por decodificadores dedicados instanciados condicionalmente em `core/stage_id.vhd`:
+A unidade de controle base (`src/shared/control_unit.vhd`) decodifica exclusivamente o conjunto RV32I. Instruções de extensões opcionais são reivindicadas por decodificadores dedicados instanciados condicionalmente em `src/core/stage_id.vhd`:
 
 | Extensão | Decodificador em `stage_id` | Condição de reivindicação | Sinais ativados |
 | :--- | :--- | :--- | :--- |
-| `M` | `M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
-| `Zicsr` | `Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` para toda a classe `SYSTEM`; `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"` |
+| `M` | `src/M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
+| `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` para toda a classe `SYSTEM`; `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"` |
 
 O estágio ID combina as habilitações de escrita por disjunção lógica (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg`) e propaga os indicadores `o_is_muldiv` e `o_is_csr` pelo registrador de barreira `reg_id_ex` até o estágio EX.
 
 ### 2.2. Efeitos Permitidos no Pipeline
 
-Uma extensão interage com o controle global do pipeline em `core/core.vhd` exclusivamente por três mecanismos:
+Uma extensão interage com o controle global do pipeline em `src/core/core.vhd` exclusivamente por três mecanismos:
 
 1. **Parada por ocupação multiciclo (`o_muldiv_stall` / `o_fencei_busy`):** congela os estágios anteriores enquanto a operação aguarda conclusão.
 2. **Descarte e redirecionamento de fluxo (`o_fencei_take`, `o_mret_take`):** esvazia `reg_if_id` e `reg_id_ex` e redireciona o PC para `o_redirect_pc`.
@@ -31,11 +31,11 @@ Uma extensão interage com o controle global do pipeline em `core/core.vhd` excl
 
 ### 2.3. Caminho de Resultado e Forwarding
 
-No estágio EX (`core/stage_ex.vhd`), o resultado produzido pela extensão (`ex_muldiv_result` quando `i_is_muldiv = '1'` ou `csr_rdata` quando `i_is_csr = '1'`) é multiplexado em `ex_alu_mux_result` junto com `ex_alu_result`. Dessa forma, o resultado atravessa `reg_ex_mem` e `reg_mem_wb` e é atendido pela malha de adiantamento (`forwarding_unit`) sem caminhos especiais no banco de registradores.
+No estágio EX (`src/core/stage_ex.vhd`), o resultado produzido pela extensão (`ex_muldiv_result` quando `i_is_muldiv = '1'` ou `csr_rdata` quando `i_is_csr = '1'`) é multiplexado em `ex_alu_mux_result` junto com `ex_alu_result`. Dessa forma, o resultado atravessa `reg_ex_mem` e `reg_mem_wb` e é atendido pela malha de adiantamento (`forwarding_unit`) sem caminhos especiais no banco de registradores.
 
 ## 3. Especificação por Extensão
 
-### 3.1. Extensão M (`M/multdiv.vhd`)
+### 3.1. Extensão M (`src/M/multdiv.vhd`)
 
 A unidade `multdiv` encapsula o multiplicador de Booth radix-2 (`booth_multiplier_rv32`), o divisor não-restaurador de 34 bits (`non_restoring_divider_rv32`) e a lógica de controle de partida e retenção:
 
@@ -51,7 +51,7 @@ A unidade `multdiv` encapsula o multiplicador de Booth radix-2 (`booth_multiplie
 | `o_stall` | `out` | Ativo enquanto `o_busy = '1'` ou `o_done = '1'`, mantendo o pipeline retido até a captura de `o_result` |
 | `o_fused` | `out` | Pulso de 1 ciclo no término de uma operação fundida com a anterior (resultado do par vem do registro de `muldiv_fusion`, sem repetir o cálculo) |
 
-### 3.2. Extensão Zicsr e Exceções (`Zicsr/csr_file.vhd` e `Zicsr/trap_unit.vhd`)
+### 3.2. Extensão Zicsr e Exceções (`src/Zicsr/csr_file.vhd` e `src/Zicsr/trap_unit.vhd`)
 
 O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade de traps operam no estágio EX:
 
@@ -91,7 +91,7 @@ Registradores CSR implementados no modo máquina:
 | `0x341` | `mepc` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` |
 | `0xF11`..`0xF15` | `mvendorid`, `marchid`, `mimpid`, `mhartid`, `mconfigptr` | Somente leitura | `0x00000000` | Lidos constantemente como zero |
 
-### 3.3. Extensão Zifencei (`Zifencei/fencei_unit.vhd`)
+### 3.3. Extensão Zifencei (`src/Zifencei/fencei_unit.vhd`)
 
 O perfil `rv32im_zicsr_zifencei` habilita `has_zifencei = true`:
 

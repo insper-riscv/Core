@@ -24,7 +24,7 @@ dev = [
 [tool.ruff]
 target-version = "py314"
 line-length = 79
-extend-exclude = ["Common-Components", "build", "sim_build"]
+extend-exclude = ["src/common", "build", "sim_build"]
 
 [tool.ruff.lint]
 select = [
@@ -112,7 +112,8 @@ search-path = ["."]
 python-version = "3.14"
 
 [tool.pylint.main]
-ignore = [".venv", "Common-Components", "build", "sim_build"]
+ignore = [".venv", "build", "sim_build"]
+ignore-paths = ["^src/common/"]
 fail-under = 10
 init-hook = "import sys; sys.path.append('.')"
 
@@ -138,7 +139,7 @@ exclude = [
     "\\.venv",
     "\\.direnv",
     "\\.git",
-    "Common-Components",
+    "src/common",
     "build",
     "sim_build",
 ]

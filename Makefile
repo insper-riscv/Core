@@ -3,7 +3,7 @@ GHDL  := ghdl
 STD   := --std=08
 WDIR  := build/ghdl
 
-VHDL := $(shell find common I M Zicsr Zicntr Zifencei core -name '*.vhd' | sort) $(sort $(wildcard Common-Components/src/*.vhd))
+VHDL := $(shell find src -name '*.vhd' -not -path 'src/common/*' | sort) $(sort $(wildcard src/common/src/*.vhd))
 
 .PHONY: check profiles profile-matrix test formal paths clean
 

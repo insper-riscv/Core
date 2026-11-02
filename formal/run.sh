@@ -18,20 +18,20 @@ expect() {
 netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
   ghdl -a --std=08 --workdir="$work" \
-    "$root/common/pipeline_types.vhd" \
-    "$root/common/byte_mask_consts.vhd" \
-    "$root/common/opcode_consts.vhd" \
-    "$root/common/funct3_consts.vhd" \
-    "$root/Common-Components/src/flip_flop.vhd" \
-    "$root/Common-Components/src/generic_register.vhd" \
-    "$root/common/mem_map_consts.vhd" \
-    "$root/common/word_consts.vhd" \
-    "$root/Zicsr/trap_consts.vhd" \
-    "$root/Zicsr/csr_addr_consts.vhd" \
-    "$root/Zicsr/csr_event_consts.vhd" \
-    "$root/Zicsr/csr_value_consts.vhd" \
-    "$root/Zicntr/counter64.vhd" \
-    "$root/Zicntr/tick_divider.vhd" \
+    "$root/src/shared/pipeline_types.vhd" \
+    "$root/src/shared/byte_mask_consts.vhd" \
+    "$root/src/shared/opcode_consts.vhd" \
+    "$root/src/shared/funct3_consts.vhd" \
+    "$root/src/common/src/flip_flop.vhd" \
+    "$root/src/common/src/generic_register.vhd" \
+    "$root/src/shared/mem_map_consts.vhd" \
+    "$root/src/shared/word_consts.vhd" \
+    "$root/src/Zicsr/trap_consts.vhd" \
+    "$root/src/Zicsr/csr_addr_consts.vhd" \
+    "$root/src/Zicsr/csr_event_consts.vhd" \
+    "$root/src/Zicsr/csr_value_consts.vhd" \
+    "$root/src/Zicntr/counter64.vhd" \
+    "$root/src/Zicntr/tick_divider.vhd" \
     "$1"
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
@@ -54,8 +54,8 @@ EOS
   if sby -f "$6.sby" > "$6.log" 2>&1; then echo PASS; else echo FAIL; fi
 }
 
-csr="$root/Zicsr/csr_file.vhd"; csr_props="$root/formal/csr_file_props.sv"
-trap="$root/Zicsr/trap_unit.vhd"; trap_props="$root/formal/trap_unit_props.sv"
+csr="$root/src/Zicsr/csr_file.vhd"; csr_props="$root/formal/csr_file_props.sv"
+trap="$root/src/Zicsr/trap_unit.vhd"; trap_props="$root/formal/trap_unit_props.sv"
 
 echo "csr_file"
 netlist "$csr" csr_file csr
@@ -77,14 +77,14 @@ netlist "$trap" trap_unit trap_ext -gext_flash=true
 expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (induction)" PASS "$(prove trap_ext.v "$trap_props" prove 2 '-DZICCLSM_ON -DEXT_FLASH' trap_zicclsm_ext)"
 
 echo "counter64"
-cnt="$root/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
+cnt="$root/src/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
 netlist "$cnt" counter64 cnt
 expect "the value shown is the ideal 64-bit counter, carry and writes (induction)" PASS "$(prove cnt.v "$cnt_props" prove 4 ''           cnt_safety)"
 expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
 expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
 
 echo "muldiv_fusion"
-fus="$root/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
+fus="$root/src/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
 netlist "$fus" muldiv_fusion fus
 # The record mirrors the units' last full result, so this proof is bounded from reset: the fusion is a hit only on the rule and shows the full result of the earlier execution.
 expect "hit only on the same values, family and another operation; the record is the last full result (bounded, 10 cycles)" PASS "$(prove fus.v "$fus_props" bmc 10 '' fus_safety)"

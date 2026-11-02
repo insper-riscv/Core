@@ -4,7 +4,7 @@
 
 The RISC-V specification defines the architectural semantics of each instruction (opcodes, `funct3`/`funct7` fields, and register effects). The extension contract defines how the hardware of an extension (`M/`, `Zicsr/`, `Zifencei/`) connects to the pipeline stages (`core/`) without coupling the base logic (`common/` and `I/`) to the internal details of each extension.
 
-Each extension resides in its own folder and is enabled at the top level `core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
+Each extension resides in its own folder and is enabled at the top level `src/core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
 The stages instantiate the unit of each extension directly with `entity work`, without a `component` declaration. For that reason every profile analyzes the files of all extensions, and a generic set to `false` removes the unit from the elaboration.
 
@@ -12,18 +12,18 @@ The stages instantiate the unit of each extension directly with `entity work`, w
 
 ### 2.1. Decoding in the ID Stage
 
-The base control unit (`common/control_unit.vhd`) decodes exclusively the RV32I base instruction set. Instructions belonging to optional extensions are claimed by dedicated decoders conditionally instantiated in `core/stage_id.vhd`:
+The base control unit (`src/shared/control_unit.vhd`) decodes exclusively the RV32I base instruction set. Instructions belonging to optional extensions are claimed by dedicated decoders conditionally instantiated in `src/core/stage_id.vhd`:
 
 | Extension | Decoder in `stage_id` | Claim condition | Activated signals |
 | :--- | :--- | :--- | :--- |
-| `M` | `M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
-| `Zicsr` | `Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
+| `M` | `src/M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
+| `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
 
 The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
 
 ### 2.2. Permitted Pipeline Effects
 
-An extension interacts with global pipeline control in `core/core.vhd` exclusively through three mechanisms:
+An extension interacts with global pipeline control in `src/core/core.vhd` exclusively through three mechanisms:
 
 1. **Multi-cycle busy stall (`o_muldiv_stall` / `o_fencei_busy`):** freezes earlier stages while the operation awaits completion.
 2. **Flow discard and redirection (`o_fencei_take`, `o_mret_take`):** flushes `reg_if_id` and `reg_id_ex` and redirects the PC to `o_redirect_pc`.
@@ -31,11 +31,11 @@ An extension interacts with global pipeline control in `core/core.vhd` exclusive
 
 ### 2.3. Result Path and Forwarding
 
-In the EX stage (`core/stage_ex.vhd`), the result produced by the extension (`ex_muldiv_result` when `i_is_muldiv = '1'` or `csr_rdata` when `i_is_csr = '1'`) is multiplexed into `ex_alu_mux_result` alongside `ex_alu_result`. As a result, the value traverses `reg_ex_mem` and `reg_mem_wb` and is served by the forwarding network (`forwarding_unit`) without special paths in the register file.
+In the EX stage (`src/core/stage_ex.vhd`), the result produced by the extension (`ex_muldiv_result` when `i_is_muldiv = '1'` or `csr_rdata` when `i_is_csr = '1'`) is multiplexed into `ex_alu_mux_result` alongside `ex_alu_result`. As a result, the value traverses `reg_ex_mem` and `reg_mem_wb` and is served by the forwarding network (`forwarding_unit`) without special paths in the register file.
 
 ## 3. Specification per Extension
 
-### 3.1. M Extension (`M/multdiv.vhd`)
+### 3.1. M Extension (`src/M/multdiv.vhd`)
 
 The `multdiv` unit encapsulates the radix-2 Booth multiplier (`booth_multiplier_rv32`), the 34-bit non-restoring divider (`non_restoring_divider_rv32`), and the start and hold control logic:
 
@@ -51,7 +51,7 @@ The `multdiv` unit encapsulates the radix-2 Booth multiplier (`booth_multiplier_
 | `o_stall` | `out` | Active while `o_busy = '1'` or `o_done = '1'`, keeping the pipeline held until `o_result` is captured |
 | `o_fused` | `out` | 1-cycle pulse at the end of an operation fused with the previous one (the result of the pair comes from the `muldiv_fusion` record, with no new calculation) |
 
-### 3.2. Zicsr Extension and Exceptions (`Zicsr/csr_file.vhd` and `Zicsr/trap_unit.vhd`)
+### 3.2. Zicsr Extension and Exceptions (`src/Zicsr/csr_file.vhd` and `src/Zicsr/trap_unit.vhd`)
 
 The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap unit operate in the EX stage:
 
@@ -91,7 +91,7 @@ Machine-mode CSRs implemented:
 | `0x341` | `mepc` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` |
 | `0xF11`..`0xF15` | `mvendorid`, `marchid`, `mimpid`, `mhartid`, `mconfigptr` | Read-only | `0x00000000` | Read constantly as zero |
 
-### 3.3. Zifencei Extension (`Zifencei/fencei_unit.vhd`)
+### 3.3. Zifencei Extension (`src/Zifencei/fencei_unit.vhd`)
 
 The `rv32im_zicsr_zifencei` profile enables `has_zifencei = true`:
 

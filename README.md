@@ -25,16 +25,18 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 
 | Caminho | Conteúdo |
 | :--- | :--- |
-| `common/` | Blocos compartilhados por todos os perfis, incluindo pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard, gerador de PC e as demais peças próprias do Core; os blocos genéricos (somador, flip-flop, registradores, multiplexadores e decodificador one-hot) vêm do repositório [Common-Components](https://github.com/insper-riscv/Common-Components), incluído como submódulo |
-| `I/` | Extensão inteira base RV32I, composta pela ULA, extensor de imediatos, extensor de leitura de memória e gerenciador de alinhamento de stores |
-| `M/` | Extensão de multiplicação e divisão inteira RV32M, contendo decodificador dedicado, multiplicador sequencial de Booth radix-2, divisor não-restaurador de 34 bits e unidade integradora |
-| `Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
-| `Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
-| `core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
+| `src/common/` | Submódulo [Common-Components](https://github.com/insper-riscv/Common-Components): os blocos genéricos (somador, flip-flop, registradores, multiplexadores e decodificador one-hot) que o Core importa |
+| `src/shared/` | Peças do Core usadas por todos os perfis: pacotes de tipos e constantes, registradores de barreira entre estágios, unidade de controle base, banco de registradores, unidades de forwarding e hazard e gerador de PC |
+| `src/I/` | Extensão inteira base RV32I, composta pela ULA, extensor de imediatos, extensor de leitura de memória e gerenciador de alinhamento de stores |
+| `src/M/` | Extensão de multiplicação e divisão inteira RV32M, contendo decodificador dedicado, multiplicador sequencial de Booth radix-2, divisor não-restaurador de 34 bits e unidade integradora |
+| `src/Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
+| `src/Zicntr/` | Extensão de contadores: `mcycle`, `minstret`, `time` e os espelhos `cycle`, `instret`, `time`, com o contador de 64 bits e o divisor do tempo |
+| `src/Zicclsm/` | Unidade de acesso desalinhado à memória principal (`misaligned_unit`), que divide em duas etapas o acesso que cruza a palavra |
+| `src/Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
+| `src/core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
 | `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby` e script de verificação formal via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
-| `tests/FPGA/entities/` | Projeto Quartus para validação em placa do banco de registradores ([documentação](tests/FPGA/entities/bancoRegistradores/README.md)) |
 
 ## 3. Perfis da ISA
 
