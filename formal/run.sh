@@ -8,10 +8,14 @@ out="$root/build/formal"
 rm -rf "$out"; mkdir -p "$out"; cd "$out"
 
 fail=0
-# expect <label> <wanted: PASS|FAIL> <result: PASS|FAIL>
+# expect <label> <wanted: PASS|FAIL> <result: PASS|FAIL|ERROR ...>. An ERROR (the tool did not reach a verdict)
+# never matches, not even a wanted FAIL.
 expect() {
-  if [ "$2" = "$3" ]; then printf '  ok    %-62s %s\n' "$1" "$3"
-  else printf '  WRONG %-62s wanted %s, got %s\n' "$1" "$2" "$3"; fail=1; fi
+  case "$3" in
+    ERROR*) printf '  ERROR %-62s %s\n' "$1" "${3#ERROR }"; fail=1 ;;
+    "$2") printf '  ok    %-62s %s\n' "$1" "$3" ;;
+    *) printf '  WRONG %-62s wanted %s, got %s\n' "$1" "$2" "$3"; fail=1 ;;
+  esac
 }
 
 # netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity.
@@ -36,7 +40,9 @@ netlist() {
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
 
-# prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS or FAIL
+# prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL or ERROR
+# PASS is sby exit code 0, FAIL is 2 (a counterexample or a goal that cannot be covered) and any other code
+# (4 unknown, 8 timeout, 16 error) is ERROR: the tool did not reach a verdict.
 prove() {
   cat > "$6.sby" <<EOS
 [options]
@@ -51,7 +57,13 @@ prep -top props
 $1
 $2
 EOS
-  if sby -f "$6.sby" > "$6.log" 2>&1; then echo PASS; else echo FAIL; fi
+  local rc=0
+  sby -f "$6.sby" > "$6.log" 2>&1 || rc=$?
+  case "$rc" in
+    0) echo PASS ;;
+    2) echo FAIL ;;
+    *) echo "ERROR sby exited with code $rc, not a verdict (see $6.log)" ;;
+  esac
 }
 
 csr="$root/src/Zicsr/csr_file.vhd"; csr_props="$root/formal/csr_file_props.sv"
