@@ -34,16 +34,20 @@ entity core is
 		has_dcache      : boolean := false;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
 		boot_rom_bits   : natural := 11;
-		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
-		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
 		rom_external    : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib    : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib     : natural := 1048576;
+		-- A RAM fica fora do núcleo e o dado sai pela porta externa.
+		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
 		periph_base_kib : natural := 2097152;
-		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
-		region_bits     : natural := 30;
 		-- Habilita a extensão Zihpm com os quatro contadores de eventos (índices 3 a 6); é o token da matriz de perfis. Exige has_zicsr.
 		has_zihpm       : boolean := false;
 		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm, salvo has_zihpm); exige has_zicsr.
@@ -515,7 +519,11 @@ begin
 	u_stage_if : entity work.stage_if
 		generic map (
 			boot_rom_bits => boot_rom_bits,
+			rom_end_kib   => rom_end_kib,
 			rom_external  => rom_external,
+			ram_base_kib  => ram_base_kib,
+			ram_end_kib   => ram_end_kib,
+			ram_external  => ram_external,
 			ext_base_kib  => ext_base_kib
 		)
 		port map (
@@ -695,9 +703,11 @@ begin
 			hpm_counters    => HPM_COUNT,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
+			ram_base_kib    => ram_base_kib,
+			ram_end_kib     => ram_end_kib,
+			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib,
-			region_bits     => region_bits
+			periph_base_kib => periph_base_kib
 		)
 		port map (
 			i_hpm_events      => hpm_events,
@@ -800,6 +810,11 @@ begin
 	u_misaligned_unit : entity work.misaligned_unit
 		generic map (
 			has_zicclsm  => has_zicclsm,
+			rom_end_kib  => rom_end_kib,
+			rom_external => rom_external,
+			ram_base_kib => ram_base_kib,
+			ram_end_kib  => ram_end_kib,
+			ram_external => ram_external,
 			ext_base_kib => ext_base_kib
 		)
 		port map (
@@ -836,9 +851,11 @@ begin
 			check_ea        => has_zicsr,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
+			ram_base_kib    => ram_base_kib,
+			ram_end_kib     => ram_end_kib,
+			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib,
-			region_bits     => region_bits
+			periph_base_kib => periph_base_kib
 		)
 		port map (
 			i_valid         => exmem_valid,
@@ -874,6 +891,9 @@ begin
 		generic map (
 			rom_end_kib  => rom_end_kib,
 			rom_external => rom_external,
+			ram_base_kib => ram_base_kib,
+			ram_end_kib  => ram_end_kib,
+			ram_external => ram_external,
 			ext_base_kib => ext_base_kib
 		)
 		port map (

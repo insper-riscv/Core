@@ -23,8 +23,16 @@ entity stage_if is
 	generic (
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
 		boot_rom_bits : natural := 11;
-		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		rom_end_kib   : natural := 32;
+		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
 		rom_external  : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib  : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib   : natural := 1048576;
+		-- A RAM fica fora do núcleo e o dado sai pela porta externa.
+		ram_external  : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib  : natural := 1048576
 	);
@@ -124,7 +132,8 @@ begin
 		);
 
 	is_boot_rom_if <= '1' when unsigned(if_pc) < boot_rom_end(boot_rom_bits) else '0';
-	if_in_sdram    <= '1' when unsigned(if_pc) >= kib_to_addr(ext_base_kib) else '0';
+	if_in_sdram    <= '1' when (is_boot_rom_if = '0' and
+	                            is_external_addr(unsigned(if_pc), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib)) else '0';
 	if_wait        <= if_in_sdram and (not i_ic_ready);
 
 	o_instr <= i_boot_rom_data when is_boot_rom_if = '1' else

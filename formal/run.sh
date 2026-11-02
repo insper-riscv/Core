@@ -136,7 +136,7 @@ netlist "$trap" trap_unit trap_noea -gcheck_ea=false
 expect "no address check: causes 4 and 6 never occur (induction)"             PASS "$(prove trap_noea.v "$trap_props" prove 2 '-DCHECK_EA_OFF' trap_noea_safety)"
 netlist "$trap" trap_unit trap_off -gHAS_ZICCLSM=false
 expect "no Zicclsm: every misaligned access traps (induction)"                PASS "$(prove trap_off.v "$trap_props" prove 2 '-DZICCLSM_OFF' trap_zicclsm_off)"
-netlist "$trap" trap_unit trap_ext -grom_external=true -grom_end_kib=0 -gext_base_kib=524288 -gperiph_base_kib=1572864 -gregion_bits=29
+netlist "$trap" trap_unit trap_ext -grom_external=true -grom_end_kib=0 -gext_base_kib=524288 -gperiph_base_kib=1572864 -gram_base_kib=1048576 -gram_end_kib=1572864
 expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (induction)" PASS "$(prove trap_ext.v "$trap_props" prove 2 '-DZICCLSM_ON -DEXT_FLASH' trap_zicclsm_ext)"
 
 echo "counter64"

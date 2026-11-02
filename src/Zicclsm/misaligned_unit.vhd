@@ -36,6 +36,16 @@ entity misaligned_unit is
 	generic (
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' desliga a unidade.
 		has_zicclsm  : boolean := true;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		rom_end_kib  : natural := 32;
+		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
+		rom_external : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib  : natural := 1048576;
+		-- A RAM fica fora do núcleo e o dado sai pela porta externa.
+		ram_external : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib : natural := 1048576
 	);
@@ -136,7 +146,7 @@ begin
 
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
 
-	is_sdram <= '1' when unsigned(i_addr) >= kib_to_addr(ext_base_kib) else '0';
+	is_sdram <= '1' when is_external_addr(unsigned(i_addr), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
 	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
 
 	first_done    <= cross and (not second) and step_ok and i_advance;

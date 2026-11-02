@@ -7,13 +7,14 @@ The limits of the instruction address space (IF stage) and of the data address s
 | `core` generic | Default | Region it delimits |
 | :--- | :--- | :--- |
 | `boot_rom_bits` | 11 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x000007FF` by default |
-| `rom_end_kib` | 32 | Exclusive end, in KiB, of the internal ROM read through the second Flash port (`0x00000800 .. 0x00007FFF` by default); 0 when the ROM is external |
-| `rom_external` | `false` | The ROM sits outside the core and the instruction comes through the instruction cache |
-| `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM, external ROM and peripherals (`0x40000000` by default) |
+| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot ROM (`0x00000800 .. 0x00007FFF` by default) |
+| `rom_external` | `false` | The ROM sits outside the core: the instruction comes through the instruction cache and the data through the external port |
+| `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Range of the RAM in KiB (`0x00008000 .. 0x3FFFFFFF` by default) |
+| `ram_external` | `false` | The RAM sits outside the core and the data goes through the external port |
+| `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM and peripherals (`0x40000000` by default), which always goes through the external port |
 | `periph_base_kib` | 2097152 | Base, in KiB, of the peripheral window (`0x80000000` by default), which ends the main memory |
-| `region_bits` | 30 | Exponent of the alignment of the external regions, used so that an access does not cross into the neighbouring region |
 
-The internal RAM is what remains between the end of the internal ROM and the external base. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The platform map with external FLASH uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `periph_base_kib => 1572864` and `region_bits => 29`.
+What is neither Boot ROM, internal ROM nor external is the internal RAM. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The hardware misaligned access serves the main memory, from where the RAM starts up to `periph_base_kib`, and does not cross the end of a region. The platform map with external FLASH at `0x20000000` uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` and `periph_base_kib => 1572864`. An external ROM right after the Boot ROM uses `rom_external => true` and `rom_end_kib => 32`.
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 
