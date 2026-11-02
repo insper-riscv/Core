@@ -1,19 +1,42 @@
 #!/usr/bin/env bash
-# Formal verification of the CSR bank and the trap unit with SymbiYosys. Needs ghdl, yosys, sby and
-# the z3 solver (all in the dev_tools image). Run from the root of the repository:  bash formal/run.sh
+# Formal verification of the CSR bank, the trap unit, the counters and the fusion record with SymbiYosys. Needs
+# ghdl, yosys, sby and the engine chosen by FORMAL_ENGINE (all in the ci-vhdl image). Run from the root of the
+# repository:  FORMAL_ENGINE=bitwuzla bash formal/run.sh
+#
+# FORMAL_ENGINE is one of yices, bitwuzla (the default), boolector and abc-bmc3. The first three are SMT solvers
+# of the smtbmc engine; abc-bmc3 is the bounded model checker of ABC, which has no induction and no cover, so it
+# skips those proofs. FORMAL_TIMEOUT (seconds, 900 by default) bounds each proof.
+#
+# Besides the report, the run writes build/formal/result-<engine>.tsv, one line per proof with the columns
+# id, wanted (pass or fail), verdict (pass, fail, error or skip), sby exit code, milliseconds and the label, which
+# formal/aggregate.sh joins across engines.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 out="$root/build/formal"
 rm -rf "$out"; mkdir -p "$out"; cd "$out"
 
+engine="${FORMAL_ENGINE:-bitwuzla}"
+case "$engine" in
+  yices|bitwuzla|boolector|abc-bmc3) ;;
+  *) echo "FORMAL_ENGINE must be yices, bitwuzla, boolector or abc-bmc3, not '$engine'" >&2; exit 2 ;;
+esac
+timeout_s="${FORMAL_TIMEOUT:-900}"
+results="$out/result-$engine.tsv"; : > "$results"
+
 fail=0
-# expect <label> <wanted: PASS|FAIL> <result: PASS|FAIL|ERROR ...>. An ERROR (the tool did not reach a verdict)
-# never matches, not even a wanted FAIL.
+# expect <label> <wanted: PASS|FAIL> <result: PASS|FAIL|SKIP|ERROR ...>. An ERROR (the tool did not reach a verdict)
+# never matches, not even a wanted FAIL; a SKIP is a proof this engine does not do and is not a failure. The id,
+# the exit code and the time of the proof come from the files prove left for its tag.
 expect() {
+  local tag verdict rc ms
+  tag="$(cat "$out/.last")"
+  IFS=$'\t' read -r verdict rc ms < "$out/$tag.res"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$tag" "${2,,}" "$verdict" "$rc" "$ms" "$1" >> "$results"
   case "$3" in
+    SKIP*) printf '  skip  %-62s %s\n' "$1" "${3#SKIP }" ;;
     ERROR*) printf '  ERROR %-62s %s\n' "$1" "${3#ERROR }"; fail=1 ;;
-    "$2") printf '  ok    %-62s %s\n' "$1" "$3" ;;
+    "$2") printf '  ok    %-62s %s (%s ms)\n' "$1" "$3" "$ms" ;;
     *) printf '  WRONG %-62s wanted %s, got %s\n' "$1" "$2" "$3"; fail=1 ;;
   esac
 }
@@ -40,29 +63,57 @@ netlist() {
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${4:-} "$2" > "$3.v"
 }
 
-# prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL or ERROR
+# prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL, SKIP or ERROR
 # PASS is sby exit code 0, FAIL is 2 (a counterexample or a goal that cannot be covered) and any other code
-# (4 unknown, 8 timeout, 16 error) is ERROR: the tool did not reach a verdict.
+# (4 unknown, 8 timeout, 16 error, 124 the FORMAL_TIMEOUT) is ERROR: the tool did not reach a verdict. The
+# abc-bmc3 engine only checks bounded properties of designs with registers, so it answers SKIP for a proof by
+# induction, for a cover and for a combinational design.
+# The verdict, the exit code and the milliseconds go to <tag>.res, and the tag to .last, for expect.
 prove() {
+  echo "$6" > "$out/.last"
+  local engine_lines script_lines options_lines="" rc=0 verdict began ended
+  case "$engine" in
+    abc-bmc3)
+      if [ "$3" != bmc ]; then
+        printf 'SKIP\t-\t0\n' > "$6.res"; echo "SKIP abc-bmc3 has no $3"; return
+      fi
+      engine_lines="abc bmc3"
+      options_lines="aigsmt none"
+      script_lines=$'techmap\nopt -fast\nsetundef -anyseq' ;;
+    *) engine_lines="smtbmc $engine"; script_lines="" ;;
+  esac
   cat > "$6.sby" <<EOS
 [options]
 mode $3
 depth $4
+$options_lines
 [engines]
-smtbmc z3
+$engine_lines
 [script]
 read_verilog -formal -sv $5 $1 $2
 prep -top props
+$script_lines
 [files]
 $1
 $2
 EOS
-  local rc=0
-  sby -f "$6.sby" > "$6.log" 2>&1 || rc=$?
+  began=$(date +%s%N)
+  timeout "$timeout_s" sby -f "$6.sby" > "$6.log" 2>&1 || rc=$?
+  ended=$(date +%s%N)
+  # ABC refuses a design without registers (the trap unit is combinational): that is a proof this engine does
+  # not do, not a failure of the tool.
+  if [ "$engine" = abc-bmc3 ] && [ "$rc" = 16 ] && grep -q 'Does not work for combinational networks' "$6.log"; then
+    printf 'skip\t%s\t0\n' "$rc" > "$6.res"; echo "SKIP abc-bmc3 does not work for a combinational design"; return
+  fi
   case "$rc" in
-    0) echo PASS ;;
-    2) echo FAIL ;;
-    *) echo "ERROR sby exited with code $rc, not a verdict (see $6.log)" ;;
+    0) verdict=PASS ;;
+    2) verdict=FAIL ;;
+    *) verdict=ERROR ;;
+  esac
+  printf '%s\t%s\t%s\n' "${verdict,,}" "$rc" "$(( (ended - began) / 1000000 ))" > "$6.res"
+  case "$verdict" in
+    ERROR) echo "ERROR sby exited with code $rc, not a verdict (see $6.log)" ;;
+    *) echo "$verdict" ;;
   esac
 }
 

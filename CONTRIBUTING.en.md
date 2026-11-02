@@ -210,7 +210,7 @@ make check          # Check VHDL-2008 syntax of all files in topological order
 make profiles       # Compile and elaborate every profile in profiles/*.yaml under GHDL
 make paths          # Verify that all paths referenced in paths.yaml exist
 make test           # Run the full unit and integration test suite (cocotb + GHDL)
-bash formal/run.sh  # Run the formal proofs (SymbiYosys + Z3) for csr_file and trap_unit
+make formal         # Run the formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
 
 The `python-static-analysis` CI job runs `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` and `uv audit` over the Python files, and the job name is the check the default-branch ruleset requires, so do not rename it.

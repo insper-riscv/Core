@@ -37,9 +37,11 @@ profile-matrix: check
 	done
 
 # Formal proofs of the CSR bank, the trap unit, the counters and the fusion record, with their mutants
-# (SymbiYosys, Yosys and z3 of the CI image); about three minutes.
+# (SymbiYosys, Yosys and one engine of the CI image: FORMAL_ENGINE is yices, bitwuzla, boolector or abc-bmc3);
+# under a minute with bitwuzla. The result of the run is build/formal/result-<engine>.tsv.
+FORMAL_ENGINE ?= bitwuzla
 formal:
-	bash formal/run.sh
+	FORMAL_ENGINE=$(FORMAL_ENGINE) bash formal/run.sh
 
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
 test:
