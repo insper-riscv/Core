@@ -1,6 +1,6 @@
-# Zicntr e Zihpm no Core
+# Zicntr no Core
 
-Este documento descreve como o Core implementa os contadores. O que o manual exige está em [instructions.md](instructions.md), e o banco de CSRs que os hospeda (leitura, escrita atômica, ilegalidade) está em [Zicsr](../Zicsr/description.md).
+Este documento descreve como o Core implementa os contadores básicos `cycle`, `time` e `instret`, e o bloco contador de 64 bits que o Zihpm também usa. O que o manual exige está em [instructions.md](instructions.md), os contadores de desempenho estão em [Zihpm](../Zihpm/description.md), e o banco de CSRs que os hospeda (leitura, escrita atômica, ilegalidade) está em [Zicsr](../Zicsr/description.md).
 
 ## 1. Generics
 
@@ -8,12 +8,8 @@ Este documento descreve como o Core implementa os contadores. O que o manual exi
 | :--- | :--- | :--- | :--- |
 | `has_zicntr` | `core` | `false` | Instancia `mcycle`, `minstret` e `time` com seus espelhos, e o registrador `mcountinhibit`; exige `has_zicsr` |
 | `tick_cycles` | `core` | 50 | Ciclos de clock por tick do `time` (50 dá 1 MHz a 50 MHz) |
-| `has_zihpm` | `core` | `false` | Instancia os quatro contadores de eventos; exige `has_zicsr` |
-| `hpm_counters` | `core` | 0 | Número de contadores de eventos, de 0 a 4; quando maior que 0 prevalece sobre `has_zihpm` |
 
-Com `has_zihpm = true` e `hpm_counters = 0` o Core instancia 4 contadores. A elaboração falha se qualquer um dos genéricos de contador for ligado sem `has_zicsr`.
-
-Cada extensão independe da outra, então o Zihpm funciona sem o Zicntr. O `mcountinhibit` existe quando há `has_zicntr` ou ao menos um contador de eventos.
+A elaboração falha se `has_zicntr` for ligado sem `has_zicsr`. O Zicntr independe do Zihpm.
 
 ## 2. Bloco contador de 64 bits
 
@@ -65,68 +61,26 @@ O Core não tem entrada externa de tempo. O `time` deriva do clock do próprio C
 
 ## 4. `mcountinhibit`
 
-O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita.
+O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita. O registrador existe quando há `has_zicntr` ou ao menos um contador de eventos, e os bits de contadores de eventos estão em [Zihpm](../Zihpm/description.md).
 
 | Bit | Inibe | Existe quando |
 | :--- | :--- | :--- |
 | 0 | `mcycle` | `has_zicntr` |
 | 1 | Nada (o `time` não é inibível) | Nunca |
 | 2 | `minstret` | `has_zicntr` |
-| $3+k$ | O contador de eventos de índice $3+k$ | $k < N$, com $N$ contadores |
 
 Um contador inibido mantém o valor e continua legível e gravável. A inibição de `minstret` também suspende a soma da retirada pendente que a leitura mostra.
 
-## 5. Contadores de eventos do Zihpm
+## 5. Endereço inexistente
 
-### 5.1. Organização
+Sem `has_zicntr` os endereços de `mcycle`, `minstret`, `time`, seus espelhos e `mcountinhibit` (quando não há contador de eventos) são inexistentes. Ler ou escrever neles sinaliza acesso CSR ilegal, que o Core trata como exceção de instrução ilegal (`mcause = 2`). Não há valor constante de retorno. O mesmo vale para a escrita efetiva em `cycle`, `instret` e `time`.
 
-Com $N$ contadores (de 1 a 4), o Core implementa os contadores de índices 3 a $2+N$. Cada contador de índice $K$ tem quatro endereços de contador e um seletor de evento.
-
-| CSR | Endereço | Escrita |
-| :--- | :--- | :--- |
-| `mhpmeventK` | $0x320 + K$ | Sim, guarda um código de 4 bits (os bits superiores leem zero) |
-| `mhpmcounterK` | $0xB00 + K$ | Sim |
-| `mhpmcounterKh` | $0xB80 + K$ | Sim |
-| `hpmcounterK` | $0xC00 + K$ | Não |
-| `hpmcounterKh` | $0xC80 + K$ | Não |
-
-Os índices de 3 a 31 que o Core não implementa dão acesso ilegal, como qualquer endereço inexistente. Escrever em `hpmcounterK` ou `hpmcounterKh` é acesso ilegal. Cada contador usa o bloco de 64 bits da Seção 2, e o código do evento é zerado no reset.
-
-### 5.2. Regra de contagem
-
-Um contador soma 1 em cada ciclo em que o bit do vetor de eventos escolhido pelo código vale `'1'`, o código não é zero e o bit de inibição do contador vale `'0'`. Um código fora da tabela de eventos não conta.
-
-### 5.3. Tabela de eventos
-
-O vetor de eventos tem 16 bits, um por código, e o bit 0 é sempre zero.
-
-| Código | Evento | Condição de contagem | Origem |
-| :---: | :--- | :--- | :--- |
-| 0 | Nenhum | Nunca conta | Não se aplica |
-| 1 | Parada da multiplicação ou divisão | Ciclo em que a unidade M segura o pipeline | Core |
-| 2 | Espera por memória externa | Ciclo em que um acesso à RAM externa aguarda o sinal de pronto | Core |
-| 3 | Desvio ou salto tomado | Desvio condicional com condição verdadeira, `JAL` ou `JALR`, com o pipeline andando | Core |
-| 4 | Acesso desalinhado | Primeiro ciclo de um acesso desalinhado executado em duas etapas | Core |
-| 5 | Falha da cache de instruções | Pulso da cache de instruções, no bit 0 da entrada externa de eventos | Fora do Core |
-| 6 | Falha da cache de dados | Pulso da cache de dados, no bit 1 da entrada externa de eventos | Fora do Core |
-| 7 | Espera por FLASH | Ciclo de espera por FLASH, no bit 2 da entrada externa de eventos | Fora do Core |
-| 8 | Parada por dependência de load | Ciclo em que a detecção de load-use segura o fetch sem outra parada ativa | Core |
-| 9 | Operação fundida | Ciclo em que a unidade M conclui uma operação reaproveitando o resultado da anterior | Core |
-| 10 a 15 | Reservados | Nunca contam | Não se aplica |
-
-O evento 9 conta a fusão de pares de multiplicação ou divisão (por exemplo `MULH` seguido de `MUL` com os mesmos operandos), descrita em [M](../M/description.md). Os eventos 5 a 7 só contam se o SoC ligar a entrada externa de eventos do Core, que por padrão vale zero.
-
-## 6. Endereço inexistente
-
-O banco de CSRs trata como inexistente todo endereço de contador cuja extensão ou índice o perfil não inclui. Ler ou escrever nele sinaliza acesso CSR ilegal, que o Core trata como exceção de instrução ilegal (`mcause = 2`). Não há valor constante de retorno. O mesmo vale para a escrita efetiva em qualquer espelho de leitura.
-
-## 7. Verificação formal
+## 6. Verificação formal
 
 | Prova | Arquivo | O que garante |
 | :--- | :--- | :--- |
 | `counter64` | `formal/counter64_props.sv` | O par de metades é sempre o valor ideal de 64 bits, a escrita vence o incremento, o vai-um nunca se perde e o valor não decresce sem escrita (indução, cover) |
 | `csr_file` com Zicntr | `formal/csr_cntr_props.sv` | Valores lidos de `mcycle`, `minstret` e espelhos, escrita por metade, espelhos e `time` somente leitura, bits 0 e 2 de `mcountinhibit` e cancelamento de retirada (BMC de 6 ciclos, cover) |
-| `csr_file` com Zihpm | `formal/csr_hpm_props.sv` | Seleção de evento, inibição, escrita por metade, espelhos somente leitura e endereços ilegais dos contadores ausentes, com 4 contadores e com 2 contadores junto de Zicntr (BMC de 6 ciclos, cover) |
 
 O procedimento das provas está em [FORMAL.md](../../FORMAL.md).
 

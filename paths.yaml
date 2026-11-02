@@ -3,7 +3,7 @@
 # Run it before and after moving any file.
 tree:
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
-  identifier_folders: [I, M, Zicsr, Zicntr, Zihpm, Zicntr_Zihpm, Zifencei, Zicclsm, ISA]
+  identifier_folders: [I, M, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, ISA]
 references:
   - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicsr sources, file: profiles/rv32im_zicsr.yaml, yaml: sources, base: .}

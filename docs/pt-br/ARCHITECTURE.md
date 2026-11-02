@@ -134,7 +134,7 @@ Quando `has_zifencei = true`, a unidade `fencei_unit` no estágio EX detecta a i
 
 ### 3.4. Extensão Zicntr
 
-A descrição completa dos contadores, com o Zihpm, está em [ISA/Zicntr_Zihpm](ISA/Zicntr_Zihpm/description.md).
+A descrição completa dos contadores está em [ISA/Zicntr](ISA/Zicntr/description.md) e, para o Zihpm, em [ISA/Zihpm](ISA/Zihpm/description.md).
 
 Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia três contadores de 64 bits, cada um com duas metades de 32 bits e carry registrado entre elas. A leitura soma o carry pendente à metade alta, de modo que `csrr` de `cycleh` logo depois de um estouro da metade baixa já vê o valor correto.
 

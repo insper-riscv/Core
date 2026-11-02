@@ -134,7 +134,7 @@ When `has_zifencei = true`, the `fencei_unit` in the EX stage detects the `FENCE
 
 ### 3.4. Zicntr Extension
 
-The full description of the counters, with Zihpm, is in [ISA/Zicntr_Zihpm](ISA/Zicntr_Zihpm/description.md).
+The full description of the counters is in [ISA/Zicntr](ISA/Zicntr/description.md) and, for Zihpm, in [ISA/Zihpm](ISA/Zihpm/description.md).
 
 When `has_zicntr = true` (which implies `has_zicsr`), `csr_file` instantiates three 64-bit counters, each made of two 32-bit halves with a registered carry between them. A read adds the pending carry to the high half, so a `csrr` of `cycleh` right after the low half wraps already sees the correct value.
 
