@@ -296,7 +296,11 @@
         "test_module": "tests.python.unittests.cores.ext_flash",
         "parameters": {
             "has_m": false,
-            "ext_flash": true
+            "rom_external": true,
+            "rom_end_kib": 0,
+            "ext_base_kib": 524288,
+            "periph_base_kib": 1572864,
+            "region_bits": 29
         },
         "build_args": [
             "--std=08"
@@ -468,7 +472,11 @@
         ],
         "test_module": "tests.python.unittests.Zicsr.trap_unit_ext_flash",
         "parameters": {
-            "ext_flash": true
+            "rom_external": true,
+            "rom_end_kib": 0,
+            "ext_base_kib": 524288,
+            "periph_base_kib": 1572864,
+            "region_bits": 29
         },
         "build_args": [
             "--std=08"

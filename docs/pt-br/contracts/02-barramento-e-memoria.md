@@ -2,24 +2,18 @@
 
 ## 1. Mapa de Endereços do Processador
 
-Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) são centralizados no pacote `src/shared/mem_map_consts.vhd`:
+Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) chegam ao `core` por genéricos de elaboração, que cada plataforma fixa no seu `config.yml`. O pacote `src/shared/mem_map_consts.vhd` traz as funções que os estágios usam para converter esses genéricos em endereços.
 
-| Constante (`mem_map_consts`) | Valor | Região demarcada |
+| Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |
-| `BOOT_ROM_SIZE_BYTES` | `0x00000800` (2 KiB) | Fim da janela da Boot ROM (`0x00000000 .. 0x000007FF`) no estágio IF |
-| `RAM_BASE_BYTES` | `0x00008000` (32 KiB) | Base da memória RAM interna de dados (`0x00008000 .. 0x3FFFFFFF`); endereços de dados abaixo deste limite acessam a segunda porta da memória Flash |
-| `SDRAM_BASE_BYTES` | `0x40000000` (1 GiB) | Base da janela externa de SDRAM e periféricos mapeados em memória (`0x40000000 .. 0xFFFFFFFF`) |
-| `FLASH_EXT_BASE_BYTES` | `0x20000000` | Base da FLASH externa no mapa da plataforma sdram |
-| `PERIPHERAL_BASE_BYTES` | `0x80000000` | Base da janela de periféricos dentro da janela externa |
+| `boot_rom_bits` | 11 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x000007FF` por padrão |
+| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM interna lida pela segunda porta da Flash (`0x00000800 .. 0x00007FFF` por padrão); 0 quando a ROM é externa |
+| `rom_external` | `false` | A ROM fica fora do núcleo e a instrução sai pela cache de instruções |
+| `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM, ROM externa e periféricos (`0x40000000` por padrão) |
+| `periph_base_kib` | 2097152 | Base, em KiB, da janela de periféricos (`0x80000000` por padrão), que encerra a memória principal |
+| `region_bits` | 30 | Expoente do alinhamento das regiões externas, usado para não deixar um acesso cruzar para a região vizinha |
 
-As fronteiras são potências de 2. Cada base é calculada a partir do índice do seu único bit em `'1'`, e os estágios decodificam a região testando esse bit do endereço, sem comparador numérico.
-
-| Constante (`mem_map_consts`) | Valor | Base derivada |
-| :--- | :--- | :--- |
-| `RAM_BASE_BIT` | 15 | `RAM_BASE_BYTES` |
-| `FLASH_EXT_BASE_BIT` | 29 | `FLASH_EXT_BASE_BYTES` |
-| `SDRAM_BASE_BIT` | 30 | `SDRAM_BASE_BYTES` |
-| `PERIPHERAL_BASE_BIT` | 31 | `PERIPHERAL_BASE_BYTES` |
+A RAM interna é o que sobra entre o fim da ROM interna e a base externa. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O mapa da plataforma com FLASH externa usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `periph_base_kib => 1572864` e `region_bits => 29`.
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 

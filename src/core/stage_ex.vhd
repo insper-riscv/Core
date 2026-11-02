@@ -21,23 +21,33 @@ use work.fwd_consts.all;
 entity stage_ex is
 	generic (
 		-- Habilita a unidade de multiplicação e divisão (multdiv) completa.
-		has_m        : boolean := false;
+		has_m           : boolean := false;
 		-- Habilita a multiplicação sem o divisor (extensão Zmmul); has_m já a inclui.
-		has_zmmul    : boolean := false;
+		has_zmmul       : boolean := false;
 		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
-		has_zicsr    : boolean := false;
+		has_zicsr       : boolean := false;
 		-- Habilita os contadores da extensão Zicntr no banco de CSRs; exige has_zicsr.
-		has_zicntr   : boolean := false;
+		has_zicntr      : boolean := false;
 		-- Ciclos de clock do core por tick do contador time.
-		tick_cycles  : positive := 50;
+		tick_cycles     : positive := 50;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
-		has_zifencei : boolean := false;
+		has_zifencei    : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
-		has_zicclsm  : boolean := true;
+		has_zicclsm     : boolean := true;
 		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
-		has_dcache   : boolean := false;
+		has_dcache      : boolean := false;
 		-- Quantidade de contadores de eventos da extensão Zihpm no banco de CSRs (0 = sem Zihpm); exige has_zicsr.
-		hpm_counters : natural range 0 to 4 := 0
+		hpm_counters    : natural range 0 to 4 := 0;
+		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		rom_end_kib     : natural := 32;
+		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		rom_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		periph_base_kib : natural := 2097152;
+		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
+		region_bits     : natural := 30
 	);
 	port (
 		-- Vetor de eventos do SoC: o bit K vale '1' nos ciclos do evento de código K (contadores do Zihpm).
@@ -404,9 +414,9 @@ begin
 
 		u_csr_file : entity work.csr_file
 			generic map (
-				has_m       => has_m,
-				has_zicntr  => has_zicntr,
-				tick_cycles => tick_cycles,
+				has_m        => has_m,
+				has_zicntr   => has_zicntr,
+				tick_cycles  => tick_cycles,
 				hpm_counters => hpm_counters
 			)
 			port map (
@@ -473,8 +483,13 @@ begin
 		-- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
 		u_trap_detect : entity work.trap_unit
 			generic map (
-				has_zicclsm => has_zicclsm,
-				check_ea    => true
+				has_zicclsm     => has_zicclsm,
+				check_ea        => true,
+				rom_end_kib     => rom_end_kib,
+				rom_external    => rom_external,
+				ext_base_kib    => ext_base_kib,
+				periph_base_kib => periph_base_kib,
+				region_bits     => region_bits
 			)
 			port map (
 				i_ex_valid    => i_valid,

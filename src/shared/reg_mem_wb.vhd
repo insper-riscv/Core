@@ -22,8 +22,12 @@ use work.mem_map_consts.all;
 
 entity reg_mem_wb is
 	generic (
-		-- Mapa da plataforma sdram: não há FLASH nem RAM internas e o dado vem da porta externa (bits 31, 30 ou 29).
-		ext_flash    : boolean := false
+		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		rom_end_kib  : natural := 32;
+		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		rom_external : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib : natural := 1048576
 	);
 	port (
 		-- Sinal de clock.
@@ -101,11 +105,9 @@ architecture rtl of reg_mem_wb is
 
 begin
 
-	-- As fronteiras do mapa são potências de 2, então a região sai de testes de bits do endereço.
-	in_is_flash <= '0' when ext_flash else
-	               '1' when i_alu_out(PERIPHERAL_BASE_BIT downto RAM_BASE_BIT) = (PERIPHERAL_BASE_BIT downto RAM_BASE_BIT => '0') else '0';
-	in_is_sdram <= (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT) or i_alu_out(FLASH_EXT_BASE_BIT)) when ext_flash else
-	               (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT));
+	-- A região sai da comparação do endereço com os limites constantes do mapa.
+	in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
+	in_is_sdram <= '1' when unsigned(i_alu_out) >= kib_to_addr(ext_base_kib) else '0';
 	in_is_cross <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
 	                         ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3))
 	               else '0';

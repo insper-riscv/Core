@@ -28,8 +28,16 @@ entity stage_mem is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo do load ou store (exceção em MEM); '0' deixa essa conferência para o estágio EX.
 		check_ea        : boolean := true;
-		-- Mapa da plataforma sdram: FLASH, SDRAM e periféricos saem pela porta externa; não há FLASH nem RAM internas.
-		ext_flash       : boolean := false
+		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		rom_end_kib     : natural := 32;
+		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		rom_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		periph_base_kib : natural := 2097152;
+		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
+		region_bits     : natural := 30
 	);
 	port (
 		-- Bit de validade da instrução no estágio MEM.
@@ -114,9 +122,13 @@ begin
 
 	u_ea_trap : entity work.trap_unit
 		generic map (
-			has_zicclsm => has_zicclsm,
-			check_ea    => check_ea,
-			ext_flash   => ext_flash
+			has_zicclsm     => has_zicclsm,
+			check_ea        => check_ea,
+			rom_end_kib     => rom_end_kib,
+			rom_external    => rom_external,
+			ext_base_kib    => ext_base_kib,
+			periph_base_kib => periph_base_kib,
+			region_bits     => region_bits
 		)
 		port map (
 			i_ex_valid    => i_valid,
@@ -140,11 +152,9 @@ begin
 	o_trap_take  <= trap_take_int;
 	access_valid <= i_valid and (not trap_take_int);
 
-	-- As fronteiras do mapa são potências de 2, então a região sai de testes de bits do endereço.
-	is_flash_data   <= '0' when ext_flash else
-	                   '1' when i_alu_out(PERIPHERAL_BASE_BIT downto RAM_BASE_BIT) = (PERIPHERAL_BASE_BIT downto RAM_BASE_BIT => '0') else '0';
-	is_sdram        <= (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT) or i_alu_out(FLASH_EXT_BASE_BIT)) when ext_flash else
-	                   (i_alu_out(PERIPHERAL_BASE_BIT) or i_alu_out(SDRAM_BASE_BIT));
+	-- A região sai da comparação do endereço com os limites constantes do mapa.
+	is_flash_data   <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
+	is_sdram        <= '1' when unsigned(i_alu_out) >= kib_to_addr(ext_base_kib) else '0';
 	is_ram_internal <= (not is_flash_data) and (not is_sdram);
 
 	o_flash_addr2   <= i_alu_out;

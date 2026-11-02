@@ -15,7 +15,7 @@ Casos típicos são um carregador que copia um programa para a memória, a gera�
 
 ## 2. Onde a Instrução Tem Efeito
 
-Só o código buscado pela cache de instruções é afetado. A BOOT_ROM é lida diretamente, e a RAM interna não é região de busca. As regiões que passam pela cache dependem do mapa de memória do Core, escolhido pelo parâmetro `ext_flash`.
+Só o código buscado pela cache de instruções é afetado. A BOOT_ROM é lida diretamente, e a RAM interna não é região de busca. As regiões que passam pela cache dependem do mapa de memória do Core, escolhido pelo genérico `rom_external`.
 
 No mapa padrão a FLASH é interna e lida diretamente, de modo que só o código gravado em SDRAM muda de resultado com o `FENCE.I`.
 

@@ -22,7 +22,7 @@ An access that crosses the word occupies the last bytes of a 32-bit word and the
 
 ## 2. When the Hardware Executes the Access
 
-The extension covers only the main memory. The address ranges come from the Core memory map, which has two forms, chosen by the `ext_flash` parameter.
+The extension covers only the main memory. The address ranges come from the Core memory map, which has two forms, chosen by the `rom_external` generic.
 
 In the default map the main memory is the internal RAM and the SDRAM window.
 

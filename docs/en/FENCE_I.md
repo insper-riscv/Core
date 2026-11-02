@@ -15,7 +15,7 @@ Typical cases are a loader that copies a program into memory, code generation at
 
 ## 2. Where the Instruction Has Effect
 
-Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal RAM is not a fetch region. The regions that go through the cache depend on the Core memory map, chosen by the `ext_flash` parameter.
+Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal RAM is not a fetch region. The regions that go through the cache depend on the Core memory map, chosen by the `rom_external` generic.
 
 In the default map the FLASH is internal and read directly, so only code written to SDRAM changes its result with `FENCE.I`.
 

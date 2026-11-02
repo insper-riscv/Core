@@ -22,7 +22,7 @@ Um acesso que cruza a palavra ocupa os bytes finais de uma palavra de 32 bits e 
 
 ## 2. Quando o Hardware Executa o Acesso
 
-A extensão cobre apenas a memória principal. Os intervalos de endereço vêm do mapa de memória do Core, que tem duas formas, escolhidas pelo parâmetro `ext_flash`.
+A extensão cobre apenas a memória principal. Os intervalos de endereço vêm do mapa de memória do Core, que tem duas formas, escolhidas pelo genérico `rom_external`.
 
 No mapa padrão a memória principal é a RAM interna e a janela de SDRAM.
 

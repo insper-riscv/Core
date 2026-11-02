@@ -32,11 +32,19 @@ use work.trap_consts.all;
 entity trap_unit is
 	generic (
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' faz todo desalinhado gerar trap.
-		has_zicclsm   : boolean := true;
+		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
-		check_ea      : boolean := true;
-		-- Mapa da plataforma sdram: a memória principal é a FLASH (bit 29) e a SDRAM (bit 30), sem RAM interna.
-		ext_flash     : boolean := false
+		check_ea        : boolean := true;
+		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		rom_end_kib     : natural := 32;
+		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		rom_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		periph_base_kib : natural := 2097152;
+		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
+		region_bits     : natural := 30
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -145,11 +153,10 @@ begin
 	                           (i_funct3 = FUNCT3_SH and i_ea(0) = '1')))
 	                    else '0';
 
-	-- As fronteiras do mapa são potências de 2, então "ea >= RAM_BASE" é "algum bit entre a RAM e a SDRAM em '1'"
-	-- e "ea < PERIPHERAL_BASE" é "bit de periféricos em '0'", sem comparador numérico depois da ULA.
-	in_main_mem <= '1' when ((ext_flash and i_ea(PERIPHERAL_BASE_BIT) = '0' and (i_ea(SDRAM_BASE_BIT) /= i_ea(FLASH_EXT_BASE_BIT))) or
-	                         ((not ext_flash) and i_ea(PERIPHERAL_BASE_BIT) = '0' and
-	                          i_ea(SDRAM_BASE_BIT downto RAM_BASE_BIT) /= (SDRAM_BASE_BIT downto RAM_BASE_BIT => '0')))
+	-- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
+	-- constantes de potência de 2 viram testes de bits na síntese.
+	in_main_mem <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external) and
+	                         unsigned(i_ea) < kib_to_addr(periph_base_kib))
 	               else '0';
 
 	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
@@ -160,8 +167,7 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	last_word <= '1' when ((ext_flash and i_ea(FLASH_EXT_BASE_BIT - 1 downto BYTE_OFFSET_0'length) = (FLASH_EXT_BASE_BIT - 1 downto BYTE_OFFSET_0'length => '1')) or
-	                       ((not ext_flash) and i_ea(SDRAM_BASE_BIT - 1 downto BYTE_OFFSET_0'length) = (SDRAM_BASE_BIT - 1 downto BYTE_OFFSET_0'length => '1')))
+	last_word <= '1' when i_ea(region_bits - 1 downto BYTE_OFFSET_0'length) = (region_bits - 1 downto BYTE_OFFSET_0'length => '1')
 	             else '0';
 
 	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal
