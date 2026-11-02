@@ -112,3 +112,7 @@ In both operations the result select field is ignored and the sum is always the 
 | `ALU` | Each operation alone (with the one-hot select the ID stage would produce) and, for all 18, a reference model on edge values (`0`, `1`, `31`, `32`, `0x7FFFFFFF`, `0x80000000`, `0xFFFFFFFF`) and 300 random pairs |
 | `control_unit` | The code the decoder generates for each instruction, against the control signal table |
 | Core tests | Programs of instructions, traps, stalls and `fence.i` that exercise the ALU in the pipeline |
+
+---
+
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../../LICENSE).

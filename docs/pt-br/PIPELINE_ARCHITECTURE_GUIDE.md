@@ -100,7 +100,7 @@ No estágio EX:
 | `ALU_BLTU` | `"11110"` | `0` | `'1'` se `unsigned(i_a) < unsigned(i_b)` |
 | `ALU_BGEU` | `"11111"` | `0` | `'1'` se `unsigned(i_a) >= unsigned(i_b)` |
 
-A codificação do código de operação e o somador-subtrator compartilhado estão descritos em [ULA.md](ULA.md).
+A codificação do código de operação e o somador-subtrator compartilhado estão descritos em [ULA.md](ISA/I/ULA.md).
 
 4. **Seleção do resultado de EX:** o sinal `ex_alu_mux_result` escolhe entre `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`) e `ex_alu_result`. Em seguida, `u_mux_ex_final` (`mux_2x1`) seleciona entre `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) e `i_pc4` (`i_sel_pc4_alu = '1'`, usado em `JAL` e `JALR`).
 5. **Alinhamento de Store (`store_manager`):** desloca `ex_fwd_rs2_val` para as lanes de byte correspondentes a `ex_alu_result(1 downto 0)` e gera a máscara de 4 bits `o_store_byte_mask` (`"1111"` para `SW`, `"0011"`/`"1100"` para `SH` e `"0001"`/`"0010"`/`"0100"`/`"1000"` para `SB`).

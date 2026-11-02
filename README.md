@@ -8,10 +8,13 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 
 - [AUTHORS.md](AUTHORS.md): autores com commits no repositório, com nome e conta do GitHub.
 - [CONTRIBUTING.md](CONTRIBUTING.md): regras obrigatórias de contribuição, norma VHDL-2008 (`--std=08`), convenção de nomenclatura, prefixos `i_`/`o_`, cabeçalhos, docstrings e regras de documentação.
-- [README.md](docs/pt-br/README.md): formatos das instruções de 32 bits do RISC-V, tabela de geração de imediatos e progressão incremental do caminho de dados para as 37 instruções da base RV32I.
+- [ISA/I/instructions.md](docs/pt-br/ISA/I/instructions.md): requisitos do manual do RISC-V para a base RV32I (estado do programador, formatos, as 37 instruções com codificação e semântica, `FENCE`, `ECALL`, `EBREAK`) e o comportamento do Core em cada caso.
+- [ISA/I/description.md](docs/pt-br/ISA/I/description.md): implementação da base RV32I no Core, com estágios, decodificador de controle, ULA, extensores de imediato e de leitura, gerenciador de stores, adiantamento e hazards.
+- [ISA/I/construcao-incremental.md](docs/pt-br/ISA/I/construcao-incremental.md): formatos das instruções de 32 bits do RISC-V e progressão incremental do caminho de dados para as 37 instruções da base RV32I.
+- [ISA/I/ULA.md](docs/pt-br/ISA/I/ULA.md): código de operação, somador-subtrator compartilhado, desvios, deslocadores e seleção do resultado da ULA.
 - [ARCHITECTURE.md](docs/pt-br/ARCHITECTURE.md): microarquitetura do pipeline de 5 estágios, responsabilidades por estágio, caminhos de forwarding, detecção de hazard load-use, stall, flush e suporte às extensões `M`, `Zicsr` e `Zifencei`.
 - [PIPELINE_ARCHITECTURE_GUIDE.md](docs/pt-br/PIPELINE_ARCHITECTURE_GUIDE.md): referência detalhada dos sinais de interconexão entre os estágios, barreiras síncronas (`IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB`), equações de stall e flush e resolução de desvios.
-- [DECODER.md](docs/pt-br/DECODER.md): especificação da palavra de controle de 21 bits da base RV32I, decodificação dedicada de `RV32M`, `Zicsr` e `Zifencei`, seleção de escrita no banco de registradores e detecção de instrução ilegal.
+- [ISA/I/DECODER.md](docs/pt-br/ISA/I/DECODER.md): tabela de decodificação da unidade de controle base, com os sinais de controle das 37 instruções da base RV32I e o comportamento de qualquer outra instrução como `NOP`.
 - [contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md): contrato de diretórios por extensão, manifestos de perfil (`profiles/*.yaml`) e ponto único de integração de novas extensões na entidade de topo.
 - [contracts/02-barramento-e-memoria.md](docs/pt-br/contracts/02-barramento-e-memoria.md): protocolo de barramento de instruções e de dados (endereçamento em byte, habilitação por byte, handshake de espera por memória lenta e cache de instruções).
 - [ACESSO_DESALINHADO.md](docs/pt-br/ACESSO_DESALINHADO.md): execução em hardware dos loads e stores desalinhados (Zicclsm), classificação dos acessos, regiões cobertas em cada mapa de memória e o acesso em duas etapas que cruza a palavra.

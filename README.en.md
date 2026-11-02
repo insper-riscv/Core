@@ -8,10 +8,13 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 - [AUTHORS.en.md](AUTHORS.en.md): authors with commits in the repository, with name and GitHub account.
 - [CONTRIBUTING.en.md](CONTRIBUTING.en.md): mandatory contribution rules, VHDL-2008 standard (`--std=08`), naming conventions, `i_`/`o_` port prefixes, file headers, docstrings, and documentation rules.
-- [README.md](docs/en/README.md): 32-bit RISC-V instruction formats, immediate generation table, and incremental datapath progression for the 37 base RV32I instructions.
+- [ISA/I/instructions.md](docs/en/ISA/I/instructions.md): RISC-V manual requirements for the RV32I base (programmer state, formats, the 37 instructions with encoding and semantics, `FENCE`, `ECALL`, `EBREAK`) and the Core behavior in each case.
+- [ISA/I/description.md](docs/en/ISA/I/description.md): how the Core implements the RV32I base, with stages, control decoder, ALU, immediate and load extenders, store manager, forwarding and hazards.
+- [ISA/I/incremental-construction.md](docs/en/ISA/I/incremental-construction.md): 32-bit RISC-V instruction formats and incremental datapath progression for the 37 base RV32I instructions.
+- [ISA/I/ALU.md](docs/en/ISA/I/ALU.md): operation code, shared adder-subtractor, branches, shifters, and result selection of the ALU.
 - [ARCHITECTURE.md](docs/en/ARCHITECTURE.md): 5-stage pipeline microarchitecture, per-stage responsibilities, forwarding paths, load-use hazard detection, stall, flush, and support for the `M`, `Zicsr`, and `Zifencei` extensions.
 - [PIPELINE_ARCHITECTURE_GUIDE.md](docs/en/PIPELINE_ARCHITECTURE_GUIDE.md): detailed reference of inter-stage interconnect signals, synchronous barriers (`IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB`), stall and flush equations, and branch resolution.
-- [DECODER.md](docs/en/DECODER.md): specification of the 21-bit RV32I base control word, dedicated decoding for `RV32M`, `Zicsr`, and `Zifencei`, register-file writeback selection, and illegal-instruction detection.
+- [ISA/I/DECODER.md](docs/en/ISA/I/DECODER.md): decoding table of the base control unit, with the control signals of the 37 base RV32I instructions and the behavior of any other instruction as a `NOP`.
 - [contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md): extension directory contract, profile manifests (`profiles/*.yaml`), and single integration point for new extensions in the top-level entity.
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
 - [MISALIGNED_ACCESS.md](docs/en/MISALIGNED_ACCESS.md): hardware execution of misaligned loads and stores (Zicclsm), access classification, regions covered in each memory map, and the two-step access that crosses a word.
