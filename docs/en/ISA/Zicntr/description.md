@@ -30,7 +30,7 @@ A write wins over the increment of its own cycle, in each half.
 
 ### 3.1. Addresses and rules
 
-There are 3 counters of 64 bits. The Core does not implement `mcounteren`, and access to that address is illegal.
+There are 3 counters of 64 bits. The Core does not implement `mcounteren`, and access to that address is illegal. The Core has only M-mode, and the privileged manual says that in harts without U-mode the `mcounteren` register should not exist ([section 2.1.1.11](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcounteren)).
 
 | Counter | Low half | High half | Read-only mirror (low and high) | Increments | Write |
 | :--- | :--- | :--- | :--- | :--- | :--- |

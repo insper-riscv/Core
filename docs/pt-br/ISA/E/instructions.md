@@ -2,7 +2,7 @@
 
 Capítulo 2 do manual ([RV32E and RV64E Base Integer Instruction Sets](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32e.html)).
 
-Este documento resume o que o manual do RISC-V exige da base RV32E. A fonte é o manual de ISA não privilegiada (v20260120), Capítulo 2, "RV32E and RV64E Base Integer Instruction Sets, Version 2.0", seção 2.1 e subseções. O capítulo só descreve as diferenças para a base RV32I e deve ser lido depois do Capítulo 1 ("RV32I Base Integer Instruction Set, Version 2.1"). A implementação no Core está em [description.md](description.md).
+Este documento resume o que o manual do RISC-V exige da base RV32E. A fonte é a seção 2.1 e as subseções do capítulo citado acima, na versão v20260120 do manual. O capítulo só descreve as diferenças para a base RV32I e deve ser lido depois do Capítulo 1 ("RV32I Base Integer Instruction Set, Version 2.1"). A implementação no Core está em [description.md](description.md).
 
 ## 1. Finalidade (seção 2.1)
 
@@ -31,7 +31,7 @@ O manual não define o comportamento de hardware diante de uma codificação res
 
 ## 4. Limites do Capítulo
 
-O Capítulo 2 não trata de convenção de chamada (ABI), de instruções HINT nem de CSRs. A ABI da RV32E (`ilp32e`) vem da especificação psABI do RISC-V, fora do manual de ISA não privilegiada, e este documento não descreve seus detalhes.
+O Capítulo 2 não trata de convenção de chamada (ABI), de instruções HINT nem de CSRs. A ABI da RV32E (`ilp32e`) vem da [psABI do RISC-V](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (seção ILP32E Calling Convention, versão v1.0), fora do manual de ISA não privilegiada, e este documento não descreve seus detalhes.
 
 ---
 

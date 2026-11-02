@@ -483,7 +483,8 @@ begin
 	retire_pulse  <= ex_valid_live and pipe_run and (not trap_take) and (not trap_sig);
 
 	-- Eventos do Zihpm (códigos de csr_event_consts): 1 parada de multdiv, 2 espera externa, 3 desvio tomado,
-	-- 4 início de acesso desalinhado, 5 a 7 das caches e da FLASH, 8 parada por dependência de load.
+	-- 4 início de acesso desalinhado, 5 a 7 das caches e da FLASH, 8 parada por dependência de load,
+	-- 9 operação fundida de multiplicação ou divisão.
 	load_use_stall <= (not id_pc_we) and (not pipe_stall);
 	process (i_clk)
 	begin
@@ -505,7 +506,7 @@ begin
 
 	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
 	assert has_zicsr or (not (has_zicntr or has_zihpm or hpm_counters > 0))
-		report "has_zicntr = true exige has_zicsr"
+		report "has_zicntr, has_zihpm e hpm_counters maior que 0 exigem has_zicsr"
 		severity failure;
 
 

@@ -63,7 +63,7 @@ The divider works on the magnitude of the operands in signed divisions and on th
 | Correction | 1 | Adds the divisor to the remainder if it ended negative |
 | Sign adjustment | 1 | Applies the signs: the quotient is negated if the operand signs differ, and the remainder is negated if the dividend is negative |
 
-In unsigned division the adjustment copies quotient and remainder unchanged. The latency is 34 cycles in the normal case.
+In unsigned division the adjustment copies quotient and remainder unchanged. The latency is 35 cycles in the normal case, the sum of the cycles in the table.
 
 The manual special cases are detected before the computation and skip the 32 iterations; the latency is 2 cycles.
 
@@ -91,12 +91,14 @@ The result is captured in a register in the completion cycle and delivered to th
 
 The `core` combines this stall with the other conditions (see section 2.4 of [ARCHITECTURE.md](../../ARCHITECTURE.md)) and counts it in Zihpm event 1. The cost per instruction, in stall cycles, is in the table.
 
-| Case | Stall cycles |
-| :--- | :--- |
-| Multiplication | 35 |
-| Normal division | 37 |
-| Division by zero or overflow | 4 |
-| Fused operation (section 6) | 3 |
+| Case | Latency of the unit | Stall cycles |
+| :--- | :---: | :---: |
+| Multiplication | 33 | 35 |
+| Normal division | 35 | 37 |
+| Division by zero or overflow | 2 | 4 |
+| Fused operation (section 6) | Not applicable | 3 |
+
+In every case the stall lasts the latency of the operator plus 2 cycles. The busy signal of the operator rises combinationally in the cycle of the start pulse and falls only after the final state, and the stall uses the registered busy signal, so it also covers the cycle in which the result is captured. Multiplication has a latency of 33 cycles (1 of load and 32 steps) and stalls for 35. Normal division has a latency of 35 cycles (1 of start, 32 iterations, 1 of correction and 1 of sign adjustment) and stalls for 37. In the special cases the latency is 2 cycles (start and detection) and the stall lasts 4.
 
 The effect of the registered stall on the critical path is in [STALL_REGISTRADO_DO_MULTDIV.md](../../timing/STALL_REGISTRADO_DO_MULTDIV.md).
 

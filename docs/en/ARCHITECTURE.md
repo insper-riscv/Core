@@ -101,7 +101,7 @@ In the EX stage, the `multdiv` unit internally generates a single start pulse (`
 | Internal operator | Instructions served | Latency | Corner-case handling |
 | :--- | :--- | :--- | :--- |
 | Radix-2 Booth multiplier (`booth_multiplier_rv32`) | `MUL`, `MULH`, `MULHSU`, `MULHU` | 33 cycles (1 init + 32 steps) | The upper signed 32-bit product receives post-multiplication correction via 32-bit adders for unsigned operands (`MULHSU` and `MULHU`) |
-| 34-bit non-restoring divider (`non_restoring_divider_rv32`) | `DIV`, `DIVU`, `REM`, `REMU` | 34 cycles (normal case) / 2 cycles (special cases) | Division by zero returns quotient `0xFFFFFFFF` and remainder equal to the dividend; signed overflow ($-2^{31} / -1$) returns quotient `0x80000000` and remainder `0` |
+| 34-bit non-restoring divider (`non_restoring_divider_rv32`) | `DIV`, `DIVU`, `REM`, `REMU` | 35 cycles (normal case) / 2 cycles (special cases) | Division by zero returns quotient `0xFFFFFFFF` and remainder equal to the dividend; signed overflow ($-2^{31} / -1$) returns quotient `0x80000000` and remainder `0` |
 
 The `o_stall` signal stays active while the operator is busy (`busy = '1'`) and during the completion pulse cycle (`done = '1'`), ensuring that the internal output register captures the final result before releasing the pipeline.
 
