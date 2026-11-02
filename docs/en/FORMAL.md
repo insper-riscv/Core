@@ -79,7 +79,7 @@ The tests of the aggregator run with `bash formal/aggregate_test.sh`.
 
 ## 6. In the CI
 
-The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it.
+The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it. In a push to `main` that reuses the result of a pull request that already passed, the engines and `formal` are skipped together, like the other required checks.
 
 ---
 
