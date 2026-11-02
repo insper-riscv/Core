@@ -1,6 +1,6 @@
 # Zicsr: Implementação no Core
 
-Este documento descreve como o Core implementa a extensão `Zicsr` e o tratamento de exceções síncronas do modo máquina que depende dela. As exigências do manual do RISC-V estão em [instructions.md](instructions.md). Os contadores acessados por CSR (`Zicntr` e `Zihpm`) estão documentados em [../Zicntr_Zihpm/](../Zicntr_Zihpm/) e não são tratados aqui.
+Este documento descreve como o Core implementa a extensão `Zicsr` e o tratamento de exceções síncronas do modo máquina que depende dela. As exigências do manual do RISC-V estão em [instructions.md](instructions.md). Os contadores acessados por CSR (`Zicntr` e `Zihpm`) estão documentados em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md) e não são tratados aqui.
 
 ## 1. Visão Geral
 
@@ -65,27 +65,29 @@ Um acesso ilegal vira exceção de instrução ilegal (seção 5). Uma escrita s
 
 ## 4. Banco de CSRs
 
-Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus`, que são constantes. A coluna Acesso indica se uma escrita efetiva é aceita, e a coluna Escrita descreve o efeito.
+Os endereços e os nomes dos CSRs não são escolha do Core. Eles vêm da tabela de CSRs de nível de máquina do manual de arquitetura privilegiada ([Currently allocated RISC-V machine-level CSR addresses](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses)), e a convenção dos bits do endereço (leitura e escrita nos bits [11:10], privilégio nos bits [9:8]) está na [seção 1.1.1 do mesmo volume](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-1-csr-address-mapping-conventions). A coluna Acesso segue as classes da tabela, com L para `MRO` (somente leitura) e L/E para `MRW` (leitura e escrita), e a coluna Definição leva à seção do manual que descreve cada registrador. O Core implementa só um subconjunto da tabela.
 
-| Endereço | CSR | Acesso | Leitura | Escrita |
-| :---: | :--- | :---: | :--- | :--- |
-| `0x300` | `mstatus` | L/E | `MPP` (bits 12 e 11) fixo em `11`, `MPIE` (bit 7), `MIE` (bit 3); demais bits zero | Só `MIE` e `MPIE` são gravados; os demais bits são ignorados |
-| `0x301` | `misa` | L/E | `0x40000100` (`MXL = 1`, extensão `I`); com `has_m`, `0x40001100` (soma o bit 12, extensão `M`) | Ignorada |
-| `0x304` | `mie` | L/E | Zero | Ignorada |
-| `0x305` | `mtvec` | L/E | Endereço base do tratador, com os bits `[1:0]` em zero | Grava os bits `[31:2]`; o modo é sempre direto |
-| `0x310` | `mstatush` | L/E | Zero | Ignorada |
-| `0x340` | `mscratch` | L/E | Valor gravado, 32 bits | Grava os 32 bits |
-| `0x341` | `mepc` | L/E | PC salvo, com os bits `[1:0]` em zero | Grava os bits `[31:2]` |
-| `0x342` | `mcause` | L/E | Código da última exceção, 32 bits | Grava os 32 bits |
-| `0x343` | `mtval` | L/E | Valor associado à última exceção, 32 bits | Grava os 32 bits |
-| `0x344` | `mip` | L/E | Zero | Ignorada |
-| `0xF11` | `mvendorid` | L | Zero | Escrita efetiva é ilegal |
-| `0xF12` | `marchid` | L | Zero | Escrita efetiva é ilegal |
-| `0xF13` | `mimpid` | L | Zero | Escrita efetiva é ilegal |
-| `0xF14` | `mhartid` | L | Zero | Escrita efetiva é ilegal |
-| `0xF15` | `mconfigptr` | L | Zero | Escrita efetiva é ilegal |
+Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus`, que são constantes. A coluna Escrita descreve o efeito de uma escrita efetiva.
 
-Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` e as metades altas) só existem quando o perfil inclui `Zicntr` ou `Zihpm`. Sem eles, esses endereços não são conhecidos e o acesso é ilegal. Qualquer outro endereço também não é conhecido. Como o Core não tem interrupções, `mie` e `mip` leem zero e ignoram escritas.
+| Endereço | CSR | Acesso | Definição | Leitura | Escrita |
+| :---: | :--- | :---: | :---: | :--- | :--- |
+| `0x300` | `mstatus` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 e 11) fixo em `11`, `MPIE` (bit 7), `MIE` (bit 3); demais bits zero | Só `MIE` e `MPIE` são gravados; os demais bits são ignorados |
+| `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `has_m`, `0x40001100` (soma o bit 12, extensão `M`) | Ignorada |
+| `0x304` | `mie` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignorada |
+| `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | Endereço base do tratador, com os bits `[1:0]` em zero | Grava os bits `[31:2]`; o modo é sempre direto |
+| `0x310` | `mstatush` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignorada |
+| `0x340` | `mscratch` | L/E | [2.1.1.13](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-13-machine-scratch-mscratch-register) | Valor gravado, 32 bits | Grava os 32 bits |
+| `0x341` | `mepc` | L/E | [2.1.1.14](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-14-machine-exception-program-counter-mepc-register) | PC salvo, com os bits `[1:0]` em zero | Grava os bits `[31:2]` |
+| `0x342` | `mcause` | L/E | [2.1.1.15](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcause) | Código da última exceção, 32 bits | Grava os 32 bits |
+| `0x343` | `mtval` | L/E | [2.1.1.16](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-16-machine-trap-value-mtval-register) | Valor associado à última exceção, 32 bits | Grava os 32 bits |
+| `0x344` | `mip` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignorada |
+| `0xF11` | `mvendorid` | L | [2.1.1.2](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-2-machine-vendor-id-mvendorid-register) | Zero | Escrita efetiva é ilegal |
+| `0xF12` | `marchid` | L | [2.1.1.3](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-3-machine-architecture-id-marchid-register) | Zero | Escrita efetiva é ilegal |
+| `0xF13` | `mimpid` | L | [2.1.1.4](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-4-machine-implementation-id-mimpid-register) | Zero | Escrita efetiva é ilegal |
+| `0xF14` | `mhartid` | L | [2.1.1.5](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-5-hart-id-mhartid-register) | Zero | Escrita efetiva é ilegal |
+| `0xF15` | `mconfigptr` | L | [2.1.1.17](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-17-machine-configuration-pointer-mconfigptr-register) | Zero | Escrita efetiva é ilegal |
+
+Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` e as metades altas) também vêm da tabela do manual privilegiado, e só existem quando o perfil inclui `Zicntr` ou `Zihpm`, descritos em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md). Sem eles, esses endereços não são conhecidos e o acesso é ilegal. Qualquer outro endereço também não é conhecido. Como o Core não tem interrupções, `mie` e `mip` leem zero e ignoram escritas.
 
 ## 5. Exceções Síncronas
 
@@ -147,7 +149,7 @@ O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FE
 
 A exceção de EX é detectada de forma combinacional no ciclo em que a instrução está em EX e o pipeline avança. Os CSRs e o PC são gravados na borda de clock que encerra esse ciclo, de modo que a primeira instrução do tratador é buscada no ciclo seguinte. Duas instruções mais novas (nos estágios IF e ID) são descartadas, além da própria instrução faltante. A exceção de load ou store é detectada no ciclo em que o acesso chega a MEM, um ciclo depois da instrução ter passado por EX.
 
-A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [../Zicntr_Zihpm/](../Zicntr_Zihpm/).
+A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
 
 ## 6. Core sem Zicsr
 

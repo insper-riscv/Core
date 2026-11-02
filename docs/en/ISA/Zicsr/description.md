@@ -1,6 +1,6 @@
 # Zicsr: Core Implementation
 
-This document describes how the Core implements the `Zicsr` extension and the machine-mode synchronous exception handling that depends on it. The RISC-V manual requirements are in [instructions.md](instructions.md). The counters accessed through CSRs (`Zicntr` and `Zihpm`) are documented in [../Zicntr_Zihpm/](../Zicntr_Zihpm/) and are not covered here.
+This document describes how the Core implements the `Zicsr` extension and the machine-mode synchronous exception handling that depends on it. The RISC-V manual requirements are in [instructions.md](instructions.md). The counters accessed through CSRs (`Zicntr` and `Zihpm`) are documented in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md) and are not covered here.
 
 ## 1. Overview
 
@@ -65,27 +65,29 @@ An illegal access becomes an illegal-instruction exception (section 5). A write 
 
 ## 4. CSR File
 
-All CSRs are zero after reset, except `misa` and the fixed part of `mstatus`, which are constants. The Access column indicates whether an effective write is accepted, and the Write column describes the effect.
+The addresses and names of the CSRs are not a choice of the Core. They come from the machine-level CSR table of the privileged architecture manual ([Currently allocated RISC-V machine-level CSR addresses](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses)), and the convention of the address bits (read and write in bits [11:10], privilege in bits [9:8]) is in [section 1.1.1 of the same volume](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-1-csr-address-mapping-conventions). The Access column follows the classes of the table, with R for `MRO` (read-only) and R/W for `MRW` (read and write), and the Definition column leads to the manual section that describes each register. The Core implements only a subset of the table.
 
-| Address | CSR | Access | Read | Write |
-| :---: | :--- | :---: | :--- | :--- |
-| `0x300` | `mstatus` | R/W | `MPP` (bits 12 and 11) fixed at `11`, `MPIE` (bit 7), `MIE` (bit 3); other bits zero | Only `MIE` and `MPIE` are stored; other bits are ignored |
-| `0x301` | `misa` | R/W | `0x40000100` (`MXL = 1`, extension `I`); with `has_m`, `0x40001100` (adds bit 12, extension `M`) | Ignored |
-| `0x304` | `mie` | R/W | Zero | Ignored |
-| `0x305` | `mtvec` | R/W | Handler base address, with bits `[1:0]` at zero | Stores bits `[31:2]`; the mode is always direct |
-| `0x310` | `mstatush` | R/W | Zero | Ignored |
-| `0x340` | `mscratch` | R/W | Stored value, 32 bits | Stores all 32 bits |
-| `0x341` | `mepc` | R/W | Saved PC, with bits `[1:0]` at zero | Stores bits `[31:2]` |
-| `0x342` | `mcause` | R/W | Code of the last exception, 32 bits | Stores all 32 bits |
-| `0x343` | `mtval` | R/W | Value associated with the last exception, 32 bits | Stores all 32 bits |
-| `0x344` | `mip` | R/W | Zero | Ignored |
-| `0xF11` | `mvendorid` | R | Zero | Effective write is illegal |
-| `0xF12` | `marchid` | R | Zero | Effective write is illegal |
-| `0xF13` | `mimpid` | R | Zero | Effective write is illegal |
-| `0xF14` | `mhartid` | R | Zero | Effective write is illegal |
-| `0xF15` | `mconfigptr` | R | Zero | Effective write is illegal |
+All CSRs are zero after reset, except `misa` and the fixed part of `mstatus`, which are constants. The Write column describes the effect of an effective write.
 
-The counter addresses (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` and the high halves) exist only when the profile includes `Zicntr` or `Zihpm`. Without them, those addresses are not known and the access is illegal. Any other address is also not known. Since the Core has no interrupts, `mie` and `mip` read zero and ignore writes.
+| Address | CSR | Access | Definition | Read | Write |
+| :---: | :--- | :---: | :---: | :--- | :--- |
+| `0x300` | `mstatus` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 and 11) fixed at `11`, `MPIE` (bit 7), `MIE` (bit 3); other bits zero | Only `MIE` and `MPIE` are stored; other bits are ignored |
+| `0x301` | `misa` | R/W | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extension `I`); with `has_m`, `0x40001100` (adds bit 12, extension `M`) | Ignored |
+| `0x304` | `mie` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignored |
+| `0x305` | `mtvec` | R/W | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | Handler base address, with bits `[1:0]` at zero | Stores bits `[31:2]`; the mode is always direct |
+| `0x310` | `mstatush` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignored |
+| `0x340` | `mscratch` | R/W | [2.1.1.13](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-13-machine-scratch-mscratch-register) | Stored value, 32 bits | Stores all 32 bits |
+| `0x341` | `mepc` | R/W | [2.1.1.14](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-14-machine-exception-program-counter-mepc-register) | Saved PC, with bits `[1:0]` at zero | Stores bits `[31:2]` |
+| `0x342` | `mcause` | R/W | [2.1.1.15](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcause) | Code of the last exception, 32 bits | Stores all 32 bits |
+| `0x343` | `mtval` | R/W | [2.1.1.16](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-16-machine-trap-value-mtval-register) | Value associated with the last exception, 32 bits | Stores all 32 bits |
+| `0x344` | `mip` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignored |
+| `0xF11` | `mvendorid` | R | [2.1.1.2](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-2-machine-vendor-id-mvendorid-register) | Zero | Effective write is illegal |
+| `0xF12` | `marchid` | R | [2.1.1.3](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-3-machine-architecture-id-marchid-register) | Zero | Effective write is illegal |
+| `0xF13` | `mimpid` | R | [2.1.1.4](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-4-machine-implementation-id-mimpid-register) | Zero | Effective write is illegal |
+| `0xF14` | `mhartid` | R | [2.1.1.5](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-5-hart-id-mhartid-register) | Zero | Effective write is illegal |
+| `0xF15` | `mconfigptr` | R | [2.1.1.17](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-17-machine-configuration-pointer-mconfigptr-register) | Zero | Effective write is illegal |
+
+The counter addresses (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` and the high halves) also come from the table of the privileged manual, and exist only when the profile includes `Zicntr` or `Zihpm`, described in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md). Without them, those addresses are not known and the access is illegal. Any other address is also not known. Since the Core has no interrupts, `mie` and `mip` read zero and ignore writes.
 
 ## 5. Synchronous Exceptions
 
@@ -148,7 +150,7 @@ The redirect PC is chosen among `mepc` (on `MRET`), `PC + 4` (on `FENCE.I`) and 
 
 The EX exception is detected combinationally in the cycle in which the instruction is in EX and the pipeline advances. The CSRs and the PC are written at the clock edge that ends that cycle, so the first handler instruction is fetched in the following cycle. Two younger instructions (in the IF and ID stages) are discarded, besides the faulting instruction itself. The load or store exception is detected in the cycle in which the access reaches MEM, one cycle after the instruction passed through EX.
 
-The retirement of an instruction in EX adds to `minstret` one cycle later, and a MEM exception cancels that addition, so the failing access does not count as retired. Counter details are in [../Zicntr_Zihpm/](../Zicntr_Zihpm/).
+The retirement of an instruction in EX adds to `minstret` one cycle later, and a MEM exception cancels that addition, so the failing access does not count as retired. Counter details are in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md).
 
 ## 6. Core without Zicsr
 
