@@ -1,6 +1,6 @@
 # Tabela de Decodificação da Unidade de Controle Base (RV32I)
 
-A unidade de controle base (`common/control_unit.vhd`) decodifica combinacionalmente os campos `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`) e `funct7` (`i_inst[31:25]`) das 37 instruções do conjunto RV32I. Qualquer instrução fora desta tabela (incluindo instruções das extensões `M`, `Zicsr` e `Zifencei`) recebe os sinais padrão de um `NOP` sem efeitos colaterais nesta unidade (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
+A unidade de controle base (`src/shared/control_unit.vhd`) decodifica combinacionalmente os campos `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`) e `funct7` (`i_inst[31:25]`) das 37 instruções do conjunto RV32I. Qualquer instrução fora desta tabela (incluindo instruções das extensões `M`, `Zicsr` e `Zifencei`) recebe os sinais padrão de um `NOP` sem efeitos colaterais nesta unidade (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
 
 ## 1. Sinais de Controle por Instrução
 

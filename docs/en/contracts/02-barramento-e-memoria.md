@@ -2,7 +2,7 @@
 
 ## 1. Processor Address Map
 
-The bounds of the instruction address space (IF stage) and data address space (MEM and WB stages) are centralized in the `common/mem_map_consts.vhd` package:
+The bounds of the instruction address space (IF stage) and data address space (MEM and WB stages) are centralized in the `src/shared/mem_map_consts.vhd` package:
 
 | Constant (`mem_map_consts`) | Value | Demarcated region |
 | :--- | :--- | :--- |
@@ -23,7 +23,7 @@ The bounds are powers of 2. Each base is computed from the index of its single b
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 
-The IF stage (`core/stage_if.vhd`) presents the current PC address on `o_if_addr` with `o_if_rden = '1'` and selects the fetched instruction according to the address range:
+The IF stage (`src/core/stage_if.vhd`) presents the current PC address on `o_if_addr` with `o_if_rden = '1'` and selects the fetched instruction according to the address range:
 
 | Port on top level `core` | Direction | Address region | Description |
 | :--- | :--- | :--- | :--- |
@@ -38,7 +38,7 @@ The IF stage (`core/stage_if.vhd`) presents the current PC address on `o_if_addr
 
 ## 3. Data Memory Interfaces (MEM and WB Stages)
 
-In the MEM stage (`core/stage_mem.vhd`), the effective address computed in the EX stage is routed to one of three data interfaces. In the WB stage (`core/stage_wb.vhd`), the corresponding read datum is selected and aligned by `I/extender_ram.vhd`.
+In the MEM stage (`src/core/stage_mem.vhd`), the effective address computed in the EX stage is routed to one of three data interfaces. In the WB stage (`src/core/stage_wb.vhd`), the corresponding read datum is selected and aligned by `src/I/extender_ram.vhd`.
 
 ### 3.1. Flash Memory Data Port (`< 0x00008000`)
 
@@ -90,8 +90,8 @@ External handshake protocol rules:
 
 The data bus always operates on 32-bit words accompanied by `byteena`:
 
-- **Naturally aligned accesses (`LB`/`LBU`/`SB` at any address, `LH`/`LHU`/`SH` at even addresses, `LW`/`SW` at multiples of 4):** on a store, `I/store_manager.vhd` replicates the byte or halfword across the byte lanes selected by `ea[1:0]` and asserts the corresponding bits of `o_byte_mask`; on a load, `I/extender_ram.vhd` extracts the slice selected by `ea[1:0]` and applies sign or zero extension in the WB stage.
-- **Misaligned accesses (`LW`/`SW` with `ea[1:0] /= "00"` or `LH`/`LHU`/`SH` with `ea[0] = '1'`):** with `has_zicclsm = true` (the Zicclsm extension), the hardware runs the access when it falls in the main memory, which is the internal RAM and the SDRAM. An access that fits in one word (`LH`, `LHU` and `SH` with `ea[1:0] = "01"`) completes in one cycle, and an access that spans two words (`LW` and `SW` at offsets 1 to 3, `LH`, `LHU` and `SH` at offset 3) runs in two steps in the `misaligned_unit`. In step 1 the pipeline waits and the unit presents the word of the first byte, in step 2 it presents the next word, and the WB stage joins the two words of a load. An access that crosses the word is not atomic, because the first half may have been written when the second fails. The two words must lie in the same region, and an access outside the main memory or between regions is an access that the hardware does not run. With `has_zicsr = true`, `Zicsr/trap_unit.vhd` detects that access in the EX stage, annuls the instruction before it reaches the MEM stage (`flush_ex_mem = '1'`), and raises a synchronous exception with `mcause = 4` (Load Address Misaligned) or `mcause = 6` (Store Address Misaligned), writing the effective address `i_ea` to `mtval`. With `has_zicclsm = false` every misaligned access is an access that the hardware does not run, and that combination requires `has_zicsr = true`, otherwise elaboration fails.
+- **Naturally aligned accesses (`LB`/`LBU`/`SB` at any address, `LH`/`LHU`/`SH` at even addresses, `LW`/`SW` at multiples of 4):** on a store, `src/I/store_manager.vhd` replicates the byte or halfword across the byte lanes selected by `ea[1:0]` and asserts the corresponding bits of `o_byte_mask`; on a load, `src/I/extender_ram.vhd` extracts the slice selected by `ea[1:0]` and applies sign or zero extension in the WB stage.
+- **Misaligned accesses (`LW`/`SW` with `ea[1:0] /= "00"` or `LH`/`LHU`/`SH` with `ea[0] = '1'`):** with `has_zicclsm = true` (the Zicclsm extension), the hardware runs the access when it falls in the main memory, which is the internal RAM and the SDRAM. An access that fits in one word (`LH`, `LHU` and `SH` with `ea[1:0] = "01"`) completes in one cycle, and an access that spans two words (`LW` and `SW` at offsets 1 to 3, `LH`, `LHU` and `SH` at offset 3) runs in two steps in the `misaligned_unit`. In step 1 the pipeline waits and the unit presents the word of the first byte, in step 2 it presents the next word, and the WB stage joins the two words of a load. An access that crosses the word is not atomic, because the first half may have been written when the second fails. The two words must lie in the same region, and an access outside the main memory or between regions is an access that the hardware does not run. With `has_zicsr = true`, `src/Zicsr/trap_unit.vhd` detects that access in the EX stage, annuls the instruction before it reaches the MEM stage (`flush_ex_mem = '1'`), and raises a synchronous exception with `mcause = 4` (Load Address Misaligned) or `mcause = 6` (Store Address Misaligned), writing the effective address `i_ea` to `mtval`. With `has_zicclsm = false` every misaligned access is an access that the hardware does not run, and that combination requires `has_zicsr = true`, otherwise elaboration fails.
 
 ## 5. Exceptions Without Zicsr
 

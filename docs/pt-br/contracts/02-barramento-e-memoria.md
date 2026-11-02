@@ -2,7 +2,7 @@
 
 ## 1. Mapa de Endereços do Processador
 
-Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) são centralizados no pacote `common/mem_map_consts.vhd`:
+Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) são centralizados no pacote `src/shared/mem_map_consts.vhd`:
 
 | Constante (`mem_map_consts`) | Valor | Região demarcada |
 | :--- | :--- | :--- |
@@ -23,7 +23,7 @@ As fronteiras são potências de 2. Cada base é calculada a partir do índice d
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 
-O estágio IF (`core/stage_if.vhd`) apresenta o endereço atual do PC em `o_if_addr` com `o_if_rden = '1'` e seleciona a instrução conforme a faixa de endereço:
+O estágio IF (`src/core/stage_if.vhd`) apresenta o endereço atual do PC em `o_if_addr` com `o_if_rden = '1'` e seleciona a instrução conforme a faixa de endereço:
 
 | Porta no topo `core` | Direção | Região de endereço | Descrição |
 | :--- | :--- | :--- | :--- |
@@ -38,7 +38,7 @@ O estágio IF (`core/stage_if.vhd`) apresenta o endereço atual do PC em `o_if_a
 
 ## 3. Interfaces de Memória de Dados (Estágios MEM e WB)
 
-No estágio MEM (`core/stage_mem.vhd`), o endereço efetivo calculado no estágio EX é roteado para uma das três interfaces de dados. No estágio WB (`core/stage_wb.vhd`), o dado lido correspondente é selecionado e alinhado pelo módulo `I/extender_ram.vhd`.
+No estágio MEM (`src/core/stage_mem.vhd`), o endereço efetivo calculado no estágio EX é roteado para uma das três interfaces de dados. No estágio WB (`src/core/stage_wb.vhd`), o dado lido correspondente é selecionado e alinhado pelo módulo `src/I/extender_ram.vhd`.
 
 ### 3.1. Porta de Dados da Memória Flash (`< 0x00008000`)
 
@@ -90,8 +90,8 @@ Regras do protocolo de handshake externo:
 
 O barramento de dados opera sempre sobre palavras de 32 bits acompanhadas de `byteena`:
 
-- **Acessos naturalmente alinhados (`LB`/`LBU`/`SB` em qualquer endereço, `LH`/`LHU`/`SH` em endereços pares, `LW`/`SW` em múltiplos de 4):** no store, `I/store_manager.vhd` replica o byte ou meia-palavra nas lanes correspondentes aos bits `ea[1:0]` e ativa os bits respectivos da máscara `o_byte_mask`; no load, `I/extender_ram.vhd` extrai a faixa selecionada por `ea[1:0]` e aplica extensão de sinal ou zero no estágio WB.
-- **Acessos desalinhados (`LW`/`SW` com `ea[1:0] /= "00"` ou `LH`/`LHU`/`SH` com `ea[0] = '1'`):** com `has_zicclsm = true` (extensão Zicclsm), o hardware executa o acesso quando ele cai na memória principal, que é a RAM interna e a SDRAM. Um acesso que cabe numa palavra (`LH`, `LHU` e `SH` com `ea[1:0] = "01"`) completa num ciclo, e um acesso que ocupa duas palavras (`LW` e `SW` com offset 1 a 3, `LH`, `LHU` e `SH` com offset 3) roda em duas etapas na `misaligned_unit`. Na etapa 1 o pipeline espera e a unidade apresenta a palavra do primeiro byte, na etapa 2 apresenta a palavra seguinte, e o estágio WB junta as duas palavras de um load. O acesso que cruza a palavra não é atômico, porque a primeira metade pode ter sido escrita quando a segunda falha. As duas palavras precisam estar na mesma região, e um acesso fora da memória principal ou entre regiões é um acesso que o hardware não executa. Com `has_zicsr = true`, a unidade `Zicsr/trap_unit.vhd` detecta esse acesso no estágio EX, anula a instrução antes que ela alcance o estágio MEM (`flush_ex_mem = '1'`) e dispara exceção síncrona com `mcause = 4` (Load Address Misaligned) ou `mcause = 6` (Store Address Misaligned), gravando o endereço efetivo `i_ea` em `mtval`. Com `has_zicclsm = false` todo acesso desalinhado é um acesso que o hardware não executa, e essa combinação exige `has_zicsr = true`, caso contrário a elaboração falha.
+- **Acessos naturalmente alinhados (`LB`/`LBU`/`SB` em qualquer endereço, `LH`/`LHU`/`SH` em endereços pares, `LW`/`SW` em múltiplos de 4):** no store, `src/I/store_manager.vhd` replica o byte ou meia-palavra nas lanes correspondentes aos bits `ea[1:0]` e ativa os bits respectivos da máscara `o_byte_mask`; no load, `src/I/extender_ram.vhd` extrai a faixa selecionada por `ea[1:0]` e aplica extensão de sinal ou zero no estágio WB.
+- **Acessos desalinhados (`LW`/`SW` com `ea[1:0] /= "00"` ou `LH`/`LHU`/`SH` com `ea[0] = '1'`):** com `has_zicclsm = true` (extensão Zicclsm), o hardware executa o acesso quando ele cai na memória principal, que é a RAM interna e a SDRAM. Um acesso que cabe numa palavra (`LH`, `LHU` e `SH` com `ea[1:0] = "01"`) completa num ciclo, e um acesso que ocupa duas palavras (`LW` e `SW` com offset 1 a 3, `LH`, `LHU` e `SH` com offset 3) roda em duas etapas na `misaligned_unit`. Na etapa 1 o pipeline espera e a unidade apresenta a palavra do primeiro byte, na etapa 2 apresenta a palavra seguinte, e o estágio WB junta as duas palavras de um load. O acesso que cruza a palavra não é atômico, porque a primeira metade pode ter sido escrita quando a segunda falha. As duas palavras precisam estar na mesma região, e um acesso fora da memória principal ou entre regiões é um acesso que o hardware não executa. Com `has_zicsr = true`, a unidade `src/Zicsr/trap_unit.vhd` detecta esse acesso no estágio EX, anula a instrução antes que ela alcance o estágio MEM (`flush_ex_mem = '1'`) e dispara exceção síncrona com `mcause = 4` (Load Address Misaligned) ou `mcause = 6` (Store Address Misaligned), gravando o endereço efetivo `i_ea` em `mtval`. Com `has_zicclsm = false` todo acesso desalinhado é um acesso que o hardware não executa, e essa combinação exige `has_zicsr = true`, caso contrário a elaboração falha.
 
 ## 5. Exceções Sem Zicsr
 

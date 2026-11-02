@@ -6,19 +6,19 @@ Este guia detalha as entradas, saídas, componentes internos e códigos de contr
 
 ![Visão geral do pipeline](../figuras/pipeline.svg)
 
-O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `core/core.vhd`:
+O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `src/core/core.vhd`:
 
 | Ordem | Entidade | Arquivo | Função principal |
 | :--- | :--- | :--- | :--- |
-| 1 | `stage_if` | `core/stage_if.vhd` | Seleção de fonte do próximo PC, incremento $\text{PC} + 4$, decodificação de região de código (Boot ROM, Flash, I-cache SDRAM) e controle de espera de busca |
-| Barreira 1 | `reg_if_id` | `common/reg_if_id.vhd` | Registro síncrono de `o_valid`, `o_pc`, `o_pc4` e `o_inst` entre IF e ID |
-| 2 | `stage_id` | `core/stage_id.vhd` | Decodificação RV32I + extensões `M`/`Zicsr`, extensão de imediato, leitura/escrita do banco de registradores, detecção de hazard load-use e inserção de bolha |
-| Barreira 2 | `reg_id_ex` | `common/reg_id_ex.vhd` | Registro síncrono de operandos, imediato, índices de registradores e sinais de controle entre ID e EX |
-| 3 | `stage_ex` | `core/stage_ex.vhd` | Forwarding de operandos, execução na ULA, unidade MulDiv, banco de CSRs e Trap Unit, unidade `FENCE.I`, cálculo de desvios e alinhamento de store |
-| Barreira 3 | `reg_ex_mem` | `common/reg_ex_mem.vhd` | Registro síncrono do resultado de EX, dados e máscara de bytes de store, destino `rd` e controles de memória/WB entre EX e MEM |
-| 4 | `stage_mem` | `core/stage_mem.vhd` | Decodificação do espaço de dados (Flash porta 2, RAM interna e janela externa SDRAM/periféricos) e controle de espera `o_sdram_wait` |
-| Barreira 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Registro síncrono de `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op` e `o_wb_sel` entre MEM e WB |
-| 5 | `stage_wb` | `core/stage_wb.vhd` | Seleção da palavra lida da memória, extensão de byte/meia-palavra (`extender_ram`) e seleção do valor final de escrita no banco de registradores |
+| 1 | `stage_if` | `src/core/stage_if.vhd` | Seleção de fonte do próximo PC, incremento $\text{PC} + 4$, decodificação de região de código (Boot ROM, Flash, I-cache SDRAM) e controle de espera de busca |
+| Barreira 1 | `reg_if_id` | `src/shared/reg_if_id.vhd` | Registro síncrono de `o_valid`, `o_pc`, `o_pc4` e `o_inst` entre IF e ID |
+| 2 | `stage_id` | `src/core/stage_id.vhd` | Decodificação RV32I + extensões `M`/`Zicsr`, extensão de imediato, leitura/escrita do banco de registradores, detecção de hazard load-use e inserção de bolha |
+| Barreira 2 | `reg_id_ex` | `src/shared/reg_id_ex.vhd` | Registro síncrono de operandos, imediato, índices de registradores e sinais de controle entre ID e EX |
+| 3 | `stage_ex` | `src/core/stage_ex.vhd` | Forwarding de operandos, execução na ULA, unidade MulDiv, banco de CSRs e Trap Unit, unidade `FENCE.I`, cálculo de desvios e alinhamento de store |
+| Barreira 3 | `reg_ex_mem` | `src/shared/reg_ex_mem.vhd` | Registro síncrono do resultado de EX, dados e máscara de bytes de store, destino `rd` e controles de memória/WB entre EX e MEM |
+| 4 | `stage_mem` | `src/core/stage_mem.vhd` | Decodificação do espaço de dados (Flash porta 2, RAM interna e janela externa SDRAM/periféricos) e controle de espera `o_sdram_wait` |
+| Barreira 4 | `reg_mem_wb` | `src/shared/reg_mem_wb.vhd` | Registro síncrono de `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op` e `o_wb_sel` entre MEM e WB |
+| 5 | `stage_wb` | `src/core/stage_wb.vhd` | Seleção da palavra lida da memória, extensão de byte/meia-palavra (`extender_ram`) e seleção do valor final de escrita no banco de registradores |
 
 ## 2. Detalhamento por Estágio
 
@@ -26,7 +26,7 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 
 ![Estágio IF](../figuras/if.svg)
 
-O estágio IF seleciona o próximo endereço de instrução por meio do código `pc_src` (`pc_src_t`) definido em `common/pc_src_consts.vhd`:
+O estágio IF seleciona o próximo endereço de instrução por meio do código `pc_src` (`pc_src_t`) definido em `src/shared/pc_src_consts.vhd`:
 
 | Constante | Código | Fonte selecionada no `mux_4x1` de `pc_fetch` |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ O estágio IF seleciona o próximo endereço de instrução por meio do código 
 | `PC_SRC_JALR` | `"10"` | `i_jalr_target` ($((\text{rs1} + \text{imm}) \land \texttt{0xFFFFFFFE})$, para `JALR`) |
 | `PC_SRC_REDIRECT` | `"11"` | `i_redirect_pc` (`mepc` em `MRET`, $\text{PC} + 4$ em `FENCE.I` ou `mtvec` em exceção) |
 
-A decodificação do endereço de busca (`if_pc`) utiliza os limites de `common/mem_map_consts.vhd`:
+A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/shared/mem_map_consts.vhd`:
 
 | Faixa de endereço (`if_pc`) | Região selecionada | Palavra entregue em `o_instr` |
 | :--- | :--- | :--- |
@@ -52,7 +52,7 @@ O estágio ID reúne sete subblocos:
 1. **Unidade de controle base (`control_unit`):** decodifica `i_inst` gerando `o_sel_pc4_alu`, `o_ext_imm_op`, `o_wb_sel`, `o_we_reg`, `o_ext_ram_op`, `o_sel_rs2_imm`, `o_sel_pc_rs1`, `o_alu_op`, `o_we_ram`, `o_re_ram`, `o_en_ram`, `o_opcode` e `o_funct3`.
 2. **Decodificador RV32M (`m_decode`, quando `has_m = true`):** ativa `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'` quando `opcode = OPCODE_OP` e `funct7 = FUNCT7_MULDIV`.
 3. **Decodificador Zicsr (`csr_decode`, quando `has_zicsr = true`):** ativa `o_use_imm_i = '1'` para toda a classe `OPCODE_SYSTEM` e ativa `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"`.
-4. **Extensor de imediatos (`extender_imm`):** reconstrói o imediato de 32 bits de acordo com `common/ext_imm_consts.vhd`:
+4. **Extensor de imediatos (`extender_imm`):** reconstrói o imediato de 32 bits de acordo com `src/shared/ext_imm_consts.vhd`:
 
 | Constante | Código | Formato e operação de extensão |
 | :--- | :--- | :--- |
@@ -65,7 +65,7 @@ O estágio ID reúne sete subblocos:
 
 5. **Banco de registradores (`reg_file`):** 32 registradores de 32 bits (`x0` fixo em zero e `x1`..`x31` instanciados com `generic_register`), decodificação de escrita via `onehot_decoder`, leitura combinacional dupla via `mux_tree` e bypass write-through via `mux_2x1` quando `i_enable = '1'` e o endereço lido coincide com `i_rd /= x0`.
 6. **Detecção de hazards (`hazard_detection_unit`) e inserção de bolha (`bubble_mux`):** congela PC e IF/ID (`o_pc_we = '0'`, `o_ifid_we = '0'`) e zera `o_we_reg`, `o_we_ram`, `o_re_ram` e `o_en_ram` (`o_bubble_sel = '1'`) durante conflitos load-use ou stalls multiciclo (`i_pipe_stall = '1'`).
-7. **Comparação do adiantamento (`forwarding_match`):** compara `rs1` e `rs2` da instrução em ID com o destino `rd` das três instruções à frente (ID/EX, EX/MEM e MEM/WB), que no ciclo seguinte estarão em EX/MEM, MEM/WB e WB2. Um destino `x0` ou sem escrita habilitada nunca casa. Os três bits de casamento de cada operando são registrados em ID/EX (`fwd_match_t`, posições `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB` e `FWD_MATCH_WB2` de `common/fwd_consts.vhd`).
+7. **Comparação do adiantamento (`forwarding_match`):** compara `rs1` e `rs2` da instrução em ID com o destino `rd` das três instruções à frente (ID/EX, EX/MEM e MEM/WB), que no ciclo seguinte estarão em EX/MEM, MEM/WB e WB2. Um destino `x0` ou sem escrita habilitada nunca casa. Os três bits de casamento de cada operando são registrados em ID/EX (`fwd_match_t`, posições `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB` e `FWD_MATCH_WB2` de `src/shared/fwd_consts.vhd`).
 
 ### 2.3. Estágio 3: Execução (`stage_ex`)
 
@@ -77,7 +77,7 @@ No estágio EX:
 
 1. **Adiantamento (`forwarding_unit`):** seleciona cada operando (`ex_fwd_rs1_val` e `ex_fwd_rs2_val`) via `mux_4x1` entre o valor vindo de ID/EX (`"00"`), o resultado de EX registrado em MEM/WB (`"01"`), o resultado em EX/MEM (`"10"`) e o dado final de WB registrado em WB2 (`"11"`). A escolha não compara índices de registrador, pois depende só dos bits de casamento registrados em ID/EX e dos bits de validade com escrita registrados em EX/MEM, MEM/WB e WB2, e vale a fonte mais nova que casa e ainda é válida.
 2. **Seleção de entrada da ULA:** dois multiplexadores `mux_2x1` escolhem o operando A (`i_pc` quando `i_sel_pc_rs1 = '0'`, ou `ex_fwd_rs1_val` quando `'1'`) e o operando B (`ex_fwd_rs2_val` quando `i_sel_rs2_imm = '0'`, ou `i_imm` quando `'1'`).
-3. **ULA (`alu`):** executa a operação definida em `common/alu_consts.vhd`:
+3. **ULA (`alu`):** executa a operação definida em `src/shared/alu_consts.vhd`:
 
 | Constante | Código | Operação em `o_d` | Flag `o_branch` |
 | :--- | :--- | :--- | :--- |
@@ -109,7 +109,7 @@ A codificação do código de operação e o somador-subtrator compartilhado est
 
 ![Estágio MEM](../figuras/mem.svg)
 
-O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de `common/mem_map_consts.vhd`:
+O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de `src/shared/mem_map_consts.vhd`:
 
 | Faixa de endereço (`i_alu_out`) | Subsistema de memória acionado | Sinais ativos |
 | :--- | :--- | :--- |
@@ -121,7 +121,7 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 
 ![Estágio WB](../figuras/wb.svg)
 
-No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_sdram_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `common/ext_ram_consts.vhd`:
+No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_sdram_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
 
 | Constante | Código (`i_ext_ram_op`) | Operação de alinhamento e extensão |
 | :--- | :--- | :--- |
@@ -131,7 +131,7 @@ No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_d
 | `EXT_RAM_LB` | `"011"` | Byte selecionado por `i_byte_offset(1 downto 0)` com extensão de sinal |
 | `EXT_RAM_LBU` | `"100"` | Byte selecionado por `i_byte_offset(1 downto 0)` com extensão por zero |
 
-Por fim, o multiplexador `u_mux_wb` (`mux_2x1`) seleciona `o_wb_data` de acordo com `common/wb_sel_consts.vhd`:
+Por fim, o multiplexador `u_mux_wb` (`mux_2x1`) seleciona `o_wb_data` de acordo com `src/shared/wb_sel_consts.vhd`:
 
 | Constante | Código (`i_wb_sel`) | Dado selecionado para escrita no banco de registradores |
 | :--- | :--- | :--- |

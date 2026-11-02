@@ -1,6 +1,6 @@
 # Base Control Unit Decoding Table (RV32I)
 
-The base control unit (`common/control_unit.vhd`) combinationally decodes the `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`), and `funct7` (`i_inst[31:25]`) fields of the 37 RV32I instructions. Any instruction outside this table (including instructions from the `M`, `Zicsr`, and `Zifencei` extensions) receives the default side-effect-free `NOP` control word in this unit (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
+The base control unit (`src/shared/control_unit.vhd`) combinationally decodes the `opcode` (`i_inst[6:0]`), `funct3` (`i_inst[14:12]`), and `funct7` (`i_inst[31:25]`) fields of the 37 RV32I instructions. Any instruction outside this table (including instructions from the `M`, `Zicsr`, and `Zifencei` extensions) receives the default side-effect-free `NOP` control word in this unit (`o_we_reg = '0'`, `o_we_ram = '0'`, `o_re_ram = '0'`, `o_en_ram = '0'`).
 
 ## 1. Control Signals per Instruction
 

@@ -6,19 +6,19 @@ This guide details the inputs, outputs, internal components, and control encodin
 
 ![Pipeline overview](../figuras/pipeline.svg)
 
-The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `core/core.vhd`:
+The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `src/core/core.vhd`:
 
 | Order | Entity | File | Primary function |
 | :--- | :--- | :--- | :--- |
-| 1 | `stage_if` | `core/stage_if.vhd` | Next-PC source selection, $\text{PC} + 4$ increment, code-region decoding (Boot ROM, Flash, SDRAM I-cache), and fetch-wait control |
-| Barrier 1 | `reg_if_id` | `common/reg_if_id.vhd` | Synchronous registration of `o_valid`, `o_pc`, `o_pc4`, and `o_inst` between IF and ID |
-| 2 | `stage_id` | `core/stage_id.vhd` | RV32I + `M`/`Zicsr` decoding, immediate extension, register-file read/write, load-use hazard detection, and bubble insertion |
-| Barrier 2 | `reg_id_ex` | `common/reg_id_ex.vhd` | Synchronous registration of operands, immediate, register indices, and control signals between ID and EX |
-| 3 | `stage_ex` | `core/stage_ex.vhd` | Operand forwarding, ALU execution, MulDiv unit, CSR file and Trap Unit, `FENCE.I` unit, branch target calculation, and store alignment |
-| Barrier 3 | `reg_ex_mem` | `common/reg_ex_mem.vhd` | Synchronous registration of EX result, store data and byte mask, destination `rd`, and memory/WB controls between EX and MEM |
-| 4 | `stage_mem` | `core/stage_mem.vhd` | Data-space decoding (Flash port 2, internal RAM, and external SDRAM/peripheral window) and wait control `o_sdram_wait` |
-| Barrier 4 | `reg_mem_wb` | `common/reg_mem_wb.vhd` | Synchronous registration of `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op`, and `o_wb_sel` between MEM and WB |
-| 5 | `stage_wb` | `core/stage_wb.vhd` | Selection of the word read from memory, byte/halfword extension (`extender_ram`), and selection of the final value written to the register file |
+| 1 | `stage_if` | `src/core/stage_if.vhd` | Next-PC source selection, $\text{PC} + 4$ increment, code-region decoding (Boot ROM, Flash, SDRAM I-cache), and fetch-wait control |
+| Barrier 1 | `reg_if_id` | `src/shared/reg_if_id.vhd` | Synchronous registration of `o_valid`, `o_pc`, `o_pc4`, and `o_inst` between IF and ID |
+| 2 | `stage_id` | `src/core/stage_id.vhd` | RV32I + `M`/`Zicsr` decoding, immediate extension, register-file read/write, load-use hazard detection, and bubble insertion |
+| Barrier 2 | `reg_id_ex` | `src/shared/reg_id_ex.vhd` | Synchronous registration of operands, immediate, register indices, and control signals between ID and EX |
+| 3 | `stage_ex` | `src/core/stage_ex.vhd` | Operand forwarding, ALU execution, MulDiv unit, CSR file and Trap Unit, `FENCE.I` unit, branch target calculation, and store alignment |
+| Barrier 3 | `reg_ex_mem` | `src/shared/reg_ex_mem.vhd` | Synchronous registration of EX result, store data and byte mask, destination `rd`, and memory/WB controls between EX and MEM |
+| 4 | `stage_mem` | `src/core/stage_mem.vhd` | Data-space decoding (Flash port 2, internal RAM, and external SDRAM/peripheral window) and wait control `o_sdram_wait` |
+| Barrier 4 | `reg_mem_wb` | `src/shared/reg_mem_wb.vhd` | Synchronous registration of `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op`, and `o_wb_sel` between MEM and WB |
+| 5 | `stage_wb` | `src/core/stage_wb.vhd` | Selection of the word read from memory, byte/halfword extension (`extender_ram`), and selection of the final value written to the register file |
 
 ## 2. Stage-by-Stage Breakdown
 
@@ -26,7 +26,7 @@ The processor is divided into five stage entities located in `core/` and four ba
 
 ![IF stage](../figuras/if.svg)
 
-The IF stage selects the next instruction address through the `pc_src` code (`pc_src_t`) defined in `common/pc_src_consts.vhd`:
+The IF stage selects the next instruction address through the `pc_src` code (`pc_src_t`) defined in `src/shared/pc_src_consts.vhd`:
 
 | Constant | Code | Source selected in the `mux_4x1` of `pc_fetch` |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ The IF stage selects the next instruction address through the `pc_src` code (`pc
 | `PC_SRC_JALR` | `"10"` | `i_jalr_target` ($((\text{rs1} + \text{imm}) \land \texttt{0xFFFFFFFE})$, for `JALR`) |
 | `PC_SRC_REDIRECT` | `"11"` | `i_redirect_pc` (`mepc` on `MRET`, $\text{PC} + 4$ on `FENCE.I`, or `mtvec` on exception) |
 
-Instruction fetch address (`if_pc`) decoding uses the bounds from `common/mem_map_consts.vhd`:
+Instruction fetch address (`if_pc`) decoding uses the bounds from `src/shared/mem_map_consts.vhd`:
 
 | Address range (`if_pc`) | Selected region | Word delivered on `o_instr` |
 | :--- | :--- | :--- |
@@ -52,7 +52,7 @@ The ID stage comprises seven sub-blocks:
 1. **Base control unit (`control_unit`):** decodes `i_inst` to produce `o_sel_pc4_alu`, `o_ext_imm_op`, `o_wb_sel`, `o_we_reg`, `o_ext_ram_op`, `o_sel_rs2_imm`, `o_sel_pc_rs1`, `o_alu_op`, `o_we_ram`, `o_re_ram`, `o_en_ram`, `o_opcode`, and `o_funct3`.
 2. **RV32M decoder (`m_decode`, when `has_m = true`):** asserts `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'` when `opcode = OPCODE_OP` and `funct7 = FUNCT7_MULDIV`.
 3. **Zicsr decoder (`csr_decode`, when `has_zicsr = true`):** asserts `o_use_imm_i = '1'` for the entire `OPCODE_SYSTEM` class and asserts `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"`.
-4. **Immediate extender (`extender_imm`):** reconstructs the 32-bit immediate according to `common/ext_imm_consts.vhd`:
+4. **Immediate extender (`extender_imm`):** reconstructs the 32-bit immediate according to `src/shared/ext_imm_consts.vhd`:
 
 | Constant | Code | Format and extension operation |
 | :--- | :--- | :--- |
@@ -65,7 +65,7 @@ The ID stage comprises seven sub-blocks:
 
 5. **Register file (`reg_file`):** 32 32-bit registers (`x0` hardwired to zero and `x1`..`x31` instantiated with `generic_register`), write decoding via `onehot_decoder`, dual combinational read via `mux_tree`, and write-through bypass via `mux_2x1` when `i_enable = '1'` and the read address matches `i_rd /= x0`.
 6. **Hazard detection (`hazard_detection_unit`) and bubble insertion (`bubble_mux`):** freezes PC and IF/ID (`o_pc_we = '0'`, `o_ifid_we = '0'`) and zeroes `o_we_reg`, `o_we_ram`, `o_re_ram`, and `o_en_ram` (`o_bubble_sel = '1'`) during load-use hazards or multi-cycle stalls (`i_pipe_stall = '1'`).
-7. **Forwarding comparison (`forwarding_match`):** compares `rs1` and `rs2` of the instruction in ID with the destination `rd` of the three instructions ahead of it (ID/EX, EX/MEM, and MEM/WB), which will be in EX/MEM, MEM/WB, and WB2 in the next cycle. A destination of `x0`, or one without register write enabled, never matches. The three match bits of each operand are registered in ID/EX (`fwd_match_t`, positions `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB`, and `FWD_MATCH_WB2` of `common/fwd_consts.vhd`).
+7. **Forwarding comparison (`forwarding_match`):** compares `rs1` and `rs2` of the instruction in ID with the destination `rd` of the three instructions ahead of it (ID/EX, EX/MEM, and MEM/WB), which will be in EX/MEM, MEM/WB, and WB2 in the next cycle. A destination of `x0`, or one without register write enabled, never matches. The three match bits of each operand are registered in ID/EX (`fwd_match_t`, positions `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB`, and `FWD_MATCH_WB2` of `src/shared/fwd_consts.vhd`).
 
 ### 2.3. Stage 3: Execute (`stage_ex`)
 
@@ -77,7 +77,7 @@ In the EX stage:
 
 1. **Forwarding (`forwarding_unit`):** selects each operand (`ex_fwd_rs1_val` and `ex_fwd_rs2_val`) via `mux_4x1` from the ID/EX value (`"00"`), the EX result registered in MEM/WB (`"01"`), the EX/MEM result (`"10"`), or the final WB datum registered in WB2 (`"11"`). The choice does not compare register indices, because it depends only on the match bits registered in ID/EX and on the valid-and-writes bits registered in EX/MEM, MEM/WB, and WB2, and the newest source that matches and is still valid wins.
 2. **ALU input selection:** two `mux_2x1` multiplexers select operand A (`i_pc` when `i_sel_pc_rs1 = '0'`, or `ex_fwd_rs1_val` when `'1'`) and operand B (`ex_fwd_rs2_val` when `i_sel_rs2_imm = '0'`, or `i_imm` when `'1'`).
-3. **ALU (`alu`):** executes the operation defined in `common/alu_consts.vhd`:
+3. **ALU (`alu`):** executes the operation defined in `src/shared/alu_consts.vhd`:
 
 | Constant | Code | Operation on `o_d` | `o_branch` flag |
 | :--- | :--- | :--- | :--- |
@@ -109,7 +109,7 @@ The encoding of the operation code and the shared adder-subtractor are described
 
 ![MEM stage](../figuras/mem.svg)
 
-The MEM stage decodes the effective address `i_alu_out` using the bounds in `common/mem_map_consts.vhd`:
+The MEM stage decodes the effective address `i_alu_out` using the bounds in `src/shared/mem_map_consts.vhd`:
 
 | Address range (`i_alu_out`) | Triggered memory subsystem | Active signals |
 | :--- | :--- | :--- |
@@ -121,7 +121,7 @@ The MEM stage decodes the effective address `i_alu_out` using the bounds in `com
 
 ![WB stage](../figuras/wb.svg)
 
-In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_sdram_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_alu_out(1 downto 0)` and applies the extension mode defined in `common/ext_ram_consts.vhd`:
+In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_sdram_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_alu_out(1 downto 0)` and applies the extension mode defined in `src/shared/ext_ram_consts.vhd`:
 
 | Constant | Code (`i_ext_ram_op`) | Alignment and extension operation |
 | :--- | :--- | :--- |
@@ -131,7 +131,7 @@ In the WB stage, the word read in the previous cycle is selected from `i_flash_d
 | `EXT_RAM_LB` | `"011"` | Byte selected by `i_byte_offset(1 downto 0)` with sign extension |
 | `EXT_RAM_LBU` | `"100"` | Byte selected by `i_byte_offset(1 downto 0)` with zero extension |
 
-Finally, the `u_mux_wb` (`mux_2x1`) multiplexer selects `o_wb_data` according to `common/wb_sel_consts.vhd`:
+Finally, the `u_mux_wb` (`mux_2x1`) multiplexer selects `o_wb_data` according to `src/shared/wb_sel_consts.vhd`:
 
 | Constant | Code (`i_wb_sel`) | Datum selected for register-file writeback |
 | :--- | :--- | :--- |

@@ -25,16 +25,18 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 | Path | Contents |
 | :--- | :--- |
-| `common/` | Blocks shared across all profiles, including type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units, PC generator, and the other parts specific to the Core; the generic blocks (adder, flip-flop, registers, multiplexers, and one-hot decoder) come from the [Common-Components](https://github.com/insper-riscv/Common-Components) repository, included as a submodule |
-| `I/` | Base integer extension RV32I, comprising the ALU, immediate extender, memory read extender, and store alignment manager |
-| `M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
-| `Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
-| `Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
-| `core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
+| `src/common/` | Submodule [Common-Components](https://github.com/insper-riscv/Common-Components): the generic blocks (adder, flip-flop, registers, multiplexers and one-hot decoder) the Core imports |
+| `src/shared/` | Core parts used by every profile: type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units and PC generator |
+| `src/I/` | Base integer extension RV32I, comprising the ALU, immediate extender, memory read extender, and store alignment manager |
+| `src/M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
+| `src/Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
+| `src/Zicntr/` | Counters extension: `mcycle`, `minstret`, `time` and the mirrors `cycle`, `instret`, `time`, with the 64-bit counter and the time divider |
+| `src/Zicclsm/` | Unit for misaligned access to the main memory (`misaligned_unit`), which splits an access that crosses a word into two steps |
+| `src/Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
+| `src/core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
 | `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`) in dependency order |
 | `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, and formal verification script via GHDL + Yosys + SymbiYosys |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
-| `tests/FPGA/entities/` | Quartus project for on-board validation of the register file ([documentation](tests/FPGA/entities/bancoRegistradores/README.en.md)) |
 
 ## 3. ISA Profiles
 
