@@ -39,7 +39,7 @@ Os CSRs de contador são somente leitura no nível não privilegiado, e uma escr
 
 ## 3. Fora do escopo deste capítulo
 
-O capítulo não define os CSRs de máquina que controlam os contadores básicos, como `mcycle`, `minstret` e `mcountinhibit`. Esses registradores pertencem ao manual de arquitetura privilegiada, que não foi consultado para este documento. A descrição do que o Core oferece nesses endereços está em [description.md](description.md).
+O capítulo não define os CSRs de máquina que controlam os contadores básicos. `mcycle` e `minstret` estão na [seção 2.1.1.10](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-10-hardware-performance-monitor) do manual de arquitetura privilegiada, e `mcountinhibit` na [seção 2.1.1.12](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-12-machine-counter-inhibit-mcountinhibit-register). Os endereços de `cycle`, `time` e `instret` estão na [tabela de endereços não privilegiados](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-1-currently-allocated-risc-v-unprivileged-csr-addresses), e os de `mcycle`, `minstret` e `mcountinhibit` na [tabela de endereços de máquina](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses). A descrição do que o Core oferece nesses endereços está em [description.md](description.md).
 
 ---
 

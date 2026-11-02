@@ -21,7 +21,7 @@ O Zihpm acrescenta até 29 contadores de 64 bits, `hpmcounter3` a `hpmcounter31`
 
 ## 3. Fora do escopo deste capítulo
 
-O capítulo não define os CSRs de máquina que controlam os contadores de desempenho, como `mhpmcounterN`, `mhpmeventN` e `mcountinhibit`. Esses registradores, o seletor de evento e a inibição da contagem pertencem ao manual de arquitetura privilegiada, que não foi consultado para este documento. A descrição do que o Core oferece nesses endereços está em [description.md](description.md).
+O capítulo não define os CSRs de máquina que controlam os contadores de desempenho. `mhpmcounterN` e `mhpmeventN` estão na [seção 2.1.1.10](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-10-hardware-performance-monitor) do manual de arquitetura privilegiada, e a inibição da contagem (`mcountinhibit`) na [seção 2.1.1.12](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-12-machine-counter-inhibit-mcountinhibit-register). Os endereços de `hpmcounterN` estão na [tabela de endereços não privilegiados](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-1-currently-allocated-risc-v-unprivileged-csr-addresses), e os de `mhpmcounterN`, `mhpmeventN` e `mcountinhibit` na [tabela de endereços de máquina](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses). A descrição do que o Core oferece nesses endereços está em [description.md](description.md).
 
 ---
 

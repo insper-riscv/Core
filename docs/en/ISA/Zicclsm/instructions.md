@@ -1,6 +1,6 @@
 # Zicclsm: What RISC-V Requires
 
-Sources ([RISC-V profiles specification](https://github.com/riscv/riscv-profiles) and [Load and Store Instructions](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html) of Chapter 1 of the manual).
+Sources ([RISC-V profiles specification, version 1.0](https://github.com/riscv/riscv-profiles/blob/v1.0/profiles.adoc) and [Load and Store Instructions](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html) of Chapter 1 of the manual).
 
 Zicclsm is not part of the unprivileged ISA manual. It is defined in the RISC-V profiles specification, as one of the requirements that a profile places on main memory. This document gathers what that specification requires, what the ISA manual says about misaligned accesses in general, and how this relates to the misaligned address exceptions. The Core implementation is in [description.md](description.md).
 
@@ -65,10 +65,10 @@ The specification covers regular loads and stores, scalar and vector, and exclud
 
 | Document | Section |
 | :--- | :--- |
-| RISC-V Profiles (repository `riscv/riscv-profiles`, files `profiles.adoc` and `rva23-profile.adoc`) | RVA20U64 Mandatory Extensions, RVA22U64 Mandatory Extensions, RVA23U64 Mandatory Extensions and the list of new extensions |
+| RISC-V Profiles, tag `v1.0` of the `riscv/riscv-profiles` repository ([`profiles.adoc`](https://github.com/riscv/riscv-profiles/blob/v1.0/profiles.adoc) and [`rva23-profile.adoc`](https://github.com/riscv/riscv-profiles/blob/v1.0/rva23-profile.adoc)) | RVA20U64 Mandatory Extensions, RVA22U64 Mandatory Extensions, RVA23U64 Mandatory Extensions and the list of new extensions |
 | Clarification by the editors of the profiles specification (issue 202 of the same repository, closed on 2026-03-21) | Normative text without qualification, with non-normative notes |
 | The RISC-V Instruction Set Manual, Volume I (Unprivileged Architecture) | RV32I Base Integer Instruction Set chapter, Load and Store Instructions section |
-| The RISC-V Instruction Set Manual, Volume II (Privileged Architecture) | Machine-Level ISA, Machine Cause Register section |
+| The RISC-V Instruction Set Manual, Volume II (Privileged Architecture) | Machine-Level ISA, [section 2.1.1.15, Machine Cause Register](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcause) |
 
 ---
 

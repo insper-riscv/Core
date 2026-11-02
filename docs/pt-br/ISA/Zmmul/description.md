@@ -8,7 +8,6 @@ Este documento descreve como o Core executa as instruções da `Zmmul`. O que o 
 | :--- | :--- | :--- |
 | `has_zmmul` | `false` | Instancia o decodificador e o multiplicador, sem o divisor (4 instruções) |
 
-
 O divisor só é instanciado com `has_m`, de modo que `has_zmmul = true` com `has_m = false` dá o perfil sem divisão. Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
 
 ## 2. Decodificação sem Divisão
@@ -37,7 +36,7 @@ Nessa expressão, $s_A$ e $s_B$ valem 1 quando o respectivo operando tem sinal. 
 
 ## 4. Parada do Pipeline
 
-A multiplicação para o pipeline por 35 ciclos. A lógica de parada e o custo das demais operações estão em [M](../M/description.md).
+A multiplicação tem latência de 33 ciclos na unidade, e o pipeline para por 35, porque a parada cobre também o estado de término e o ciclo em que o resultado é capturado. A lógica de parada e o custo das demais operações estão em [M](../M/description.md).
 
 ---
 

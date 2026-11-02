@@ -35,7 +35,7 @@ Uma instrução ilegal não escreve nenhum registrador e segue a mesma via de ex
 
 O banco menor não muda o pipeline nem o adiantamento, que seguem comparando índices de 5 bits. Como a verificação de ilegalidade só depende de `num_regs`, ela é independente das demais extensões, e as 60 combinações de extensões de `profiles/matrix.yaml` valem tanto para a base de 32 registradores quanto para a de 16, o que dá 120 perfis.
 
-Os programas do RV32E usam a ABI `ilp32e`, definida na especificação psABI do RISC-V (fora do manual de ISA), que só aloca registradores até `x15`.
+Os programas do RV32E usam a ABI `ilp32e`, definida na [psABI do RISC-V](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (fora do manual de ISA), que só aloca registradores até `x15`.
 
 ---
 

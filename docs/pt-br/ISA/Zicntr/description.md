@@ -30,7 +30,7 @@ Uma escrita vence o incremento do próprio ciclo, em cada metade.
 
 ### 3.1. Endereços e regras
 
-Há 3 contadores de 64 bits. O Core não implementa `mcounteren`, e o acesso a esse endereço é ilegal.
+Há 3 contadores de 64 bits. O Core não implementa `mcounteren`, e o acesso a esse endereço é ilegal. O Core só tem o modo M, e o manual privilegiado diz que, em harts sem modo U, o `mcounteren` não deve existir ([seção 2.1.1.11](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcounteren)).
 
 | Contador | Metade baixa | Metade alta | Espelho somente leitura (baixa e alta) | Incrementa | Escrita |
 | :--- | :--- | :--- | :--- | :--- | :--- |

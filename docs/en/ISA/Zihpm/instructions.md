@@ -21,7 +21,7 @@ Zihpm adds up to 29 counters of 64 bits, `hpmcounter3` to `hpmcounter31`, at add
 
 ## 3. Out of scope for this chapter
 
-The chapter does not define the machine CSRs that control the performance counters, such as `mhpmcounterN`, `mhpmeventN` and `mcountinhibit`. These registers, the event selector and the count inhibit belong to the privileged architecture manual, which was not consulted for this document. What the Core offers at these addresses is described in [description.md](description.md).
+The chapter does not define the machine CSRs that control the performance counters. `mhpmcounterN` and `mhpmeventN` are in [section 2.1.1.10](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-10-hardware-performance-monitor) of the privileged architecture manual, and the count inhibit (`mcountinhibit`) in [section 2.1.1.12](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-12-machine-counter-inhibit-mcountinhibit-register). The addresses of `hpmcounterN` are in the [unprivileged address table](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-1-currently-allocated-risc-v-unprivileged-csr-addresses), and those of `mhpmcounterN`, `mhpmeventN` and `mcountinhibit` in the [machine-level address table](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses). What the Core offers at these addresses is described in [description.md](description.md).
 
 ---
 

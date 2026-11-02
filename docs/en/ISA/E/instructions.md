@@ -2,7 +2,7 @@
 
 Chapter 2 of the manual ([RV32E and RV64E Base Integer Instruction Sets](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32e.html)).
 
-This document summarizes what the RISC-V manual requires of the RV32E base. The source is the unprivileged ISA manual (v20260120), Chapter 2, "RV32E and RV64E Base Integer Instruction Sets, Version 2.0", section 2.1 and its subsections. The chapter only describes the differences from the RV32I base and is meant to be read after Chapter 1 ("RV32I Base Integer Instruction Set, Version 2.1"). The implementation in the Core is in [description.md](description.md).
+This document summarizes what the RISC-V manual requires of the RV32E base. The source is section 2.1 and its subsections of the chapter cited above, in version v20260120 of the manual. The chapter only describes the differences from the RV32I base and is meant to be read after Chapter 1 ("RV32I Base Integer Instruction Set, Version 2.1"). The implementation in the Core is in [description.md](description.md).
 
 ## 1. Purpose (section 2.1)
 
@@ -31,7 +31,7 @@ The manual does not define the hardware behavior for a reserved encoding in this
 
 ## 4. Limits of the Chapter
 
-Chapter 2 does not cover the calling convention (ABI), HINT instructions or CSRs. The RV32E ABI (`ilp32e`) comes from the RISC-V psABI specification, outside the unprivileged ISA manual, and this document does not describe its details.
+Chapter 2 does not cover the calling convention (ABI), HINT instructions or CSRs. The RV32E ABI (`ilp32e`) comes from the [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (section ILP32E Calling Convention, version v1.0), outside the unprivileged ISA manual, and this document does not describe its details.
 
 ---
 

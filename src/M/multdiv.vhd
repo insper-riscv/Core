@@ -6,7 +6,7 @@
 --   - Multiplicação (33 ciclos via booth_multiplier_rv32):
 --     MUL (32 bits baixos), MULH (32 bits altos signed x signed),
 --     MULHSU (32 bits altos signed x unsigned) e MULHU (32 bits altos unsigned x unsigned).
---   - Divisão e Resto (34 ciclos via non_restoring_divider_rv32):
+--   - Divisão e Resto (35 ciclos via non_restoring_divider_rv32):
 --     DIV, DIVU, REM e REMU.
 --
 -- Gera internamente o pulso único de início (start_pulse) no primeiro ciclo em
@@ -17,7 +17,9 @@
 -- O stall é o OU do pulso de início (combinacional, para parar a instrução já no
 -- primeiro ciclo) com um flip-flop que guarda o sinal de ocupado do ciclo anterior.
 -- Esse flip-flop cobre os ciclos de cálculo e o de término, e assim o pulso de
--- término não entra na lógica de stall do pipeline.
+-- término não entra na lógica de stall do pipeline. Por isso o stall dura a latência do
+-- operador mais 2 ciclos, o do estado de término e o de captura do resultado: 35 na
+-- multiplicação, 37 na divisão normal e 4 nos casos especiais.
 --
 -- Fusão de pares (recomendação do capítulo da extensão M): ao terminar, cada
 -- operação grava num registro os dois operandos, o funct3 e o resultado completo
