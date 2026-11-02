@@ -1,5 +1,7 @@
 # M and Zmmul Extensions: Instructions
 
+Chapter 11 of the manual ([M Extension for Integer Multiplication and Division](https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html)), with Zmmul in [section 11.1.3](https://docs.riscv.org/reference/isa/v20260120/unpriv/m-st-ext.html#11-1-3-zmmul-extension-version-1-0).
+
 This document gathers what the RISC-V manual requires of the `M` extension (integer multiplication and division) and the `Zmmul` extension (multiplication only). The source is the unprivileged ISA manual v20260120, chapter 11 ("M" Extension for Integer Multiplication and Division, Version 2.0). The implementation in the Core is in [description.md](description.md).
 
 ## 1. Overview
