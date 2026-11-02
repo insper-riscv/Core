@@ -18,6 +18,8 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [FORMAL.md](docs/pt-br/FORMAL.md): provas formais, engines de solver, arquivo de resultado por engine e a regra do agregador que decide o check `formal` do CI.
 - [RV32E.md](docs/pt-br/RV32E.md): o genérico `num_regs` que escolhe o banco de 32 registradores (RV32I) ou de 16 (RV32E), a instrução ilegal com `x16` a `x31` e a ABI `ilp32e`.
 - [FENCE_I.md](docs/pt-br/FENCE_I.md): instrução `FENCE.I` (Zifencei), regiões que passam pela cache de instruções, execução com e sem cache de dados write-back, efeito no pipeline e nas caches e custo.
+- [ISA/M/instructions.md](docs/pt-br/ISA/M/instructions.md): instruções da extensão `M` e da `Zmmul` conforme o manual do RISC-V (capítulo 11): codificação, semântica, divisão por zero, estouro e fusão de pares.
+- [ISA/M/description.md](docs/pt-br/ISA/M/description.md): como o Core executa a `M` e a `Zmmul`: decodificador, multiplicador de Booth, divisor não-restaurador, parada do pipeline, fusão de pares e verificação formal.
 - [LARGURA_DA_MEMORIA.md](docs/pt-br/LARGURA_DA_MEMORIA.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/pt-br/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): análise matemática da faixa do resto parcial na divisão não-restauradora e do uso de 34 bits internos para divisores sem sinal acima de $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/pt-br/bugs/FLUSH_COM_PIPELINE_PARADO.md): análise da interação entre redirecionamento de desvio em EX e parada global do pipeline por espera de memória em MEM.

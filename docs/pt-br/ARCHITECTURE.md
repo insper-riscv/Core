@@ -90,6 +90,8 @@ $$
 
 ### 3.1. Extensão M (Multiplicação e Divisão Inteira)
 
+Instruções, semântica e detalhes de implementação: [ISA/M/instructions.md](ISA/M/instructions.md) e [ISA/M/description.md](ISA/M/description.md).
+
 Quando `has_m = true`, o decodificador `m_decode` no estágio ID reconhece instruções R-type com `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`), ativando `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'`.
 
 Com `has_zmmul = true` e `has_m = false` (extensão Zmmul), o `m_decode` reconhece só as quatro multiplicações (`funct3(2) = '0'`) e a `multdiv` não instancia o divisor. `DIV`, `DIVU`, `REM` e `REMU` ficam sem dono, e a unidade de controle as trata como instruções ilegais.
