@@ -1,5 +1,7 @@
 # Zifencei: Instruções Exigidas pelo Manual do RISC-V
 
+Capítulo 4 do manual ([Zifencei Extension for Instruction-Fetch Fence](https://docs.riscv.org/reference/isa/v20260120/unpriv/zifencei.html)).
+
 Este documento resume o que o manual de ISA não privilegiada (versão 20260120) exige da extensão Zifencei, descrita no Capítulo 4, "Zifencei Extension for Instruction-Fetch Fence, Version 2.0". A extensão define uma única instrução, `FENCE.I`. A implementação no Core está em [description.md](description.md).
 
 ## 1. Escopo da Extensão
