@@ -15,29 +15,39 @@ use work.fwd_consts.all;
 entity core is
 	generic (
 		-- Habilita a extensão M de multiplicação e divisão inteira.
-		has_m        : boolean := false;
+		has_m           : boolean := false;
 		-- Habilita só a multiplicação (extensão Zmmul), sem divisão; has_m já a inclui.
-		has_zmmul    : boolean := false;
+		has_zmmul       : boolean := false;
 		-- Habilita a extensão Zicsr e o tratamento de exceções do modo máquina.
-		has_zicsr    : boolean := false;
+		has_zicsr       : boolean := false;
 		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time); exige has_zicsr.
-		has_zicntr   : boolean := false;
+		has_zicntr      : boolean := false;
 		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
-		tick_cycles  : positive := 50;
+		tick_cycles     : positive := 50;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
-		has_zifencei : boolean := false;
+		has_zifencei    : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
-		has_zicclsm  : boolean := true;
+		has_zicclsm     : boolean := true;
 		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E); no RV32E a instrução que usa x16 a x31 é ilegal.
-		num_regs     : natural := 32;
+		num_regs        : natural := 32;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
-		has_dcache   : boolean := false;
-		-- Mapa da plataforma sdram: a FLASH fica fora do núcleo (0x20000000) e, com a SDRAM, sai pela porta externa; não há RAM interna.
-		ext_flash    : boolean := false;
+		has_dcache      : boolean := false;
+		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
+		boot_rom_bits   : natural := 11;
+		-- Fim exclusivo, em KiB, da ROM interna (a FLASH que o núcleo lê pela segunda porta); 0 quando a ROM é externa.
+		rom_end_kib     : natural := 32;
+		-- A ROM fica fora do núcleo e a instrução sai pela cache de instruções (a janela externa começa em ext_base_kib).
+		rom_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		periph_base_kib : natural := 2097152;
+		-- Expoente do tamanho do alinhamento das regiões externas: a última palavra de cada uma não cruza para a vizinha.
+		region_bits     : natural := 30;
 		-- Habilita a extensão Zihpm com os quatro contadores de eventos (índices 3 a 6); é o token da matriz de perfis. Exige has_zicsr.
-		has_zihpm    : boolean := false;
+		has_zihpm       : boolean := false;
 		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm, salvo has_zihpm); exige has_zicsr.
-		hpm_counters : natural range 0 to 4 := 0
+		hpm_counters    : natural range 0 to 4 := 0
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -504,7 +514,9 @@ begin
 	-- =========================================================================
 	u_stage_if : entity work.stage_if
 		generic map (
-			ext_flash => ext_flash
+			boot_rom_bits => boot_rom_bits,
+			rom_external  => rom_external,
+			ext_base_kib  => ext_base_kib
 		)
 		port map (
 			i_clk             => i_clk,
@@ -672,15 +684,20 @@ begin
 	-- =========================================================================
 	u_stage_ex : entity work.stage_ex
 		generic map (
-			has_m        => has_m,
-			has_zmmul    => has_zmmul,
-			has_zicsr    => has_zicsr,
-			has_zicntr   => has_zicntr,
-			tick_cycles  => tick_cycles,
-			has_zifencei => has_zifencei,
-			has_zicclsm  => has_zicclsm,
-			has_dcache   => has_dcache,
-			hpm_counters => HPM_COUNT
+			has_m           => has_m,
+			has_zmmul       => has_zmmul,
+			has_zicsr       => has_zicsr,
+			has_zicntr      => has_zicntr,
+			tick_cycles     => tick_cycles,
+			has_zifencei    => has_zifencei,
+			has_zicclsm     => has_zicclsm,
+			has_dcache      => has_dcache,
+			hpm_counters    => HPM_COUNT,
+			rom_end_kib     => rom_end_kib,
+			rom_external    => rom_external,
+			ext_base_kib    => ext_base_kib,
+			periph_base_kib => periph_base_kib,
+			region_bits     => region_bits
 		)
 		port map (
 			i_hpm_events      => hpm_events,
@@ -782,8 +799,8 @@ begin
 	-- =========================================================================
 	u_misaligned_unit : entity work.misaligned_unit
 		generic map (
-			has_zicclsm => has_zicclsm,
-			ext_flash   => ext_flash
+			has_zicclsm  => has_zicclsm,
+			ext_base_kib => ext_base_kib
 		)
 		port map (
 			i_clk         => i_clk,
@@ -815,9 +832,13 @@ begin
 
 	u_stage_mem : entity work.stage_mem
 		generic map (
-			has_zicclsm => has_zicclsm,
-			check_ea    => has_zicsr,
-			ext_flash   => ext_flash
+			has_zicclsm     => has_zicclsm,
+			check_ea        => has_zicsr,
+			rom_end_kib     => rom_end_kib,
+			rom_external    => rom_external,
+			ext_base_kib    => ext_base_kib,
+			periph_base_kib => periph_base_kib,
+			region_bits     => region_bits
 		)
 		port map (
 			i_valid         => exmem_valid,
@@ -851,7 +872,9 @@ begin
 
 	u_reg_mem_wb : entity work.reg_mem_wb
 		generic map (
-			ext_flash => ext_flash
+			rom_end_kib  => rom_end_kib,
+			rom_external => rom_external,
+			ext_base_kib => ext_base_kib
 		)
 		port map (
 			i_clk        => i_clk,
