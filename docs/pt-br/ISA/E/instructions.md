@@ -1,5 +1,7 @@
 # RV32E: Conjunto Base de Instruções Inteiras Reduzido
 
+Capítulo 2 do manual ([RV32E and RV64E Base Integer Instruction Sets](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32e.html)).
+
 Este documento resume o que o manual do RISC-V exige da base RV32E. A fonte é o manual de ISA não privilegiada (v20260120), Capítulo 2, "RV32E and RV64E Base Integer Instruction Sets, Version 2.0", seção 2.1 e subseções. O capítulo só descreve as diferenças para a base RV32I e deve ser lido depois do Capítulo 1 ("RV32I Base Integer Instruction Set, Version 2.1"). A implementação no Core está em [description.md](description.md).
 
 ## 1. Finalidade (seção 2.1)
