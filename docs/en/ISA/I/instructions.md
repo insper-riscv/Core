@@ -1,5 +1,7 @@
 # RV32I: ISA Requirements and Core Behavior
 
+Chapter 1 of the manual ([RV32I Base Integer Instruction Set](https://docs.riscv.org/reference/isa/v20260120/unpriv/rv32.html)).
+
 This document gathers what the RISC-V manual requires of the RV32I base integer set and, at each point, what the Core does. The source is the unprivileged ISA manual, version 20260120, Chapter 1 ("RV32I Base Integer Instruction Set, Version 2.1"), section 1.1 and its subsections. The encodings match the instruction listing in Chapter 35 of the same manual. The text paraphrases the manual and does not replace it. The hardware implementation is in [description.md](description.md).
 
 ## 1. Programmer State
