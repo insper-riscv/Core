@@ -24,7 +24,7 @@ An access that crosses the word occupies the last bytes of a 32-bit word and the
 
 For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map generics (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). 
 
-The start of the main memory is `ext_base_kib * 1024` when `rom_external` is true and `rom_end_kib` is 0, and `rom_end_kib * 1024` otherwise. The end is `periph_base_kib * 1024`, where the peripheral window starts. The intervals below are half-open and hold for any value of the generics.
+The start of the main memory is `ext_base_kib * 1024` when `rom_external` is true and `rom_end_kib` is 0, `2 ** boot_rom_bits` (the end of the BOOT_ROM) when `rom_external` is true and `rom_end_kib` is greater than 0, and `rom_end_kib * 1024` otherwise. The end is `periph_base_kib * 1024`, where the peripheral window starts. The intervals below are half-open and hold for any value of the generics.
 
 | Region | Range as a function of the generics | Misaligned access in hardware |
 | :--- | :--- | :--- |

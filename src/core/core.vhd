@@ -703,6 +703,7 @@ begin
 			has_zicclsm     => has_zicclsm,
 			has_dcache      => has_dcache,
 			hpm_counters    => HPM_COUNT,
+			boot_rom_bits   => boot_rom_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
@@ -851,6 +852,7 @@ begin
 		generic map (
 			has_zicclsm     => has_zicclsm,
 			check_ea        => has_zicsr,
+			boot_rom_bits   => boot_rom_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
