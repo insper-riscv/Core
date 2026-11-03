@@ -35,6 +35,8 @@ entity trap_unit is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
 		check_ea        : boolean := true;
+		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
+		boot_rom_bits   : natural := 11;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
 		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
@@ -159,7 +161,7 @@ begin
 
 	-- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
 	-- constantes de potência de 2 viram testes de bits na síntese.
-	in_main_mem <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external) and
+	in_main_mem <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
 	                         unsigned(i_ea) < kib_to_addr(periph_base_kib))
 	               else '0';
 

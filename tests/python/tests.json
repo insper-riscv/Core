@@ -566,6 +566,33 @@
             "--std=08"
         ]
     },
+    "TrapUnitExtRom": {
+        "toplevel": "trap_unit",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/Zicsr/trap_consts.vhd",
+            "src/Zicsr/trap_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.trap_unit_ext_rom",
+        "parameters": {
+            "rom_external": true,
+            "rom_end_kib": 256,
+            "ext_base_kib": 1114112,
+            "periph_base_kib": 1572864,
+            "ram_base_kib": 1048576,
+            "ram_end_kib": 1114112
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
     "CoreFetchStall": {
         "toplevel": "core",
         "sources": [

@@ -22,8 +22,9 @@ package mem_map_consts is
 	-- Endereço exclusivo do fim da ROM interna, ou zero quando a ROM é externa.
 	function internal_rom_end(end_kib : natural; external : boolean) return unsigned;
 
-	-- Início da memória principal: logo depois da ROM interna, ou a base externa quando a ROM é externa e vazia.
-	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean) return unsigned;
+	-- Início da memória principal: logo depois da ROM interna; com a ROM externa, a base externa quando a ROM é vazia
+	-- ou o fim da BOOT_ROM, pois a ROM externa, que começa ali, é lida e escrita pela porta externa como a RAM.
+	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean; boot_bits : natural) return unsigned;
 
 	-- O endereço sai pela porta externa: a janela externa, a ROM quando é externa ou a RAM quando é externa.
 	function is_external_addr(
@@ -68,10 +69,13 @@ package body mem_map_consts is
 		return kib_to_addr(end_kib);
 	end function internal_rom_end;
 
-	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean) return unsigned is
+	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean; boot_bits : natural) return unsigned is
 	begin
 		if external and end_kib = 0 then
 			return kib_to_addr(ext_kib);
+		end if;
+		if external then
+			return boot_rom_end(boot_bits);
 		end if;
 		return kib_to_addr(end_kib);
 	end function main_mem_base;
