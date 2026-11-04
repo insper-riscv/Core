@@ -8,9 +8,9 @@ The limits of the instruction address space (IF stage) and of the data address s
 | :--- | :--- | :--- |
 | `boot_rom_bits` | 12 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x00000FFF` by default |
 | `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot ROM (`0x00001000 .. 0x00007FFF` by default) |
-| `rom_external` | `false` | The ROM sits outside the core: the instruction comes through the instruction cache and the data through the external port |
+| `rom_external` | `false` | The ROM is reached through the core port (`o_sdram_*` or the instruction port): the instruction comes through the instruction port and the data through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Range of the RAM in KiB (`0x00008000 .. 0x3FFFFFFF` by default) |
-| `ram_external` | `false` | The RAM sits outside the core and the data goes through the external port |
+| `ram_external` | `false` | The RAM is reached through the core port (`o_sdram_*`) and the data goes through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
 | `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM and peripherals (`0x40000000` by default), which always goes through the external port |
 | `periph_base_kib` | 2097152 | Base, in KiB, of the peripheral window (`0x80000000` by default), which ends the main memory |
 
