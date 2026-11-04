@@ -6,8 +6,8 @@ The limits of the instruction address space (IF stage) and of the data address s
 
 | `core` generic | Default | Region it delimits |
 | :--- | :--- | :--- |
-| `boot_rom_bits` | 11 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x000007FF` by default |
-| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot ROM (`0x00000800 .. 0x00007FFF` by default) |
+| `boot_rom_bits` | 12 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x00000FFF` by default |
+| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot ROM (`0x00001000 .. 0x00007FFF` by default) |
 | `rom_external` | `false` | The ROM sits outside the core: the instruction comes through the instruction cache and the data through the external port |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Range of the RAM in KiB (`0x00008000 .. 0x3FFFFFFF` by default) |
 | `ram_external` | `false` | The RAM sits outside the core and the data goes through the external port |
@@ -24,8 +24,8 @@ The IF stage (`src/core/stage_if.vhd`) presents the current PC address on `o_if_
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | All | Byte address of the current Program Counter |
 | `o_if_rden` | `out` | All | Instruction read enable (hardwired to `'1'`) |
-| `i_boot_rom_data` | `in` | `< 0x00000800` | 32-bit instruction word returned by the Boot ROM |
-| `i_flash_data` | `in` | `0x00000800 .. 0x3FFFFFFF` | 32-bit instruction word returned by port 1 of Flash memory |
+| `i_boot_rom_data` | `in` | `< 0x00001000` | 32-bit instruction word returned by the Boot ROM |
+| `i_flash_data` | `in` | `0x00001000 .. 0x3FFFFFFF` | 32-bit instruction word returned by port 1 of Flash memory |
 | `o_ic_sel` | `out` | `>= 0x40000000` | Indicates that the current PC points to the region served by the external instruction cache (SDRAM) |
 | `i_ic_data` | `in` | `>= 0x40000000` | 32-bit instruction word supplied by the external instruction cache |
 | `i_ic_ready` | `in` | `>= 0x40000000` | Signals that `i_ic_data` holds a valid instruction for `o_if_addr`; while `'0'` with `o_ic_sel = '1'`, the PC freezes and `reg_if_id` receives a bubble (`i_valid = '0'`) |

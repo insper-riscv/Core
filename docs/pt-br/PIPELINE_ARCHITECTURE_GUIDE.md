@@ -39,8 +39,8 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/sha
 
 | Faixa de endereço (`if_pc`) | Região selecionada | Palavra entregue em `o_instr` |
 | :--- | :--- | :--- |
-| `< 0x00000800` (`boot_rom_bits`) | Boot ROM | `i_boot_rom_data` |
-| `0x00000800 .. 0x3FFFFFFF` | Memória Flash (porta 1) | `i_flash_data` |
+| `< 0x00001000` (`boot_rom_bits`) | Boot ROM | `i_boot_rom_data` |
+| `0x00001000 .. 0x3FFFFFFF` | Memória Flash (porta 1) | `i_flash_data` |
 | `>= 0x40000000` (`ext_base_kib`) | Cache de instruções externa (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (congela o PC e anula `o_instr_valid` enquanto `i_ic_ready = '0'`) |
 
 ### 2.2. Estágio 2: Decodificação e Leitura de Registradores (`stage_id`)

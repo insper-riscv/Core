@@ -33,7 +33,7 @@ entity core is
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache      : boolean := false;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 11;
+		boot_rom_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
 		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.

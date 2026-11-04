@@ -6,8 +6,8 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 
 | Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |
-| `boot_rom_bits` | 11 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x000007FF` por padrão |
-| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00000800 .. 0x00007FFF` por padrão) |
+| `boot_rom_bits` | 12 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
+| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00001000 .. 0x00007FFF` por padrão) |
 | `rom_external` | `false` | A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Faixa da RAM em KiB (`0x00008000 .. 0x3FFFFFFF` por padrão) |
 | `ram_external` | `false` | A RAM fica fora do núcleo e o dado sai pela porta externa |
@@ -24,8 +24,8 @@ O estágio IF (`src/core/stage_if.vhd`) apresenta o endereço atual do PC em `o_
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | Todas | Endereço de byte do Program Counter atual |
 | `o_if_rden` | `out` | Todas | Habilitação de leitura de instrução (fixa em `'1'`) |
-| `i_boot_rom_data` | `in` | `< 0x00000800` | Palavra de instrução de 32 bits retornada pela Boot ROM |
-| `i_flash_data` | `in` | `0x00000800 .. 0x3FFFFFFF` | Palavra de instrução de 32 bits retornada pela porta 1 da memória Flash |
+| `i_boot_rom_data` | `in` | `< 0x00001000` | Palavra de instrução de 32 bits retornada pela Boot ROM |
+| `i_flash_data` | `in` | `0x00001000 .. 0x3FFFFFFF` | Palavra de instrução de 32 bits retornada pela porta 1 da memória Flash |
 | `o_ic_sel` | `out` | `>= 0x40000000` | Indica que o PC atual aponta para a região atendida pela cache de instruções externa (SDRAM) |
 | `i_ic_data` | `in` | `>= 0x40000000` | Palavra de instrução de 32 bits fornecida pela cache de instruções externa |
 | `i_ic_ready` | `in` | `>= 0x40000000` | Sinaliza que `i_ic_data` contém a instrução válida para `o_if_addr`; enquanto vale `'0'` com `o_ic_sel = '1'`, o PC congela e `reg_if_id` recebe bolha (`i_valid = '0'`) |
