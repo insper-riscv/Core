@@ -16,8 +16,8 @@ from tests.python.unittests.Zicsr.trap_unit import (
     probe,
 )
 
-MAIN_MEMORY = [0x800, 0x3FF00, 0x40000000, 0x43FFFFF0]
-OUTSIDE_MAIN_MEMORY = [0x0, 0x7F0, 0x60000000, 0x80000000]
+MAIN_MEMORY = [0x1000, 0x3FF00, 0x40000000, 0x43FFFFF0]
+OUTSIDE_MAIN_MEMORY = [0x0, 0xFFC, 0x60000000, 0x80000000]
 
 
 @cocotb.test()

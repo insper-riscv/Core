@@ -29,7 +29,7 @@ entity stage_mem is
 		-- Confere o endereço efetivo do load ou store (exceção em MEM); '0' deixa essa conferência para o estágio EX.
 		check_ea        : boolean := true;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 11;
+		boot_rom_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
 		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.

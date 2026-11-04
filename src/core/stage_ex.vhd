@@ -41,7 +41,7 @@ entity stage_ex is
 		-- Quantidade de contadores de eventos da extensão Zihpm no banco de CSRs (0 = sem Zihpm); exige has_zicsr.
 		hpm_counters    : natural range 0 to 4 := 0;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 11;
+		boot_rom_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
 		rom_end_kib     : natural := 32;
 		-- A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa.
