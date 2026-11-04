@@ -8,9 +8,9 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 | :--- | :--- | :--- |
 | `boot_rom_bits` | 12 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
 | `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00001000 .. 0x00007FFF` por padrão) |
-| `rom_external` | `false` | A ROM fica fora do núcleo: a instrução sai pela cache de instruções e o dado pela porta externa |
+| `rom_external` | `false` | A ROM é alcançada pela porta do núcleo (`o_sdram_*` ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Faixa da RAM em KiB (`0x00008000 .. 0x3FFFFFFF` por padrão) |
-| `ram_external` | `false` | A RAM fica fora do núcleo e o dado sai pela porta externa |
+| `ram_external` | `false` | A RAM é alcançada pela porta do núcleo (`o_sdram_*`) e o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM e periféricos (`0x40000000` por padrão), que sai sempre pela porta externa |
 | `periph_base_kib` | 2097152 | Base, em KiB, da janela de periféricos (`0x80000000` por padrão), que encerra a memória principal |
 
