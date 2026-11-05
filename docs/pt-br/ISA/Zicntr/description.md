@@ -83,7 +83,7 @@ Sem `has_zicntr` os endereços de `mcycle`, `minstret`, `time`, seus espelhos e 
 | `counter64` | `formal/counter64_props.sv` | O par de metades é sempre o valor ideal de 64 bits, a escrita vence o incremento, o vai-um nunca se perde e o valor não decresce sem escrita (indução, cover) |
 | `csr_file` com Zicntr | `formal/csr_cntr_props.sv` | Valores lidos de `mcycle`, `minstret` e espelhos, escrita por metade, espelhos e `time` somente leitura, bits 0 e 2 de `mcountinhibit` e cancelamento de retirada (BMC de 6 ciclos, cover) |
 
-O procedimento das provas está em [FORMAL.md](../../FORMAL.md).
+O procedimento das provas está em [FORMAL.md](../../formal/FORMAL.md).
 
 ---
 

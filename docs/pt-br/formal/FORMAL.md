@@ -95,4 +95,4 @@ Os testes da guarda rodam junto com os do agregador, em `bash formal/aggregate_t
 
 ---
 
-Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../LICENSE).

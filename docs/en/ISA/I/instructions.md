@@ -136,7 +136,7 @@ Manual section 1.1.8. Both are I-format SYSTEM instructions. `ECALL` requests a 
 | With the Zicsr extension | Exception with cause 11 (machine-mode environment call), `mtval` equal to 0, and `pc` redirected to `mtvec` | Exception with cause 3 (breakpoint), `mtval` equal to 0, and `pc` redirected to `mtvec` |
 | Without the Zicsr extension | The Core `o_trap` output flags the event, with the cause and the instruction `pc`; execution continues without redirection | Same as `ECALL`, with cause 3 |
 
-Any other SYSTEM instruction that is not a CSR access, `MRET`, or `WFI`, including `ECALL` or `EBREAK` with `rd` or `rs1` different from `x0`, is illegal and raises cause 2. The trap details are in [ARCHITECTURE.md](../../ARCHITECTURE.md), section 3.2.
+Any other SYSTEM instruction that is not a CSR access, `MRET`, or `WFI`, including `ECALL` or `EBREAK` with `rd` or `rs1` different from `x0`, is illegal and raises cause 2. The trap details are in [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 3.2.
 
 ## 6. `NOP` and HINT Instructions
 

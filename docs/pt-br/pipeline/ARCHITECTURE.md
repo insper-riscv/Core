@@ -2,7 +2,7 @@
 
 Este documento descreve a organização microarquitetural do processador, a divisão estrutural em cinco estágios, o tratamento de hazards de dados e controle e a integração das extensões `M`, `Zicsr` e `Zifencei`.
 
-![Pipeline Diagram](../img/multi-stage-rv32m_pipeline_final-Pipeline.jpg)
+![Pipeline Diagram](../../img/multi-stage-rv32m_pipeline_final-Pipeline.jpg)
 
 ## 1. Visão Geral e Decomposição Estrutural
 
@@ -90,7 +90,7 @@ $$
 
 ### 3.1. Extensão M (Multiplicação e Divisão Inteira)
 
-Instruções, semântica e detalhes de implementação da `M`: [ISA/M/instructions.md](ISA/M/instructions.md) e [ISA/M/description.md](ISA/M/description.md). A multiplicação sozinha (`Zmmul`) está em [ISA/Zmmul/instructions.md](ISA/Zmmul/instructions.md) e [ISA/Zmmul/description.md](ISA/Zmmul/description.md).
+Instruções, semântica e detalhes de implementação da `M`: [ISA/M/instructions.md](../ISA/M/instructions.md) e [ISA/M/description.md](../ISA/M/description.md). A multiplicação sozinha (`Zmmul`) está em [ISA/Zmmul/instructions.md](../ISA/Zmmul/instructions.md) e [ISA/Zmmul/description.md](../ISA/Zmmul/description.md).
 
 Quando `has_m = true`, o decodificador `m_decode` no estágio ID reconhece instruções R-type com `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`), ativando `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'`.
 
@@ -120,7 +120,7 @@ O capítulo da extensão M recomenda executar uma só vez `MULH[[S]U]` seguido d
 
 ### 3.2. Extensão Zicsr e Tratamento de Traps
 
-A especificação das instruções e a descrição completa da implementação estão em [instructions.md](ISA/Zicsr/instructions.md) e [description.md](ISA/Zicsr/description.md).
+A especificação das instruções e a descrição completa da implementação estão em [instructions.md](../ISA/Zicsr/instructions.md) e [description.md](../ISA/Zicsr/description.md).
 
 Quando `has_zicsr = true`, o decodificador `csr_decode` no estágio ID identifica a classe `OPCODE_SYSTEM` (`"1110011"`), força a extração do imediato I-type (`instr[31:20]`) para transportar o endereço de 12 bits do CSR até EX e ativa `o_is_csr = '1'` e `o_we_reg = '1'` para as seis instruções de acesso a CSR (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
 
@@ -138,7 +138,7 @@ Quando `has_zifencei = true`, a unidade `fencei_unit` no estágio EX detecta a i
 
 ### 3.4. Extensão Zicntr
 
-A descrição completa dos contadores está em [ISA/Zicntr](ISA/Zicntr/description.md) e, para o Zihpm, em [ISA/Zihpm](ISA/Zihpm/description.md).
+A descrição completa dos contadores está em [ISA/Zicntr](../ISA/Zicntr/description.md) e, para o Zihpm, em [ISA/Zihpm](../ISA/Zihpm/description.md).
 
 Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia três contadores de 64 bits, cada um com duas metades de 32 bits e carry registrado entre elas. A leitura soma o carry pendente à metade alta, de modo que `csrr` de `cycleh` logo depois de um estouro da metade baixa já vê o valor correto.
 
@@ -152,4 +152,4 @@ Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia tr�
 
 ---
 
-Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../LICENSE).
