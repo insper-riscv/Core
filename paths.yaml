@@ -43,4 +43,115 @@ references:
   - {name: profile rv32i sources, file: profiles/rv32i.yaml, yaml: sources, base: .}
   - {name: profile rv32i_zmmul sources, file: profiles/rv32i_zmmul.yaml, yaml: sources, base: .}
   - {name: per-entity tests.json, file: tests/python/tests.json, yaml: "*.sources", base: .}
+  - {name: provides sources, file: paths.yaml, yaml: "provides.*.sources", base: .}
   - {name: entry points, paths: [src/core, src/shared, src/common, tests/python/runner.py, docs/pt-br/contracts, docs/en/contracts]}
+
+provides:
+  # Each component lists its sources in GHDL dependency order and the components it needs. Every component also needs
+  # the shared blocks of src/common (the Common-Components submodule). The constants
+  # component groups the packages of every folder, because the decoders and units of one folder read the constants of the others.
+  # A component is a folder of src/, so the name of an extension keeps its capitals.
+  constants:
+    requires: []
+    sources:
+      - src/shared/pipeline_types.vhd
+      - src/shared/byte_mask_consts.vhd
+      - src/shared/opcode_consts.vhd
+      - src/shared/funct3_consts.vhd
+      - src/shared/funct7_consts.vhd
+      - src/shared/alu_consts.vhd
+      - src/shared/ext_imm_consts.vhd
+      - src/shared/ext_ram_consts.vhd
+      - src/shared/wb_sel_consts.vhd
+      - src/shared/pc_src_consts.vhd
+      - src/shared/mem_map_consts.vhd
+      - src/shared/word_consts.vhd
+      - src/shared/fwd_consts.vhd
+      - src/Zicond/zicond_consts.vhd
+      - src/M/muldiv_consts.vhd
+      - src/Zicsr/trap_consts.vhd
+      - src/Zicsr/csr_addr_consts.vhd
+      - src/Zicsr/csr_event_consts.vhd
+      - src/Zimop/zimop_consts.vhd
+      - src/Zicsr/csr_value_consts.vhd
+      - src/Zicsr/irq_consts.vhd
+      - src/Zihintntl/zihintntl_consts.vhd
+      - src/Zihintpause/zihintpause_consts.vhd
+  shared:
+    requires: [constants]
+    sources:
+      - src/shared/reg_file.vhd
+      - src/shared/control_unit.vhd
+      - src/shared/bubble_mux.vhd
+      - src/shared/forwarding_match.vhd
+      - src/shared/forwarding_unit.vhd
+      - src/shared/hazard_detection_unit.vhd
+      - src/shared/pc_fetch.vhd
+      - src/shared/reg_if_id.vhd
+      - src/shared/reg_id_ex.vhd
+      - src/shared/reg_ex_mem.vhd
+      - src/shared/reg_mem_wb.vhd
+  I-E:
+    requires: [constants]
+    sources:
+      - src/I-E/alu.vhd
+      - src/I-E/extender_imm.vhd
+      - src/I-E/extender_ram.vhd
+      - src/I-E/store_manager.vhd
+  M:
+    requires: [constants]
+    sources:
+      - src/M/m_decode.vhd
+      - src/M/booth_multiplier_rv32.vhd
+      - src/M/non_restoring_divider_rv32.vhd
+      - src/M/muldiv_fusion.vhd
+      - src/M/multdiv.vhd
+  Zicclsm:
+    requires: [constants]
+    sources:
+      - src/Zicclsm/misaligned_unit.vhd
+  Zicntr:
+    requires: [constants]
+    sources:
+      - src/Zicntr/counter64.vhd
+      - src/Zicntr/tick_divider.vhd
+  Zihpm:
+    requires: [constants, Zicntr]
+    sources:
+      - src/Zihpm/hpm_counter_bank.vhd
+  Zicsr:
+    requires: [constants, Zicntr, Zihpm]
+    sources:
+      - src/Zicsr/csr_decode.vhd
+      - src/Zicsr/csr_file.vhd
+      - src/Zicsr/trap_unit.vhd
+  Zicond:
+    requires: [constants]
+    sources:
+      - src/Zicond/zicond_decode.vhd
+      - src/Zicond/zicond_unit.vhd
+  Zimop:
+    requires: [constants]
+    sources:
+      - src/Zimop/zimop_decode.vhd
+  Zifencei:
+    requires: [constants]
+    sources:
+      - src/Zifencei/fencei_unit.vhd
+  Zihintntl:
+    requires: [constants]
+    sources:
+      - src/Zihintntl/zihintntl_decode.vhd
+  Zihintpause:
+    requires: [constants]
+    sources:
+      - src/Zihintpause/zihintpause_decode.vhd
+  core:
+    requires: [constants, shared, I-E, M, Zicclsm, Zicond, Zicsr, Zifencei, Zimop, Zihintntl, Zihintpause]
+    sources:
+      - src/core/stage_if.vhd
+      - src/core/stage_id.vhd
+      - src/core/stage_ex.vhd
+      - src/core/stage_mem.vhd
+      - src/core/stage_wb.vhd
+      - src/core/core.vhd
