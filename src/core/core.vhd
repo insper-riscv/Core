@@ -30,6 +30,10 @@ entity core is
 		has_zicond      : boolean := false;
 		-- Habilita a extensão Zimop: mop.r.n e mop.rr.n escrevem zero em rd e não geram exceção.
 		has_zimop       : boolean := false;
+		-- Habilita o decodificador das dicas ntl.* (Zihintntl), que executam como nop.
+		has_zihintntl   : boolean := false;
+		-- Habilita o decodificador da dica pause (Zihintpause), que executa como nop.
+		has_zihintpause : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
 		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15) e instrução ilegal para x16 a x31; falso é o RV32I, de 32 registradores.
@@ -574,6 +578,8 @@ begin
 			has_zifencei => has_zifencei,
 			has_zicond   => has_zicond,
 			has_zimop    => has_zimop,
+			has_zihintntl   => has_zihintntl,
+			has_zihintpause => has_zihintpause,
 			has_e        => has_e
 		)
 		port map (

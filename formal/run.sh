@@ -62,8 +62,11 @@ netlist() {
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
     "$root/src/shared/funct3_consts.vhd" \
+    "$root/src/shared/funct7_consts.vhd" \
     "$root/src/shared/alu_consts.vhd" \
     "$root/src/Zimop/zimop_consts.vhd" \
+    "$root/src/Zihintntl/zihintntl_consts.vhd" \
+    "$root/src/Zihintpause/zihintpause_consts.vhd" \
     "$root/src/common/src/flip_flop.vhd" \
     "$root/src/common/src/generic_register.vhd" \
     "$root/src/shared/mem_map_consts.vhd" \
@@ -191,6 +194,18 @@ netlist "$zim" zimop_decode zim
 expect "exactly the 32 mop.r.n and the 8 mop.rr.n are claimed, they write rd and carry a zero-result ALU operation (induction)" PASS "$(prove zim.v "$zim_props" prove 2 '' zim_safety)"
 expect "cover: a mop.r, a mop.rr and an unclaimed SYSTEM instruction are reachable" PASS "$(prove zim.v "$zim_props" cover 2 '-DCOVER' zim_cover)"
 
+echo "zihintntl_decode"
+ntl="$root/src/Zihintntl/zihintntl_decode.vhd"; ntl_props="$root/formal/zihintntl_props.sv"
+netlist "$ntl" zihintntl_decode ntl
+expect "exactly the four ADD x0, x0, x2..x5 are claimed (induction)" PASS "$(prove ntl.v "$ntl_props" prove 2 '' ntl_safety)"
+expect "cover: a hint, an ADD with another rs2 and an ADD with a nonzero rd are reachable" PASS "$(prove ntl.v "$ntl_props" cover 2 '-DCOVER' ntl_cover)"
+
+echo "zihintpause_decode"
+pau="$root/src/Zihintpause/zihintpause_decode.vhd"; pau_props="$root/formal/zihintpause_props.sv"
+netlist "$pau" zihintpause_decode pau
+expect "exactly the word 0x0100000F is claimed (induction)" PASS "$(prove pau.v "$pau_props" prove 2 '' pau_safety)"
+expect "cover: pause and another FENCE are reachable" PASS "$(prove pau.v "$pau_props" cover 2 '-DCOVER' pau_cover)"
+
 echo "csr_file with Zicntr"
 netlist "$csr" csr_file csrc "-ghas_zicntr=true -gtick_cycles=3"
 csr_cntr_props="$root/formal/csr_cntr_props.sv"
@@ -252,6 +267,16 @@ mutant "$zim" "$zim_props" zimop_decode '' zimop_mop_rr_any_bit25 "s/is_mop_rr <
 mutant "$zim" "$zim_props" zimop_decode '' zimop_no_write "s/o_we_reg   <= is_mop;/o_we_reg   <= '0';/" "" 2
 mutant "$zim" "$zim_props" zimop_decode '' zimop_alu_has_result "s/o_alu_op   <= ALU_BGEU;/o_alu_op   <= ALU_ADD;/" "" 2
 mutant "$zim" "$zim_props" zimop_decode '' zimop_keeps_system "s/o_opcode   <= OPCODE_OP_IMM;/o_opcode   <= OPCODE_SYSTEM;/" "" 2
+
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rd_ignored "s/rd = ZIHINTNTL_REG_ZERO and rs1/rs1/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs1_ignored "s/ and rs1 = ZIHINTNTL_REG_ZERO and/ and/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_funct7_ignored "s/ and funct7 = FUNCT7_DEFAULT//" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs2_too_wide "s/<= unsigned(ZIHINTNTL_RS2_LAST)/<= unsigned(ZIHINTNTL_RS2_LAST) + 1/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs2_too_low "s/>= unsigned(ZIHINTNTL_RS2_FIRST)/>= unsigned(ZIHINTNTL_RS2_FIRST) - 1/" "" 2
+
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_pred_ignored "s/i_instr(31 downto 20) = ZIHINTPAUSE_FM_PRED_SUCC/i_instr(31 downto 24) = ZIHINTPAUSE_FM_PRED_SUCC(11 downto 4)/" "" 2
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_rd_ignored "s/rd = ZIHINTPAUSE_REG_ZERO and rs1/rs1/" "" 2
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_funct3_ignored "s/ and funct3 = FUNCT3_FENCE and/ and/" "" 2
 
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hi_is_lo "s/minstret_rd_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/minstret_rd_lo when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/" "-ghas_zicntr=true -gtick_cycles=3" 6
