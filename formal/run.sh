@@ -41,7 +41,8 @@ expect() {
   esac
 }
 
-# netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity.
+# netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity, with the
+# bank of event counters of BANK_FILE (the real one by default).
 netlist() {
   local work="$out/work_$3"; mkdir -p "$work"
   ghdl -a --std=08 --workdir="$work" \
@@ -59,8 +60,11 @@ netlist() {
     "$root/src/Zicsr/csr_addr_consts.vhd" \
     "$root/src/Zicsr/csr_event_consts.vhd" \
     "$root/src/Zicsr/csr_value_consts.vhd" \
+    "$root/src/common/src/utils_pkg.vhd" \
+    "$root/src/common/src/mux_tree.vhd" \
     "$root/src/Zicntr/counter64.vhd" \
     "$root/src/Zicntr/tick_divider.vhd" \
+    "${BANK_FILE:-$root/src/Zihpm/hpm_counter_bank.vhd}" \
     "$1"
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:4} "$2" > "$3.v"
 }
@@ -147,6 +151,10 @@ netlist "$cnt" counter64 cnt
 expect "the value shown is the ideal 64-bit counter, carry and writes (induction)" PASS "$(prove cnt.v "$cnt_props" prove 4 ''           cnt_safety)"
 expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
 expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
+for w in 1 20 32 33 63; do
+  netlist "$cnt" counter64 "cnt$w" "-gwidth=$w"
+  expect "width $w: the value shown is the ideal counter of that width, writes truncated (induction)" PASS "$(prove "cnt$w.v" "$cnt_props" prove 4 "-DWIDTH=$w" "cnt${w}_safety")"
+done
 
 echo "muldiv_fusion"
 fus="$root/src/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
@@ -170,12 +178,20 @@ expect "cover: a write at the carry point and a write with a retire are reachabl
 
 echo "csr_file with Zihpm"
 csr_hpm_props="$root/formal/csr_hpm_props.sv"
-netlist "$csr" csr_file csrh "-ghpm_counters=4"
-# The event counters share the counter64 already proven, so this proof is bounded from reset: it checks the wiring (addresses, halves, event selection, inhibit bits, write path, legality).
-expect "events, inhibit, selectors and counters follow the models, mirrors read-only (bounded, 6 cycles)" PASS "$(prove csrh.v "$csr_hpm_props" bmc 6 '-DNHPM=4' csrh_safety)"
-expect "cover: a count at the carry point, an inhibited event and a write with a count are reachable"  PASS "$(prove csrh.v "$csr_hpm_props" cover 12 '-DNHPM=4 -DCOVER' csrh_cover)"
-netlist "$csr" csr_file csrh2 "-ghpm_counters=2 -ghas_zicntr=true -gtick_cycles=3"
-expect "two event counters with Zicntr: the other two are illegal, mcycle/minstret own bits 0 and 2 (bounded, 6 cycles)" PASS "$(prove csrh2.v "$csr_hpm_props" bmc 6 '-DNHPM=2 -DHAS_CNTR' csrh2_safety)"
+# The counters share the counter64 already proven, and the 29 indices share one structure, so a symbolic index
+# stands for them all. The proofs are bounded from reset: they check the wiring (the five ranges, event
+# selection, inhibit bits, width, write path, legality).
+netlist "$csr" csr_file csrh29 "-ghas_zihpm=true -ghpm_counters=29 -ghpm_width=33"
+expect "29 counters of 33 bits (the width is proven apart): every index exists, reads and writes follow the model, mirrors read-only (bounded, 4 cycles)" PASS "$(prove csrh29.v "$csr_hpm_props" bmc 4 '-DNHPM=29 -DWIDTH=33' csrh29_safety)"
+netlist "$csr" csr_file csrh "-ghas_zihpm=true -ghpm_counters=4 -ghpm_width=64"
+expect "4 counters: indices past them read zero and ignore writes (bounded, 6 cycles)" PASS "$(prove csrh.v "$csr_hpm_props" bmc 6 '-DNHPM=4' csrh_safety)"
+expect "cover: a count at the carry point, an inhibited event, a write with a count and a write past the counters are reachable" PASS "$(prove csrh.v "$csr_hpm_props" cover 12 '-DNHPM=4 -DCOVER' csrh_cover)"
+netlist "$csr" csr_file csrh2 "-ghas_zihpm=true -ghpm_counters=2 -ghpm_width=40 -ghas_zicntr=true -gtick_cycles=3"
+expect "2 counters of 40 bits with Zicntr: mcycle/minstret own bits 0 and 2, the width truncates (bounded, 6 cycles)" PASS "$(prove csrh2.v "$csr_hpm_props" bmc 6 '-DNHPM=2 -DWIDTH=40 -DHAS_CNTR' csrh2_safety)"
+netlist "$csr" csr_file csrh3 "-ghas_zihpm=true -ghpm_counters=5 -ghpm_width=20"
+expect "5 counters of 20 bits: the low half truncates and the high half reads zero (bounded, 6 cycles)" PASS "$(prove csrh3.v "$csr_hpm_props" bmc 6 '-DNHPM=5 -DWIDTH=20' csrh3_safety)"
+netlist "$csr" csr_file csrh0 "-ghas_zihpm=true -ghpm_counters=3 -ghpm_width=0"
+expect "width 0: no real counter, all 29 indices read zero (bounded, 6 cycles)" PASS "$(prove csrh0.v "$csr_hpm_props" bmc 6 '-DNHPM=3 -DWIDTH=0' csrh0_safety)"
 
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl generics] [bmc depth]
@@ -211,9 +227,31 @@ mutant "$csr" "$csr_cntr_props" csr_file '' cntr_inhibit_instret_ignored "s/ and
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_cancel_ignored "s/retire_pending and (not i_retire_cancel) and (not inhibit_reg(2));/retire_pending and (not inhibit_reg(2));/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_pending_unseen "s/unsigned'(0 => retire_pending and (not inhibit_reg(2))));/unsigned'(0 => '0'));/" "-ghas_zicntr=true -gtick_cycles=3" 6
 
-mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_inhibit_ignored "s/(not inhibit_reg(3 + k));/'1';/" "-ghpm_counters=4" 6
-mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=4' hpm_code_zero_counts "s/bool_to_sl(event_code(k) \/= std_logic_vector(to_unsigned(EVENT_NONE, EVENT_CODE_WIDTH))) and/'1' and/" "-ghpm_counters=4" 6
-mutant "$csr" "$csr_hpm_props" csr_file '-DNHPM=2' hpm_mask_wide "s/mask(3 + k) := '1';/mask(3 + k) := '1'; mask(6) := '1';/" "-ghpm_counters=2" 6
+# Mutants of the bank of event counters and of the decoding in csr_file (the proofs above, one defect each).
+bank="$root/src/Zihpm/hpm_counter_bank.vhd"
+mutant_bank() {  # <file> <props> <defines> <name> <sed expression> <ghdl generics> <bmc depth>
+  local copy="$out/mut_$4.vhd"
+  sed "$5" "$1" > "$copy"
+  cmp -s "$1" "$copy" && { echo "mutant $4: the edit did not change the file"; exit 1; }
+  if [ "$1" = "$bank" ]; then
+    BANK_FILE="$copy" netlist "$csr" csr_file "mut_$4" "$6"
+  else
+    netlist "$copy" csr_file "mut_$4" "$6"
+  fi
+  expect "mutant $4 is caught" FAIL "$(prove "mut_$4.v" "$2" bmc "$7" "$3" "mut_$4")"
+}
+hpm4="-ghas_zihpm=true -ghpm_counters=4 -ghpm_width=64"
+hpm2="-ghas_zihpm=true -ghpm_counters=2 -ghpm_width=40"
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_ignored "s/(not inhibit_q(n - HPM_FIRST_INDEX))/'1'/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_table_ignored "s/events_valid <= i_events and EVENT_TABLE_MASK;/events_valid <= i_events;/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_absent_not_zero "s/lo_rows(n)    <= (others => '0');/lo_rows(n)    <= (others => '1');/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=2 -DWIDTH=40' hpm_width_ignored "s/width => hpm_width/width => 64/" "$hpm2" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inhibit_q(HPM_MAX_COUNTERS - 1 downto REAL_COUNTERS) <= (others => '0');/inhibit_q(HPM_MAX_COUNTERS - 1 downto REAL_COUNTERS) <= (others => '1');/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_family_confused "s/i_funct3(2) = rec_funct3(2) and//" "" 10
@@ -222,8 +260,9 @@ mutant "$fus" "$fus_props" muldiv_fusion '' fusion_same_op        "s/i_funct3 \/
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_no_check_cycle "s/hit   <= check_q and rec_valid/hit   <= rec_valid/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_record_on_start "0,/i_enable => i_done/s//i_enable => i_start/" "" 10
 
-mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = WORD_ALL_ONES/lo = WORD_INT_MIN/"
-mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata when/lo_nxt <= std_logic_vector(unsigned(i_wdata) + 1) when/"
+mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = LO_ALL_ONES/lo(lo'high) = '1'/"
+mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=33' width_one_bit_wider "s/HI_WIDTH : natural := width - LO_WIDTH;/HI_WIDTH : natural := width - LO_WIDTH + 1;/" "-gwidth=33"
+mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata(LO_WIDTH - 1 downto 0) when/lo_nxt <= std_logic_vector(unsigned(i_wdata(LO_WIDTH - 1 downto 0)) + 1) when/"
 mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

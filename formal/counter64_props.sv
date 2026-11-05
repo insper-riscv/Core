@@ -1,5 +1,7 @@
 // Properties of counter64, checked on the Verilog netlist that GHDL synthesizes from the VHDL.
-// A model keeps the ideal 64-bit value of the counter. Whatever the inputs do, the value the
+// WIDTH (a define, 64 by default) is the width of the counter: the halves keep min(WIDTH, 32) and
+// WIDTH - 32 bits, a write keeps only the bits that fit, and the bits above the width read zero.
+// A model keeps the ideal value of the counter. Whatever the inputs do, the value the
 // counter shows (the high half with the pending carry summed) is the model's value: it counts one
 // per increment, a write wins over the increment of its own cycle, and the carry between the
 // halves is never lost.
@@ -21,10 +23,18 @@ module props (input clk);
 
   // The ideal counter: the low half takes the write or the increment, the high half takes the write
   // (or keeps its value) and then the carry that the low half produced in this cycle.
-  wire        carry_out = inc && !we_lo && model[31:0] == 32'hFFFFFFFF;
-  wire [31:0] lo_next   = we_lo ? wdata : (inc ? model[31:0] + 32'd1 : model[31:0]);
-  wire [31:0] hi_base   = we_hi ? wdata : model[63:32];
-  wire [31:0] hi_next   = hi_base + {31'b0, carry_out};
+`ifdef WIDTH
+  localparam W = `WIDTH;
+`else
+  localparam W = 64;
+`endif
+  localparam LW = W < 32 ? W : 32;
+  localparam [31:0] LO_MASK = 32'hFFFFFFFF >> (32 - LW);
+  localparam [31:0] HI_MASK = W <= 32 ? 32'h0 : (32'hFFFFFFFF >> (64 - W));
+  wire        carry_out = inc && !we_lo && model[31:0] == LO_MASK;
+  wire [31:0] lo_next   = we_lo ? (wdata & LO_MASK) : (inc ? ((model[31:0] + 32'd1) & LO_MASK) : model[31:0]);
+  wire [31:0] hi_base   = we_hi ? (wdata & HI_MASK) : model[63:32];
+  wire [31:0] hi_next   = (hi_base + {31'b0, carry_out}) & HI_MASK;
 
   always @(posedge clk) begin
     f_past <= 1;
@@ -48,8 +58,8 @@ module props (input clk);
 `ifdef COVER
   // The carry between the halves is reachable, and a write together with the wrap.
   always @(posedge clk) if (f_past && !reset) begin
-    cover (p_inc && p_lo == 32'hFFFFFFFF && lo == 32'h0 && hi == p_hi + 1);
-    cover (p_we_hi && p_lo == 32'hFFFFFFFF && p_inc);
+    cover (p_inc && p_lo == LO_MASK && lo == 32'h0 && HI_MASK != 32'h0 && hi == ((p_hi + 1) & HI_MASK));
+    cover (p_we_hi && p_lo == LO_MASK && p_inc);
   end
 `endif
 endmodule

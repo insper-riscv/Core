@@ -8,10 +8,10 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | indução, cover |
 | `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm |
-| `counter64` | `counter64_props.sv` | indução, cover |
+| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |
-| `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover |
+| `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover, com 29, 5, 4, 3 e 2 contadores reais e larguras de 0 a 64 bits |
 
 Cada defeito proposital do VHDL (um mutante) precisa fazer uma prova falhar, e esse resultado esperado é `fail`. Uma prova de indução ou de BMC espera `pass`, e um cover espera `pass` quando o objetivo é alcançável.
 
@@ -26,7 +26,7 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 | `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | cerca de 60 s |
 | `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | cerca de 35 s |
 
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit`, que o ABC recusa), o que deixa 21 das 47 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
+O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit`, que o ABC recusa), o que deixa 26 das 63 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
 
 Os tempos são de uma execução com 4 CPUs.
 

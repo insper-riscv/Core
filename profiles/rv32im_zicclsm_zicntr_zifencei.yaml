@@ -54,6 +54,7 @@ sources:
   - src/Zimop/zimop_decode.vhd
   - src/Zicntr/counter64.vhd
   - src/Zicntr/tick_divider.vhd
+  - src/Zihpm/hpm_counter_bank.vhd
   - src/Zicsr/csr_file.vhd
   - src/Zicsr/trap_unit.vhd
   - src/Zifencei/fencei_unit.vhd

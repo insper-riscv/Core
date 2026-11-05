@@ -13,7 +13,7 @@ Elaboration fails if `has_zicntr` is on without `has_zicsr`. Zicntr is independe
 
 ## 2. 64-bit counter block
 
-Every counter is an instance of `counter64`, which keeps the value in two halves of 32 bits.
+Every counter is an instance of `counter64`, which keeps the value in two halves. With the default width of 64 bits, each half has 32 bits. Zihpm instantiates the same block with a width $W$ from 1 to 64 bits, where the low half keeps the $\min(W,32)$ low bits and the high half the remaining $W-32$ (absent when $W \le 32$).
 
 | Aspect | Behavior |
 | :--- | :--- |
@@ -22,6 +22,7 @@ Every counter is an instance of `counter64`, which keeps the value in two halves
 | Read | The high half read already includes the pending carry, so the pair read is always the ideal 64-bit value |
 | Write to the low half | Replaces the value and cancels the increment and the carry of the same cycle |
 | Write to the high half | Replaces the value and drops the pending carry |
+| Width | The bits of each output above the width of the half read zero, and a write keeps only the bits that fit; the carry leaves the low half when all its bits are one |
 | Reset | Clears both halves and the carry |
 
 A write wins over the increment of its own cycle, in each half.
@@ -61,7 +62,7 @@ The Core has no external time input. `time` derives from the Core's own clock, a
 
 ## 4. `mcountinhibit`
 
-The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what the profile includes, and the other bits read zero and ignore writes. The register exists when there is `has_zicntr` or at least one event counter, and the event counter bits are in [Zihpm](../Zihpm/description.md).
+The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what the profile includes, and the other bits read zero and ignore writes. The register exists when there is `has_zicntr` or `has_zihpm`, and the event counter bits are in [Zihpm](../Zihpm/description.md).
 
 | Bit | Inhibits | Exists when |
 | :--- | :--- | :--- |

@@ -3,8 +3,8 @@
 --
 -- O contrato do SoC: o código gravado em mhpmeventN escolhe um destes eventos, e
 -- o contador soma 1 a cada ciclo em que o evento ocorre. O código 0 não conta
--- nada, e um código fora da tabela também não conta. Os eventos de 5 a 7 vêm das
--- caches e da FLASH, fora do núcleo.
+-- nada, e um código fora da tabela também não conta, mesmo que o bit do vetor de
+-- eventos valha '1'. Os eventos de 5 a 7 vêm das caches e da FLASH, fora do núcleo.
 -- =============================================================================
 
 library ieee;
@@ -37,5 +37,8 @@ package csr_event_consts is
 	constant EVENT_LOAD_USE      : natural := 8;
 	-- Operação de multiplicação ou divisão fundida com a anterior (resultado reaproveitado, sem repetir o cálculo).
 	constant EVENT_MULDIV_FUSED  : natural := 9;
+
+	-- Bits do vetor de eventos que a tabela define (códigos de 1 a 9); os demais não contam.
+	constant EVENT_TABLE_MASK : std_logic_vector(EVENT_VECTOR_WIDTH - 1 downto 0) := x"03FE";
 
 end package csr_event_consts;
