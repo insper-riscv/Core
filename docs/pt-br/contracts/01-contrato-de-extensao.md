@@ -4,7 +4,7 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `src/core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `src/core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_zicond`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
 Os estágios instanciam as unidades de cada extensão diretamente por `entity work`, sem declaração `component`. Por isso todo perfil analisa os arquivos de todas as extensões, e o generic em `false` retira a unidade da elaboração.
 
@@ -17,10 +17,11 @@ A unidade de controle base (`src/shared/control_unit.vhd`) decodifica exclusivam
 | Extensão | Decodificador em `stage_id` | Condição de reivindicação | Sinais ativados |
 | :--- | :--- | :--- | :--- |
 | `M` | `src/M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
+| `Zicond` | `src/Zicond/zicond_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`), `funct7 = FUNCT7_ZICOND` (`"0000111"`) e `funct3` igual a `"101"` ou `"111"` | `o_is_zicond = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` e `o_alu_op` com o código da instrução |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` para toda a classe `SYSTEM`; `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"` |
 | `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` e os campos fixos de `mop.r.n` e `mop.rr.n` (ver [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; a operação da ULA vira `ALU_BGEU` (resultado zero) e o `opcode` apresentado a EX vira `OPCODE_OP_IMM` |
 
-O estágio ID combina as habilitações de escrita por disjunção lógica (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg`) e propaga os indicadores `o_is_muldiv` e `o_is_csr` pelo registrador de barreira `reg_id_ex` até o estágio EX.
+O estágio ID combina as habilitações de escrita por disjunção lógica (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg or zc_we_reg`) e propaga os indicadores `o_is_muldiv` e `o_is_csr` pelo registrador de barreira `reg_id_ex` até o estágio EX.
 
 ### 2.2. Efeitos Permitidos no Pipeline
 

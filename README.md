@@ -27,6 +27,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [ISA/M/description.md](docs/pt-br/ISA/M/description.md): como o Core executa a `M`: decodificador, divisor não-restaurador, parada do pipeline, fusão de pares e verificação formal.
 - [ISA/Zmmul/instructions.md](docs/pt-br/ISA/Zmmul/instructions.md): instruções da extensão `Zmmul` (só multiplicação, seção 11.1.3 do manual): codificação e semântica.
 - [ISA/Zmmul/description.md](docs/pt-br/ISA/Zmmul/description.md): como o Core executa a `Zmmul`: configuração, decodificação sem divisão e multiplicador de Booth.
+- [ISA/Zicond/instructions.md](docs/pt-br/ISA/Zicond/instructions.md) e [ISA/Zicond/description.md](docs/pt-br/ISA/Zicond/description.md): extensão Zicond (`czero.eqz` e `czero.nez`, capítulo 10 do manual), codificação, semântica e a execução no Core.
 - [ISA/Zifencei/instructions.md](docs/pt-br/ISA/Zifencei/instructions.md) e [ISA/Zifencei/description.md](docs/pt-br/ISA/Zifencei/description.md): extensão Zifencei (`FENCE.I`), exigências do manual, regiões que passam pela cache de instruções, execução com e sem cache de dados write-back, efeito no pipeline e nas caches e custo.
 - [ISA/Zimop/instructions.md](docs/pt-br/ISA/Zimop/instructions.md) e [ISA/Zimop/description.md](docs/pt-br/ISA/Zimop/description.md): extensão Zimop (`mop.r.n` e `mop.rr.n`), exigências do manual, codificação das 40 instruções, decodificação no estágio ID e verificação.
 - [MEMORY_WIDTH.md](docs/pt-br/MEMORY_WIDTH.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
@@ -46,9 +47,10 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `src/Zicntr/` | Extensão de contadores: `mcycle`, `minstret`, `time` e os espelhos `cycle`, `instret`, `time`, com o contador de 64 bits e o divisor do tempo |
 | `src/Zicclsm/` | Unidade de acesso desalinhado à memória principal (`misaligned_unit`), que divide em duas etapas o acesso que cruza a palavra |
 | `src/Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
+| `src/Zicond/` | Extensão de condicionais zero (`czero.eqz` e `czero.nez`), com decodificador no estágio ID e unidade de execução no estágio EX |
 | `src/Zimop/` | Extensão de operações possivelmente definidas (`mop.r.n` e `mop.rr.n`), que escrevem zero em `rd` |
 | `src/core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
-| `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) em ordem de dependência |
+| `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicond.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/FORMAL.md)) |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
 
@@ -64,8 +66,9 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zimop | `has_zimop` | `false` | As 40 codificações de `mop.r.n` e `mop.rr.n` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
+| Zicond | `has_zicond` | `false` | `czero.eqz` e `czero.nez` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 
-Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`has_e` falso) ou o RV32E (`has_e` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`:
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`has_e` falso) ou o RV32E (`has_e` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`, que não expande a Zicond; o perfil `rv32im_zicond` a liga na compilação do GHDL:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha

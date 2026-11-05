@@ -27,6 +27,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
 - [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.
 - [ISA/Zmmul/description.md](docs/en/ISA/Zmmul/description.md): how the Core executes `Zmmul`: configuration, decoding without division and the Booth multiplier.
+- [ISA/Zicond/instructions.md](docs/en/ISA/Zicond/instructions.md) and [ISA/Zicond/description.md](docs/en/ISA/Zicond/description.md): `Zicond` extension (`czero.eqz` and `czero.nez`, chapter 10 of the manual), encoding, semantics and the execution in the Core.
 - [ISA/Zifencei/instructions.md](docs/en/ISA/Zifencei/instructions.md) and [ISA/Zifencei/description.md](docs/en/ISA/Zifencei/description.md): the Zifencei extension (`FENCE.I`), manual requirements, regions that go through the instruction cache, execution with and without a write-back data cache, effect on the pipeline and the caches, and cost.
 - [ISA/Zimop/instructions.md](docs/en/ISA/Zimop/instructions.md) and [ISA/Zimop/description.md](docs/en/ISA/Zimop/description.md): the Zimop extension (`mop.r.n` and `mop.rr.n`), manual requirements, encoding of the 40 instructions, decoding in the ID stage and verification.
 - [MEMORY_WIDTH.md](docs/en/MEMORY_WIDTH.md): rules for the adapter between the Core's 32-bit word and a narrower or wider memory, covering address, byte mask, read, ready signal and interaction with misaligned access.
@@ -46,9 +47,10 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 | `src/Zicntr/` | Counters extension: `mcycle`, `minstret`, `time` and the mirrors `cycle`, `instret`, `time`, with the 64-bit counter and the time divider |
 | `src/Zicclsm/` | Unit for misaligned access to the main memory (`misaligned_unit`), which splits an access that crosses a word into two steps |
 | `src/Zifencei/` | Instruction-memory synchronization extension (`FENCE.I`), with optional write-back data-cache flush handshake support |
+| `src/Zicond/` | Conditional zero extension (`czero.eqz` and `czero.nez`), with a decoder in the ID stage and an execution unit in the EX stage |
 | `src/Zimop/` | May-Be-Operations extension (`mop.r.n` and `mop.rr.n`), which write zero to `rd` |
 | `src/core/` | Entities for the 5 pipeline stages (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) and the processor structural top level (`core`) |
-| `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) in dependency order |
+| `profiles/` | The profile specification (`matrix.yaml`) and the source manifests of the profiles that prove the core builds without the optional directories (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicond.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) in dependency order |
 | `formal/` | SystemVerilog properties (`csr_file_props.sv`, `trap_unit_props.sv`), `.sby` configurations, formal verification script via GHDL + Yosys + SymbiYosys, and the aggregator of the engines ([documentation](docs/en/FORMAL.md)) |
 | `tests/python/` | Per-entity and top-level integration unit tests in cocotb/GHDL ([documentation](tests/python/README.en.md)) |
 
@@ -64,8 +66,9 @@ The structural top level `core` takes one boolean generic per extension, which e
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` is illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 | Zimop | `has_zimop` | `false` | The 40 encodings of `mop.r.n` and `mop.rr.n` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 | Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
+| Zicond | `has_zicond` | `false` | `czero.eqz` and `czero.nez` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`has_e` false) or RV32E (`has_e` true, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`has_e` false) or RV32E (`has_e` true, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`, which does not expand Zicond; the `rv32im_zicond` profile turns it on in the GHDL build:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
