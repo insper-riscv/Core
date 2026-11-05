@@ -26,8 +26,8 @@ entity core is
 		tick_cycles     : positive := 50;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
 		has_zifencei    : boolean := false;
-		-- Habilita a extensão Zimop: mop.r.n e mop.rr.n escrevem zero em rd e não geram exceção.
-		has_zimop       : boolean := false;
+		-- Habilita a extensão Zicond (czero.eqz e czero.nez).
+		has_zicond      : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
 		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E); no RV32E a instrução que usa x16 a x31 é ilegal.
@@ -582,7 +582,7 @@ begin
 			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei,
-			has_zimop    => has_zimop,
+			has_zicond   => has_zicond,
 			num_regs     => num_regs
 		)
 		port map (
@@ -703,6 +703,7 @@ begin
 			has_zicntr      => has_zicntr,
 			tick_cycles     => tick_cycles,
 			has_zifencei    => has_zifencei,
+			has_zicond      => has_zicond,
 			has_zicclsm     => has_zicclsm,
 			has_dcache      => has_dcache,
 			hpm_counters    => HPM_COUNT,

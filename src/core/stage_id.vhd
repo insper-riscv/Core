@@ -4,7 +4,7 @@
 -- Encapsula a decodificação de instruções, leitura/escrita no banco de
 -- registradores e detecção de hazards no segundo estágio do pipeline:
 --   1. Unidade de controle base RV32I (control_unit) e decodificadores opcionais
---      das extensões M (m_decode) e Zicsr (csr_decode).
+--      das extensões M (m_decode), Zicsr (csr_decode) e Zicond (zicond_decode).
 --   2. Extensor de imediatos de 32 bits (extender_imm).
 --   3. Banco de 32 (RV32I) ou 16 (RV32E) registradores de uso geral (reg_file), recebendo a escrita
 --      vinda do estágio WB.
@@ -31,8 +31,8 @@ entity stage_id is
 		has_zicsr : boolean := false;
 		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
 		has_zifencei : boolean := false;
-		-- Habilita o decodificador da extensão Zimop (zimop_decode): mop.r.n e mop.rr.n escrevem zero em rd.
-		has_zimop : boolean := false;
+		-- Habilita o decodificador da extensão Zicond (zicond_decode).
+		has_zicond   : boolean := false;
 		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E, x0 a x15).
 		num_regs  : natural := 32
 	);
@@ -141,18 +141,6 @@ architecture rtl of stage_id is
 	signal cu_ext_imm_op   : ext_imm_op_t;
 	-- Código de operação da ULA gerado pela unidade de controle.
 	signal cu_alu_op       : alu_op_t;
-	-- Código de operação da ULA efetivo, com a substituição feita pela extensão Zimop.
-	signal id_alu_op       : alu_op_t;
-	-- Opcode gerado pela unidade de controle, antes da substituição feita pela extensão Zimop.
-	signal cu_opcode       : opcode_t;
-	-- Indica instrução da extensão Zimop (mop.r.n ou mop.rr.n) decodificada no estágio ID.
-	signal id_is_zimop     : std_logic;
-	-- Habilitação de escrita em registrador do decodificador Zimop.
-	signal zimop_we_reg    : std_logic;
-	-- Operação da ULA sem resultado de dados do decodificador Zimop.
-	signal zimop_alu_op    : alu_op_t;
-	-- Opcode que o decodificador Zimop apresenta aos estágios seguintes.
-	signal zimop_opcode    : opcode_t;
 	-- Operação efetiva do extensor de imediato (forçada para EXT_IMM_I em instruções SYSTEM/CSR).
 	signal id_ext_imm_op   : ext_imm_op_t;
 	-- Habilitação de escrita em registrador da unidade de controle base RV32I.
@@ -161,12 +149,20 @@ architecture rtl of stage_id is
 	signal m_we_reg        : std_logic;
 	-- Habilitação de escrita em registrador do decodificador Zicsr.
 	signal csr_we_reg      : std_logic;
+	-- Habilitação de escrita em registrador do decodificador Zicond.
+	signal zc_we_reg       : std_logic;
 	-- Habilitação de escrita em registrador combinada antes do bubble_mux.
 	signal cu_we_reg       : std_logic;
 	-- Seletor PC/rs1 da unidade de controle base RV32I.
 	signal base_sel_pc_rs1 : std_logic;
 	-- Seletor PC/rs1 do decodificador da extensão M.
 	signal m_sel_pc_rs1    : std_logic;
+	-- Seletor PC/rs1 do decodificador da extensão Zicond.
+	signal zc_sel_pc_rs1   : std_logic;
+	-- Código de operação entregue ao estágio EX pelo decodificador da extensão Zicond.
+	signal zc_alu_op       : alu_op_t;
+	-- Indica instrução da extensão Zicond decodificada no estágio ID.
+	signal id_is_zicond    : std_logic;
 	-- Indica uso de imediato I-type solicitado por csr_decode.
 	signal csr_use_imm_i   : std_logic;
 	-- Habilitação de escrita na RAM antes do bubble_mux.
@@ -227,7 +223,7 @@ begin
 			o_we_ram      => cu_we_ram,
 			o_re_ram      => cu_re_ram,
 			o_en_ram      => cu_en_ram,
-			o_opcode      => cu_opcode,
+			o_opcode      => o_opcode,
 			o_funct3      => o_funct3,
 			o_illegal     => cu_illegal
 		);
@@ -249,21 +245,21 @@ begin
 		m_sel_pc_rs1 <= '0';
 	end generate gen_m_decode;
 
-	gen_zimop_decode : if has_zimop generate
-		u_zimop_decode : entity work.zimop_decode
+	gen_zicond_decode : if has_zicond generate
+		u_zicond_decode : entity work.zicond_decode
 			port map (
-				i_instr    => i_instr,
-				o_is_zimop => id_is_zimop,
-				o_we_reg   => zimop_we_reg,
-				o_alu_op   => zimop_alu_op,
-				o_opcode   => zimop_opcode
+				i_instr      => i_instr,
+				o_is_zicond  => id_is_zicond,
+				o_alu_op     => zc_alu_op,
+				o_we_reg     => zc_we_reg,
+				o_sel_pc_rs1 => zc_sel_pc_rs1
 			);
 	else generate
-		id_is_zimop   <= '0';
-		zimop_we_reg  <= '0';
-		zimop_alu_op  <= ALU_ADD;
-		zimop_opcode  <= OPCODE_OP_IMM;
-	end generate gen_zimop_decode;
+		id_is_zicond  <= '0';
+		zc_alu_op     <= (others => '0');
+		zc_we_reg     <= '0';
+		zc_sel_pc_rs1 <= '0';
+	end generate gen_zicond_decode;
 
 	gen_csr_decode : if has_zicsr generate
 		u_csr_decode : entity work.csr_decode
@@ -298,9 +294,9 @@ begin
 	                          (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
 	                          (id_uses_rs2 = '1' and id_rs2_idx(4) = '1')))
 	               else '0';
-	o_illegal     <= (cu_illegal and (not id_is_muldiv) and (not id_is_fencei)) or id_bad_reg;
-	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg or zimop_we_reg;
-	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1;
+	o_illegal     <= (cu_illegal and (not id_is_muldiv) and (not id_is_fencei) and (not id_is_zicond)) or id_bad_reg;
+	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg     or zc_we_reg;
+	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1 or zc_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;
 
 	u_extender_imm : entity work.extender_imm
@@ -324,10 +320,8 @@ begin
 			o_match_rs2 => o_fwd_match_rs2
 		);
 
-	id_alu_op <= zimop_alu_op when id_is_zimop = '1' else cu_alu_op;
-	o_opcode  <= zimop_opcode when id_is_zimop = '1' else cu_opcode;
-	o_alu_op  <= id_alu_op;
-	o_alu_sel <= alu_result_select(id_alu_op);
+	o_alu_op  <= zc_alu_op when id_is_zicond = '1' else cu_alu_op;
+	o_alu_sel <= alu_result_select(cu_alu_op);
 
 	u_regfile : entity work.reg_file
 		generic map (
