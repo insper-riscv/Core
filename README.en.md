@@ -19,7 +19,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [contracts/02-barramento-e-memoria.md](docs/en/contracts/02-barramento-e-memoria.md): instruction and data bus protocol (byte addressing, byte enables, wait handshake for variable-latency memory, and instruction cache).
 - [ISA/Zicclsm/instructions.md](docs/en/ISA/Zicclsm/instructions.md) and [ISA/Zicclsm/description.md](docs/en/ISA/Zicclsm/description.md): what the profiles specification requires of Zicclsm and the hardware execution of misaligned loads and stores, access classification, regions covered in each memory map, and the two-step access that crosses a word.
 - [FORMAL.md](docs/en/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
-- [ISA/E/description.md](docs/en/ISA/E/description.md): the `num_regs` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
+- [ISA/E/description.md](docs/en/ISA/E/description.md): the `has_e` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
 - [ISA/Zicsr/instructions.md](docs/en/ISA/Zicsr/instructions.md) and [ISA/Zicsr/description.md](docs/en/ISA/Zicsr/description.md): the Zicsr extension, with the instructions, encoding and read/write rules required by the manual, and the Core implementation (CSR file, synchronous exceptions, `MRET`, redirection and behavior without Zicsr).
 - [ISA/Zicntr](docs/en/ISA/Zicntr/description.md): the base counters `cycle`, `time` and `instret` (Zicntr), with what the manual requires, the 64-bit counter block, instruction retirement, the tick divider and `mcountinhibit`.
 - [ISA/Zihpm](docs/en/ISA/Zihpm/description.md): the `hpmcounter` performance counters (Zihpm), with what the manual requires, the organization of the event counters, the counting rule and the event table.
@@ -40,7 +40,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 | :--- | :--- |
 | `src/common/` | Submodule [Common-Components](https://github.com/insper-riscv/Common-Components): the generic blocks (adder, flip-flop, registers, multiplexers and one-hot decoder) the Core imports |
 | `src/shared/` | Core parts used by every profile: type and constant packages, inter-stage barrier registers, base control unit, register file, forwarding and hazard units and PC generator |
-| `src/I/` | Base integer extension RV32I, comprising the ALU, immediate extender, memory read extender, and store alignment manager |
+| `src/I-E/` | Blocks shared by the RV32I and RV32E bases (the RV32E only cuts the register file to 16), comprising the ALU, immediate extender, memory read extender, and store alignment manager |
 | `src/M/` | Integer multiplication and division extension RV32M, containing a dedicated decoder, sequential radix-2 Booth multiplier, 34-bit non-restoring divider, and integration unit |
 | `src/Zicsr/` | Machine-mode Control and Status Registers (CSRs) extension and synchronous exception and trap-return (`MRET`) detection unit |
 | `src/Zicntr/` | Counters extension: `mcycle`, `minstret`, `time` and the mirrors `cycle`, `instret`, `time`, with the 64-bit counter and the time divider |
@@ -65,7 +65,7 @@ The structural top level `core` takes one boolean generic per extension, which e
 | Zimop | `has_zimop` | `false` | The 40 encodings of `mop.r.n` and `mop.rr.n` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 | Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`num_regs` 32) or RV32E (`num_regs` 16, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`has_e` false) or RV32E (`has_e` true, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 60 combinations of extensions, which gives 120 profiles. The list of profiles comes from `profiles/matrix.yaml`:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line

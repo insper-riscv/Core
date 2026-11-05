@@ -33,13 +33,13 @@ sources:
   - src/common/src/mux_4x1.vhd
   - src/common/src/flip_flop.vhd
   - src/common/src/utils_pkg.vhd
-  - src/I/alu.vhd
+  - src/I-E/alu.vhd
   - src/common/src/onehot_decoder.vhd
   - src/common/src/mux_tree.vhd
   - src/shared/reg_file.vhd
-  - src/I/extender_imm.vhd
-  - src/I/extender_ram.vhd
-  - src/I/store_manager.vhd
+  - src/I-E/extender_imm.vhd
+  - src/I-E/extender_ram.vhd
+  - src/I-E/store_manager.vhd
   - src/Zicclsm/misaligned_unit.vhd
   - src/shared/control_unit.vhd
   - src/shared/bubble_mux.vhd

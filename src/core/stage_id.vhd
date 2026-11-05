@@ -33,8 +33,8 @@ entity stage_id is
 		has_zifencei : boolean := false;
 		-- Habilita o decodificador da extensão Zimop (zimop_decode): mop.r.n e mop.rr.n escrevem zero em rd.
 		has_zimop : boolean := false;
-		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E, x0 a x15).
-		num_regs  : natural := 32
+		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15); falso é o RV32I, de 32.
+		has_e     : boolean := false
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -173,17 +173,17 @@ architecture rtl of stage_id is
 	signal cu_we_ram       : std_logic;
 	-- Habilitação de leitura na RAM antes do bubble_mux.
 	signal cu_re_ram       : std_logic;
-	-- Largura do endereço do banco de registradores: 5 bits para 32 registradores, 4 bits para 16.
-	function addr_bits_for(count : natural) return natural is
+	-- Largura do endereço do banco de registradores: 5 bits para 32 registradores (RV32I), 4 bits para 16 (RV32E).
+	function addr_bits_for(e : boolean) return natural is
 	begin
-		if count = 32 then
-			return 5;
+		if e then
+			return 4;
 		end if;
-		return 4;
+		return 5;
 	end function addr_bits_for;
 
 	-- Largura do endereço do banco de registradores desta instância.
-	constant REG_ADDR_WIDTH : natural := addr_bits_for(num_regs);
+	constant REG_ADDR_WIDTH : natural := addr_bits_for(has_e);
 
 	-- Habilitação geral da RAM antes do bubble_mux.
 	signal cu_en_ram       : std_logic;
@@ -205,9 +205,6 @@ architecture rtl of stage_id is
 	signal id_uses_rs2     : std_logic;
 
 begin
-
-	assert num_regs = 16 or num_regs = 32
-		report "num_regs deve ser 16 (RV32E) ou 32 (RV32I)" severity failure;
 
 	o_rs1_idx <= id_rs1_idx;
 	o_rs2_idx <= id_rs2_idx;
@@ -293,7 +290,7 @@ begin
 	               else '0';
 	id_uses_rs2 <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP)
 	               else '0';
-	id_bad_reg  <= '1' when (num_regs = 16 and
+	id_bad_reg  <= '1' when (has_e and
 	                         ((id_uses_rd = '1' and id_rd_idx(4) = '1') or
 	                          (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
 	                          (id_uses_rs2 = '1' and id_rs2_idx(4) = '1')))

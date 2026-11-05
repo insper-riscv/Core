@@ -9,8 +9,8 @@
 # with neither Zicsr nor Zicclsm signals a misaligned access, an ecall, an ebreak and an illegal
 # instruction on its trap output instead of running or handling it.
 bases:
-  - {name: rv32i, generics: {num_regs: 32}}
-  - {name: rv32e, generics: {num_regs: 16}}
+  - {name: rv32i, generics: {has_e: false}}
+  - {name: rv32e, generics: {has_e: true}}
 extensions:
   - {name: Zicclsm,  generic: has_zicclsm}
   - {name: Zicsr,    generic: has_zicsr}
