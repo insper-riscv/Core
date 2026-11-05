@@ -83,6 +83,16 @@ Os testes do agregador rodam com `bash formal/aggregate_test.sh`.
 
 O workflow tem um job por engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` e `abc-bmc3`), que roda `make formal FORMAL_ENGINE=<engine>` e sobe o resultado e os logs como artefato. O job `formal` espera todos eles, baixa os artefatos e roda o agregador. Só o job `formal` é check obrigatório do ruleset da branch padrão, então um engine que quebra não bloqueia o merge enquanto outro decide, e um contraexemplo achado por qualquer engine bloqueia. Num push para a `main` que reaproveita o resultado de um PR já aprovado, os engines e o `formal` são pulados juntos, como os demais checks obrigatórios.
 
+## 7. Aviso é erro
+
+Qualquer aviso do GHDL, do Yosys ou do SymbiYosys faz o `formal/run.sh` falhar, nas provas e nos mutantes. A guarda fica em `formal/warnings.sh`: o script varre a saída de cada ferramenta depois que ela termina e, para cada linha com a palavra `warning` (sem diferenciar maiúsculas, palavra inteira ou no plural), imprime `formal: WARNING treated as error: <arquivo>:<linha>:<texto>` e reprova a execução ao final. Nomes como `warning_count` e o resumo `Warnings: 0` do Yosys não contam.
+
+Um aviso indica código fora da norma ou no limite, então a correção é no VHDL ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Cada mutante é analisado no lugar da unidade que substitui, de modo que nenhuma entidade é definida em dois arquivos.
+
+O engine `abc-bmc3` tem uma exceção exata, só para as três mensagens que o próprio ABC imprime sobre o arquivo AIGER recebido (o clock consumido pelo passo `clk2ff`, a contagem de bits sem driver e a contagem de saídas lidas como restrições), e só no log desse engine. Uma mensagem a mais, `The network is combinational.`, é aceita apenas na prova que o engine recusa por ser combinacional e que o script registra como `skip`. O `yices`, o `bitwuzla` e o `boolector` não têm exceção, e qualquer outro aviso do `abc-bmc3` continua falhando.
+
+Os testes da guarda rodam junto com os do agregador, em `bash formal/aggregate_test.sh`.
+
 ---
 
 Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
