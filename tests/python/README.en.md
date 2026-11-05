@@ -14,7 +14,9 @@ tests/python/
 │   ├── common/                  # Tests for common/ entities and reference table (data/riscv_opcodes.csv)
 │   ├── I/                       # Tests for base I/ extension entities
 │   ├── M/                       # Tests for the M/ extension decoder and divider
+│   ├── Zicntr/                  # Tests for counter64 (every width), tick_divider, and csr_file with Zicntr
 │   ├── Zicsr/                   # Tests for csr_decode, csr_file, and trap_unit
+│   ├── Zihpm/                   # Tests for hpm_counter_bank and csr_file with the 29 Zihpm indices
 │   └── cores/                   # Top-level core integration tests (SDRAM stalls, I-cache, and FENCE.I)
 └── sim_build/                   # Per-simulation build artifacts (<group>/<name>/waves.ghw)
 ```

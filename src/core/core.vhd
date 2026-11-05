@@ -26,8 +26,6 @@ entity core is
 		tick_cycles     : positive := 50;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
 		has_zifencei    : boolean := false;
-		-- Habilita a extensão Zimop: mop.r.n e mop.rr.n escrevem zero em rd e não geram exceção.
-		has_zimop       : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
 		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E); no RV32E a instrução que usa x16 a x31 é ilegal.
@@ -50,10 +48,12 @@ entity core is
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
 		periph_base_kib : natural := 2097152;
-		-- Habilita a extensão Zihpm com os quatro contadores de eventos (índices 3 a 6); é o token da matriz de perfis. Exige has_zicsr.
+		-- Habilita a extensão Zihpm com os 29 endereços de contador de eventos (índices 3 a 31); é o token da matriz de perfis. Exige has_zicsr.
 		has_zihpm       : boolean := false;
-		-- Quantidade de contadores de eventos da extensão Zihpm (0 = sem Zihpm, salvo has_zihpm); exige has_zicsr.
-		hpm_counters    : natural range 0 to 4 := 0
+		-- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters); os outros leem zero.
+		hpm_counters    : natural range 0 to 29 := 29;
+		-- Largura em bits de cada contador de eventos real, de 0 a 64.
+		hpm_width       : natural range 0 to 64 := 64
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -138,20 +138,6 @@ entity core is
 end entity core;
 
 architecture rtl of core is
-
-	-- Quantidade efetiva de contadores de eventos: os pedidos em hpm_counters ou, com has_zihpm, os quatro.
-	function effective_hpm_count return natural is
-	begin
-		if hpm_counters > 0 then
-			return hpm_counters;
-		elsif has_zihpm then
-			return 4;
-		end if;
-		return 0;
-	end function;
-
-	-- Contadores de eventos do Zihpm instanciados no banco de CSRs.
-	constant HPM_COUNT : natural range 0 to 4 := effective_hpm_count;
 
 	-- =========================================================================
 	-- Sinais globais de avanço, stall e flush entre estágios
@@ -507,8 +493,8 @@ begin
 	o_retire      <= retire_pulse;
 
 	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not (has_zicntr or has_zihpm or hpm_counters > 0))
-		report "has_zicntr, has_zihpm e hpm_counters maior que 0 exigem has_zicsr"
+	assert has_zicsr or (not (has_zicntr or has_zihpm))
+		report "has_zicntr e has_zihpm exigem has_zicsr"
 		severity failure;
 
 
@@ -582,7 +568,6 @@ begin
 			has_zmmul    => has_zmmul,
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei,
-			has_zimop    => has_zimop,
 			num_regs     => num_regs
 		)
 		port map (
@@ -705,7 +690,9 @@ begin
 			has_zifencei    => has_zifencei,
 			has_zicclsm     => has_zicclsm,
 			has_dcache      => has_dcache,
-			hpm_counters    => HPM_COUNT,
+			has_zihpm       => has_zihpm,
+			hpm_counters    => hpm_counters,
+			hpm_width       => hpm_width,
 			boot_rom_bits   => boot_rom_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,

@@ -13,7 +13,7 @@ A elaboração falha se `has_zicntr` for ligado sem `has_zicsr`. O Zicntr indepe
 
 ## 2. Bloco contador de 64 bits
 
-Todo contador é uma instância de `counter64`, que guarda o valor em duas metades de 32 bits.
+Todo contador é uma instância de `counter64`, que guarda o valor em duas metades. Com a largura padrão de 64 bits, cada metade tem 32 bits. O Zihpm instancia o mesmo bloco com uma largura $W$ de 1 a 64 bits, em que a metade baixa guarda os $\min(W,32)$ bits baixos e a metade alta os $W-32$ restantes (ausente quando $W \le 32$).
 
 | Aspecto | Comportamento |
 | :--- | :--- |
@@ -22,6 +22,7 @@ Todo contador é uma instância de `counter64`, que guarda o valor em duas metad
 | Leitura | A metade alta lida já inclui o vai-um pendente, então o par lido é sempre o valor ideal de 64 bits |
 | Escrita na metade baixa | Substitui o valor e cancela o incremento e o vai-um do mesmo ciclo |
 | Escrita na metade alta | Substitui o valor e descarta o vai-um pendente |
+| Largura | Os bits de cada saída acima da largura da metade leem zero, e uma escrita guarda só os bits que cabem; o vai-um sai da metade baixa quando todos os seus bits valem um |
 | Reset | Zera as duas metades e o vai-um |
 
 Uma escrita vence o incremento do próprio ciclo, em cada metade.
@@ -61,7 +62,7 @@ O Core não tem entrada externa de tempo. O `time` deriva do clock do próprio C
 
 ## 4. `mcountinhibit`
 
-O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita. O registrador existe quando há `has_zicntr` ou ao menos um contador de eventos, e os bits de contadores de eventos estão em [Zihpm](../Zihpm/description.md).
+O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita. O registrador existe quando há `has_zicntr` ou `has_zihpm`, e os bits de contadores de eventos estão em [Zihpm](../Zihpm/description.md).
 
 | Bit | Inibe | Existe quando |
 | :--- | :--- | :--- |

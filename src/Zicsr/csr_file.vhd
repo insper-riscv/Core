@@ -23,14 +23,18 @@
 --     a cada tick_cycles ciclos. mcycle e minstret aceitam escrita; cycle, time e
 --     instret (0xC00 a 0xC82) são somente leitura. Sem has_zicntr esses endereços
 --     são inexistentes.
---   - Com hpm_counters = N (de 1 a 4), a extensão Zihpm acrescenta os contadores de
---     eventos de índice 3 a 2 + N: mhpmcounterK em 0xB00 + K, a metade alta em
---     0xB80 + K, os espelhos somente leitura em 0xC00 + K e 0xC80 + K e o seletor de
---     evento mhpmeventK em 0x320 + K (4 bits; o código escolhe um bit de i_events, e o
---     código 0 não conta). Um contador soma 1 a cada ciclo em que o evento escolhido
---     vale '1' em i_events. Sem hpm_counters esses endereços são inexistentes.
---   - O registrador mcountinhibit (0x320) existe com has_zicntr ou hpm_counters > 0:
---     o bit 0 inibe mcycle, o bit 2 inibe minstret e os bits de 3 a 2 + N inibem os
+--   - Com has_zihpm = true, a extensão Zihpm define os 29 contadores de eventos de
+--     índice 3 a 31: mhpmcounterK em 0xB00 + K, a metade alta em 0xB80 + K, os
+--     espelhos somente leitura em 0xC00 + K e 0xC80 + K e o seletor de evento
+--     mhpmeventK em 0x320 + K (4 bits; o código escolhe um bit de i_events, e o
+--     código 0 não conta). Os 29 endereços existem sempre; os hpm_counters primeiros
+--     (índices 3 a 2 + hpm_counters) têm contador de hpm_width bits, que soma 1 a cada
+--     ciclo em que o evento escolhido vale '1' em i_events, e os demais leem zero e
+--     ignoram a escrita, sem exceção. Os endereços do banco são decodificados pelos
+--     7 bits altos (a faixa) e pelos 5 bits baixos (o índice). Sem has_zihpm esses
+--     endereços são inexistentes.
+--   - O registrador mcountinhibit (0x320) existe com has_zicntr ou has_zihpm: o bit 0
+--     inibe mcycle, o bit 2 inibe minstret e os bits de 3 a 2 + hpm_counters inibem os
 --     contadores de eventos; os demais bits leem zero e ignoram a escrita (o time não
 --     é inibível). Um contador inibido mantém o valor e continua legível e gravável.
 --
@@ -58,8 +62,12 @@ entity csr_file is
 		has_zicntr : boolean := false;
 		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
 		tick_cycles : positive := 50;
-		-- Quantidade de contadores de eventos da extensão Zihpm, de índices 3 a 2 + hpm_counters (0 = sem Zihpm).
-		hpm_counters : natural range 0 to 4 := 0
+		-- Habilita a extensão Zihpm: os 29 endereços de contador, evento e espelho de índices 3 a 31 e os bits de mcountinhibit.
+		has_zihpm : boolean := false;
+		-- Quantidade de contadores de eventos reais da extensão Zihpm, de índices 3 a 2 + hpm_counters; os outros leem zero.
+		hpm_counters : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
+		-- Largura em bits de cada contador de eventos real (0 a 64).
+		hpm_width : natural range 0 to 64 := 64
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -183,56 +191,47 @@ architecture rtl of csr_file is
 	-- Escrita na metade alta de minstret.
 	signal minstret_we_hi    : std_logic;
 
-	-- Vetor de palavras de 32 bits, uma por contador de eventos possível.
-	type word_array_t is array (0 to 3) of word_t;
-	-- Vetor de códigos de evento de 4 bits, um por contador de eventos possível.
-	type code_array_t is array (0 to 3) of std_logic_vector(EVENT_CODE_WIDTH - 1 downto 0);
-
 	-- O perfil tem o registrador mcountinhibit (Zicntr ou Zihpm).
-	constant HAS_INHIBIT     : boolean := has_zicntr or hpm_counters > 0;
-	-- Bits de mcountinhibit que aceitam escrita: mcycle (0), minstret (2) e um por contador de eventos (3 em diante).
+	constant HAS_INHIBIT     : boolean := has_zicntr or has_zihpm;
+	-- Bits de mcountinhibit de mcycle (0) e minstret (2) que aceitam escrita, quando há Zicntr.
 	function inhibit_mask return std_logic_vector is
-		-- Máscara dos bits de mcountinhibit que aceitam escrita, montada conforme as extensões habilitadas.
-		variable mask : std_logic_vector(6 downto 0) := (others => '0');
 	begin
 		if has_zicntr then
-			mask(0) := '1';
-			mask(2) := '1';
+			return "101";
 		end if;
-		for k in 0 to 3 loop
-			if k < hpm_counters then
-				mask(3 + k) := '1';
-			end if;
-		end loop;
-		return mask;
+		return "000";
 	end function;
 
-	-- Valor registrado de mcountinhibit (só os bits do mask podem valer '1').
-	signal inhibit_reg       : std_logic_vector(6 downto 0);
-	-- Habilitação de escrita em mcountinhibit.
+	-- Valor registrado dos bits 2 a 0 de mcountinhibit (só os bits do mask podem valer '1').
+	signal inhibit_reg       : std_logic_vector(2 downto 0);
+	-- Habilitação de escrita nos bits 2 a 0 de mcountinhibit.
 	signal inhibit_we        : std_logic;
 	-- Soma de mcycle neste ciclo: sempre, salvo inibição.
 	signal mcycle_inc        : std_logic;
-	-- Próximo valor de mcountinhibit: o escrito, só nos bits que aceitam escrita.
-	signal inhibit_nxt       : std_logic_vector(6 downto 0);
+	-- Próximo valor dos bits 2 a 0 de mcountinhibit: o escrito, só nos bits que aceitam escrita.
+	signal inhibit_nxt       : std_logic_vector(2 downto 0);
+	-- Faixa do endereço (bits [11:5]).
+	signal addr_range        : std_logic_vector(6 downto 0);
+	-- Índice do endereço dentro da faixa (bits [4:0]).
+	signal addr_idx          : std_logic_vector(4 downto 0);
+	-- O índice é de um contador de eventos (3 a 31).
+	signal idx_is_hpm        : std_logic;
+	-- O endereço está na faixa de mcountinhibit e dos seletores de evento.
+	signal in_event_range    : std_logic;
+	-- O endereço está numa faixa de metades baixas (de máquina ou espelho).
+	signal in_lo_range       : std_logic;
+	-- O endereço está numa faixa de metades altas (de máquina ou espelho).
+	signal in_hi_range       : std_logic;
+	-- O endereço é o de mcountinhibit (faixa dos seletores de evento, índice 0).
+	signal is_inhibit_addr   : std_logic;
 	-- Indica que i_addr é um endereço da extensão Zihpm ou de mcountinhibit e o perfil o inclui.
 	signal is_ext_addr       : std_logic;
 	-- Valor lido do CSR da extensão Zihpm ou de mcountinhibit selecionado por i_addr (zero nos outros).
 	signal ext_value         : word_t;
-	-- Código de evento registrado em cada mhpmeventK.
-	signal event_code        : code_array_t;
-	-- Escrita em cada mhpmeventK.
-	signal event_we          : std_logic_vector(3 downto 0);
-	-- Metade baixa de cada contador de eventos.
-	signal hpm_lo            : word_array_t;
-	-- Metade alta de cada contador de eventos.
-	signal hpm_hi            : word_array_t;
-	-- Pulso de soma de cada contador de eventos: o evento escolhido, se o contador não está inibido.
-	signal hpm_inc           : std_logic_vector(3 downto 0);
-	-- Escrita efetiva de uma instrução CSR no endereço de cada metade baixa de contador de eventos.
-	signal hpm_we_lo         : std_logic_vector(3 downto 0);
-	-- Escrita efetiva de uma instrução CSR no endereço de cada metade alta de contador de eventos.
-	signal hpm_we_hi         : std_logic_vector(3 downto 0);
+	-- Valor lido pelo banco de contadores de eventos (zero fora dele).
+	signal bank_rdata        : word_t;
+	-- Bits 2 a 0 de mcountinhibit como o programa os lê (zero fora do endereço).
+	signal inhibit_word      : word_t;
 
 	-- Sinais de habilitação e próximo valor para os flip-flops de mstatus (MIE e MPIE).
 	signal mie_we            : std_logic;
@@ -444,10 +443,19 @@ begin
 		time_tick    <= '0';
 	end generate gen_no_zicntr;
 
-	-- mcountinhibit e os contadores de eventos.
-	gen_inhibit : if HAS_INHIBIT generate
-		inhibit_we  <= cntr_write and bool_to_sl(i_addr = ADDR_MCOUNTINHIBIT);
-		inhibit_nxt <= new_value(6 downto 0) and inhibit_mask;
+	-- Decodificação dos endereços de mcountinhibit e do Zihpm: a faixa pelos bits altos, o índice pelos 5 bits baixos.
+	addr_range       <= i_addr(11 downto 5);
+	addr_idx         <= i_addr(4 downto 0);
+	idx_is_hpm       <= '1' when unsigned(addr_idx) >= HPM_FIRST_INDEX else '0';
+	in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';
+	in_lo_range      <= '1' when (addr_range = RANGE_MHPMCOUNTER or addr_range = RANGE_HPMCOUNTER) else '0';
+	in_hi_range      <= '1' when (addr_range = RANGE_MHPMCOUNTERH or addr_range = RANGE_HPMCOUNTERH) else '0';
+	is_inhibit_addr  <= in_event_range and bool_to_sl(unsigned(addr_idx) = 0);
+
+	-- Bits de mcountinhibit de mcycle e minstret.
+	gen_inhibit : if has_zicntr generate
+		inhibit_we  <= cntr_write and is_inhibit_addr;
+		inhibit_nxt <= new_value(2 downto 0) and inhibit_mask;
 
 		u_inhibit_reg : entity work.generic_register
 			generic map (
@@ -462,96 +470,46 @@ begin
 			);
 	end generate gen_inhibit;
 
-	gen_no_inhibit : if not HAS_INHIBIT generate
+	gen_no_inhibit : if not has_zicntr generate
 		inhibit_we  <= '0';
+		inhibit_nxt <= (others => '0');
 		inhibit_reg <= (others => '0');
 	end generate gen_no_inhibit;
 
-	gen_hpm : for k in 0 to 3 generate
-		gen_present : if k < hpm_counters generate
-			event_we(k) <= cntr_write and bool_to_sl(i_addr = std_logic_vector(unsigned(ADDR_MHPMEVENT_BASE) + (k + 3)));
-			hpm_we_lo(k) <= cntr_write and bool_to_sl(i_addr = std_logic_vector(unsigned(ADDR_MHPMCOUNTER_BASE) + (k + 3)));
-			hpm_we_hi(k) <= cntr_write and bool_to_sl(i_addr = std_logic_vector(unsigned(ADDR_MHPMCOUNTERH_BASE) + (k + 3)));
+	-- Banco de contadores de eventos da extensão Zihpm.
+	gen_zihpm : if has_zihpm generate
+		u_hpm_bank : entity work.hpm_counter_bank
+			generic map (
+				hpm_counters => hpm_counters,
+				hpm_width    => hpm_width
+			)
+			port map (
+				i_clk         => i_clk,
+				i_rst         => i_rst,
+				i_events      => i_events,
+				i_idx         => addr_idx,
+				i_sel_inhibit => is_inhibit_addr,
+				i_sel_event   => in_event_range,
+				i_sel_lo      => in_lo_range,
+				i_sel_hi      => in_hi_range,
+				i_we          => cntr_write,
+				i_wdata       => new_value,
+				o_rdata       => bank_rdata
+			);
 
-			u_event_code : entity work.generic_register
-				generic map (
-					data_width => EVENT_CODE_WIDTH
-				)
-				port map (
-					i_clk    => i_clk,
-					i_rst    => i_rst,
-					i_enable => event_we(k),
-					i_d      => new_value(EVENT_CODE_WIDTH - 1 downto 0),
-					o_d      => event_code(k)
-				);
+		is_ext_addr <= is_inhibit_addr or
+		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range));
+	end generate gen_zihpm;
 
-			-- O contador soma nos ciclos em que o evento escolhido vale '1'; o código 0 não conta nada.
-			hpm_inc(k) <= i_events(to_integer(unsigned(event_code(k)))) and
-			              bool_to_sl(event_code(k) /= std_logic_vector(to_unsigned(EVENT_NONE, EVENT_CODE_WIDTH))) and
-			              (not inhibit_reg(3 + k));
+	gen_no_zihpm : if not has_zihpm generate
+		bank_rdata  <= (others => '0');
+		is_ext_addr <= is_inhibit_addr and bool_to_sl(has_zicntr);
+	end generate gen_no_zihpm;
 
-			u_hpm : entity work.counter64
-				port map (
-					i_clk   => i_clk,
-					i_rst   => i_rst,
-					i_inc   => hpm_inc(k),
-					i_we_lo => hpm_we_lo(k),
-					i_we_hi => hpm_we_hi(k),
-					i_wdata => new_value,
-					o_lo    => hpm_lo(k),
-					o_hi    => hpm_hi(k)
-				);
-		end generate gen_present;
-
-		gen_absent : if k >= hpm_counters generate
-			event_we(k)  <= '0';
-			hpm_we_lo(k) <= '0';
-			hpm_we_hi(k) <= '0';
-			hpm_inc(k)   <= '0';
-			event_code(k) <= (others => '0');
-			hpm_lo(k)    <= (others => '0');
-			hpm_hi(k)    <= (others => '0');
-		end generate gen_absent;
-	end generate gen_hpm;
-
-	gen_ext_addr : if HAS_INHIBIT generate
-		process (i_addr, inhibit_reg, event_code, hpm_lo, hpm_hi)
-			-- Indica que o endereço pertence a um CSR do grupo de contadores de eventos ou de mcountinhibit.
-			variable known : std_logic;
-			-- Valor lido do CSR do grupo de contadores de eventos ou de mcountinhibit.
-			variable value : word_t;
-		begin
-			known := '0';
-			value := (others => '0');
-			if i_addr = ADDR_MCOUNTINHIBIT then
-				known := '1';
-				value(6 downto 0) := inhibit_reg;
-			end if;
-			for k in 0 to 3 loop
-				if k < hpm_counters then
-					if i_addr = std_logic_vector(unsigned(ADDR_MHPMEVENT_BASE) + (k + 3)) then
-						known := '1';
-						value(EVENT_CODE_WIDTH - 1 downto 0) := event_code(k);
-					elsif i_addr = std_logic_vector(unsigned(ADDR_MHPMCOUNTER_BASE) + (k + 3)) or
-					      i_addr = std_logic_vector(unsigned(ADDR_HPMCOUNTER_BASE) + (k + 3)) then
-						known := '1';
-						value := hpm_lo(k);
-					elsif i_addr = std_logic_vector(unsigned(ADDR_MHPMCOUNTERH_BASE) + (k + 3)) or
-					      i_addr = std_logic_vector(unsigned(ADDR_HPMCOUNTERH_BASE) + (k + 3)) then
-						known := '1';
-						value := hpm_hi(k);
-					end if;
-				end if;
-			end loop;
-			is_ext_addr <= known;
-			ext_value   <= value;
-		end process;
-	end generate gen_ext_addr;
-
-	gen_no_ext_addr : if not HAS_INHIBIT generate
-		is_ext_addr <= '0';
-		ext_value   <= (others => '0');
-	end generate gen_no_ext_addr;
+	-- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.
+	inhibit_word(2 downto 0)  <= inhibit_reg and (2 downto 0 => is_inhibit_addr);
+	inhibit_word(31 downto 3) <= (others => '0');
+	ext_value <= bank_rdata or inhibit_word;
 
 	-- Instâncias estruturais de flip_flop e generic_register para os CSRs.
 	u_mstatus_mie_ff : entity work.flip_flop
