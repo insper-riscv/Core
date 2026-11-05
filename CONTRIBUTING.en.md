@@ -237,7 +237,7 @@ make formal    # Run the formal proofs (SymbiYosys) with the engine of FORMAL_EN
 
 The `formal` CI job runs the proofs once per engine (`formal - yices`, `formal - bitwuzla`, `formal - boolector`, and `formal - abc-bmc3`) and the aggregator job `formal` decides from the results: every proof must have an answer, and the engines that answered must agree with each other and with the expected result. The name `formal` is the check the default-branch ruleset requires, so do not rename it; the `formal - <engine>` jobs are not required.
 
-A warning in the formal run is an error. The formal flow scans the GHDL output and the Yosys and SymbiYosys logs after every step, including on the mutants, and fails pointing at the file and line of the warning. The fix is always in the code or in the properties, never in an option that hides the warning (`-Wno-*`). The details are in [docs/en/FORMAL.md](docs/en/FORMAL.md).
+A warning in the formal run is an error. The formal flow scans the GHDL output and the Yosys and SymbiYosys logs after every step, including on the mutants, and fails pointing at the file and line of the warning. The fix is always in the code or in the properties, never in an option that hides the warning (`-Wno-*`). The details are in [docs/en/formal/FORMAL.md](docs/en/formal/FORMAL.md).
 
 The `python-static-analysis` CI job runs `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` and `uv audit` over the Python files, and the job name is the check the default-branch ruleset requires, so do not rename it.
 

@@ -237,7 +237,7 @@ make formal    # Executa as provas formais (SymbiYosys) com o engine de FORMAL_E
 
 O job `formal` do CI roda as provas uma vez por engine (`formal - yices`, `formal - bitwuzla`, `formal - boolector` e `formal - abc-bmc3`) e o job agregador `formal` decide a partir dos resultados: cada prova precisa ter uma resposta e os engines que responderam precisam concordar entre si e com o esperado. O nome `formal` é o check que o ruleset da branch padrão exige, então não o renomeie; os jobs `formal - <engine>` não são exigidos.
 
-Warning no formal é erro. O fluxo de verificação formal varre a saída do GHDL e os logs do Yosys e do SymbiYosys depois de cada passo, inclusive nos mutantes, e falha apontando o arquivo e a linha do aviso. A correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/FORMAL.md](docs/pt-br/FORMAL.md).
+Warning no formal é erro. O fluxo de verificação formal varre a saída do GHDL e os logs do Yosys e do SymbiYosys depois de cada passo, inclusive nos mutantes, e falha apontando o arquivo e a linha do aviso. A correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/formal/FORMAL.md](docs/pt-br/formal/FORMAL.md).
 
 O job `python-static-analysis` do CI roda `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` e `uv audit` sobre os arquivos Python, e o nome do job é o check que o ruleset da branch padrão exige, então não o renomeie.
 
