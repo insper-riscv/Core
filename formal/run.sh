@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Formal verification of the CSR bank, the trap unit, the counters, the fusion record and the Zimop decoder with SymbiYosys. Needs
+# Formal verification of the CSR bank, the trap unit, the counters, the fusion record, the Zimop decoder and Zicond with SymbiYosys. Needs
 # ghdl, yosys, sby and the engine chosen by FORMAL_ENGINE (all in the ci-vhdl image). Run from the root of the
 # repository:  FORMAL_ENGINE=bitwuzla bash formal/run.sh
 #
@@ -55,6 +55,7 @@ netlist() {
     "$root/src/common/src/generic_register.vhd" \
     "$root/src/shared/mem_map_consts.vhd" \
     "$root/src/shared/word_consts.vhd" \
+    "$root/src/Zicond/zicond_consts.vhd" \
     "$root/src/Zicsr/trap_consts.vhd" \
     "$root/src/Zicsr/csr_addr_consts.vhd" \
     "$root/src/Zicsr/csr_event_consts.vhd" \
@@ -177,6 +178,18 @@ expect "cover: a count at the carry point, an inhibited event and a write with a
 netlist "$csr" csr_file csrh2 "-ghpm_counters=2 -ghas_zicntr=true -gtick_cycles=3"
 expect "two event counters with Zicntr: the other two are illegal, mcycle/minstret own bits 0 and 2 (bounded, 6 cycles)" PASS "$(prove csrh2.v "$csr_hpm_props" bmc 6 '-DNHPM=2 -DHAS_CNTR' csrh2_safety)"
 
+echo "zicond_unit"
+zc="$root/src/Zicond/zicond_unit.vhd"; zc_props="$root/formal/zicond_props.sv"
+netlist "$zc" zicond_unit zc
+expect "czero.eqz and czero.nez give zero or rs1 by the condition of rs2, no other code is claimed (induction)" PASS "$(prove zc.v "$zc_props" prove 2 '' zc_safety)"
+expect "cover: both instructions, both outcomes and an unclaimed code are reachable"                         PASS "$(prove zc.v "$zc_props" cover 2 '-DCOVER' zc_cover)"
+
+echo "zicond_decode"
+zd="$root/src/Zicond/zicond_decode.vhd"; zd_props="$root/formal/zicond_decode_props.sv"
+netlist "$zd" zicond_decode zd
+expect "exactly opcode 0110011, funct7 0000111 and funct3 101 or 111 are claimed, with their codes (induction)" PASS "$(prove zd.v "$zd_props" prove 2 '' zd_safety)"
+expect "cover: both claims and the near misses are reachable"                                               PASS "$(prove zd.v "$zd_props" cover 2 '-DCOVER' zd_cover)"
+
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl generics] [bmc depth]
   local copy="$out/mut_$5.vhd"
@@ -225,5 +238,23 @@ mutant "$fus" "$fus_props" muldiv_fusion '' fusion_record_on_start "0,/i_enable 
 mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = WORD_ALL_ONES/lo = WORD_INT_MIN/"
 mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata when/lo_nxt <= std_logic_vector(unsigned(i_wdata) + 1) when/"
 mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
+
+mutant "$zc" "$zc_props" zicond_unit '' zc_eqz_inverted   "s/(is_eqz and rs2_zero)/(is_eqz and not rs2_zero)/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_nez_inverted   "s/(is_nez and not rs2_zero)/(is_nez and rs2_zero)/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_eqz_never_zero "s/(is_eqz and rs2_zero) or //" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_eqz_always_zero "s/(is_eqz and rs2_zero)/is_eqz/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_nez_never_zero "s/ or (is_nez and not rs2_zero)//" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_nez_always_zero "s/(is_nez and not rs2_zero)/is_nez/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_result_is_rs2 "s/else i_rs1;/else i_rs2;/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_rs2_msb_ignored "s/'1' when i_rs2 = (i_rs2'range => '0')/'1' when i_rs2(30 downto 0) = (30 downto 0 => '0')/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_only_eqz_active "s/o_active <= is_eqz or is_nez;/o_active <= is_eqz;/" "" 2
+mutant "$zc" "$zc_props" zicond_unit '' zc_nez_code_taken_by_eqz "s/'1' when i_op = ALU_CZERO_EQZ else/'1' when i_op(3 downto 0) = ALU_CZERO_EQZ(3 downto 0) else/" "" 2
+
+mutant "$zd" "$zd_props" zicond_decode '' zd_funct7_lsb_ignored "0,/funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_EQZ/s//funct7(6 downto 1) = FUNCT7_ZICOND(6 downto 1) and funct3 = FUNCT3_CZERO_EQZ/" "" 2
+mutant "$zd" "$zd_props" zicond_decode '' zd_opcode_ignored "s/'1' when (opcode = OPCODE_OP and funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_NEZ)/'1' when (funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_NEZ)/" "" 2
+mutant "$zd" "$zd_props" zicond_decode '' zd_codes_swapped "s/ALU_CZERO_EQZ when is_eqz = '1' else/ALU_CZERO_NEZ when is_eqz = '1' else/" "" 2
+mutant "$zd" "$zd_props" zicond_decode '' zd_no_write "s/o_we_reg     <= is_eqz or is_nez;/o_we_reg     <= '0';/" "" 2
+mutant "$zd" "$zd_props" zicond_decode '' zd_no_rs1 "s/o_sel_pc_rs1 <= is_eqz or is_nez;/o_sel_pc_rs1 <= is_eqz;/" "" 2
+mutant "$zd" "$zd_props" zicond_decode '' zd_funct3_one_bit "s/funct3 = FUNCT3_CZERO_NEZ) else/funct3(1 downto 0) = FUNCT3_CZERO_NEZ(1 downto 0)) else/" "" 2
 
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }
