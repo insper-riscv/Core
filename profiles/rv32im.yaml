@@ -26,6 +26,7 @@ sources:
   - src/Zicsr/csr_addr_consts.vhd
   - src/Zicsr/csr_event_consts.vhd
   - src/Zicsr/csr_value_consts.vhd
+  - src/Zimop/zimop_consts.vhd
   - src/common/src/generic_register.vhd
   - src/common/src/adder.vhd
   - src/common/src/mux_2x1.vhd
@@ -53,6 +54,7 @@ sources:
   - src/Zicond/zicond_decode.vhd
   - src/Zicond/zicond_unit.vhd
   - src/Zicsr/csr_decode.vhd
+  - src/Zimop/zimop_decode.vhd
   - src/Zicntr/counter64.vhd
   - src/Zicntr/tick_divider.vhd
   - src/Zicsr/csr_file.vhd

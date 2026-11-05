@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Formal verification of the CSR bank, the trap unit, the counters, the fusion record and Zicond with SymbiYosys. Needs
+# Formal verification of the CSR bank, the trap unit, the counters, the fusion record, the Zimop decoder and Zicond with SymbiYosys. Needs
 # ghdl, yosys, sby and the engine chosen by FORMAL_ENGINE (all in the ci-vhdl image). Run from the root of the
 # repository:  FORMAL_ENGINE=bitwuzla bash formal/run.sh
 #
@@ -49,6 +49,8 @@ netlist() {
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
     "$root/src/shared/funct3_consts.vhd" \
+    "$root/src/shared/alu_consts.vhd" \
+    "$root/src/Zimop/zimop_consts.vhd" \
     "$root/src/common/src/flip_flop.vhd" \
     "$root/src/common/src/generic_register.vhd" \
     "$root/src/shared/mem_map_consts.vhd" \
@@ -154,6 +156,12 @@ netlist "$fus" muldiv_fusion fus
 expect "hit only on the same values, family and another operation; the record is the last full result (bounded, 10 cycles)" PASS "$(prove fus.v "$fus_props" bmc 10 '' fus_safety)"
 expect "cover: a hit in each family and the near misses are reachable" PASS "$(prove fus.v "$fus_props" cover 10 '-DCOVER' fus_cover)"
 
+echo "zimop_decode"
+zim="$root/src/Zimop/zimop_decode.vhd"; zim_props="$root/formal/zimop_props.sv"
+netlist "$zim" zimop_decode zim
+expect "exactly the 32 mop.r.n and the 8 mop.rr.n are claimed, they write rd and carry a zero-result ALU operation (induction)" PASS "$(prove zim.v "$zim_props" prove 2 '' zim_safety)"
+expect "cover: a mop.r, a mop.rr and an unclaimed SYSTEM instruction are reachable" PASS "$(prove zim.v "$zim_props" cover 2 '-DCOVER' zim_cover)"
+
 echo "csr_file with Zicntr"
 netlist "$csr" csr_file csrc "-ghas_zicntr=true -gtick_cycles=3"
 csr_cntr_props="$root/formal/csr_cntr_props.sv"
@@ -199,6 +207,14 @@ mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_m
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+
+mutant "$zim" "$zim_props" zimop_decode '' zimop_funct3_ignored "s/funct3 = FUNCT3_SYSTEM_RESERVED and/true and/" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_bit31_ignored "s/i_instr(31) = ZIMOP_BIT31 and//" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_mop_r_fields_ignored "s/i_instr(24 downto 22) = ZIMOP_BITS_24_22/i_instr(24 downto 23) = ZIMOP_BITS_24_22(2 downto 1)/" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_mop_rr_any_bit25 "s/is_mop_rr <= '1' when (is_common = '1' and i_instr(25) = ZIMOP_BIT25_RR)/is_mop_rr <= '1' when (is_common = '1')/" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_no_write "s/o_we_reg   <= is_mop;/o_we_reg   <= '0';/" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_alu_has_result "s/o_alu_op   <= ALU_BGEU;/o_alu_op   <= ALU_ADD;/" "" 2
+mutant "$zim" "$zim_props" zimop_decode '' zimop_keeps_system "s/o_opcode   <= OPCODE_OP_IMM;/o_opcode   <= OPCODE_SYSTEM;/" "" 2
 
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hi_is_lo "s/minstret_rd_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/minstret_rd_lo when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/" "-ghas_zicntr=true -gtick_cycles=3" 6

@@ -19,7 +19,7 @@ check:
 # units, because core instantiates them directly, and the disabled ones leave the elaboration.
 # GHDL 6 takes the generic at run time, so each profile is elaborated and run for 1 ns.
 profiles: profile-matrix
-	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicond rv32im_zicsr_zifencei rv32im_zicclsm_zicntr_zifencei; do \
+	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicond rv32im_zicsr_zifencei rv32im_zicclsm_zicntr_zifencei rv32im_zimop; do \
 	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
 	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
