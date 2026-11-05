@@ -38,8 +38,12 @@ entity stage_ex is
 		has_zicclsm     : boolean := true;
 		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
 		has_dcache      : boolean := false;
-		-- Quantidade de contadores de eventos da extensão Zihpm no banco de CSRs (0 = sem Zihpm); exige has_zicsr.
-		hpm_counters    : natural range 0 to 4 := 0;
+		-- Habilita a extensão Zihpm no banco de CSRs; exige has_zicsr.
+		has_zihpm       : boolean := false;
+		-- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters).
+		hpm_counters    : natural range 0 to 29 := 29;
+		-- Largura em bits de cada contador de eventos real.
+		hpm_width       : natural range 0 to 64 := 64;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
 		boot_rom_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
@@ -426,7 +430,9 @@ begin
 				base_e       => base_e,
 				has_zicntr   => has_zicntr,
 				tick_cycles  => tick_cycles,
-				hpm_counters => hpm_counters
+				has_zihpm    => has_zihpm,
+				hpm_counters => hpm_counters,
+				hpm_width    => hpm_width
 			)
 			port map (
 				i_clk        => i_clk,

@@ -1,10 +1,14 @@
 -- =============================================================================
--- Contador de 64 bits em duas metades de 32 bits, com vai-um registrado
+-- Contador de até 64 bits em duas metades, com vai-um registrado
 --
--- Guarda um valor de 64 bits como metade baixa (o_lo) e metade alta (o_hi).
--- A cada ciclo com i_inc = '1' a metade baixa soma 1; quando ela estava em
--- 0xFFFFFFFF, o vai-um fica registrado e a metade alta soma 1 no ciclo seguinte,
--- de modo que nenhuma soma de 64 bits entra em um caminho combinacional.
+-- Guarda um valor de width bits como metade baixa (o_lo, com os min(width, 32)
+-- bits baixos) e metade alta (o_hi, com os width - 32 bits restantes, ausente
+-- quando width não passa de 32). Os bits de cada saída acima da largura da
+-- metade leem zero, e uma escrita guarda só os bits que cabem na metade.
+-- A cada ciclo com i_inc = '1' a metade baixa soma 1; quando ela estava com
+-- todos os bits em '1', o vai-um fica registrado e a metade alta soma 1 no
+-- ciclo seguinte, de modo que nenhuma soma de 64 bits entra em um caminho
+-- combinacional.
 --
 -- Leitura coerente: no ciclo em que o vai-um está pendente a metade alta
 -- armazenada ainda não somou, então o_hi devolve a metade alta mais o vai-um
@@ -20,9 +24,12 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 use work.pipeline_types.all;
-use work.word_consts.all;
 
 entity counter64 is
+	generic (
+		-- Largura do contador em bits, de 1 a 64.
+		width   : positive range 1 to 64 := 64
+	);
 	port (
 		-- Sinal de clock do sistema.
 		i_clk   : in  std_logic;
@@ -45,46 +52,64 @@ end entity counter64;
 
 architecture rtl of counter64 is
 
+	-- Largura da metade baixa: a do contador, até o máximo de 32 bits.
+	function low_width return positive is
+	begin
+		if width > word_t'length then
+			return word_t'length;
+		end if;
+		return width;
+	end function;
+
+	-- Largura de um sinal da metade alta, com 1 bit quando a metade não existe.
+	function high_signal_width(w : natural) return positive is
+	begin
+		if w = 0 then
+			return 1;
+		end if;
+		return w;
+	end function;
+
+	-- Largura da metade baixa.
+	constant LO_WIDTH : positive := low_width;
+	-- Largura da metade alta (0 quando o contador cabe na metade baixa).
+	constant HI_WIDTH : natural := width - LO_WIDTH;
+	-- Valor da metade baixa que gera o vai-um (todos os bits em '1').
+	constant LO_ALL_ONES : std_logic_vector(LO_WIDTH - 1 downto 0) := (others => '1');
+
 	-- Metade baixa armazenada.
-	signal lo        : word_t;
+	signal lo        : std_logic_vector(LO_WIDTH - 1 downto 0);
 	-- Metade alta armazenada, sem o vai-um pendente.
-	signal hi        : word_t;
-	-- A metade baixa passou de 0xFFFFFFFF no ciclo anterior e a alta ainda não somou.
+	signal hi        : std_logic_vector(high_signal_width(HI_WIDTH) - 1 downto 0);
+	-- A metade baixa passou do valor máximo no ciclo anterior e a alta ainda não somou.
 	signal carry     : std_logic;
 	-- Próximo valor da metade baixa.
-	signal lo_nxt    : word_t;
+	signal lo_nxt    : std_logic_vector(LO_WIDTH - 1 downto 0);
 	-- Habilita a atualização da metade baixa.
 	signal lo_en     : std_logic;
 	-- Próximo valor da metade alta.
-	signal hi_nxt    : word_t;
+	signal hi_nxt    : std_logic_vector(high_signal_width(HI_WIDTH) - 1 downto 0);
 	-- Habilita a atualização da metade alta.
 	signal hi_en     : std_logic;
 	-- Vai-um que a metade baixa gera neste ciclo.
 	signal carry_nxt : std_logic;
 	-- Metade baixa mais 1.
-	signal lo_inc    : word_t;
+	signal lo_inc    : std_logic_vector(LO_WIDTH - 1 downto 0);
 	-- Metade alta mais 1.
-	signal hi_inc    : word_t;
+	signal hi_inc    : std_logic_vector(high_signal_width(HI_WIDTH) - 1 downto 0);
 
 begin
 
 	lo_inc <= std_logic_vector(unsigned(lo) + 1);
-	hi_inc <= std_logic_vector(unsigned(hi) + 1);
 
-	lo_nxt <= i_wdata when i_we_lo = '1' else lo_inc;
+	lo_nxt <= i_wdata(LO_WIDTH - 1 downto 0) when i_we_lo = '1' else lo_inc;
 	lo_en  <= i_we_lo or i_inc;
 
-	hi_nxt <= i_wdata when i_we_hi = '1' else hi_inc;
-	hi_en  <= i_we_hi or carry;
-
-	carry_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = WORD_ALL_ONES) else '0';
-
-	o_lo <= lo;
-	o_hi <= hi_inc when carry = '1' else hi;
+	o_lo <= std_logic_vector(resize(unsigned(lo), word_t'length));
 
 	u_lo : entity work.generic_register
 		generic map (
-			data_width => word_t'length
+			data_width => LO_WIDTH
 		)
 		port map (
 			i_clk    => i_clk,
@@ -94,25 +119,50 @@ begin
 			o_d      => lo
 		);
 
-	u_hi : entity work.generic_register
-		generic map (
-			data_width => word_t'length
-		)
-		port map (
-			i_clk    => i_clk,
-			i_rst    => i_rst,
-			i_enable => hi_en,
-			i_d      => hi_nxt,
-			o_d      => hi
-		);
+	-- Contador que cabe na metade baixa: não há metade alta nem vai-um.
+	gen_no_hi : if HI_WIDTH = 0 generate
+		carry     <= '0';
+		carry_nxt <= '0';
+		hi_en     <= '0';
+		hi_inc    <= (others => '0');
+		hi_nxt    <= (others => '0');
+		hi        <= (others => '0');
+		o_hi      <= (others => '0');
+	end generate gen_no_hi;
 
-	u_carry : entity work.flip_flop
-		port map (
-			i_d      => carry_nxt,
-			o_d      => carry,
-			i_enable => '1',
-			i_clk    => i_clk,
-			i_rst    => i_rst
-		);
+	gen_hi : if HI_WIDTH > 0 generate
+
+		hi_inc <= std_logic_vector(unsigned(hi) + 1);
+
+		hi_nxt <= i_wdata(HI_WIDTH - 1 downto 0) when i_we_hi = '1' else hi_inc;
+		hi_en  <= i_we_hi or carry;
+
+		carry_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = LO_ALL_ONES) else '0';
+
+		o_hi <= std_logic_vector(resize(unsigned(hi_inc), word_t'length)) when carry = '1' else
+		        std_logic_vector(resize(unsigned(hi), word_t'length));
+
+		u_hi : entity work.generic_register
+			generic map (
+				data_width => HI_WIDTH
+			)
+			port map (
+				i_clk    => i_clk,
+				i_rst    => i_rst,
+				i_enable => hi_en,
+				i_d      => hi_nxt,
+				o_d      => hi
+			);
+
+		u_carry : entity work.flip_flop
+			port map (
+				i_d      => carry_nxt,
+				o_d      => carry,
+				i_enable => '1',
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
+
+	end generate gen_hi;
 
 end architecture rtl;

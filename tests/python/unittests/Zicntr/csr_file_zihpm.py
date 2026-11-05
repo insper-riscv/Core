@@ -11,6 +11,7 @@ from cocotb.triggers import RisingEdge, Timer
 from tests.python.unittests.checks import check_equal, check_true
 
 RW, RS, RC = 0b001, 0b010, 0b011
+MASK32 = 0xFFFFFFFF
 MCYCLE, MINSTRET = 0xB00, 0xB02
 MCOUNTINHIBIT = 0x320
 MHPMEVENT = {n: 0x320 + n for n in (3, 4, 5, 6)}
@@ -20,7 +21,8 @@ HPMCOUNTER = {n: 0xC00 + n for n in (3, 4, 5, 6)}
 HPMCOUNTERH = {n: 0xC80 + n for n in (3, 4, 5, 6)}
 
 
-async def _reset(dut):
+async def reset(dut):
+    """Start the clock and apply a reset."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_commit.value = 0
     dut.i_addr.value = MCYCLE
@@ -88,7 +90,7 @@ async def pulses(dut, code, count):
 @cocotb.test()
 async def test_a_counter_counts_only_its_event(dut):
     """Verifica a counter counts only its event."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[3], 3)
     await write(dut, MHPMEVENT[4], 8)
     await pulses(dut, 3, 5)
@@ -101,7 +103,7 @@ async def test_a_counter_counts_only_its_event(dut):
 @cocotb.test()
 async def test_code_zero_and_codes_outside_the_table_count_nothing(dut):
     """Verifica code zero and codes outside the table count nothing."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[3], 0)
     await write(dut, MHPMEVENT[4], 12)
     dut.i_events.value = (
@@ -119,7 +121,7 @@ async def test_code_zero_and_codes_outside_the_table_count_nothing(dut):
 @cocotb.test()
 async def test_the_event_selector_keeps_four_bits(dut):
     """Verifica the event selector keeps four bits."""
-    await _reset(dut)
+    await reset(dut)
     check_equal(await read(dut, MHPMEVENT[5]), 0)
     await write(dut, MHPMEVENT[5], 0xFFFFFFF5)
     check_equal(await read(dut, MHPMEVENT[5]), 5)
@@ -128,7 +130,7 @@ async def test_the_event_selector_keeps_four_bits(dut):
 @cocotb.test()
 async def test_the_mirrors_follow_and_are_read_only(dut):
     """Verifica the mirrors follow and are read only."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[6], 1)
     await pulses(dut, 1, 4)
     check_equal(await read(dut, HPMCOUNTER[6]), 4)
@@ -155,7 +157,7 @@ async def test_the_counter_is_writable_and_carries_into_the_high_half(dut):
 
     Verifica the counter is writable and carries into the high half.
     """
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[3], 2)
     await write(dut, MHPMCOUNTER[3], 0xFFFFFFFE)
     await pulses(dut, 2, 3)
@@ -168,17 +170,39 @@ async def test_the_counter_is_writable_and_carries_into_the_high_half(dut):
 
 
 @cocotb.test()
-async def test_addresses_past_the_implemented_counters_are_illegal(dut):
-    """Verifica addresses past the implemented counters are illegal."""
-    await _reset(dut)
-    for addr in (0xB07, 0xB87, 0xC07, 0xC87, 0x327, 0x3A0, 0xB1F, 0xC1F):
+async def test_indices_past_the_real_counters_read_zero(dut):
+    """Verifica indices past the real counters read zero.
+
+    The 29 addresses exist, so an index past the four real counters
+    reads zero and ignores a write without an exception; a mirror stays
+    read-only.
+    """
+    await reset(dut)
+    for index in (7, 8, 17, 31):
+        for base in (0x320, 0xB00, 0xB80, 0xC00, 0xC80):
+            addr = base + index
+            check_equal(await access(dut, addr, RS, 0), (0, 0), hex(addr))
+        for base in (0x320, 0xB00, 0xB80):
+            addr = base + index
+            check_equal((await write(dut, addr, MASK32))[1], 0, hex(addr))
+            check_equal(await read(dut, addr), 0, hex(addr))
+        for base in (0xC00, 0xC80):
+            addr = base + index
+            check_equal((await write(dut, addr, 1))[1], 1, hex(addr))
+
+
+@cocotb.test()
+async def test_addresses_the_chapter_does_not_define_are_illegal(dut):
+    """Verifica addresses the chapter does not define are illegal."""
+    await reset(dut)
+    for addr in (0x321, 0x322, 0xB01, 0xB81, 0x3A0, 0x345):
         check_equal((await access(dut, addr, RS, 0))[1], 1, hex(addr))
 
 
 @cocotb.test()
 async def test_mcountinhibit_stops_one_counter_and_only_that_one(dut):
     """Verifica mcountinhibit stops one counter and only that one."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[3], 3)
     await write(dut, MHPMEVENT[4], 3)
     await write(dut, MCOUNTINHIBIT, 1 << 3)
@@ -196,7 +220,7 @@ async def test_mcountinhibit_stops_one_counter_and_only_that_one(dut):
 @cocotb.test()
 async def test_mcountinhibit_stops_mcycle_and_minstret(dut):
     """Verifica mcountinhibit stops mcycle and minstret."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MCOUNTINHIBIT, (1 << 0) | (1 << 2))
     first = await read(dut, MCYCLE)
     for _ in range(8):
@@ -225,7 +249,7 @@ async def test_mcountinhibit_reserved_bits_read_zero_and_counter_writable(
     Verifica mcountinhibit reserved bits read zero and the counter stays
     writable.
     """
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MCOUNTINHIBIT, 0xFFFFFFFF)
     # bit 1 (time) and the bits past the four counters are reserved
     check_equal(await read(dut, MCOUNTINHIBIT), 0b1111101)
@@ -240,7 +264,7 @@ async def test_mcountinhibit_reserved_bits_read_zero_and_counter_writable(
 @cocotb.test()
 async def test_a_trap_does_not_change_the_counters(dut):
     """Verifica a trap does not change the counters."""
-    await _reset(dut)
+    await reset(dut)
     await write(dut, MHPMEVENT[3], 3)
     await pulses(dut, 3, 3)
     dut.i_trap_take.value = 1
