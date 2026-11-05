@@ -20,6 +20,8 @@ The base control unit (`src/shared/control_unit.vhd`) decodes exclusively the RV
 | `Zicond` | `src/Zicond/zicond_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`), `funct7 = FUNCT7_ZICOND` (`"0000111"`) and `funct3` equal to `"101"` or `"111"` | `o_is_zicond = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` and `o_alu_op` with the code of the instruction |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
 | `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` and the fixed fields of `mop.r.n` and `mop.rr.n` (see [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; the ALU operation becomes `ALU_BGEU` (zero result) and the `opcode` shown to EX becomes `OPCODE_OP_IMM` |
+| `Zihintntl` | `src/Zihintntl/zihintntl_decode.vhd` | `opcode = OPCODE_OP`, `funct7 = "0000000"`, `funct3 = "000"`, `rd` and `rs1` at `x0` and `rs2` from `x2` to `x5` (see [Zihintntl](../ISA/Zihintntl/instructions.md)) | `o_is_hint = '1'`; the ID stage disables the write to `rd` |
+| `Zihintpause` | `src/Zihintpause/zihintpause_decode.vhd` | The word `0x0100000F` (see [Zihintpause](../ISA/Zihintpause/instructions.md)) | `o_is_hint = '1'`; the ID stage disables the write to `rd` |
 
 The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg or zc_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
 
@@ -65,7 +67,8 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
 | `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; Zmmul has no bit of its own; writes are ignored |
-| Not implemented | Interrupts (`mie` and `mip` read zero and ignore writes); the counters `cycle`, `time` and `instret` exist only with `has_zicntr = true`, and without it an access is an illegal CSR access |
+| Interrupts | With `has_interrupts = true`, `mip` mirrors the ports `i_irq_software`, `i_irq_timer` and `i_irq_external` and `mie` holds bits 3, 7 and 11; without the generic, `mie` and `mip` read zero and ignore writes |
+| Not implemented | The counters `cycle`, `time` and `instret` exist only with `has_zicntr = true`, and without it an access is an illegal CSR access |
 
 Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). Causes 4 and 6 come from the instance in the MEM stage when `has_zicsr = true`, one cycle after the others, and take precedence over the instruction in EX. The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:
 
@@ -86,7 +89,7 @@ Machine-mode CSRs implemented:
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Read-write | `0x00001800` | `MPP` (bits `[12:11]`) hardwired to `"11"`; `MIE` (bit 3) and `MPIE` (bit 7) writable |
 | `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `has_e` true the base is `E` and the value is `0x40001010` |
-| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | All bits hardwired to zero |
+| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `has_interrupts`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
 | `0x305` | `mtvec` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` (direct mode) |
 | `0x310` | `mstatush` | Read-write | `0x00000000` | All bits hardwired to zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Read-write | `0x00000000` | Full 32 bits |

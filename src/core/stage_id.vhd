@@ -35,6 +35,10 @@ entity stage_id is
 		has_zicond   : boolean := false;
 		-- Habilita o decodificador da extensão Zimop (zimop_decode): mop.r.n e mop.rr.n escrevem zero em rd.
 		has_zimop : boolean := false;
+		-- Habilita o decodificador das dicas ntl.* da extensão Zihintntl (executam como nop).
+		has_zihintntl : boolean := false;
+		-- Habilita o decodificador da dica pause da extensão Zihintpause (executa como nop).
+		has_zihintpause : boolean := false;
 		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15); falso é o RV32I, de 32.
 		has_e     : boolean := false
 	);
@@ -147,6 +151,12 @@ architecture rtl of stage_id is
 	signal id_alu_op       : alu_op_t;
 	-- Opcode gerado pela unidade de controle, antes da substituição feita pela extensão Zimop.
 	signal cu_opcode       : opcode_t;
+	-- Indica uma dica (ntl.* ou pause) decodificada no estágio ID, que executa como nop.
+	signal id_is_hint      : std_logic;
+	-- Indica uma dica ntl.* da extensão Zihintntl.
+	signal id_is_ntl       : std_logic;
+	-- Indica a dica pause da extensão Zihintpause.
+	signal id_is_pause     : std_logic;
 	-- Indica instrução da extensão Zimop (mop.r.n ou mop.rr.n) decodificada no estágio ID.
 	signal id_is_zimop     : std_logic;
 	-- Habilitação de escrita em registrador do decodificador Zimop.
@@ -288,6 +298,28 @@ begin
 		zimop_opcode  <= OPCODE_OP_IMM;
 	end generate gen_zimop_decode;
 
+	gen_zihintntl_decode : if has_zihintntl generate
+		u_zihintntl_decode : entity work.zihintntl_decode
+			port map (
+				i_instr   => i_instr,
+				o_is_hint => id_is_ntl
+			);
+	else generate
+		id_is_ntl <= '0';
+	end generate gen_zihintntl_decode;
+
+	gen_zihintpause_decode : if has_zihintpause generate
+		u_zihintpause_decode : entity work.zihintpause_decode
+			port map (
+				i_instr   => i_instr,
+				o_is_hint => id_is_pause
+			);
+	else generate
+		id_is_pause <= '0';
+	end generate gen_zihintpause_decode;
+
+	id_is_hint <= id_is_ntl or id_is_pause;
+
 	gen_csr_decode : if has_zicsr generate
 		u_csr_decode : entity work.csr_decode
 			port map (
@@ -322,7 +354,7 @@ begin
 	                          (id_uses_rs2 = '1' and id_rs2_idx(4) = '1')))
 	               else '0';
 	o_illegal     <= (cu_illegal and (not id_is_muldiv) and (not id_is_fencei) and (not id_is_zicond)) or id_bad_reg;
-	cu_we_reg     <= base_we_reg     or m_we_reg     or csr_we_reg or zimop_we_reg or zc_we_reg;
+	cu_we_reg     <= (base_we_reg or m_we_reg or csr_we_reg or zimop_we_reg or zc_we_reg) and (not id_is_hint);
 	o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1 or zc_sel_pc_rs1;
 	id_ext_imm_op <= EXT_IMM_I when csr_use_imm_i = '1' else cu_ext_imm_op;
 

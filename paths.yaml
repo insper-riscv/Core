@@ -2,12 +2,39 @@
 #   riscv-tools --root . check-paths --manifest paths.yaml
 # Run it before and after moving any file.
 tree:
+  coverage:
+    formal:
+      counter64: []
+      csr_file: [formal/csr_file_props.sv, formal/csr_cntr_props.sv, formal/csr_hpm_props.sv, formal/csr_irq_props.sv]
+      muldiv_fusion: []
+      trap_unit: []
+      zicond_decode: []
+      zicond_unit: [formal/zicond_props.sv]
+      zimop_decode: [formal/zimop_props.sv]
+      zihintntl_decode: [formal/zihintntl_props.sv]
+      zihintpause_decode: [formal/zihintpause_props.sv]
+    # Entities without an entity test of their own, and why (changed only with a justification in the pull request).
+    exceptions:
+      fencei_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      misaligned_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      muldiv_fusion: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      pc_fetch: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      reg_ex_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      reg_id_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      reg_if_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      reg_mem_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      stage_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      stage_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      stage_if: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      stage_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+      stage_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
-  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, ISA]
+  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, ISA]
 references:
   - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zimop sources, file: profiles/rv32im_zimop.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicsr sources, file: profiles/rv32im_zicsr.yaml, yaml: sources, base: .}
+  - {name: profile rv32im_zicsr_irq sources, file: profiles/rv32im_zicsr_irq.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicsr_zifencei sources, file: profiles/rv32im_zicsr_zifencei.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicclsm_zicntr_zifencei sources, file: profiles/rv32im_zicclsm_zicntr_zifencei.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicond sources, file: profiles/rv32im_zicond.yaml, yaml: sources, base: .}
@@ -47,6 +74,9 @@ provides:
       - src/Zicsr/csr_event_consts.vhd
       - src/Zimop/zimop_consts.vhd
       - src/Zicsr/csr_value_consts.vhd
+      - src/Zicsr/irq_consts.vhd
+      - src/Zihintntl/zihintntl_consts.vhd
+      - src/Zihintpause/zihintpause_consts.vhd
   shared:
     requires: [constants]
     sources:
@@ -108,8 +138,16 @@ provides:
     requires: [constants]
     sources:
       - src/Zifencei/fencei_unit.vhd
+  Zihintntl:
+    requires: [constants]
+    sources:
+      - src/Zihintntl/zihintntl_decode.vhd
+  Zihintpause:
+    requires: [constants]
+    sources:
+      - src/Zihintpause/zihintpause_decode.vhd
   core:
-    requires: [constants, shared, I-E, M, Zicclsm, Zicond, Zicsr, Zifencei, Zimop]
+    requires: [constants, shared, I-E, M, Zicclsm, Zicond, Zicsr, Zifencei, Zimop, Zihintntl, Zihintpause]
     sources:
       - src/core/stage_if.vhd
       - src/core/stage_id.vhd

@@ -62,8 +62,11 @@ netlist() {
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
     "$root/src/shared/funct3_consts.vhd" \
+    "$root/src/shared/funct7_consts.vhd" \
     "$root/src/shared/alu_consts.vhd" \
     "$root/src/Zimop/zimop_consts.vhd" \
+    "$root/src/Zihintntl/zihintntl_consts.vhd" \
+    "$root/src/Zihintpause/zihintpause_consts.vhd" \
     "$root/src/common/src/flip_flop.vhd" \
     "$root/src/common/src/generic_register.vhd" \
     "$root/src/shared/mem_map_consts.vhd" \
@@ -73,6 +76,7 @@ netlist() {
     "$root/src/Zicsr/csr_addr_consts.vhd" \
     "$root/src/Zicsr/csr_event_consts.vhd" \
     "$root/src/Zicsr/csr_value_consts.vhd" \
+    "$root/src/Zicsr/irq_consts.vhd" \
     "$root/src/common/src/utils_pkg.vhd" \
     "$root/src/common/src/mux_tree.vhd" \
     "$root/src/Zicntr/counter64.vhd" \
@@ -191,6 +195,18 @@ netlist "$zim" zimop_decode zim
 expect "exactly the 32 mop.r.n and the 8 mop.rr.n are claimed, they write rd and carry a zero-result ALU operation (induction)" PASS "$(prove zim.v "$zim_props" prove 2 '' zim_safety)"
 expect "cover: a mop.r, a mop.rr and an unclaimed SYSTEM instruction are reachable" PASS "$(prove zim.v "$zim_props" cover 2 '-DCOVER' zim_cover)"
 
+echo "zihintntl_decode"
+ntl="$root/src/Zihintntl/zihintntl_decode.vhd"; ntl_props="$root/formal/zihintntl_props.sv"
+netlist "$ntl" zihintntl_decode ntl
+expect "exactly the four ADD x0, x0, x2..x5 are claimed (induction)" PASS "$(prove ntl.v "$ntl_props" prove 2 '' ntl_safety)"
+expect "cover: a hint, an ADD with another rs2 and an ADD with a nonzero rd are reachable" PASS "$(prove ntl.v "$ntl_props" cover 2 '-DCOVER' ntl_cover)"
+
+echo "zihintpause_decode"
+pau="$root/src/Zihintpause/zihintpause_decode.vhd"; pau_props="$root/formal/zihintpause_props.sv"
+netlist "$pau" zihintpause_decode pau
+expect "exactly the word 0x0100000F is claimed (induction)" PASS "$(prove pau.v "$pau_props" prove 2 '' pau_safety)"
+expect "cover: pause and another FENCE are reachable" PASS "$(prove pau.v "$pau_props" cover 2 '-DCOVER' pau_cover)"
+
 echo "csr_file with Zicntr"
 netlist "$csr" csr_file csrc "-ghas_zicntr=true -gtick_cycles=3"
 csr_cntr_props="$root/formal/csr_cntr_props.sv"
@@ -214,6 +230,15 @@ netlist "$csr" csr_file csrh3 "-ghas_zihpm=true -ghpm_counters=5 -ghpm_width=20"
 expect "5 counters of 20 bits: the low half truncates and the high half reads zero (bounded, 6 cycles)" PASS "$(prove csrh3.v "$csr_hpm_props" bmc 6 '-DNHPM=5 -DWIDTH=20' csrh3_safety)"
 netlist "$csr" csr_file csrh0 "-ghas_zihpm=true -ghpm_counters=3 -ghpm_width=0"
 expect "width 0: no real counter, all 29 indices read zero (bounded, 6 cycles)" PASS "$(prove csrh0.v "$csr_hpm_props" bmc 6 '-DNHPM=3 -DWIDTH=0' csrh0_safety)"
+
+echo "csr_file with interrupts"
+csr_irq_props="$root/formal/csr_irq_props.sv"
+# The model keeps the three mask bits of mie, which the register holds outside the unit proven by induction, so the proofs are bounded from reset: they check the wiring (positions, read-only mip, mask, pending).
+netlist "$csr" csr_file csri "-ghas_interrupts=true"
+expect "mip reads the three lines, mie keeps bits 3, 7 and 11, a write to mip changes nothing, pending is lines and mask (bounded, 6 cycles)" PASS "$(prove csri.v "$csr_irq_props" bmc 6 '' csri_safety)"
+expect "cover: a pending timer alone, a mie write setting MTIE and a write to mip are reachable" PASS "$(prove csri.v "$csr_irq_props" cover 12 '-DCOVER' csri_cover)"
+netlist "$csr" csr_file csrio "-ghas_interrupts=false"
+expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (bounded, 6 cycles)" PASS "$(prove csrio.v "$csr_irq_props" bmc 6 '-DOFF' csrio_safety)"
 
 echo "zicond_unit"
 zc="$root/src/Zicond/zicond_unit.vhd"; zc_props="$root/formal/zicond_props.sv"
@@ -253,6 +278,16 @@ mutant "$zim" "$zim_props" zimop_decode '' zimop_no_write "s/o_we_reg   <= is_mo
 mutant "$zim" "$zim_props" zimop_decode '' zimop_alu_has_result "s/o_alu_op   <= ALU_BGEU;/o_alu_op   <= ALU_ADD;/" "" 2
 mutant "$zim" "$zim_props" zimop_decode '' zimop_keeps_system "s/o_opcode   <= OPCODE_OP_IMM;/o_opcode   <= OPCODE_SYSTEM;/" "" 2
 
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rd_ignored "s/rd = ZIHINTNTL_REG_ZERO and rs1/rs1/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs1_ignored "s/ and rs1 = ZIHINTNTL_REG_ZERO and/ and/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_funct7_ignored "s/ and funct7 = FUNCT7_DEFAULT//" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs2_too_wide "s/<= unsigned(ZIHINTNTL_RS2_LAST)/<= unsigned(ZIHINTNTL_RS2_LAST) + 1/" "" 2
+mutant "$ntl" "$ntl_props" zihintntl_decode '' ntl_rs2_too_low "s/>= unsigned(ZIHINTNTL_RS2_FIRST)/>= unsigned(ZIHINTNTL_RS2_FIRST) - 1/" "" 2
+
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_pred_ignored "s/i_instr(31 downto 20) = ZIHINTPAUSE_FM_PRED_SUCC/i_instr(31 downto 24) = ZIHINTPAUSE_FM_PRED_SUCC(11 downto 4)/" "" 2
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_rd_ignored "s/rd = ZIHINTPAUSE_REG_ZERO and rs1/rs1/" "" 2
+mutant "$pau" "$pau_props" zihintpause_decode '' pause_funct3_ignored "s/ and funct3 = FUNCT3_FENCE and/ and/" "" 2
+
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hi_is_lo "s/minstret_rd_hi when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/minstret_rd_lo when (i_addr = ADDR_MINSTRETH or i_addr = ADDR_INSTRETH)/" "-ghas_zicntr=true -gtick_cycles=3" 6
 
@@ -286,6 +321,14 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
+
+# Mutants of the interrupts in csr_file, one defect each.
+mutant "$csr" "$csr_irq_props" csr_file '' irq_lines_swapped "s/(i_irq_external \& i_irq_timer \& i_irq_software)/(i_irq_external \& i_irq_software \& i_irq_timer)/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/(irq_in and irq_en_reg) \/=/irq_in \/=/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_write_lost "s/i_enable => irq_en_we,/i_enable => '0',/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_bit_moved "s/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_EXTERNAL);/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_read_wrong_bit "s/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_SOFTWARE),/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_ports_not_gated "s/when has_interrupts else (others => '0');/when true else (others => '0');/" "-ghas_interrupts=false" 6
 
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_family_confused "s/i_funct3(2) = rec_funct3(2) and//" "" 10
