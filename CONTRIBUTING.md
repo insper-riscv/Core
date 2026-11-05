@@ -2,7 +2,7 @@
 
 🌐 [Português](CONTRIBUTING.md) · [English](CONTRIBUTING.en.md)
 
-Este documento define as regras obrigatórias de codificação VHDL, organização estrutural, documentação e verificação para qualquer contribuição ao repositório `Core`.
+Este documento define as regras obrigatórias de codificação (VHDL, C e Python), organização estrutural, documentação e verificação para qualquer contribuição ao repositório `Core`.
 
 ## 1. Normas VHDL e Compatibilidade de Síntese
 
@@ -29,7 +29,7 @@ A norma de referência é a [IEEE Std 1076-2008, IEEE Standard VHDL Language Ref
 }
 ```
 
-A organização em blocos reutilizáveis com interfaces e parâmetros explícitos (extensões em pastas próprias, controladas por generics) segue a [IEEE Std 1685, IEEE Standard for IP-XACT](https://standards.ieee.org/ieee/1685/10583/), cuja entrada BibTeX é:
+A organização em blocos reutilizáveis com interfaces e parâmetros explícitos segue a [IEEE Std 1685, IEEE Standard for IP-XACT](https://standards.ieee.org/ieee/1685/10583/), cuja entrada BibTeX é:
 
 ```bibtex
 @misc{ieee1685,
@@ -54,7 +54,29 @@ A metodologia de projeto para reuso de blocos de hardware segue o livro *Reuse M
 }
 ```
 
-## 2. Nomenclatura e Prefixos Obrigatórios em VHDL
+## 2. Norma C e Programas de Teste
+
+Todo código em C do projeto, onde quer que esteja (programas de teste, runtime e código de inicialização das plataformas), é escrito sob a norma **ISO/IEC 9899:2024 (C23)** e compilado com a flag `-std=c23`. O C é a linguagem dos programas que exercitam o processador, e é por meio deles que os módulos de hardware são verificados na simulação e na placa.
+
+| Regra | Especificação |
+| :--- | :--- |
+| Norma da linguagem | C23 (`-std=c23`) em todos os arquivos `.c` e `.h` |
+| Extensões do compilador | Não utilizar extensões GNU quando houver equivalente na norma |
+| Biblioteca padrão | picolibc, conforme a imagem de toolchain do Infra |
+
+A norma de referência é a [ISO/IEC 9899:2024, Programming languages: C](https://www.iso.org/standard/82075.html). Em trabalhos acadêmicos, cite-a com a entrada BibTeX abaixo:
+
+```bibtex
+@misc{iso9899,
+  title        = {Programming languages --- C},
+  author       = {{ISO/IEC}},
+  year         = {2024},
+  note         = {ISO/IEC 9899:2024},
+  howpublished = {\url{https://www.iso.org/standard/82075.html}}
+}
+```
+
+## 3. Nomenclatura e Prefixos Obrigatórios em VHDL
 
 Todos os identificadores de código devem ser escritos em **inglês**, enquanto todos os comentários e cabeçalhos devem ser escritos em **português**.
 
@@ -69,9 +91,9 @@ Todos os identificadores de código devem ser escritos em **inglês**, enquanto 
 | Sinais e variáveis internas | `snake_case` (prefixado pelo estágio quando aplicável) | `ex_alu_result`, `id_imm`, `wb_ram_raw` |
 | Rótulos de instância | Prefixo `u_` + `snake_case` | `u_alu`, `u_reg_file`, `u_pc_reg` |
 
-## 3. Cabeçalhos (Headers) e Docstrings em VHDL
+## 4. Cabeçalhos (Headers) e Docstrings em VHDL
 
-### 3.1. Cabeçalho Obrigatório de Arquivo
+### 4.1. Cabeçalho Obrigatório de Arquivo
 
 Todo arquivo `.vhd` deve iniciar com um bloco de cabeçalho de 72 colunas (`-- ====...====`) em português descrevendo a responsabilidade arquitetural do pacote ou da entidade:
 
@@ -86,7 +108,7 @@ Todo arquivo `.vhd` deve iniciar com um bloco de cabeçalho de 72 colunas (`-- =
 
 Seções internas de uma arquitetura devem utilizar separadores de 72 colunas com hífens simples (`-- ----...----`).
 
-### 3.2. Docstring Individual Acima de Cada Declaração
+### 4.2. Docstring Individual Acima de Cada Declaração
 
 Cada declaração individual de `generic`, `port`, `constant`, `subtype`, `type`, `signal`, `alias` e `variable` deve possuir seu próprio comentário descritivo em português imediatamente na linha acima. Comentários na mesma linha (inline ao final da linha) não substituem a docstring acima da declaração:
 
@@ -109,25 +131,25 @@ entity mux_2x1 is
 end entity mux_2x1;
 ```
 
-## 4. Projeto para Reuso e Proibição de Duplicação
+## 5. Projeto para Reuso e Proibição de Duplicação
 
 O projeto segue a prática de *Design for Reuse* descrita no *Reuse Methodology Manual* (Keating e Bricaud). Cada regra abaixo se traduz em um critério verificável em revisão:
 
-| # | Regra | Critério de revisão no `Core` |
+| # | Regra | Critério de revisão |
 | :--- | :--- | :--- |
-| 1 | **Blocos de propósito único:** separar controle, caminho de dados e interface de protocolo em entidades distintas | Uma entidade com mais de uma função (por exemplo, decodificar e executar) deve ser dividida; o topo `src/core/core.vhd` apenas conecta os cinco estágios (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e os quatro registradores de barreira (`reg_if_id`, `reg_id_ex`, `reg_ex_mem`, `reg_mem_wb`) |
-| 2 | **Parametrização por `generic` e constantes de pacote:** nenhuma largura, profundidade ou recurso fixado dentro da arquitetura | Nenhum literal mágico (`"0110011"`, `x"300"`) na lógica dos estágios; todo código de opcode, operação da ULA, seletor de imediato, seletor de write-back e endereço de CSR reside no pacote de constantes de `common/` ou da pasta da extensão |
+| 1 | **Blocos de propósito único:** separar controle, caminho de dados e interface de protocolo em entidades distintas | Uma entidade com mais de uma função deve ser dividida; um topo estrutural apenas conecta instâncias |
+| 2 | **Parametrização por `generic` e constantes de pacote:** nenhuma largura, profundidade ou recurso fixado dentro da arquitetura | Nenhum literal mágico na lógica; códigos, endereços e seletores residem em pacotes de constantes |
 | 3 | **Interfaces padronizadas e intercambiáveis:** entidades com a mesma assinatura de portas podem ser trocadas sem alterar quem as instancia | Trocar a arquitetura de um bloco não pode mudar suas portas nem seu comportamento observável de fora |
 | 4 | **Portas enxutas:** a entidade expõe somente as portas e os generics que usa | Sinais ou generics "para uso futuro" não entram em uma entidade |
 | 5 | **Dependência apenas das portas:** o nível superior conhece a declaração da entidade, nunca detalhes internos de sua arquitetura | O topo nunca carrega lógica fina de implementação |
-| 6 | **Composição com primitivos de `src/common/`:** reaproveitar os blocos-folha já verificados | Registradores simples instanciam `entity work.generic_register`, somadores dedicados instanciam `entity work.adder` e seletores estruturais usam `mux_2x1`, `mux_4x1`, `mux_tree` e `onehot_decoder`; não reimplementar com processos ou operadores redundantes o que o primitivo ou um sinal já calculado no estágio fornece |
-| 7 | **Extensões como blocos opcionais:** cada extensão reside em diretório próprio, habilitada por generic booleano no topo `core`, e se comporta como `NOP` quando desabilitada | Contrato em [docs/pt-br/contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md) |
+| 6 | **Composição com blocos-folha já verificados:** reaproveitar primitivos existentes | Não reimplementar com processos ou operadores redundantes o que um primitivo ou um sinal já calculado fornece |
+| 7 | **Extensões como blocos opcionais:** cada extensão reside em diretório próprio, habilitada por generic booleano no topo `core`, e se comporta como `NOP` quando desabilitada | Contrato em [docs/pt-br/contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md); o topo `src/core/core.vhd` apenas conecta os cinco estágios e os quatro registradores de barreira |
 
-## 5. Normas Python
+## 6. Normas Python
 
 O código Python (runner e testes em `tests/python/`) segue o [PEP 8](https://peps.python.org/pep-0008) (estilo) e o [PEP 257](https://peps.python.org/pep-0257) (docstrings); o `ruff` verifica ambos (regras `E`, `W`, `N` e `D`).
 
-### 5.1. Estilo de Código (PEP 8)
+### 6.1. Estilo de Código (PEP 8)
 
 > **Desvio do PEP 8:** O PEP 8 manda escrever comentários em inglês, e este projeto os escreve em **português**. Todas as demais recomendações do PEP 8 sobre comentários se mantêm, ou seja, frases completas, sempre atualizadas e sem repetir o que o código já diz. Identificadores continuam em inglês.
 
@@ -145,7 +167,7 @@ O código Python (runner e testes em `tests/python/`) segue o [PEP 8](https://pe
 | Comentários | **Em português** (desvio do PEP 8); frases completas, com inicial maiúscula, em linha própria ou após dois espaços no fim do código, iniciados por `# `; explicam o porquê, não repetem o que o código faz |
 | Idioma | Identificadores em **inglês**; comentários em **português** |
 
-### 5.2. Docstrings (PEP 257)
+### 6.2. Docstrings (PEP 257)
 
 | Regra | Especificação |
 | :--- | :--- |
@@ -176,7 +198,7 @@ def fetch_user(user_id: str, include_roles: bool = False) -> User:
     """
 ```
 
-### 5.3. Ferramentas e Processo
+### 6.3. Ferramentas e Processo
 
 | Regra | Especificação |
 | :--- | :--- |
@@ -187,37 +209,39 @@ def fetch_user(user_id: str, include_roles: bool = False) -> User:
 | Complexidade e duplicação | `complexipy` com máximo de 10 por função; `codeclone` para código duplicado |
 | Segurança | `semgrep` para análise estática; `uv audit` para vulnerabilidades nas dependências |
 
-## 6. Regras de Documentação Markdown
+## 7. Regras de Documentação Markdown
 
-Toda documentação do repositório mantém versões espelhadas em português (`README.md`, `docs/pt-br/`) e em inglês (`README.en.md`, `docs/en/`), obedecendo às seguintes regras:
+`README`, `CONTRIBUTING` e `AUTHORS` mantêm versões espelhadas em português (`*.md`) e em inglês (`*.en.md`), e a documentação em `docs/` mantém as pastas espelhadas `docs/pt-br/` e `docs/en/`, obedecendo às seguintes regras:
 
 1. **Seletor de idioma e rodapé de licença:** todo `README.md` e `README.en.md` traz no topo o seletor `🌐 [Português](...) · [English](...)`, e todo arquivo `.md` encerra com o rodapé de copyright e link para `LICENSE`.
 2. **Seções numeradas e progressivas:** todas as seções a partir de `##` devem ser numeradas (`## 1.`, `### 1.1.`, `## 2.`) em ordem lógica de leitura.
 3. **Pontuação direta:**
    - **Proibido o uso de travessão** em prosa ou tabelas; utilize vírgula, parênteses, ponto e vírgula ou dois-pontos conforme a relação sintática real.
    - **Proibidos dois-pontos encadeados** (mais de um `:` na mesma frase ou célula de tabela).
-4. **Explicação de comportamento:** nunca cite o nome de um arquivo, módulo ou sinal interno como se o próprio nome explicasse o que o hardware faz; descreva sempre a operação realizada.
+4. **Explicação de comportamento:** nunca cite o nome de um arquivo, módulo ou sinal interno como se o próprio nome explicasse o que o sistema faz; descreva sempre a operação realizada.
 5. **Tabelas e LaTeX sem redundância:** dados estruturados devem estar em tabelas Markdown e expressões matemáticas/lógicas em blocos LaTeX (`$$ ... $$` ou `$ ... $`), sem repetir em prosa o que a tabela ou equação já enuncia.
-6. **Sem histórico ou pendências na documentação técnica:** documentos de arquitetura e contratos descrevem exclusivamente o estado atual do hardware, sem changelogs internos nem listas de tarefas futuras.
+6. **Sem histórico ou pendências na documentação técnica:** documentos de arquitetura e contratos descrevem exclusivamente o estado atual, sem changelogs internos nem listas de tarefas futuras.
 7. **Guias de uso apenas instruem:** instruções de instalação e execução dizem como fazer, sem justificar a escolha do método.
 
-## 7. Verificação Obrigatória Antes de Abrir Pull Request
+## 8. Verificação Obrigatória Antes de Abrir Pull Request
 
-Qualquer alteração em código VHDL, manifestos de perfil ou documentação deve passar sem erros pelos cinco comandos abaixo antes do envio:
+Qualquer alteração em código, configuração ou documentação deve passar sem erros pelos comandos abaixo antes do envio:
 
 ```bash
-make check          # Verifica a sintaxe VHDL-2008 de todos os arquivos em ordem topológica
-make profiles       # Compila e elabora cada perfil em profiles/*.yaml no GHDL
-make paths          # Confere os caminhos de paths.yaml e a árvore do repositório (riscv-tools check-tree)
-make test           # Executa a suíte completa de testes unitários e de integração (cocotb + GHDL)
-make formal         # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
+make check     # Verifica a sintaxe VHDL-2008 de todos os fontes em ordem topológica
+make profiles  # Compila e elabora cada perfil em profiles/*.yaml no GHDL
+make test      # Executa os testes por entidade (cocotb + GHDL)
+make paths     # Confere os caminhos de paths.yaml e a árvore do repositório (riscv-tools check-tree)
+make formal    # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
 ```
 
-Warning no formal é erro. O `formal/run.sh` falha se o GHDL, o Yosys ou o SymbiYosys emitir qualquer `warning`, e a correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/FORMAL.md](docs/pt-br/FORMAL.md).
+O job `formal` do CI roda as provas uma vez por engine (`formal - yices`, `formal - bitwuzla`, `formal - boolector` e `formal - abc-bmc3`) e o job agregador `formal` decide a partir dos resultados: cada prova precisa ter uma resposta e os engines que responderam precisam concordar entre si e com o esperado. O nome `formal` é o check que o ruleset da branch padrão exige, então não o renomeie; os jobs `formal - <engine>` não são exigidos.
+
+Warning no formal é erro. O fluxo de verificação formal varre a saída do GHDL e os logs do Yosys e do SymbiYosys depois de cada passo, inclusive nos mutantes, e falha apontando o arquivo e a linha do aviso. A correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/FORMAL.md](docs/pt-br/FORMAL.md).
 
 O job `python-static-analysis` do CI roda `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` e `uv audit` sobre os arquivos Python, e o nome do job é o check que o ruleset da branch padrão exige, então não o renomeie.
 
-Ao adicionar, renomear ou remover qualquer arquivo `.vhd` ou `.md`, atualize imediatamente:
+Ao adicionar, renomear ou remover qualquer arquivo versionado, atualize imediatamente:
 - `profiles/*.yaml`
 - `tests/python/tests.json`
 - `paths.yaml`

@@ -19,7 +19,6 @@ Este repositório faz parte do Capstone de Engenharia de Computação e Ciência
 | 2025.2 | Lucas Fernando De Souza Lima | [@lucasouzamil](https://github.com/lucasouzamil) |
 | 2025.2 | Pedro Pereira Cecilio Ventura | [@pedropcventura](https://github.com/pedropcventura) |
 
-
 ## 2. Histórico do Projeto
 
 Cada grupo do Capstone continuou o trabalho do anterior. A lista completa dos grupos, incluindo quem não fez commits neste repositório, está no [README da organização](https://github.com/insper-riscv/.github/blob/main/profile/README.md).
