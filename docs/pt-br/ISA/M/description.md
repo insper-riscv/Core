@@ -89,7 +89,7 @@ O resultado é capturado num registrador no ciclo de conclusão e entregue ao es
 
 A `multdiv` mantém sua saída de parada ativa desde o ciclo do pulso de início, durante todo o cálculo e no ciclo de conclusão. O ciclo do pulso é coberto por um termo combinacional, de modo que a instrução para já no primeiro ciclo, e o restante vem de um flip-flop que guarda o ocupado do ciclo anterior. Assim, o pulso de conclusão não atravessa a lógica de parada do pipeline.
 
-O `core` combina essa parada com as demais condições (ver a seção 2.4 de [ARCHITECTURE.md](../../ARCHITECTURE.md)) e a conta no evento 1 do Zihpm. O custo por instrução, em ciclos de parada, é o da tabela.
+O `core` combina essa parada com as demais condições (ver a seção 2.4 de [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md)) e a conta no evento 1 do Zihpm. O custo por instrução, em ciclos de parada, é o da tabela.
 
 | Caso | Latência da unidade | Ciclos de parada |
 | :--- | :---: | :---: |
@@ -132,7 +132,7 @@ O registro é válido a partir da primeira operação concluída e só o reset o
 
 ## 7. Verificação Formal
 
-As propriedades de `formal/muldiv_fusion_props.sv` verificam a `muldiv_fusion` por BMC e cobertura (ver [FORMAL.md](../../FORMAL.md)). Um modelo guarda a última operação concluída e as asserções exigem que o acerto ocorra apenas no ciclo seguinte a um início, com registro válido, mesmos valores de operandos, mesma família e outra operação. Exigem também que, no ciclo de término fundido, o registro mostre exatamente o resultado completo que a execução anterior sobre aqueles operandos entregou. As coberturas alcançam o acerto de multiplicação e de divisão e os casos de operandos iguais com família diferente ou com a mesma operação.
+As propriedades de `formal/muldiv_fusion_props.sv` verificam a `muldiv_fusion` por BMC e cobertura (ver [FORMAL.md](../../formal/FORMAL.md)). Um modelo guarda a última operação concluída e as asserções exigem que o acerto ocorra apenas no ciclo seguinte a um início, com registro válido, mesmos valores de operandos, mesma família e outra operação. Exigem também que, no ciclo de término fundido, o registro mostre exatamente o resultado completo que a execução anterior sobre aqueles operandos entregou. As coberturas alcançam o acerto de multiplicação e de divisão e os casos de operandos iguais com família diferente ou com a mesma operação.
 
 ---
 

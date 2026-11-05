@@ -89,7 +89,7 @@ The result is captured in a register in the completion cycle and delivered to th
 
 `multdiv` keeps its stall output active from the start pulse cycle, throughout the computation and in the completion cycle. The pulse cycle is covered by a combinational term, so the instruction stalls already in the first cycle, and the rest comes from a flip-flop that keeps the busy of the previous cycle. Thus the completion pulse does not cross the pipeline stall logic.
 
-The `core` combines this stall with the other conditions (see section 2.4 of [ARCHITECTURE.md](../../ARCHITECTURE.md)) and counts it in Zihpm event 1. The cost per instruction, in stall cycles, is in the table.
+The `core` combines this stall with the other conditions (see section 2.4 of [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md)) and counts it in Zihpm event 1. The cost per instruction, in stall cycles, is in the table.
 
 | Case | Latency of the unit | Stall cycles |
 | :--- | :---: | :---: |
@@ -132,7 +132,7 @@ The record is valid from the first completed operation on and only reset invalid
 
 ## 7. Formal Verification
 
-The properties in `formal/muldiv_fusion_props.sv` verify `muldiv_fusion` by BMC and cover (see [FORMAL.md](../../FORMAL.md)). A model keeps the last completed operation, and the assertions require a hit only in the cycle after a start, with a valid record, same operand values, same family and another operation. They also require that, in the fused completion cycle, the record shows exactly the full result that the earlier execution on those operands delivered. The covers reach a multiplication hit and a division hit, and the cases of equal operands with a different family or with the same operation.
+The properties in `formal/muldiv_fusion_props.sv` verify `muldiv_fusion` by BMC and cover (see [FORMAL.md](../../formal/FORMAL.md)). A model keeps the last completed operation, and the assertions require a hit only in the cycle after a start, with a valid record, same operand values, same family and another operation. They also require that, in the fused completion cycle, the record shows exactly the full result that the earlier execution on those operands delivered. The covers reach a multiplication hit and a division hit, and the cases of equal operands with a different family or with the same operation.
 
 ---
 

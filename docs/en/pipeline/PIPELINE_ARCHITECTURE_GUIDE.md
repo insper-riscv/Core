@@ -4,7 +4,7 @@ This guide details the inputs, outputs, internal components, and control encodin
 
 ## 1. Structural Top Level and Pipeline Stages
 
-![Pipeline overview](../figuras/pipeline.svg)
+![Pipeline overview](../../figuras/pipeline.svg)
 
 The processor is divided into five stage entities located in `core/` and four barrier registers in `common/`, interconnected by the top level `src/core/core.vhd`:
 
@@ -24,7 +24,7 @@ The processor is divided into five stage entities located in `core/` and four ba
 
 ### 2.1. Stage 1: Instruction Fetch (`stage_if` and `pc_fetch`)
 
-![IF stage](../figuras/if.svg)
+![IF stage](../../figuras/if.svg)
 
 The IF stage selects the next instruction address through the `pc_src` code (`pc_src_t`) defined in `src/shared/pc_src_consts.vhd`:
 
@@ -45,7 +45,7 @@ Instruction fetch address (`if_pc`) decoding uses the bounds from `src/shared/me
 
 ### 2.2. Stage 2: Instruction Decode and Register Read (`stage_id`)
 
-![ID stage](../figuras/id.svg)
+![ID stage](../../figuras/id.svg)
 
 The ID stage comprises seven sub-blocks:
 
@@ -69,9 +69,9 @@ The ID stage comprises seven sub-blocks:
 
 ### 2.3. Stage 3: Execute (`stage_ex`)
 
-![EX stage](../figuras/ex.svg)
+![EX stage](../../figuras/ex.svg)
 
-![multdiv unit](../figuras/multdiv.svg)
+![multdiv unit](../../figuras/multdiv.svg)
 
 In the EX stage:
 
@@ -100,14 +100,14 @@ In the EX stage:
 | `ALU_BLTU` | `"11110"` | `0` | `'1'` if `unsigned(i_a) < unsigned(i_b)` |
 | `ALU_BGEU` | `"11111"` | `0` | `'1'` if `unsigned(i_a) >= unsigned(i_b)` |
 
-The encoding of the operation code and the shared adder-subtractor are described in [ULA.md](ISA/I/ULA.md).
+The encoding of the operation code and the shared adder-subtractor are described in [ULA.md](../ISA/I/ULA.md).
 
 4. **EX result selection:** `ex_alu_mux_result` chooses between `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`), and `ex_alu_result`. Next, `u_mux_ex_final` (`mux_2x1`) selects between `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) and `i_pc4` (`i_sel_pc4_alu = '1'`, used by `JAL` and `JALR`).
 5. **Store alignment (`store_manager`):** shifts `ex_fwd_rs2_val` into the byte lanes matching `ex_alu_result(1 downto 0)` and produces the 4-bit mask `o_store_byte_mask` (`"1111"` for `SW`, `"0011"`/`"1100"` for `SH`, and `"0001"`/`"0010"`/`"0100"`/`"1000"` for `SB`).
 
 ### 2.4. Stage 4: Data Memory Access (`stage_mem`)
 
-![MEM stage](../figuras/mem.svg)
+![MEM stage](../../figuras/mem.svg)
 
 The MEM stage decodes the effective address `i_alu_out` using the bounds in `src/shared/mem_map_consts.vhd`:
 
@@ -119,7 +119,7 @@ The MEM stage decodes the effective address `i_alu_out` using the bounds in `src
 
 ### 2.5. Stage 5: Write-Back (`stage_wb`)
 
-![WB stage](../figuras/wb.svg)
+![WB stage](../../figuras/wb.svg)
 
 In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_sdram_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_alu_out(1 downto 0)` and applies the extension mode defined in `src/shared/ext_ram_consts.vhd`:
 
@@ -140,4 +140,4 @@ Finally, the `u_mux_wb` (`mux_2x1`) multiplexer selects `o_wb_data` according to
 
 ---
 
-Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../LICENSE).

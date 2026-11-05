@@ -2,7 +2,7 @@
 
 This document describes the microarchitectural organization of the processor, the structural decomposition into five stages, the handling of data and control hazards, and the integration of the `M`, `Zicsr`, and `Zifencei` extensions.
 
-![Pipeline Diagram](../img/multi-stage-rv32m_pipeline_final-Pipeline.jpg)
+![Pipeline Diagram](../../img/multi-stage-rv32m_pipeline_final-Pipeline.jpg)
 
 ## 1. Overview and Structural Decomposition
 
@@ -90,7 +90,7 @@ $$
 
 ### 3.1. M Extension (Integer Multiplication and Division)
 
-Instructions, semantics and implementation details of `M`: [ISA/M/instructions.md](ISA/M/instructions.md) and [ISA/M/description.md](ISA/M/description.md). Multiplication alone (`Zmmul`) is in [ISA/Zmmul/instructions.md](ISA/Zmmul/instructions.md) and [ISA/Zmmul/description.md](ISA/Zmmul/description.md).
+Instructions, semantics and implementation details of `M`: [ISA/M/instructions.md](../ISA/M/instructions.md) and [ISA/M/description.md](../ISA/M/description.md). Multiplication alone (`Zmmul`) is in [ISA/Zmmul/instructions.md](../ISA/Zmmul/instructions.md) and [ISA/Zmmul/description.md](../ISA/Zmmul/description.md).
 
 When `has_m = true`, the `m_decode` decoder in the ID stage recognizes R-type instructions with `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`), asserting `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'`.
 
@@ -120,7 +120,7 @@ The M chapter recommends running `MULH[[S]U]` followed by `MUL`, and `DIV[U]` fo
 
 ### 3.2. Zicsr Extension and Trap Handling
 
-The instruction specification and the full implementation description are in [instructions.md](ISA/Zicsr/instructions.md) and [description.md](ISA/Zicsr/description.md).
+The instruction specification and the full implementation description are in [instructions.md](../ISA/Zicsr/instructions.md) and [description.md](../ISA/Zicsr/description.md).
 
 When `has_zicsr = true`, the `csr_decode` decoder in the ID stage identifies the `OPCODE_SYSTEM` class (`"1110011"`), forces I-type immediate extraction (`instr[31:20]`) to carry the 12-bit CSR address into EX, and asserts `o_is_csr = '1'` and `o_we_reg = '1'` for the six CSR access instructions (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
 
@@ -138,7 +138,7 @@ When `has_zifencei = true`, the `fencei_unit` in the EX stage detects the `FENCE
 
 ### 3.4. Zicntr Extension
 
-The full description of the counters is in [ISA/Zicntr](ISA/Zicntr/description.md) and, for Zihpm, in [ISA/Zihpm](ISA/Zihpm/description.md).
+The full description of the counters is in [ISA/Zicntr](../ISA/Zicntr/description.md) and, for Zihpm, in [ISA/Zihpm](../ISA/Zihpm/description.md).
 
 When `has_zicntr = true` (which implies `has_zicsr`), `csr_file` instantiates three 64-bit counters, each made of two 32-bit halves with a registered carry between them. A read adds the pending carry to the high half, so a `csrr` of `cycleh` right after the low half wraps already sees the correct value.
 
@@ -152,4 +152,4 @@ When `has_zicntr = true` (which implies `has_zicsr`), `csr_file` instantiates th
 
 ---
 
-Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../LICENSE).

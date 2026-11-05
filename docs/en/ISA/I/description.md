@@ -1,6 +1,6 @@
 # RV32I: Core Implementation
 
-This document describes how the Core implements the RV32I base integer set. The RISC-V manual requirements are in [instructions.md](instructions.md), and the full pipeline microarchitecture is in [ARCHITECTURE.md](../../ARCHITECTURE.md).
+This document describes how the Core implements the RV32I base integer set. The RISC-V manual requirements are in [instructions.md](instructions.md), and the full pipeline microarchitecture is in [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md).
 
 ## 1. Base Modules
 
@@ -69,7 +69,7 @@ Branches and jumps resolve in EX, under the assume-not-taken policy.
 | `JALR` | $(x[rs1] + \text{imm}_I) \land \texttt{0xFFFFFFFE}$, in the ALU | Always taken |
 | `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` | $\text{pc} + \text{imm}_B$, in the branch adder | ALU `o_branch` |
 
-`JAL` and `JALR` write $\text{pc} + 4$ to `rd` through the normal EX result path. When a branch or jump is taken, the IF/ID and ID/EX registers are discarded, which costs two cycles. The `pc` selector and its priority are in [ARCHITECTURE.md](../../ARCHITECTURE.md), section 2.3.
+`JAL` and `JALR` write $\text{pc} + 4$ to `rd` through the normal EX result path. When a branch or jump is taken, the IF/ID and ID/EX registers are discarded, which costs two cycles. The `pc` selector and its priority are in [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.3.
 
 ## 6. Data-Memory Access
 
@@ -99,7 +99,7 @@ The load extender, in WB, receives the word read and the byte offset.
 | `LB` | Byte of the selected lane, sign-extended |
 | `LBU` | Byte of the selected lane, zero-extended |
 
-The final data of a load exists only at the end of WB. For this reason load forwarding starts from the WB2 register, and not from MEM/WB. Misaligned accesses, memory width, and the map regions have their own documents ([Zicclsm/description.md](../Zicclsm/description.md) and [MEMORY_WIDTH.md](../../MEMORY_WIDTH.md)).
+The final data of a load exists only at the end of WB. For this reason load forwarding starts from the WB2 register, and not from MEM/WB. Misaligned accesses, memory width, and the map regions have their own documents ([Zicclsm/description.md](../Zicclsm/description.md) and [MEMORY_WIDTH.md](../../pipeline/MEMORY_WIDTH.md)).
 
 ## 7. Register File
 
@@ -115,10 +115,10 @@ The final data of a load exists only at the end of WB. For this reason load forw
 
 | Situation | Handling | Cost | Detail |
 | :--- | :--- | :--- | :--- |
-| Data dependence between nearby instructions | Forwarding to the EX operands from EX/MEM, MEM/WB, and WB2, with priority to the stage closest to EX; `x0` is never forwarded | None | [ARCHITECTURE.md](../../ARCHITECTURE.md), section 2.1 |
-| Use of a load result | ID stall with a bubble in ID/EX | 2 cycles if the dependence is immediate, 1 if one instruction sits between them | [ARCHITECTURE.md](../../ARCHITECTURE.md), section 2.2 |
-| Taken branch or jump | Discard of IF/ID and ID/EX | 2 cycles | [ARCHITECTURE.md](../../ARCHITECTURE.md), section 2.3 |
-| Slow-memory wait | Global pipeline freeze | Wait time | [ARCHITECTURE.md](../../ARCHITECTURE.md), section 2.4 |
+| Data dependence between nearby instructions | Forwarding to the EX operands from EX/MEM, MEM/WB, and WB2, with priority to the stage closest to EX; `x0` is never forwarded | None | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.1 |
+| Use of a load result | ID stall with a bubble in ID/EX | 2 cycles if the dependence is immediate, 1 if one instruction sits between them | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.2 |
+| Taken branch or jump | Discard of IF/ID and ID/EX | 2 cycles | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.3 |
+| Slow-memory wait | Global pipeline freeze | Wait time | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.4 |
 
 ## 9. Generics That Affect the Base
 
