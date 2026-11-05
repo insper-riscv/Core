@@ -95,4 +95,4 @@ The tests of the guard run together with those of the aggregator, with `bash for
 
 ---
 
-Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../../LICENSE).

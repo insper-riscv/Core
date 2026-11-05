@@ -1,6 +1,6 @@
 # RV32I: Implementação no Core
 
-Este documento descreve como o Core implementa a base inteira RV32I. Os requisitos do manual do RISC-V estão em [instructions.md](instructions.md), e a microarquitetura completa do pipeline em [ARCHITECTURE.md](../../ARCHITECTURE.md).
+Este documento descreve como o Core implementa a base inteira RV32I. Os requisitos do manual do RISC-V estão em [instructions.md](instructions.md), e a microarquitetura completa do pipeline em [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md).
 
 ## 1. Módulos da Base
 
@@ -69,7 +69,7 @@ Os desvios e saltos são resolvidos em EX, sob a política de assumir desvio nã
 | `JALR` | $(x[rs1] + \text{imm}_I) \land \texttt{0xFFFFFFFE}$, na ULA | Sempre tomado |
 | `BEQ`, `BNE`, `BLT`, `BGE`, `BLTU`, `BGEU` | $\text{pc} + \text{imm}_B$, no somador de desvio | `o_branch` da ULA |
 
-`JAL` e `JALR` gravam $\text{pc} + 4$ em `rd` pelo caminho normal do resultado de EX. Quando um desvio ou salto é tomado, os registradores IF/ID e ID/EX são descartados, o que custa dois ciclos. O seletor de `pc` e sua prioridade estão em [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 2.3.
+`JAL` e `JALR` gravam $\text{pc} + 4$ em `rd` pelo caminho normal do resultado de EX. Quando um desvio ou salto é tomado, os registradores IF/ID e ID/EX são descartados, o que custa dois ciclos. O seletor de `pc` e sua prioridade estão em [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.3.
 
 ## 6. Acesso à Memória de Dados
 
@@ -99,7 +99,7 @@ O extensor de leitura, em WB, recebe a palavra lida e o deslocamento de bytes.
 | `LB` | Byte da faixa escolhida, com extensão de sinal |
 | `LBU` | Byte da faixa escolhida, com extensão de zero |
 
-O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um load parte do registrador WB2, e não de MEM/WB. Acessos desalinhados, a largura da memória e as regiões do mapa têm documentos próprios ([Zicclsm/description.md](../Zicclsm/description.md) e [MEMORY_WIDTH.md](../../MEMORY_WIDTH.md)).
+O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um load parte do registrador WB2, e não de MEM/WB. Acessos desalinhados, a largura da memória e as regiões do mapa têm documentos próprios ([Zicclsm/description.md](../Zicclsm/description.md) e [MEMORY_WIDTH.md](../../pipeline/MEMORY_WIDTH.md)).
 
 ## 7. Banco de Registradores
 
@@ -115,10 +115,10 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 
 | Situação | Tratamento | Custo | Detalhe |
 | :--- | :--- | :--- | :--- |
-| Dependência de dados entre instruções próximas | Adiantamento para os operandos de EX a partir de EX/MEM, MEM/WB e WB2, com prioridade ao estágio mais próximo de EX; `x0` nunca é adiantado | Nenhum | [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 2.1 |
-| Uso do resultado de um load | Parada de ID com bolha em ID/EX | 2 ciclos se a dependência é imediata, 1 se há uma instrução entre os dois | [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 2.2 |
-| Desvio ou salto tomado | Descarte de IF/ID e ID/EX | 2 ciclos | [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 2.3 |
-| Espera de memória lenta | Congelamento global do pipeline | Tempo de espera | [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 2.4 |
+| Dependência de dados entre instruções próximas | Adiantamento para os operandos de EX a partir de EX/MEM, MEM/WB e WB2, com prioridade ao estágio mais próximo de EX; `x0` nunca é adiantado | Nenhum | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.1 |
+| Uso do resultado de um load | Parada de ID com bolha em ID/EX | 2 ciclos se a dependência é imediata, 1 se há uma instrução entre os dois | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.2 |
+| Desvio ou salto tomado | Descarte de IF/ID e ID/EX | 2 ciclos | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.3 |
+| Espera de memória lenta | Congelamento global do pipeline | Tempo de espera | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.4 |
 
 ## 9. Genéricos que Afetam a Base
 

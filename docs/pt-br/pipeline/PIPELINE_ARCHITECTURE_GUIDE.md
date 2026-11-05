@@ -4,7 +4,7 @@ Este guia detalha as entradas, saídas, componentes internos e códigos de contr
 
 ## 1. Topo Estrutural e Estágios do Pipeline
 
-![Visão geral do pipeline](../figuras/pipeline.svg)
+![Visão geral do pipeline](../../figuras/pipeline.svg)
 
 O processador é dividido em cinco entidades de estágio localizadas em `core/` e quatro registradores de barreira em `common/`, interconectados pelo topo `src/core/core.vhd`:
 
@@ -24,7 +24,7 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 
 ### 2.1. Estágio 1: Busca de Instrução (`stage_if` e `pc_fetch`)
 
-![Estágio IF](../figuras/if.svg)
+![Estágio IF](../../figuras/if.svg)
 
 O estágio IF seleciona o próximo endereço de instrução por meio do código `pc_src` (`pc_src_t`) definido em `src/shared/pc_src_consts.vhd`:
 
@@ -45,7 +45,7 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/sha
 
 ### 2.2. Estágio 2: Decodificação e Leitura de Registradores (`stage_id`)
 
-![Estágio ID](../figuras/id.svg)
+![Estágio ID](../../figuras/id.svg)
 
 O estágio ID reúne sete subblocos:
 
@@ -69,9 +69,9 @@ O estágio ID reúne sete subblocos:
 
 ### 2.3. Estágio 3: Execução (`stage_ex`)
 
-![Estágio EX](../figuras/ex.svg)
+![Estágio EX](../../figuras/ex.svg)
 
-![Unidade multdiv](../figuras/multdiv.svg)
+![Unidade multdiv](../../figuras/multdiv.svg)
 
 No estágio EX:
 
@@ -100,14 +100,14 @@ No estágio EX:
 | `ALU_BLTU` | `"11110"` | `0` | `'1'` se `unsigned(i_a) < unsigned(i_b)` |
 | `ALU_BGEU` | `"11111"` | `0` | `'1'` se `unsigned(i_a) >= unsigned(i_b)` |
 
-A codificação do código de operação e o somador-subtrator compartilhado estão descritos em [ULA.md](ISA/I/ULA.md).
+A codificação do código de operação e o somador-subtrator compartilhado estão descritos em [ULA.md](../ISA/I/ULA.md).
 
 4. **Seleção do resultado de EX:** o sinal `ex_alu_mux_result` escolhe entre `ex_muldiv_result` (`i_is_muldiv = '1'`), `csr_rdata` (`i_is_csr = '1'`) e `ex_alu_result`. Em seguida, `u_mux_ex_final` (`mux_2x1`) seleciona entre `ex_alu_mux_result` (`i_sel_pc4_alu = '0'`) e `i_pc4` (`i_sel_pc4_alu = '1'`, usado em `JAL` e `JALR`).
 5. **Alinhamento de Store (`store_manager`):** desloca `ex_fwd_rs2_val` para as lanes de byte correspondentes a `ex_alu_result(1 downto 0)` e gera a máscara de 4 bits `o_store_byte_mask` (`"1111"` para `SW`, `"0011"`/`"1100"` para `SH` e `"0001"`/`"0010"`/`"0100"`/`"1000"` para `SB`).
 
 ### 2.4. Estágio 4: Acesso à Memória de Dados (`stage_mem`)
 
-![Estágio MEM](../figuras/mem.svg)
+![Estágio MEM](../../figuras/mem.svg)
 
 O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de `src/shared/mem_map_consts.vhd`:
 
@@ -119,7 +119,7 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 
 ### 2.5. Estágio 5: Write-Back (`stage_wb`)
 
-![Estágio WB](../figuras/wb.svg)
+![Estágio WB](../../figuras/wb.svg)
 
 No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_sdram_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
 
@@ -140,4 +140,4 @@ Por fim, o multiplexador `u_mux_wb` (`mux_2x1`) seleciona `o_wb_data` de acordo 
 
 ---
 
-Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../LICENSE).
+Copyright 2026 Insper. Licenciado sob a [Apache License, Version 2.0](../../../LICENSE).

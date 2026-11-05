@@ -88,7 +88,7 @@ Um contador inibido mantém o valor e continua legível e gravável.
 | Prova formal de `csr_file` com Zihpm | `formal/csr_hpm_props.sv`: os 29 índices das cinco faixas, a ilegalidade dos espelhos e dos endereços não definidos, a leitura zero além de `hpm_counters`, o modelo de cada contador e a decodificação sem sobreposição, com 29, 4, 2, 5 e 3 contadores e larguras de 64, 40, 20 e 0 bits, mais um mutante por propriedade |
 | Prova formal de `counter64` | Valor ideal da largura escolhida, de 1 a 64 bits, com escrita truncada |
 
-O procedimento das provas está em [FORMAL.md](../../FORMAL.md).
+O procedimento das provas está em [FORMAL.md](../../formal/FORMAL.md).
 
 ---
 

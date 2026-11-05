@@ -213,7 +213,7 @@ make test           # Executa a suíte completa de testes unitários e de integr
 make formal         # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
 ```
 
-Warning no formal é erro. O `formal/run.sh` falha se o GHDL, o Yosys ou o SymbiYosys emitir qualquer `warning`, e a correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/FORMAL.md](docs/pt-br/FORMAL.md).
+Warning no formal é erro. O `formal/run.sh` falha se o GHDL, o Yosys ou o SymbiYosys emitir qualquer `warning`, e a correção é sempre no código ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Os detalhes estão em [docs/pt-br/formal/FORMAL.md](docs/pt-br/formal/FORMAL.md).
 
 O job `python-static-analysis` do CI roda `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` e `uv audit` sobre os arquivos Python, e o nome do job é o check que o ruleset da branch padrão exige, então não o renomeie.
 

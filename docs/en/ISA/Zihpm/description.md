@@ -88,7 +88,7 @@ An inhibited counter keeps its value and stays readable and writable.
 | Formal proof of `csr_file` with Zihpm | `formal/csr_hpm_props.sv`: the 29 indices of the five ranges, the illegality of the mirrors and of the undefined addresses, the zero read past `hpm_counters`, the model of each counter and the decoding without overlap, with 29, 4, 2, 5 and 3 counters and widths of 64, 40, 20 and 0 bits, plus one mutant per property |
 | Formal proof of `counter64` | Ideal value of the chosen width, from 1 to 64 bits, with truncated writes |
 
-The proof procedure is in [FORMAL.md](../../FORMAL.md).
+The proof procedure is in [FORMAL.md](../../formal/FORMAL.md).
 
 ---
 

@@ -136,7 +136,7 @@ Seção 1.1.8 do manual. Ambas são instruções SYSTEM do formato I. `ECALL` so
 | Com a extensão Zicsr | Exceção de causa 11 (chamada de ambiente do modo M), com `mtval` igual a 0 e redirecionamento do `pc` para `mtvec` | Exceção de causa 3 (breakpoint), com `mtval` igual a 0 e redirecionamento do `pc` para `mtvec` |
 | Sem a extensão Zicsr | A saída `o_trap` do Core sinaliza a ocorrência, com a causa e o `pc` da instrução; o fluxo segue sem redirecionamento | Igual ao `ECALL`, com causa 3 |
 
-Qualquer outra instrução SYSTEM que não seja de acesso a CSR, `MRET` ou `WFI`, incluindo `ECALL` ou `EBREAK` com `rd` ou `rs1` diferentes de `x0`, é ilegal e gera a causa 2. Os detalhes do trap estão em [ARCHITECTURE.md](../../ARCHITECTURE.md), seção 3.2.
+Qualquer outra instrução SYSTEM que não seja de acesso a CSR, `MRET` ou `WFI`, incluindo `ECALL` ou `EBREAK` com `rd` ou `rs1` diferentes de `x0`, é ilegal e gera a causa 2. Os detalhes do trap estão em [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 3.2.
 
 ## 6. `NOP` e Instruções HINT
 
