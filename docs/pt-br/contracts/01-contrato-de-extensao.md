@@ -65,7 +65,8 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
 | `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
-| Não implementados | Interrupções (`mie` e `mip` leem zero e ignoram escritas); os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
+| Interrupções | Com `has_interrupts = true`, `mip` espelha as portas `i_irq_software`, `i_irq_timer` e `i_irq_external` e `mie` guarda os bits 3, 7 e 11; sem o generic, `mie` e `mip` leem zero e ignoram escritas |
+| Não implementados | Os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
 
 Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `has_zicsr = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
 
@@ -86,7 +87,7 @@ Registradores CSR implementados no modo máquina:
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Leitura e escrita | `0x00001800` | `MPP` (bits `[12:11]`) fixo em `"11"`; bits `MIE` (bit 3) e `MPIE` (bit 7) graváveis |
 | `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `has_e` verdadeiro a base é a `E` e o valor é `0x40001010` |
-| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Todos os bits fixos em zero |
+| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `has_interrupts`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem o generic, todos fixos em zero |
 | `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` (modo direto) |
 | `0x310` | `mstatush` | Leitura e escrita | `0x00000000` | Todos os bits fixos em zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Leitura e escrita | `0x00000000` | 32 bits completos |

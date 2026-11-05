@@ -57,7 +57,9 @@ entity core is
 		-- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters); os outros leem zero.
 		hpm_counters    : natural range 0 to 29 := 29;
 		-- Largura em bits de cada contador de eventos real, de 0 a 64.
-		hpm_width       : natural range 0 to 64 := 64
+		hpm_width       : natural range 0 to 64 := 64;
+		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
+		has_interrupts  : boolean := false
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -137,7 +139,13 @@ entity core is
 		o_retire        : out std_logic;
 		-- Eventos das caches e da FLASH para os contadores do Zihpm: bit 0 falha da cache de instruções (evento 5),
 		-- bit 1 falha da cache de dados (6), bit 2 ciclo de espera por FLASH (7); pulsos de um ciclo.
-		i_hpm_ext_events : in  std_logic_vector(2 downto 0) := (others => '0')
+		i_hpm_ext_events : in  std_logic_vector(2 downto 0) := (others => '0');
+		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do núcleo; fontes de outro domínio passam por um synchronizer.
+		i_irq_software  : in  std_logic := '0';
+		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do núcleo.
+		i_irq_timer     : in  std_logic := '0';
+		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do núcleo.
+		i_irq_external  : in  std_logic := '0'
 	);
 end entity core;
 
@@ -501,6 +509,11 @@ begin
 		report "has_zicntr e has_zihpm exigem has_zicsr"
 		severity failure;
 
+	-- mip e mie são CSRs: sem Zicsr não há onde lê-los.
+	assert has_zicsr or (not has_interrupts)
+		report "has_interrupts exige has_zicsr"
+		severity failure;
+
 
 	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
@@ -700,6 +713,7 @@ begin
 			has_zihpm       => has_zihpm,
 			hpm_counters    => hpm_counters,
 			hpm_width       => hpm_width,
+			has_interrupts  => has_interrupts,
 			boot_rom_bits   => boot_rom_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
@@ -711,6 +725,9 @@ begin
 		)
 		port map (
 			i_hpm_events      => hpm_events,
+			i_irq_software    => i_irq_software,
+			i_irq_timer       => i_irq_timer,
+			i_irq_external    => i_irq_external,
 			i_clk             => i_clk,
 			i_rst             => i_rst,
 			i_base_run        => base_run,

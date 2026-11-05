@@ -73,6 +73,7 @@ netlist() {
     "$root/src/Zicsr/csr_addr_consts.vhd" \
     "$root/src/Zicsr/csr_event_consts.vhd" \
     "$root/src/Zicsr/csr_value_consts.vhd" \
+    "$root/src/Zicsr/irq_consts.vhd" \
     "$root/src/common/src/utils_pkg.vhd" \
     "$root/src/common/src/mux_tree.vhd" \
     "$root/src/Zicntr/counter64.vhd" \
@@ -215,6 +216,15 @@ expect "5 counters of 20 bits: the low half truncates and the high half reads ze
 netlist "$csr" csr_file csrh0 "-ghas_zihpm=true -ghpm_counters=3 -ghpm_width=0"
 expect "width 0: no real counter, all 29 indices read zero (bounded, 6 cycles)" PASS "$(prove csrh0.v "$csr_hpm_props" bmc 6 '-DNHPM=3 -DWIDTH=0' csrh0_safety)"
 
+echo "csr_file with interrupts"
+csr_irq_props="$root/formal/csr_irq_props.sv"
+# The model keeps the three mask bits of mie, which the register holds outside the unit proven by induction, so the proofs are bounded from reset: they check the wiring (positions, read-only mip, mask, pending).
+netlist "$csr" csr_file csri "-ghas_interrupts=true"
+expect "mip reads the three lines, mie keeps bits 3, 7 and 11, a write to mip changes nothing, pending is lines and mask (bounded, 6 cycles)" PASS "$(prove csri.v "$csr_irq_props" bmc 6 '' csri_safety)"
+expect "cover: a pending timer alone, a mie write setting MTIE and a write to mip are reachable" PASS "$(prove csri.v "$csr_irq_props" cover 12 '-DCOVER' csri_cover)"
+netlist "$csr" csr_file csrio "-ghas_interrupts=false"
+expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (bounded, 6 cycles)" PASS "$(prove csrio.v "$csr_irq_props" bmc 6 '-DOFF' csrio_safety)"
+
 echo "zicond_unit"
 zc="$root/src/Zicond/zicond_unit.vhd"; zc_props="$root/formal/zicond_props.sv"
 netlist "$zc" zicond_unit zc
@@ -286,6 +296,14 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
+
+# Mutants of the interrupts in csr_file, one defect each.
+mutant "$csr" "$csr_irq_props" csr_file '' irq_lines_swapped "s/(i_irq_external \& i_irq_timer \& i_irq_software)/(i_irq_external \& i_irq_software \& i_irq_timer)/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/(irq_in and irq_en_reg) \/=/irq_in \/=/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_write_lost "s/i_enable => irq_en_we,/i_enable => '0',/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_bit_moved "s/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_EXTERNAL);/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_read_wrong_bit "s/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_SOFTWARE),/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_ports_not_gated "s/when has_interrupts else (others => '0');/when true else (others => '0');/" "-ghas_interrupts=false" 6
 
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_family_confused "s/i_funct3(2) = rec_funct3(2) and//" "" 10

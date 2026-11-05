@@ -16,7 +16,14 @@
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
 --   - O misa anuncia RV32I (RV32E quando base_e = true) e, quando has_m = true, a
---     extensão M. mie e mip leem zero porque não há interrupções.
+--     extensão M.
+--   - Com has_interrupts = true, mip e mie funcionam: mip (0x344) é somente leitura e
+--     espelha as portas i_irq_software (bit 3, MSIP), i_irq_timer (bit 7, MTIP) e
+--     i_irq_external (bit 11, MEIP), e mie (0x304) guarda os bits 3, 7 e 11 (MSIE, MTIE e
+--     MEIE); os demais bits dos dois leem zero e ignoram a escrita, e a escrita em mip não
+--     gera exceção. o_irq_pending vale '1' quando algum bit de mip e o de mie estão
+--     ambos em '1', sem considerar mstatus.MIE. Sem has_interrupts as portas são
+--     ignoradas e mie e mip leem zero e ignoram a escrita.
 --   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
 --     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
 --     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
@@ -49,6 +56,7 @@ use work.pipeline_types.all;
 use work.csr_addr_consts.all;
 use work.csr_event_consts.all;
 use work.csr_value_consts.all;
+use work.irq_consts.all;
 use work.byte_mask_consts.all;
 use work.word_consts.all;
 
@@ -67,7 +75,9 @@ entity csr_file is
 		-- Quantidade de contadores de eventos reais da extensão Zihpm, de índices 3 a 2 + hpm_counters; os outros leem zero.
 		hpm_counters : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
 		-- Largura em bits de cada contador de eventos real (0 a 64).
-		hpm_width : natural range 0 to 64 := 64
+		hpm_width : natural range 0 to 64 := 64;
+		-- Habilita as interrupções de máquina: mip espelha as portas i_irq_* e mie guarda as máscaras.
+		has_interrupts : boolean := false
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -107,7 +117,15 @@ entity csr_file is
 		-- Endereço base do tratador de traps armazenado no registrador mtvec.
 		o_mtvec      : out word_t;
 		-- Endereço de retorno de exceção armazenado no registrador mepc.
-		o_mepc       : out word_t
+		o_mepc       : out word_t;
+		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do core.
+		i_irq_software : in  std_logic := '0';
+		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do core.
+		i_irq_timer    : in  std_logic := '0';
+		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do core.
+		i_irq_external : in  std_logic := '0';
+		-- Há interrupção pendente e habilitada em mie, sem considerar mstatus.MIE ('0' sem has_interrupts).
+		o_irq_pending  : out std_logic
 	);
 end entity csr_file;
 
@@ -233,6 +251,19 @@ architecture rtl of csr_file is
 	-- Bits 2 a 0 de mcountinhibit como o programa os lê (zero fora do endereço).
 	signal inhibit_word      : word_t;
 
+	-- Valor das três portas de interrupção na ordem software, timer e externa (zero sem has_interrupts).
+	signal irq_in            : std_logic_vector(IRQ_COUNT - 1 downto 0);
+	-- Valor registrado das máscaras MSIE, MTIE e MEIE na mesma ordem.
+	signal irq_en_reg        : std_logic_vector(IRQ_COUNT - 1 downto 0);
+	-- Próximo valor das máscaras, tirado do valor escrito.
+	signal irq_en_nxt        : std_logic_vector(IRQ_COUNT - 1 downto 0);
+	-- Habilitação de escrita em mie.
+	signal irq_en_we         : std_logic;
+	-- Palavra de mip como o programa a lê.
+	signal mip_value         : word_t;
+	-- Palavra de mie como o programa a lê.
+	signal mie_value         : word_t;
+
 	-- Sinais de habilitação e próximo valor para os flip-flops de mstatus (MIE e MPIE).
 	signal mie_we            : std_logic;
 	-- Próximo bit a ser gravado em mstatus_mie.
@@ -281,6 +312,8 @@ begin
 			mepc_reg      when ADDR_MEPC,
 			mcause_reg    when ADDR_MCAUSE,
 			mtval_reg     when ADDR_MTVAL,
+			mie_value     when ADDR_MIE,
+			mip_value     when ADDR_MIP,
 			cntr_value or ext_value when others;
 
 	with i_addr select
@@ -333,6 +366,45 @@ begin
 
 	mtval_we    <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else '0';
 	mtval_nxt   <= i_trap_tval  when i_trap_take = '1' else new_value;
+
+	-- Interrupções de máquina: mip espelha as portas, mie guarda as máscaras.
+	irq_in <= (i_irq_external & i_irq_timer & i_irq_software) when has_interrupts else (others => '0');
+
+	mip_value <= (IRQ_BIT_EXTERNAL => irq_in(IRQ_IDX_EXTERNAL),
+	              IRQ_BIT_TIMER    => irq_in(IRQ_IDX_TIMER),
+	              IRQ_BIT_SOFTWARE => irq_in(IRQ_IDX_SOFTWARE),
+	              others           => '0');
+	mie_value <= (IRQ_BIT_EXTERNAL => irq_en_reg(IRQ_IDX_EXTERNAL),
+	              IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),
+	              IRQ_BIT_SOFTWARE => irq_en_reg(IRQ_IDX_SOFTWARE),
+	              others           => '0');
+
+	irq_en_nxt(IRQ_IDX_EXTERNAL) <= new_value(IRQ_BIT_EXTERNAL);
+	irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);
+	irq_en_nxt(IRQ_IDX_SOFTWARE) <= new_value(IRQ_BIT_SOFTWARE);
+
+	o_irq_pending <= '1' when (irq_in and irq_en_reg) /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
+
+	gen_irq : if has_interrupts generate
+		irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and i_mret_take = '0') else '0';
+
+		u_irq_en_reg : entity work.generic_register
+			generic map (
+				data_width => IRQ_COUNT
+			)
+			port map (
+				i_clk    => i_clk,
+				i_rst    => i_rst,
+				i_enable => irq_en_we,
+				i_d      => irq_en_nxt,
+				o_d      => irq_en_reg
+			);
+	end generate gen_irq;
+
+	gen_no_irq : if not has_interrupts generate
+		irq_en_we  <= '0';
+		irq_en_reg <= (others => '0');
+	end generate gen_no_irq;
 
 	-- Contadores da extensão Zicntr.
 	cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
