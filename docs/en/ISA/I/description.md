@@ -6,10 +6,10 @@ This document describes how the Core implements the RV32I base integer set. The 
 
 | Module | Folder | Responsibility |
 | :--- | :--- | :--- |
-| `alu` | `src/I/` | Integer operations, effective address, `JALR` target, and branch condition ([ULA.md](ULA.md)) |
-| `extender_imm` | `src/I/` | Builds the 32-bit immediate of each format |
-| `extender_ram` | `src/I/` | Selects and extends the byte or halfword read by a load |
-| `store_manager` | `src/I/` | Positions the store data in the word and generates the byte mask |
+| `alu` | `src/I-E/` | Integer operations, effective address, `JALR` target, and branch condition ([ULA.md](ULA.md)) |
+| `extender_imm` | `src/I-E/` | Builds the 32-bit immediate of each format |
+| `extender_ram` | `src/I-E/` | Selects and extends the byte or halfword read by a load |
+| `store_manager` | `src/I-E/` | Positions the store data in the word and generates the byte mask |
 | `control_unit` | `src/shared/` | Decodes `opcode`, `funct3`, and `funct7` into control signals ([DECODER.md](DECODER.md)) and detects illegal instructions |
 | `reg_file` | `src/shared/` | Register file with two read ports and one write port |
 | `pc_fetch` | `src/shared/` | `pc` register, $\text{pc} + 4$ sum, and next-`pc` selection |
@@ -109,7 +109,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | `x0` | Constant zero, without a register; a write never enables it |
 | Reset | Asynchronous, on registers `x1` to `x31` |
 | Read in the write cycle | A multiplexer delivers the data being written when the register read is the same one, except `x0` |
-| Size | 32 registers; the `num_regs` generic equal to 16 selects RV32E ([E/description.md](../E/description.md)) |
+| Size | 32 registers; the `has_e` generic set to true selects RV32E ([E/description.md](../E/description.md)) |
 
 ## 8. Forwarding and Hazards
 
@@ -124,7 +124,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 
 | Generic | Effect on the RV32I base |
 | :--- | :--- |
-| `num_regs` | 32 or 16 registers; at 16, an instruction that uses `x16` to `x31` is illegal |
+| `has_e` | False, 32 registers; true, 16 registers and an instruction that uses `x16` to `x31` is illegal |
 | `has_zicsr` | Enables the synchronous exception (illegal, `ECALL`, `EBREAK`, misaligned target) with redirect to `mtvec`; disabled, the Core only flags `o_trap` |
 | `has_zicclsm` | Runs misaligned main-memory loads and stores in hardware; disabled, every misaligned access raises an exception |
 | `has_zifencei` | Makes `FENCE.I` legal; `FENCE` is always legal |

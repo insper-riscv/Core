@@ -6,10 +6,10 @@ Este documento descreve como o Core implementa a base inteira RV32I. Os requisit
 
 | Módulo | Pasta | Responsabilidade |
 | :--- | :--- | :--- |
-| `alu` | `src/I/` | Operações inteiras, endereço efetivo, alvo de `JALR` e condição de desvio ([ULA.md](ULA.md)) |
-| `extender_imm` | `src/I/` | Monta o imediato de 32 bits de cada formato |
-| `extender_ram` | `src/I/` | Seleciona e estende o byte ou a meia-palavra lida por um load |
-| `store_manager` | `src/I/` | Posiciona o dado de um store na palavra e gera a máscara de bytes |
+| `alu` | `src/I-E/` | Operações inteiras, endereço efetivo, alvo de `JALR` e condição de desvio ([ULA.md](ULA.md)) |
+| `extender_imm` | `src/I-E/` | Monta o imediato de 32 bits de cada formato |
+| `extender_ram` | `src/I-E/` | Seleciona e estende o byte ou a meia-palavra lida por um load |
+| `store_manager` | `src/I-E/` | Posiciona o dado de um store na palavra e gera a máscara de bytes |
 | `control_unit` | `src/shared/` | Decodifica `opcode`, `funct3` e `funct7` nos sinais de controle ([DECODER.md](DECODER.md)) e detecta instrução ilegal |
 | `reg_file` | `src/shared/` | Banco de registradores com duas portas de leitura e uma de escrita |
 | `pc_fetch` | `src/shared/` | Registrador do `pc`, soma $\text{pc} + 4$ e seleção do próximo `pc` |
@@ -109,7 +109,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | `x0` | Constante zero, sem registrador; a escrita nunca o habilita |
 | Reset | Assíncrono, nos registradores `x1` a `x31` |
 | Leitura no ciclo da escrita | Um multiplexador entrega o dado que está sendo escrito quando o registrador lido é o mesmo, exceto `x0` |
-| Tamanho | 32 registradores; o genérico `num_regs` igual a 16 seleciona o RV32E ([E/description.md](../E/description.md)) |
+| Tamanho | 32 registradores; o genérico `has_e` verdadeiro seleciona o RV32E ([E/description.md](../E/description.md)) |
 
 ## 8. Adiantamento e Hazards
 
@@ -124,7 +124,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 
 | Genérico | Efeito sobre a base RV32I |
 | :--- | :--- |
-| `num_regs` | 32 ou 16 registradores; no valor 16, a instrução que usa `x16` a `x31` é ilegal |
+| `has_e` | Falso, 32 registradores; verdadeiro, 16 registradores e a instrução que usa `x16` a `x31` é ilegal |
 | `has_zicsr` | Ativa a exceção síncrona (ilegal, `ECALL`, `EBREAK`, alvo desalinhado) com redirecionamento para `mtvec`; desativado, o Core apenas sinaliza `o_trap` |
 | `has_zicclsm` | Executa em hardware os loads e stores desalinhados da memória principal; desativado, todo acesso desalinhado gera exceção |
 | `has_zifencei` | Torna `FENCE.I` legal; `FENCE` é sempre legal |

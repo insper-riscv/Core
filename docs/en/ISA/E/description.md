@@ -1,17 +1,17 @@
 # 16-Register File (RV32E)
 
-The `num_regs` generic of the `core` chooses how many general-purpose registers the processor has. With 32, the default, it is an RV32I. With 16, it is an RV32E, which gives up registers `x16` to `x31` for less area. The manual requirements are in [instructions.md](instructions.md).
+The boolean `has_e` generic of the `core` chooses how many general-purpose registers the processor has. False, the default, gives an RV32I with 32 registers. True gives an RV32E, which gives up registers `x16` to `x31` for less area. The manual requirements are in [instructions.md](instructions.md).
 
 ## 1. What Changes
 
-| Item | `num_regs = 32` | `num_regs = 16` |
+| Item | `has_e = false` | `has_e = true` |
 | :--- | :--- | :--- |
 | Registers | `x0` to `x31` | `x0` to `x15` |
 | `reg_file` address | 5 bits | 4 bits |
 | Instruction using `x16` to `x31` | Runs | Illegal, `mcause` 2 with `has_zicsr` |
 | Base bit of `misa` with `has_zicsr` | `I` (bit 8) | `E` (bit 4), and the `I` bit is zero |
 
-The `misa` follows the privileged manual ([section 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), which sets the `E` bit in the RV32E and defines it as reading as the complement of the `I` bit. Only the values 16 and 32 are accepted, and any other value fails the elaboration. The ID stage computes the register file address width as the number of bits needed to index `num_regs` registers and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
+The `misa` follows the privileged manual ([section 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), which sets the `E` bit in the RV32E and defines it as reading as the complement of the `I` bit. The ID stage computes the register file address width (5 bits with `has_e` false, 4 bits with `has_e` true) and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
 
 ## 2. Illegal Instruction
 
@@ -34,7 +34,7 @@ An illegal instruction writes no register and takes the same exception path as a
 
 ## 3. Compatibility
 
-The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `num_regs`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
+The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `has_e`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
 
 RV32E programs use the `ilp32e` ABI, defined in the [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (outside the ISA manual), which allocates registers only up to `x15`.
 

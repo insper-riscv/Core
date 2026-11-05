@@ -30,8 +30,8 @@ entity core is
 		has_zimop       : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
-		-- Quantidade de registradores de uso geral: 32 (RV32I) ou 16 (RV32E); no RV32E a instrução que usa x16 a x31 é ilegal.
-		num_regs        : natural := 32;
+		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15) e instrução ilegal para x16 a x31; falso é o RV32I, de 32 registradores.
+		has_e           : boolean := false;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache      : boolean := false;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
@@ -583,7 +583,7 @@ begin
 			has_zicsr    => has_zicsr,
 			has_zifencei => has_zifencei,
 			has_zimop    => has_zimop,
-			num_regs     => num_regs
+			has_e        => has_e
 		)
 		port map (
 			i_clk         => i_clk,
@@ -698,7 +698,7 @@ begin
 		generic map (
 			has_m           => has_m,
 			has_zmmul       => has_zmmul,
-			base_e          => num_regs = 16,
+			base_e          => has_e,
 			has_zicsr       => has_zicsr,
 			has_zicntr      => has_zicntr,
 			tick_cycles     => tick_cycles,
