@@ -47,6 +47,8 @@ entity stage_ex is
 		hpm_counters    : natural range 0 to 29 := 29;
 		-- Largura em bits de cada contador de eventos real.
 		hpm_width       : natural range 0 to 64 := 64;
+		-- Habilita as interrupções de máquina (mip e mie) no banco de CSRs; exige has_zicsr.
+		has_interrupts  : boolean := false;
 		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
 		boot_rom_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
@@ -67,6 +69,12 @@ entity stage_ex is
 	port (
 		-- Vetor de eventos do SoC: o bit K vale '1' nos ciclos do evento de código K (contadores do Zihpm).
 		i_hpm_events      : in  std_logic_vector(15 downto 0) := (others => '0');
+		-- Interrupção de software de máquina (MSIP), de nível.
+		i_irq_software    : in  std_logic := '0';
+		-- Interrupção de timer de máquina (MTIP), de nível.
+		i_irq_timer       : in  std_logic := '0';
+		-- Interrupção externa de máquina (MEIP), de nível.
+		i_irq_external    : in  std_logic := '0';
 		-- Sinal de clock principal do processador.
 		i_clk             : in  std_logic;
 		-- Sinal de reset ativo em '1'.
@@ -456,7 +464,8 @@ begin
 				tick_cycles  => tick_cycles,
 				has_zihpm    => has_zihpm,
 				hpm_counters => hpm_counters,
-				hpm_width    => hpm_width
+				hpm_width    => hpm_width,
+				has_interrupts => has_interrupts
 			)
 			port map (
 				i_clk        => i_clk,
@@ -477,7 +486,11 @@ begin
 				i_retire_cancel => i_mem_trap_take,
 				i_events     => i_hpm_events,
 				o_mtvec      => csr_mtvec,
-				o_mepc       => csr_mepc
+				o_mepc       => csr_mepc,
+				i_irq_software => i_irq_software,
+				i_irq_timer    => i_irq_timer,
+				i_irq_external => i_irq_external,
+				o_irq_pending  => open
 			);
 
 		-- O alvo desalinhado depende só do bit 1 do alvo, porque o bit 0 é zero: no JALR ele sai da soma dos dois

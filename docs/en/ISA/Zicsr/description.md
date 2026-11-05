@@ -12,7 +12,7 @@ The extension is enabled by the `has_zicsr` generic of the `core` entity (defaul
 | `csr_file` | EX | Holds the CSRs, reads the old value and applies the write at the end of the cycle |
 | `trap_unit` | EX and MEM | Detects synchronous exceptions and the `MRET` return |
 
-The packages `csr_addr_consts`, `csr_value_consts` and `trap_consts` define the CSR addresses, the operation codes and `misa` values, and the constants for `ECALL`, `EBREAK`, `MRET`, `WFI` and `mcause`. The Core implements only machine mode, and `mstatus.MPP` always reads `11`.
+The packages `csr_addr_consts`, `csr_value_consts`, `trap_consts` and `irq_consts` define the CSR addresses, the operation codes and `misa` values, and the constants for `ECALL`, `EBREAK`, `MRET`, `WFI` and `mcause`, plus the bit positions and causes of the machine interrupts. The Core implements only machine mode, and `mstatus.MPP` always reads `11`.
 
 ## 2. Decoding in the ID Stage
 
@@ -73,21 +73,39 @@ All CSRs are zero after reset, except `misa` and the fixed part of `mstatus`, wh
 | :---: | :--- | :---: | :---: | :--- | :--- |
 | `0x300` | `mstatus` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 and 11) fixed at `11`, `MPIE` (bit 7), `MIE` (bit 3); other bits zero | Only `MIE` and `MPIE` are stored; other bits are ignored |
 | `0x301` | `misa` | R/W | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extension `I`); with `has_m`, `0x40001100` (adds bit 12, extension `M`); with `has_e` true (RV32E), bit 4 (extension `E`) replaces bit 8, and the value is `0x40000010` or, with `has_m`, `0x40001010` | Ignored |
-| `0x304` | `mie` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignored |
+| `0x304` | `mie` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; with `has_interrupts`, the masks `MSIE`, `MTIE` and `MEIE` (bits 3, 7 and 11) | With `has_interrupts`, writes bits 3, 7 and 11; the other bits are ignored |
 | `0x305` | `mtvec` | R/W | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | Handler base address, with bits `[1:0]` at zero | Stores bits `[31:2]`; the mode is always direct |
 | `0x310` | `mstatush` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignored |
 | `0x340` | `mscratch` | R/W | [2.1.1.13](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-13-machine-scratch-mscratch-register) | Stored value, 32 bits | Stores all 32 bits |
 | `0x341` | `mepc` | R/W | [2.1.1.14](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-14-machine-exception-program-counter-mepc-register) | Saved PC, with bits `[1:0]` at zero | Stores bits `[31:2]` |
 | `0x342` | `mcause` | R/W | [2.1.1.15](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcause) | Code of the last exception, 32 bits | Stores all 32 bits |
 | `0x343` | `mtval` | R/W | [2.1.1.16](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-16-machine-trap-value-mtval-register) | Value associated with the last exception, 32 bits | Stores all 32 bits |
-| `0x344` | `mip` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero | Ignored |
+| `0x344` | `mip` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; with `has_interrupts`, the level of the `MSIP`, `MTIP` and `MEIP` lines (bits 3, 7 and 11) | Ignored |
 | `0xF11` | `mvendorid` | R | [2.1.1.2](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-2-machine-vendor-id-mvendorid-register) | Zero | Effective write is illegal |
 | `0xF12` | `marchid` | R | [2.1.1.3](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-3-machine-architecture-id-marchid-register) | Zero | Effective write is illegal |
 | `0xF13` | `mimpid` | R | [2.1.1.4](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-4-machine-implementation-id-mimpid-register) | Zero | Effective write is illegal |
 | `0xF14` | `mhartid` | R | [2.1.1.5](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-5-hart-id-mhartid-register) | Zero | Effective write is illegal |
 | `0xF15` | `mconfigptr` | R | [2.1.1.17](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-17-machine-configuration-pointer-mconfigptr-register) | Zero | Effective write is illegal |
 
-The counter addresses (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` and the high halves) also come from the table of the privileged manual, and exist only when the profile includes `Zicntr` or `Zihpm`, described in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md). Without them, those addresses are not known and the access is illegal. Any other address is also not known. Since the Core has no interrupts, `mie` and `mip` read zero and ignore writes.
+The counter addresses (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` and the high halves) also come from the table of the privileged manual, and exist only when the profile includes `Zicntr` or `Zihpm`, described in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md). Without them, those addresses are not known and the access is illegal. Any other address is also not known. Without `has_interrupts`, `mie` and `mip` read zero and ignore writes.
+
+### 4.1. Machine Interrupts
+
+The `has_interrupts` generic (default `false`, requires `has_zicsr`) turns on the three machine interrupt lines of the `core` and makes `mip` and `mie` work. The lines are level signals in the clock domain of the core; a source in another domain goes first through a `synchronizer` of `Common-Components`.
+
+| Port | Interrupt | Bit in `mip` and `mie` |
+| :--- | :--- | :---: |
+| `i_irq_software` | Machine software (`MSIP`, `MSIE`) | 3 |
+| `i_irq_timer` | Machine timer (`MTIP`, `MTIE`) | 7 |
+| `i_irq_external` | Machine external (`MEIP`, `MEIE`) | 11 |
+
+The `mip` register is read-only and reads the current level of the three lines at bits 3, 7 and 11; the other bits read zero. A write to `mip` is legal and changes nothing. The `mie` register holds bits 3, 7 and 11; the other bits read zero and ignore the write, and the value after reset is zero. A write to `mie` follows the general rules of section 3.2 and does not happen in the cycle of a trap or an `MRET`.
+
+The `o_irq_pending` output of the `csr_file` tells that an interrupt is pending and enabled in `mie`, regardless of `mstatus.MIE`.
+
+$$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0$$
+
+With `has_interrupts = false`, the ports are ignored, `mie` and `mip` read zero and ignore writes, and `o_irq_pending` is `0`. The bit positions and the `mcause` code of each interrupt are in the `irq_consts` package: `0x80000003` (software), `0x80000007` (timer) and `0x8000000B` (external).
 
 ## 5. Synchronous Exceptions
 

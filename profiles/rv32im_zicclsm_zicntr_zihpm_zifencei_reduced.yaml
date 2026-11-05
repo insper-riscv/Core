@@ -29,6 +29,7 @@ sources:
   - src/Zicsr/csr_event_consts.vhd
   - src/Zimop/zimop_consts.vhd
   - src/Zicsr/csr_value_consts.vhd
+  - src/Zicsr/irq_consts.vhd
   - src/common/src/generic_register.vhd
   - src/common/src/adder.vhd
   - src/common/src/mux_2x1.vhd
