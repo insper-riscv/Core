@@ -18,6 +18,7 @@ The base control unit (`src/shared/control_unit.vhd`) decodes exclusively the RV
 | :--- | :--- | :--- | :--- |
 | `M` | `src/M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
+| `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` and the fixed fields of `mop.r.n` and `mop.rr.n` (see [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; the ALU operation becomes `ALU_BGEU` (zero result) and the `opcode` shown to EX becomes `OPCODE_OP_IMM` |
 
 The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
 
