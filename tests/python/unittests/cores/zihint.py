@@ -64,13 +64,14 @@ def build():
     ]
     check_true(len(program) < HANDLER_WORD, len(program))
     program += [NOP] * (HANDLER_WORD - len(program))
-    return program + [
+    handler = [
         addi(12, 12, 1),
         csrrs(10, MEPC, 0),
         addi(10, 10, 4),
         csrrw(0, MEPC, 10),
         MRET,
     ]
+    return [*program, *handler]
 
 
 @cocotb.test()

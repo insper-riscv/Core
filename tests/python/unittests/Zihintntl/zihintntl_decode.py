@@ -11,6 +11,8 @@ from cocotb.triggers import Timer
 from tests.python.unittests.checks import check_equal
 
 OP = 0b0110011
+FIRST_RS2 = 2
+LAST_RS2 = 5
 NTL_WORDS = {
     "ntl.p1": 0x00200033,
     "ntl.pall": 0x00300033,
@@ -19,16 +21,9 @@ NTL_WORDS = {
 }
 
 
-def add_word(rd, rs1, rs2, funct3=0, funct7=0, opcode=OP):
-    """Encode an R-type word."""
-    return (
-        (funct7 << 25)
-        | (rs2 << 20)
-        | (rs1 << 15)
-        | (funct3 << 12)
-        | (rd << 7)
-        | opcode
-    )
+def add_word(rd, rs1, rs2):
+    """Encode an ADD word."""
+    return (rs2 << 20) | (rs1 << 15) | (rd << 7) | OP
 
 
 async def _is_hint(dut, instr):
@@ -55,7 +50,7 @@ async def test_claims_only_rs2_two_to_five(dut):
     Every other rs2 leaves the ADD alone.
     """
     for rs2 in range(32):
-        want = 1 if 2 <= rs2 <= 5 else 0
+        want = 1 if FIRST_RS2 <= rs2 <= LAST_RS2 else 0
         got = await _is_hint(dut, add_word(0, 0, rs2))
         check_equal(got, want, f"rs2 x{rs2}")
 
