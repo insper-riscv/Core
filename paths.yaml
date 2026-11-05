@@ -11,6 +11,8 @@ tree:
       zicond_decode: []
       zicond_unit: [formal/zicond_props.sv]
       zimop_decode: [formal/zimop_props.sv]
+      zihintntl_decode: [formal/zihintntl_props.sv]
+      zihintpause_decode: [formal/zihintpause_props.sv]
     # Entities without an entity test of their own, and why (changed only with a justification in the pull request).
     exceptions:
       fencei_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
@@ -27,7 +29,7 @@ tree:
       stage_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
       stage_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
-  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, ISA]
+  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, ISA]
 references:
   - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zimop sources, file: profiles/rv32im_zimop.yaml, yaml: sources, base: .}

@@ -20,6 +20,8 @@ A unidade de controle base (`src/shared/control_unit.vhd`) decodifica exclusivam
 | `Zicond` | `src/Zicond/zicond_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`), `funct7 = FUNCT7_ZICOND` (`"0000111"`) e `funct3` igual a `"101"` ou `"111"` | `o_is_zicond = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` e `o_alu_op` com o código da instrução |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` para toda a classe `SYSTEM`; `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"` |
 | `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` e os campos fixos de `mop.r.n` e `mop.rr.n` (ver [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; a operação da ULA vira `ALU_BGEU` (resultado zero) e o `opcode` apresentado a EX vira `OPCODE_OP_IMM` |
+| `Zihintntl` | `src/Zihintntl/zihintntl_decode.vhd` | `opcode = OPCODE_OP`, `funct7 = "0000000"`, `funct3 = "000"`, `rd` e `rs1` em `x0` e `rs2` de `x2` a `x5` (ver [Zihintntl](../ISA/Zihintntl/instructions.md)) | `o_is_hint = '1'`; o estágio ID desabilita a escrita em `rd` |
+| `Zihintpause` | `src/Zihintpause/zihintpause_decode.vhd` | A palavra `0x0100000F` (ver [Zihintpause](../ISA/Zihintpause/instructions.md)) | `o_is_hint = '1'`; o estágio ID desabilita a escrita em `rd` |
 
 O estágio ID combina as habilitações de escrita por disjunção lógica (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg or zc_we_reg`) e propaga os indicadores `o_is_muldiv` e `o_is_csr` pelo registrador de barreira `reg_id_ex` até o estágio EX.
 

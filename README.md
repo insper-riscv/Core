@@ -30,6 +30,8 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [ISA/Zicond/instructions.md](docs/pt-br/ISA/Zicond/instructions.md) e [ISA/Zicond/description.md](docs/pt-br/ISA/Zicond/description.md): extensão Zicond (`czero.eqz` e `czero.nez`, capítulo 10 do manual), codificação, semântica e a execução no Core.
 - [ISA/Zifencei/instructions.md](docs/pt-br/ISA/Zifencei/instructions.md) e [ISA/Zifencei/description.md](docs/pt-br/ISA/Zifencei/description.md): extensão Zifencei (`FENCE.I`), exigências do manual, regiões que passam pela cache de instruções, execução com e sem cache de dados write-back, efeito no pipeline e nas caches e custo.
 - [ISA/Zimop/instructions.md](docs/pt-br/ISA/Zimop/instructions.md) e [ISA/Zimop/description.md](docs/pt-br/ISA/Zimop/description.md): extensão Zimop (`mop.r.n` e `mop.rr.n`), exigências do manual, codificação das 40 instruções, decodificação no estágio ID e verificação.
+- [ISA/Zihintntl/instructions.md](docs/pt-br/ISA/Zihintntl/instructions.md) e [ISA/Zihintntl/description.md](docs/pt-br/ISA/Zihintntl/description.md): extensão Zihintntl (`ntl.p1`, `ntl.pall`, `ntl.s1` e `ntl.all`), codificação das dicas e execução como `nop`.
+- [ISA/Zihintpause/instructions.md](docs/pt-br/ISA/Zihintpause/instructions.md) e [ISA/Zihintpause/description.md](docs/pt-br/ISA/Zihintpause/description.md): extensão Zihintpause (`pause`), codificação da dica e execução como `nop`.
 - [MEMORY_WIDTH.md](docs/pt-br/MEMORY_WIDTH.md): regras do adaptador entre a palavra de 32 bits do Core e uma memória mais estreita ou mais larga, com endereço, máscara de bytes, leitura, sinal de pronto e interação com o acesso desalinhado.
 - [bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md](docs/pt-br/bugs/DIVISOR_SEM_SINAL_ACIMA_DE_2_31.md): análise matemática da faixa do resto parcial na divisão não-restauradora e do uso de 34 bits internos para divisores sem sinal acima de $2^{31}$.
 - [bugs/FLUSH_COM_PIPELINE_PARADO.md](docs/pt-br/bugs/FLUSH_COM_PIPELINE_PARADO.md): análise da interação entre redirecionamento de desvio em EX e parada global do pipeline por espera de memória em MEM.
@@ -49,6 +51,8 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `src/Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
 | `src/Zicond/` | Extensão de condicionais zero (`czero.eqz` e `czero.nez`), com decodificador no estágio ID e unidade de execução no estágio EX |
 | `src/Zimop/` | Extensão de operações possivelmente definidas (`mop.r.n` e `mop.rr.n`), que escrevem zero em `rd` |
+| `src/Zihintntl/` | Extensão de dicas de localidade não temporal (`ntl.p1`, `ntl.pall`, `ntl.s1` e `ntl.all`), que executam como `nop` |
+| `src/Zihintpause/` | Extensão da dica `pause`, que executa como `nop` |
 | `src/core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
 | `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_irq.yaml`, `rv32im_zicond.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/FORMAL.md)) |
@@ -65,6 +69,8 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 | Zicsr | `has_zicsr` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zimop | `has_zimop` | `false` | As 40 codificações de `mop.r.n` e `mop.rr.n` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zihintntl | `has_zihintntl` | `false` | As quatro dicas `ntl.*` seguem como `ADD` em `x0`, que também é um `nop` |
+| Zihintpause | `has_zihintpause` | `false` | `pause` segue como `FENCE`, que também é um `nop` |
 | Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
 | Zicond | `has_zicond` | `false` | `czero.eqz` e `czero.nez` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 

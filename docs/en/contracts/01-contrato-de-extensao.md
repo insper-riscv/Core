@@ -20,6 +20,8 @@ The base control unit (`src/shared/control_unit.vhd`) decodes exclusively the RV
 | `Zicond` | `src/Zicond/zicond_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`), `funct7 = FUNCT7_ZICOND` (`"0000111"`) and `funct3` equal to `"101"` or `"111"` | `o_is_zicond = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` and `o_alu_op` with the code of the instruction |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
 | `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` and the fixed fields of `mop.r.n` and `mop.rr.n` (see [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; the ALU operation becomes `ALU_BGEU` (zero result) and the `opcode` shown to EX becomes `OPCODE_OP_IMM` |
+| `Zihintntl` | `src/Zihintntl/zihintntl_decode.vhd` | `opcode = OPCODE_OP`, `funct7 = "0000000"`, `funct3 = "000"`, `rd` and `rs1` at `x0` and `rs2` from `x2` to `x5` (see [Zihintntl](../ISA/Zihintntl/instructions.md)) | `o_is_hint = '1'`; the ID stage disables the write to `rd` |
+| `Zihintpause` | `src/Zihintpause/zihintpause_decode.vhd` | The word `0x0100000F` (see [Zihintpause](../ISA/Zihintpause/instructions.md)) | `o_is_hint = '1'`; the ID stage disables the write to `rd` |
 
 The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg or zc_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
 

@@ -27,6 +27,8 @@ sources:
   - src/Zicsr/csr_addr_consts.vhd
   - src/Zicsr/csr_event_consts.vhd
   - src/Zimop/zimop_consts.vhd
+  - src/Zihintntl/zihintntl_consts.vhd
+  - src/Zihintpause/zihintpause_consts.vhd
   - src/Zicsr/csr_value_consts.vhd
   - src/Zicsr/irq_consts.vhd
   - src/common/src/generic_register.vhd
@@ -57,6 +59,8 @@ sources:
   - src/Zicond/zicond_unit.vhd
   - src/Zicsr/csr_decode.vhd
   - src/Zimop/zimop_decode.vhd
+  - src/Zihintntl/zihintntl_decode.vhd
+  - src/Zihintpause/zihintpause_decode.vhd
   - src/Zicntr/counter64.vhd
   - src/Zicntr/tick_divider.vhd
   - src/Zihpm/hpm_counter_bank.vhd
