@@ -213,6 +213,8 @@ make test           # Run the full unit and integration test suite (cocotb + GHD
 make formal         # Run the formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
 
+A warning in the formal run is an error. `formal/run.sh` fails if GHDL, Yosys or SymbiYosys emit any `warning`, and the fix is always in the code or in the properties, never in an option that hides the warning (`-Wno-*`). The details are in [docs/en/FORMAL.md](docs/en/FORMAL.md).
+
 The `python-static-analysis` CI job runs `ruff`, `pycodestyle`, `pydocstyle`, `pylint`, `pyright`, `pyrefly`, `deptry`, `complexipy`, `codeclone`, `semgrep` and `uv audit` over the Python files, and the job name is the check the default-branch ruleset requires, so do not rename it.
 
 When adding, renaming, or removing any `.vhd` or `.md` file, immediately update:

@@ -10,6 +10,11 @@
 # Besides the report, the run writes build/formal/result-<engine>.tsv, one line per proof with the columns
 # id, wanted (pass or fail), verdict (pass, fail, error or skip), sby exit code, milliseconds and the label, which
 # formal/aggregate.sh joins across engines.
+#
+# A warning is an error. Every ghdl and sby/yosys output of the run (the proofs and the mutants) goes through
+# scan_warnings (formal/warnings.sh); any line with the word "warning" makes the run fail, naming the file and
+# the line. The flags that hide warnings (-Wno-*) are not used: the cause of a warning is fixed in the VHDL or in
+# the proofs.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,6 +30,10 @@ timeout_s="${FORMAL_TIMEOUT:-900}"
 results="$out/result-$engine.tsv"; : > "$results"
 
 fail=0
+warnings="$out/warnings.txt"; : > "$warnings"
+# shellcheck source=formal/warnings.sh
+source "$root/formal/warnings.sh"
+
 # expect <label> <wanted: PASS|FAIL> <result: PASS|FAIL|SKIP|ERROR ...>. An ERROR (the tool did not reach a verdict)
 # never matches, not even a wanted FAIL; a SKIP is a proof this engine does not do and is not a failure. The id,
 # the exit code and the time of the proof come from the files prove left for its tag.
@@ -42,10 +51,13 @@ expect() {
 }
 
 # netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity, with the
-# bank of event counters of BANK_FILE (the real one by default).
+# bank of event counters of BANK_FILE (the real one by default). The mutant takes the place of the original unit in
+# the analysis order: REPLACES names the file the mutant stands for, and the file under proof ($1) is analyzed in
+# its place, so that no entity is defined in two files. Without REPLACES, $1 comes last.
 netlist() {
-  local work="$out/work_$3"; mkdir -p "$work"
-  ghdl -a --std=08 --workdir="$work" \
+  local work="$out/work_$3" replaces="${REPLACES:-}" log="$out/$3.ghdl.log" file replaced=0 files=()
+  mkdir -p "$work"; : > "$log"
+  for file in \
     "$root/src/shared/pipeline_types.vhd" \
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
@@ -65,9 +77,16 @@ netlist() {
     "$root/src/common/src/mux_tree.vhd" \
     "$root/src/Zicntr/counter64.vhd" \
     "$root/src/Zicntr/tick_divider.vhd" \
-    "${BANK_FILE:-$root/src/Zihpm/hpm_counter_bank.vhd}" \
-    "$1"
-  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:4} "$2" > "$3.v"
+    "${BANK_FILE:-$root/src/Zihpm/hpm_counter_bank.vhd}"; do
+    if [ -n "$replaces" ] && [ "$file" = "$replaces" ]; then file="$1"; replaced=1; fi
+    files+=("$file")
+  done
+  [ "$replaced" = 1 ] || files+=("$1")
+  for file in "${files[@]}"; do
+    ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
+  done
+  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:4} "$2" > "$3.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  scan_warnings "$log"
 }
 
 # prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL, SKIP or ERROR
@@ -108,8 +127,9 @@ EOS
   timeout "$timeout_s" sby -f "$6.sby" > "$6.log" 2>&1 || rc=$?
   ended=$(date +%s%N)
   # ABC refuses a design without registers (the trap unit is combinational): that is a proof this engine does
-  # not do, not a failure of the tool.
+  # not do, not a failure of the tool. Its warning "The network is combinational." comes with the refusal.
   if [ "$engine" = abc-bmc3 ] && [ "$rc" = 16 ] && grep -q 'Does not work for combinational networks' "$6.log"; then
+    scan_warnings "$6.log" skipped
     printf 'skip\t%s\t0\n' "$rc" > "$6.res"; echo "SKIP abc-bmc3 does not work for a combinational design"; return
   fi
   case "$rc" in
@@ -117,6 +137,7 @@ EOS
     2) verdict=FAIL ;;
     *) verdict=ERROR ;;
   esac
+  scan_warnings "$6.log"
   printf '%s\t%s\t%s\n' "${verdict,,}" "$rc" "$(( (ended - began) / 1000000 ))" > "$6.res"
   case "$verdict" in
     ERROR) echo "ERROR sby exited with code $rc, not a verdict (see $6.log)" ;;
@@ -211,7 +232,7 @@ mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl ge
   local copy="$out/mut_$5.vhd"
   sed "$6" "$1" > "$copy"
   cmp -s "$1" "$copy" && { echo "mutant $5: the edit did not change the file"; exit 1; }
-  netlist "$copy" "$3" "mut_$5" "${7:-}"
+  REPLACES="$1" netlist "$copy" "$3" "mut_$5" ${7:-}
   expect "mutant $5 is caught" FAIL "$(prove "mut_$5.v" "$2" bmc "${8:-8}" "$4" "mut_$5")"
 }
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0'          when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
@@ -296,4 +317,5 @@ mutant "$zd" "$zd_props" zicond_decode '' zd_no_write "s/o_we_reg     <= is_eqz 
 mutant "$zd" "$zd_props" zicond_decode '' zd_no_rs1 "s/o_sel_pc_rs1 <= is_eqz or is_nez;/o_sel_pc_rs1 <= is_eqz;/" "" 2
 mutant "$zd" "$zd_props" zicond_decode '' zd_funct3_one_bit "s/funct3 = FUNCT3_CZERO_NEZ) else/funct3(1 downto 0) = FUNCT3_CZERO_NEZ(1 downto 0)) else/" "" 2
 
+[ -s "$warnings" ] && { echo "formal: $(wc -l < "$warnings") warning(s) found; a warning is an error (see above)"; fail=1; }
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

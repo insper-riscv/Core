@@ -83,6 +83,16 @@ The tests of the aggregator run with `bash formal/aggregate_test.sh`.
 
 The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it. In a push to `main` that reuses the result of a pull request that already passed, the engines and `formal` are skipped together, like the other required checks.
 
+## 7. A warning is an error
+
+Any warning from GHDL, Yosys or SymbiYosys makes `formal/run.sh` fail, in the proofs and in the mutants. The guard lives in `formal/warnings.sh`: the script scans the output of each tool after it ends and, for every line with the word `warning` (case-insensitive, whole word or plural), prints `formal: WARNING treated as error: <file>:<line>:<text>` and fails the run at the end. Names such as `warning_count` and the Yosys summary `Warnings: 0` do not count.
+
+A warning means code outside the norm or at its limit, so the fix is in the VHDL or in the properties, never in an option that hides the warning (`-Wno-*`). Each mutant is analyzed in the place of the unit it replaces, so no entity is defined in two files.
+
+The `abc-bmc3` engine has one exact exception, only for the three messages that ABC itself prints about the AIGER file it receives (the clock consumed by the `clk2ff` step, the count of undriven bits and the count of outputs read as constraints), and only in the log of that engine. One more message, `The network is combinational.`, is accepted only in the proof that the engine refuses for being combinational and that the script records as `skip`. `yices`, `bitwuzla` and `boolector` have no exception, and any other warning of `abc-bmc3` still fails.
+
+The tests of the guard run together with those of the aggregator, with `bash formal/aggregate_test.sh`.
+
 ---
 
 Copyright 2026 Insper. Licensed under the [Apache License, Version 2.0](../../LICENSE).
