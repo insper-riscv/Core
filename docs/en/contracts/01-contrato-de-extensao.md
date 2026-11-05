@@ -4,7 +4,7 @@
 
 The RISC-V specification defines the architectural semantics of each instruction (opcodes, `funct3`/`funct7` fields, and register effects). The extension contract defines how the hardware of an extension (`M/`, `Zicsr/`, `Zifencei/`) connects to the pipeline stages (`core/`) without coupling the base logic (`common/` and `I/`) to the internal details of each extension.
 
-Each extension resides in its own folder and is enabled at the top level `src/core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
+Each extension resides in its own folder and is enabled at the top level `src/core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_zicond`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
 The stages instantiate the unit of each extension directly with `entity work`, without a `component` declaration. For that reason every profile analyzes the files of all extensions, and a generic set to `false` removes the unit from the elaboration.
 
@@ -17,10 +17,11 @@ The base control unit (`src/shared/control_unit.vhd`) decodes exclusively the RV
 | Extension | Decoder in `stage_id` | Claim condition | Activated signals |
 | :--- | :--- | :--- | :--- |
 | `M` | `src/M/m_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`) and `funct7 = FUNCT7_MULDIV` (`"0000001"`) | `o_is_muldiv = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` |
+| `Zicond` | `src/Zicond/zicond_decode.vhd` | `opcode = OPCODE_OP` (`"0110011"`), `funct7 = FUNCT7_ZICOND` (`"0000111"`) and `funct3` equal to `"101"` or `"111"` | `o_is_zicond = '1'`, `o_we_reg = '1'`, `o_sel_pc_rs1 = '1'` and `o_alu_op` with the code of the instruction |
 | `Zicsr` | `src/Zicsr/csr_decode.vhd` | `opcode = OPCODE_SYSTEM` (`"1110011"`) | `o_use_imm_i = '1'` for the entire `SYSTEM` class; `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"` |
 | `Zimop` | `src/Zimop/zimop_decode.vhd` | `opcode = OPCODE_SYSTEM`, `funct3 = "100"` and the fixed fields of `mop.r.n` and `mop.rr.n` (see [Zimop](../ISA/Zimop/instructions.md)) | `o_we_reg = '1'`; the ALU operation becomes `ALU_BGEU` (zero result) and the `opcode` shown to EX becomes `OPCODE_OP_IMM` |
 
-The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
+The ID stage combines write enables by logical disjunction (`cu_we_reg <= base_we_reg or m_we_reg or csr_we_reg or zc_we_reg`) and propagates the `o_is_muldiv` and `o_is_csr` indicators through the `reg_id_ex` barrier register into the EX stage.
 
 ### 2.2. Permitted Pipeline Effects
 

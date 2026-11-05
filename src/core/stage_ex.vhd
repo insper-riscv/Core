@@ -9,7 +9,8 @@
 --   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true; só a multiplicação quando has_zmmul = true).
 --   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando has_zicsr = true).
 --   5. Unidade de sincronização FENCE.I (fencei_unit, quando has_zifencei = true).
---   6. Gerenciador de alinhamento de escrita em memória (store_manager).
+--   6. Unidade de condicionais zero (zicond_unit, quando has_zicond = true).
+--   7. Gerenciador de alinhamento de escrita em memória (store_manager).
 -- =============================================================================
 
 library ieee;
@@ -34,6 +35,8 @@ entity stage_ex is
 		tick_cycles     : positive := 50;
 		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
 		has_zifencei    : boolean := false;
+		-- Habilita a unidade de execução da extensão Zicond (zicond_unit).
+		has_zicond      : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
 		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
@@ -256,7 +259,11 @@ architecture rtl of stage_ex is
 	-- Validade da instrução em EX que a unidade de FENCE.I enxerga.
 	signal fencei_valid       : std_logic;
 
-	-- Resultado selecionado entre ULA, MulDiv e CSR antes do mux de PC + 4.
+	-- Indica que a instrução em EX é czero.eqz ou czero.nez.
+	signal ex_is_zicond       : std_logic;
+	-- Resultado da instrução da extensão Zicond em EX.
+	signal ex_zicond_result   : word_t;
+	-- Resultado selecionado entre ULA, MulDiv, CSR e Zicond antes do mux de PC + 4.
 	signal ex_alu_mux_result  : word_t;
 
 	-- Sinais internos de cálculo de endereço e decisão de branch/JAL/JALR.
@@ -370,6 +377,23 @@ begin
 		o_muldiv_fused   <= '0';
 		ex_muldiv_result <= (others => '0');
 	end generate gen_m;
+
+	-- =========================================================================
+	-- Extensão Zicond: Condicionais Zero (czero.eqz e czero.nez)
+	-- =========================================================================
+	gen_zicond : if has_zicond generate
+		u_zicond : entity work.zicond_unit
+			port map (
+				i_op     => i_alu_op,
+				i_rs1    => ex_fwd_rs1_val,
+				i_rs2    => ex_fwd_rs2_val,
+				o_active => ex_is_zicond,
+				o_result => ex_zicond_result
+			);
+	else generate
+		ex_is_zicond     <= '0';
+		ex_zicond_result <= (others => '0');
+	end generate gen_zicond;
 
 	-- =========================================================================
 	-- Extensão Zifencei: Sincronização de Memória de Instruções (FENCE.I)
@@ -558,6 +582,7 @@ begin
 	-- =========================================================================
 	ex_alu_mux_result <= ex_muldiv_result when i_is_muldiv = '1' else
 	                     csr_rdata        when i_is_csr    = '1' else
+	                     ex_zicond_result when ex_is_zicond = '1' else
 	                     ex_alu_result;
 
 	u_mux_ex_final : entity work.mux_2x1

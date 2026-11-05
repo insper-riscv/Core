@@ -22,6 +22,7 @@ sources:
   - src/shared/mem_map_consts.vhd
   - src/shared/word_consts.vhd
   - src/shared/fwd_consts.vhd
+  - src/Zicond/zicond_consts.vhd
   - src/M/muldiv_consts.vhd
   - src/Zicsr/trap_consts.vhd
   - src/Zicsr/csr_addr_consts.vhd
@@ -52,6 +53,8 @@ sources:
   - src/M/non_restoring_divider_rv32.vhd
   - src/M/muldiv_fusion.vhd
   - src/M/multdiv.vhd
+  - src/Zicond/zicond_decode.vhd
+  - src/Zicond/zicond_unit.vhd
   - src/Zicsr/csr_decode.vhd
   - src/Zimop/zimop_decode.vhd
   - src/Zicntr/counter64.vhd

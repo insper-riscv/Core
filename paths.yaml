@@ -3,13 +3,14 @@
 # Run it before and after moving any file.
 tree:
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
-  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zimop, ISA]
+  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, ISA]
 references:
   - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zimop sources, file: profiles/rv32im_zimop.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicsr sources, file: profiles/rv32im_zicsr.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicsr_zifencei sources, file: profiles/rv32im_zicsr_zifencei.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicclsm_zicntr_zifencei sources, file: profiles/rv32im_zicclsm_zicntr_zifencei.yaml, yaml: sources, base: .}
+  - {name: profile rv32im_zicond sources, file: profiles/rv32im_zicond.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicclsm_zicntr_zihpm_zifencei sources, file: profiles/rv32im_zicclsm_zicntr_zihpm_zifencei.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zicclsm_zicntr_zihpm_zifencei_reduced sources, file: profiles/rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml, yaml: sources, base: .}
   - {name: profile rv32i sources, file: profiles/rv32i.yaml, yaml: sources, base: .}
