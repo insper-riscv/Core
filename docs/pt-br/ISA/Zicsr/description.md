@@ -9,6 +9,8 @@ Este documento descreve como o Core implementa a extensão `Zicsr` e o tratament
 | Capítulo | 5, Zicsr Extension for Control and Status Register (CSR) Instructions, versão 2.0 |
 | Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
 | Requisitos do manual | [instructions.md](instructions.md) |
+| Capítulos do volume privilegiado | 2, Control and Status Registers (CSRs), e 3, Machine-Level ISA, nas seções 3.1.6 a 3.1.16 (CSRs de trap), 3.3 (`ECALL`, `EBREAK`, `MRET`, `WFI`) e a Tabela 17 (prioridade das exceções) |
+| Conformidade com o volume privilegiado | `docs/conformance/riscv-privilegiado.md` do Insper-RISC-V |
 
 ## 2. Visão Geral
 
@@ -118,7 +120,9 @@ $$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0 \qquad
 | Externa (`MEIP` e `MEIE`) | `0x8000000B` |
 | Software (`MSIP` e `MSIE`), sem externa | `0x80000003` |
 | Timer (`MTIP` e `MTIE`), sem as duas anteriores | `0x80000007` |
+| Estouro de contador (`LCOFIP` e `LCOFIE`, só com Sscofpmf), sem as três anteriores | `0x8000000D` |
 
+A interrupção de estouro de contador pertence à extensão [Sscofpmf](../Sscofpmf/description.md), que acrescenta o bit 13 a `mip` e a `mie`.
 Com `has_interrupts = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, `o_irq_pending` e `o_irq_take` valem `0` e `MODE` de `mtvec` lê zero. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`.
 
 ## 6. Exceções Síncronas
@@ -146,10 +150,12 @@ Para a instância do estágio EX, a prioridade é a da tabela, de cima para baix
 
 | Prioridade | `mcause` |
 | :---: | :---: |
-| 1 | 0 |
-| 2 | 2 |
+| 1 | 2 |
+| 2 | 0 |
 | 3 | 3 |
 | 4 | 11 |
+
+A ordem é a da Tabela 17 do volume privilegiado: a instrução ilegal vem antes do endereço de instrução desalinhado. Um `JALR` ou um desvio de codificação reservada com alvo desalinhado gera a causa 2 com `mtval` zero, e só o salto legal gera a causa 0.
 
 A exceção de load ou store (causas 4 e 6) pertence a uma instrução mais antiga que a do estágio EX e por isso tem prioridade sobre todas as causas de EX. Quando ela ocorre, a instrução de EX é descartada por inteiro, sem escrita de CSR, desvio, `MRET`, `FENCE.I` ou retirada.
 
@@ -201,7 +207,8 @@ Enquanto a condição não vale, a interrupção fica pendente e o programa segu
 | 1 | Interrupção externa de máquina | `0x8000000B` |
 | 2 | Interrupção de software de máquina | `0x80000003` |
 | 3 | Interrupção de timer de máquina | `0x80000007` |
-| 4 | Exceção síncrona da instrução em EX (seção 6.2) | Código da exceção |
+| 4 | Interrupção de estouro de contador (Sscofpmf) | `0x8000000D` |
+| 5 | Exceção síncrona da instrução em EX (seção 6.2) | Código da exceção |
 
 A interrupção tem prioridade sobre a exceção síncrona e sobre o `MRET` da instrução em EX: ela é abortada e fica como a instrução de retorno, e a exceção só ocorre se a instrução for executada depois do retorno. A exceção de load ou store do estágio MEM é de uma instrução mais antiga e vence a interrupção: a instrução de EX é descartada pela exceção, e a interrupção continua pendente até o tratador devolver o controle.
 

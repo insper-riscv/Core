@@ -93,6 +93,7 @@ Machine-mode CSRs implemented:
 | `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `has_e` true the base is `E` and the value is `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `has_interrupts`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
 | `0x305` | `mtvec` | Read-write | `0x00000000` | `BASE` in bits `[31:2]` and `MODE` in bit 0, which only writes with `has_interrupts` (vectored); bit 1 is hardwired to `0`. In vectored mode bits `[5:2]` of `BASE` read zero |
+| `0x723` to `0x73F` | `mhpmevent3h` to `mhpmevent31h` | Read and write | `0x00000000` | Only with `has_sscofpmf`: `OF` (bit 31) and `MINH` (bit 30) of the counter with the same index; without the generic the address is nonexistent. Bit 13 of `mie` and `mip` is `LCOFIE` and `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
 | `0x310` | `mstatush` | Read-write | `0x00000000` | All bits hardwired to zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Read-write | `0x00000000` | Full 32 bits |
 | `0x341` | `mepc` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` |

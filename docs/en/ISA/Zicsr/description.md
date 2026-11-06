@@ -9,6 +9,8 @@ This document describes how the Core implements the `Zicsr` extension and the ma
 | Chapter | 5, Zicsr Extension for Control and Status Register (CSR) Instructions, version 2.0 |
 | Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
 | Manual requirements | [instructions.md](instructions.md) |
+| Chapters of the privileged volume | 2, Control and Status Registers (CSRs), and 3, Machine-Level ISA, in sections 3.1.6 to 3.1.16 (trap CSRs), 3.3 (`ECALL`, `EBREAK`, `MRET`, `WFI`) and Table 17 (exception priority) |
+| Conformance with the privileged volume | `docs/conformance/riscv-privilegiado.md` of Insper-RISC-V |
 
 ## 2. Overview
 
@@ -118,7 +120,9 @@ $$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0 \qquad
 | External (`MEIP` and `MEIE`) | `0x8000000B` |
 | Software (`MSIP` and `MSIE`), without external | `0x80000003` |
 | Timer (`MTIP` and `MTIE`), without the two above | `0x80000007` |
+| Counter overflow (`LCOFIP` and `LCOFIE`, Sscofpmf only), without the three above | `0x8000000D` |
 
+The counter-overflow interrupt belongs to the [Sscofpmf](../Sscofpmf/description.md) extension, which adds bit 13 to `mip` and `mie`.
 With `has_interrupts = false`, the ports are ignored, `mie` and `mip` read zero and ignore writes, `o_irq_pending` and `o_irq_take` are `0` and the `MODE` of `mtvec` reads zero. The bit positions and the `mcause` code of each interrupt are in the `irq_consts` package.
 
 ## 6. Synchronous Exceptions
@@ -146,10 +150,12 @@ For the EX-stage instance, the priority is the one in the table, from top to bot
 
 | Priority | `mcause` |
 | :---: | :---: |
-| 1 | 0 |
-| 2 | 2 |
+| 1 | 2 |
+| 2 | 0 |
 | 3 | 3 |
 | 4 | 11 |
+
+The order is the one of Table 17 of the privileged volume: the illegal instruction comes before the misaligned instruction address. A `JALR` or a branch with a reserved encoding and a misaligned target raises cause 2 with `mtval` zero, and only the legal jump raises cause 0.
 
 The load or store exception (causes 4 and 6) belongs to an instruction older than the one in the EX stage and therefore has priority over all EX causes. When it occurs, the EX instruction is discarded entirely, with no CSR write, branch, `MRET`, `FENCE.I` or retirement.
 
@@ -201,7 +207,8 @@ While the condition does not hold, the interrupt stays pending and the program g
 | 1 | Machine external interrupt | `0x8000000B` |
 | 2 | Machine software interrupt | `0x80000003` |
 | 3 | Machine timer interrupt | `0x80000007` |
-| 4 | Synchronous exception of the instruction in EX (section 6.2) | Exception code |
+| 4 | Counter-overflow interrupt (Sscofpmf) | `0x8000000D` |
+| 5 | Synchronous exception of the instruction in EX (section 6.2) | Exception code |
 
 The interrupt has priority over the synchronous exception and over the `MRET` of the instruction in EX: it is aborted and becomes the return instruction, and the exception only happens if the instruction runs after the return. The load or store exception of the MEM stage belongs to an older instruction and wins over the interrupt: the exception discards the EX instruction, and the interrupt stays pending until the handler gives control back.
 

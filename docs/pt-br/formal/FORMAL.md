@@ -7,15 +7,16 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | Bloco | Propriedades | Tipos de prova |
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | indução, cover |
-| `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm |
+| `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm, e com a instrução ilegal antes do alvo desalinhado (Tabela 17) |
 | `csr_file` com interrupções | `csr_irq_props.sv` | indução, BMC, cover, com a condição e a prioridade da tomada e os modos de `mtvec` |
 | `trap_unit` com interrupção | `trap_unit_props.sv` | indução, cover |
 | `stage_ex` com interrupções | `stage_ex_irq_props.sv` | indução, cover, com `mepc`, `mcause`, `MIE`, o PC seguinte e o efeito nulo do acesso a CSR abortado |
 | `alu` | `alu_props.sv` | equivalência combinacional, cover |
-| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits |
+| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits, incluindo o pulso de estouro `o_wrap` |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover, com 29, 5, 4, 3 e 2 contadores reais e larguras de 0 a 64 bits |
+| `csr_file` com Sscofpmf | `csr_ofp_props.sv` | BMC, cover, com `OF`, `MINH`, `LCOFIP`, `LCOFIE` e a prioridade do timer sobre o estouro, em um índice simbólico |
 | `zicond_unit` | `zicond_props.sv` | indução, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | indução, cover |
 | `core` com Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |

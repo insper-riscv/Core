@@ -19,7 +19,7 @@ tree:
     # Entities without an entity test of their own, and why (changed only with a justification in the pull request).
     exceptions: {}
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
-  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, ISA]
+  identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, Sscofpmf, ISA]
 references:
   - {name: profile rv32im sources, file: profiles/rv32im.yaml, yaml: sources, base: .}
   - {name: profile rv32im_zimop sources, file: profiles/rv32im_zimop.yaml, yaml: sources, base: .}

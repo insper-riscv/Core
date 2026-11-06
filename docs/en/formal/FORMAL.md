@@ -7,15 +7,16 @@ The formal proofs of the Core run in SymbiYosys over the Verilog netlist that GH
 | Block | Properties | Kinds of proof |
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | induction, cover |
-| `trap_unit` | `trap_unit_props.sv` | induction, cover, with and without the address check and Zicclsm |
+| `trap_unit` | `trap_unit_props.sv` | induction, cover, with and without the address check and Zicclsm, and with the illegal instruction before the misaligned target (Table 17) |
 | `csr_file` with interrupts | `csr_irq_props.sv` | induction, BMC, cover, with the entry condition and priority and the `mtvec` modes |
 | `trap_unit` with an interrupt | `trap_unit_props.sv` | induction, cover |
 | `stage_ex` with interrupts | `stage_ex_irq_props.sv` | induction, cover, with `mepc`, `mcause`, `MIE`, the next PC and the null effect of an aborted CSR access |
 | `alu` | `alu_props.sv` | combinational equivalence, cover |
-| `counter64` | `counter64_props.sv` | induction, cover, with widths from 1 to 64 bits |
+| `counter64` | `counter64_props.sv` | induction, cover, with widths from 1 to 64 bits, including the `o_wrap` overflow pulse |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` with Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` with Zihpm | `csr_hpm_props.sv` | BMC, cover, with 29, 5, 4, 3 and 2 real counters and widths from 0 to 64 bits |
+| `csr_file` with Sscofpmf | `csr_ofp_props.sv` | BMC, cover, with `OF`, `MINH`, `LCOFIP`, `LCOFIE` and the timer priority over the overflow, on a symbolic index |
 | `zicond_unit` | `zicond_props.sv` | induction, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | induction, cover |
 | `core` with Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |
