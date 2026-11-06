@@ -28,10 +28,10 @@ The engine is chosen by the `FORMAL_ENGINE` variable.
 
 | Engine | What it is | Induction | BMC | Cover | Typical time of `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| `bitwuzla` (default) | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 220 s |
-| `boolector` | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 211 s |
-| `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | 276 s |
-| `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | 247 s |
+| `bitwuzla` (default) | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 216 s |
+| `boolector` | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 226 s |
+| `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | 376 s |
+| `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | 346 s |
 
 `abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`alu`, `trap_unit` and the Zicond blocks, which ABC refuses), which leaves 53 of the 154 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do. The induction proofs of `mip`, `mie` and `mstatus.MIE` therefore have one more bounded form of 6 cycles (`csri_bounded`), the only one it answers.
 

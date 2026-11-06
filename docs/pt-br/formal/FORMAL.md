@@ -28,10 +28,10 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 
 | Engine | O que é | Indução | BMC | Cover | Tempo típico de `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| `bitwuzla` (padrão) | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 220 s |
-| `boolector` | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 211 s |
-| `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | 276 s |
-| `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | 247 s |
+| `bitwuzla` (padrão) | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 216 s |
+| `boolector` | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 226 s |
+| `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | 376 s |
+| `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | 346 s |
 
 O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 53 das 154 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz. As provas de indução do `mip`, do `mie` e do `mstatus.MIE` têm por isso uma forma limitada de 6 ciclos a mais (`csri_bounded`), a única que ele responde.
 
