@@ -49,7 +49,7 @@ async def _reset(dut):
     dut.i_rst.value = 0
 
 
-    """Escolhe o evento EVENT em idx e conta `pulses` ciclos."""
+async def _count(dut, idx, pulses):
     """Escolhe o evento EVENT para o contador idx e conta pulses ciclos."""
     await _drive(dut, "event", idx, 1, EVENT)
     await _clock(dut)
