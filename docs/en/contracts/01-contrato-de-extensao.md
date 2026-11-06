@@ -31,7 +31,7 @@ An extension interacts with global pipeline control in `src/core/core.vhd` exclu
 
 1. **Multi-cycle busy stall (`o_muldiv_stall` / `o_fencei_busy`):** freezes earlier stages while the operation awaits completion.
 2. **Flow discard and redirection (`o_fencei_take`, `o_mret_take`):** flushes `reg_if_id` and `reg_id_ex` and redirects the PC to `o_redirect_pc`.
-3. **Synchronous exception (`o_trap_take`):** in addition to flushing `reg_if_id` and `reg_id_ex` and redirecting the PC to `mtvec`, flushes `reg_ex_mem` to prevent the faulting instruction from modifying registers or memory.
+3. **Synchronous exception or interrupt (`o_trap_take`):** in addition to flushing `reg_if_id` and `reg_id_ex` and redirecting the PC to `mtvec`, flushes `reg_ex_mem` to prevent the faulting instruction from modifying registers or memory.
 
 ### 2.3. Result Path and Forwarding
 
@@ -67,7 +67,7 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
 | `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; Zmmul has no bit of its own; writes are ignored |
-| Interrupts | With `has_interrupts = true`, `mip` mirrors the ports `i_irq_software`, `i_irq_timer` and `i_irq_external` and `mie` holds bits 3, 7 and 11; without the generic, `mie` and `mip` read zero and ignore writes |
+| Interrupts | With `has_interrupts = true`, `mip` mirrors the ports `i_irq_software`, `i_irq_timer` and `i_irq_external`, `mie` holds bits 3, 7 and 11, and the `trap_unit` takes the highest-priority interrupt (external, software, timer) on the instruction in EX when `mstatus.MIE`, the `mie` bit and the `mip` bit are `1` (see [Zicsr](../ISA/Zicsr/description.md)); without the generic, `mie` and `mip` read zero and ignore writes |
 | Not implemented | The counters `cycle`, `time` and `instret` exist only with `has_zicntr = true`, and without it an access is an illegal CSR access |
 
 Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). Causes 4 and 6 come from the instance in the MEM stage when `has_zicsr = true`, one cycle after the others, and take precedence over the instruction in EX. The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:
@@ -81,6 +81,8 @@ Synchronous exceptions detected by `trap_unit` (at most one per instruction, wit
 | `6` | Misaligned Store effective address that the hardware does not run, under the same conditions as cause 4 | Effective address (`i_ea`) |
 | `11` | Machine-mode environment call (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
+When taking an interrupt (`o_take = '1'` and `o_irq = '1'`), `o_cause` carries the `mcause` of the interrupt (bit 31 at `1`), `o_tval` is zero, `mepc` receives the PC of the instruction in EX, which is aborted and redone on return, and the PC jumps to `mtvec` (or to `BASE + 4 x cause` in vectored mode). The interrupt has priority over any exception and over `MRET`, and does not abort `FENCE.I`.
+
 When taking an exception (`o_take = '1'`), `mepc` receives the instruction's PC, `mcause` receives `o_cause`, `mtval` receives `o_tval`, `mstatus.MPIE` receives `mstatus.MIE`, `mstatus.MIE` is cleared, and the PC jumps to `mtvec`. On `MRET` (`0x30200073`), `mstatus.MIE` restores `mstatus.MPIE`, `mstatus.MPIE` receives `'1'`, and the PC jumps to `mepc`. The `WFI` instruction (`0x10500073`) executes as a `NOP`.
 
 Machine-mode CSRs implemented:
@@ -90,7 +92,7 @@ Machine-mode CSRs implemented:
 | `0x300` | `mstatus` | Read-write | `0x00001800` | `MPP` (bits `[12:11]`) hardwired to `"11"`; `MIE` (bit 3) and `MPIE` (bit 7) writable |
 | `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `has_e` true the base is `E` and the value is `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `has_interrupts`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
-| `0x305` | `mtvec` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` (direct mode) |
+| `0x305` | `mtvec` | Read-write | `0x00000000` | `BASE` in bits `[31:2]` and `MODE` in bit 0, which only writes with `has_interrupts` (vectored); bit 1 is hardwired to `0`. In vectored mode bits `[5:2]` of `BASE` read zero |
 | `0x310` | `mstatush` | Read-write | `0x00000000` | All bits hardwired to zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Read-write | `0x00000000` | Full 32 bits |
 | `0x341` | `mepc` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` |

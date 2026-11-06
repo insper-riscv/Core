@@ -93,6 +93,20 @@ netlist() {
   scan_warnings "$log"
 }
 
+# netlist_tree <entity> <name> [ghdl generics]: the Verilog netlist of an entity that needs the whole source tree
+# (stage_ex), with every source of the repository analyzed in the order riscv-tools vhdl-sort gives. A mutant
+# takes the place of the original file: TREE_REPLACES names the file and TREE_COPY is the mutant.
+netlist_tree() {
+  local work="$out/work_$2" log="$out/$2.ghdl.log" file
+  mkdir -p "$work"; : > "$log"
+  while read -r file; do
+    if [ -n "${TREE_REPLACES:-}" ] && [ "$file" = "$TREE_REPLACES" ]; then file="$TREE_COPY"; else file="$root/$file"; fi
+    ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
+  done < <(cd "$root" && riscv-tools vhdl-sort $(find src -name '*.vhd' -not -path 'src/common/*' | sort) $(ls src/common/src/*.vhd | sort) | tr ' ' '\n')
+  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:3} "$1" > "$2.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  scan_warnings "$log"
+}
+
 # prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL, SKIP or ERROR
 # PASS is sby exit code 0, FAIL is 2 (a counterexample or a goal that cannot be covered) and any other code
 # (4 unknown, 8 timeout, 16 error, 124 the FORMAL_TIMEOUT) is ERROR: the tool did not reach a verdict. The
@@ -171,6 +185,10 @@ expect "no Zicclsm: every misaligned access traps (induction)"                PA
 netlist "$trap" trap_unit trap_ext -grom_external=true -grom_end_kib=0 -gext_base_kib=524288 -gperiph_base_kib=1572864 -gram_base_kib=1048576 -gram_end_kib=1572864
 expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (induction)" PASS "$(prove trap_ext.v "$trap_props" prove 2 '-DZICCLSM_ON -DEXT_FLASH' trap_zicclsm_ext)"
 
+echo "trap_unit with an interrupt to take"
+expect "the interrupt is taken on a valid, advancing instruction that is not FENCE.I, wins over every exception and MRET, carries its cause and mtval 0 (induction)" PASS "$(prove trap.v "$trap_props" prove 2 '-DIRQ' trap_irq)"
+expect "cover: an interrupt over ecall, over MRET, over an illegal instruction, over a misaligned jump and over a load, and a deferred FENCE.I are reachable" PASS "$(prove trap.v "$trap_props" cover 2 '-DIRQ -DCOVER' trap_irq_cover)"
+
 echo "counter64"
 cnt="$root/src/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
 netlist "$cnt" counter64 cnt
@@ -240,6 +258,13 @@ expect "cover: a pending timer alone, a mie write setting MTIE and a write to mi
 netlist "$csr" csr_file csrio "-ghas_interrupts=false"
 expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (bounded, 6 cycles)" PASS "$(prove csrio.v "$csr_irq_props" bmc 6 '-DOFF' csrio_safety)"
 
+echo "stage_ex with interrupts"
+stage_props="$root/formal/stage_ex_irq_props.sv"
+ex_gens="-ghas_zicsr=true -ghas_interrupts=true"
+netlist_tree stage_ex stage_irq $ex_gens
+expect "an interrupt aborts the instruction in EX: mepc is its address, mcause its cause and line, MIE 0 and MPIE 1, the next PC is BASE or the vector, an aborted CSR access changes nothing (induction)" PASS "$(prove stage_irq.v "$stage_props" prove 2 '' stage_irq_safety)"
+expect "cover: the aborts of an ADDI and of CSR accesses to mscratch, mie and mtvec, and the vectored mode, are reachable" PASS "$(prove stage_irq.v "$stage_props" cover 14 '-DCOVER' stage_irq_cover)"
+
 echo "zicond_unit"
 zc="$root/src/Zicond/zicond_unit.vhd"; zc_props="$root/formal/zicond_props.sv"
 netlist "$zc" zicond_unit zc
@@ -269,6 +294,37 @@ mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_m
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+
+# Mutants of the interrupt entry in the trap unit and in the CSR bank, one defect each.
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_keeps_mret   "s/ and (not irq_go);/;/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_aborts_fencei "s/ and (not is_fencei);/;/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_dirty_tval   "s/o_tval  <= (others => '0') when irq_go = '1' else/o_tval  <= i_ea when irq_go = '1' else/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_loses_to_exception "s/o_cause <= i_irq_cause when irq_go = '1' else/o_cause <= i_irq_cause when (irq_go = '1' and has_exc = '0') else/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_run  "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_ex_valid and/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_valid "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_run and/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_flag_always  "s/o_irq       <= irq_go;/o_irq       <= i_irq_take;/"
+mutant "$csr" "$csr_irq_props" csr_file '' irq_take_ignores_mie "s/o_irq_take    <= mstatus_mie when/o_irq_take    <= '1' when/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_software_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_SOFTWARE when irq_pend_vec(IRQ_IDX_SOFTWARE) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_timer_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_TIMER when irq_pend_vec(IRQ_IDX_TIMER) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_mode_lost "s/mtvec_mode_nxt <= new_value(0) when has_interrupts else '0';/mtvec_mode_nxt <= '0';/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_unaligned_vector "s/(others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2)/new_value(5 downto 2)/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_mtvec_mode_without_interrupts "s/mtvec_mode <= '0';/mtvec_mode <= i_wdata(0);/" "-ghas_interrupts=false" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_bit1_reads_mode "s/mtvec_reg(31 downto 2) \& '0' \& mtvec_mode;/mtvec_reg(31 downto 2) \& mtvec_mode \& mtvec_mode;/" "-ghas_interrupts=true" 6
+
+# Mutants of the interrupt entry in stage_ex, one defect each (the whole tree is analyzed again for each).
+ex_file="$root/src/core/stage_ex.vhd"
+mutant_tree() {  # <name> <sed expression>
+  local copy="$out/mut_$1.vhd"
+  sed "$2" "$ex_file" > "$copy"
+  cmp -s "$ex_file" "$copy" && { echo "mutant $1: the edit did not change the file"; exit 1; }
+  TREE_REPLACES="src/core/stage_ex.vhd" TREE_COPY="$copy" netlist_tree stage_ex "mut_$1" $ex_gens
+  expect "mutant $1 is caught" FAIL "$(prove "mut_$1.v" "$stage_props" bmc 14 '' "mut_$1")"
+}
+mutant_tree stage_irq_mepc_next "s/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc;/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc4;/"
+mutant_tree stage_irq_vector_ignored "s/irq_vector_pc  when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/csr_mtvec when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/"
+mutant_tree stage_irq_vector_wrong_bits "s/csr_mtvec(31 downto 6) \& trap_cause(3 downto 0) \& BYTE_OFFSET_0;/csr_mtvec(31 downto 6) \& trap_cause(4 downto 1) \& BYTE_OFFSET_0;/"
+mutant_tree stage_irq_vector_for_exceptions "s/(trap_is_irq = '1' and csr_mtvec_vec = '1')/(trap_take_int = '1' and csr_mtvec_vec = '1')/"
+mutant_tree stage_irq_cause_lost "s/i_irq_cause   => irq_cause,/i_irq_cause   => (others => '0'),/"
 
 mutant "$zim" "$zim_props" zimop_decode '' zimop_funct3_ignored "s/funct3 = FUNCT3_SYSTEM_RESERVED and/true and/" "" 2
 mutant "$zim" "$zim_props" zimop_decode '' zimop_bit31_ignored "s/i_instr(31) = ZIMOP_BIT31 and//" "" 2
@@ -324,7 +380,7 @@ mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_ran
 
 # Mutants of the interrupts in csr_file, one defect each.
 mutant "$csr" "$csr_irq_props" csr_file '' irq_lines_swapped "s/(i_irq_external \& i_irq_timer \& i_irq_software)/(i_irq_external \& i_irq_software \& i_irq_timer)/" "-ghas_interrupts=true" 6
-mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/(irq_in and irq_en_reg) \/=/irq_in \/=/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/irq_pend_vec  <= irq_in and irq_en_reg;/irq_pend_vec  <= irq_in;/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_write_lost "s/i_enable => irq_en_we,/i_enable => '0',/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_bit_moved "s/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_EXTERNAL);/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_read_wrong_bit "s/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_SOFTWARE),/" "-ghas_interrupts=true" 6

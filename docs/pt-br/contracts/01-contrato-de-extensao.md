@@ -31,7 +31,7 @@ Uma extensão interage com o controle global do pipeline em `src/core/core.vhd` 
 
 1. **Parada por ocupação multiciclo (`o_muldiv_stall` / `o_fencei_busy`):** congela os estágios anteriores enquanto a operação aguarda conclusão.
 2. **Descarte e redirecionamento de fluxo (`o_fencei_take`, `o_mret_take`):** esvazia `reg_if_id` e `reg_id_ex` e redireciona o PC para `o_redirect_pc`.
-3. **Exceção síncrona (`o_trap_take`):** além de esvaziar `reg_if_id` e `reg_id_ex` e redirecionar o PC para `mtvec`, aplica flush em `reg_ex_mem` para impedir que a instrução faltante altere registradores ou memória.
+3. **Exceção síncrona ou interrupção (`o_trap_take`):** além de esvaziar `reg_if_id` e `reg_id_ex` e redirecionar o PC para `mtvec`, aplica flush em `reg_ex_mem` para impedir que a instrução faltante altere registradores ou memória.
 
 ### 2.3. Caminho de Resultado e Forwarding
 
@@ -67,7 +67,7 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
 | `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
-| Interrupções | Com `has_interrupts = true`, `mip` espelha as portas `i_irq_software`, `i_irq_timer` e `i_irq_external` e `mie` guarda os bits 3, 7 e 11; sem o generic, `mie` e `mip` leem zero e ignoram escritas |
+| Interrupções | Com `has_interrupts = true`, `mip` espelha as portas `i_irq_software`, `i_irq_timer` e `i_irq_external`, `mie` guarda os bits 3, 7 e 11 e a `trap_unit` toma a interrupção de maior prioridade (externa, software, timer) sobre a instrução em EX quando `mstatus.MIE`, o bit de `mie` e o de `mip` valem `1` (ver [Zicsr](../ISA/Zicsr/description.md)); sem o generic, `mie` e `mip` leem zero e ignoram escritas |
 | Não implementados | Os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
 
 Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `has_zicsr = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
@@ -81,6 +81,8 @@ Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução
 | `6` | Endereço efetivo de Store desalinhado que o hardware não executa, nas mesmas condições da causa 4 | Endereço efetivo (`i_ea`) |
 | `11` | Chamada de ambiente do modo máquina (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
+Ao tomar uma interrupção (`o_take = '1'` e `o_irq = '1'`), `o_cause` traz o `mcause` da interrupção (bit 31 em `1`), `o_tval` vale zero, `mepc` recebe o PC da instrução em EX, que é abortada e refeita no retorno, e o PC salta para `mtvec` (ou para `BASE + 4 x causa`, no modo vetorado). A interrupção tem prioridade sobre qualquer exceção e sobre o `MRET`, e não aborta `FENCE.I`.
+
 Ao tomar uma exceção (`o_take = '1'`), `mepc` recebe o PC da instrução, `mcause` recebe `o_cause`, `mtval` recebe `o_tval`, `mstatus.MPIE` recebe `mstatus.MIE`, `mstatus.MIE` é zerado e o PC salta para `mtvec`. Na instrução `MRET` (`0x30200073`), `mstatus.MIE` restaura `mstatus.MPIE`, `mstatus.MPIE` recebe `'1'` e o PC salta para `mepc`. A instrução `WFI` (`0x10500073`) executa como `NOP`.
 
 Registradores CSR implementados no modo máquina:
@@ -90,7 +92,7 @@ Registradores CSR implementados no modo máquina:
 | `0x300` | `mstatus` | Leitura e escrita | `0x00001800` | `MPP` (bits `[12:11]`) fixo em `"11"`; bits `MIE` (bit 3) e `MPIE` (bit 7) graváveis |
 | `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `has_e` verdadeiro a base é a `E` e o valor é `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `has_interrupts`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem o generic, todos fixos em zero |
-| `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` (modo direto) |
+| `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | `BASE` nos bits `[31:2]` e `MODE` no bit 0, que só grava com `has_interrupts` (vetorado); o bit 1 é fixo em `0`. No modo vetorado os bits `[5:2]` de `BASE` leem zero |
 | `0x310` | `mstatush` | Leitura e escrita | `0x00000000` | Todos os bits fixos em zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Leitura e escrita | `0x00000000` | 32 bits completos |
 | `0x341` | `mepc` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` |

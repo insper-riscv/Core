@@ -24,6 +24,14 @@
 --     gera exceção. o_irq_pending vale '1' quando algum bit de mip e o de mie estão
 --     ambos em '1', sem considerar mstatus.MIE. Sem has_interrupts as portas são
 --     ignoradas e mie e mip leem zero e ignoram a escrita.
+--   - A condição de tomada de interrupção é o_irq_take = mstatus.MIE e o_irq_pending. Com
+--     mais de uma pendente, o_irq_cause escolhe a de maior prioridade: externa (causa 11),
+--     software (causa 3) e timer (causa 7), no formato de mcause (bit 31 em '1').
+--   - mtvec (0x305) tem BASE nos bits 31 a 2 e MODE no bit 0: '0' é o modo direto e '1' o
+--     vetorado, que só existe com has_interrupts (sem ele o bit 0 lê zero). O bit 1 lê
+--     zero (os modos 2 e 3 são reservados). No modo vetorado a BASE tem alinhamento de 64
+--     bytes (os bits 5 a 2 leem zero), para que BASE + 4 x causa seja um OR de bits.
+--     o_mtvec entrega a BASE (bits 1 e 0 em zero) e o_mtvec_vectored o MODE.
 --   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
 --     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
 --     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
@@ -125,7 +133,13 @@ entity csr_file is
 		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do core.
 		i_irq_external : in  std_logic := '0';
 		-- Há interrupção pendente e habilitada em mie, sem considerar mstatus.MIE ('0' sem has_interrupts).
-		o_irq_pending  : out std_logic
+		o_irq_pending  : out std_logic;
+		-- Há interrupção a tomar: pendente, habilitada em mie e com mstatus.MIE em '1' ('0' sem has_interrupts).
+		o_irq_take     : out std_logic;
+		-- Código de mcause da interrupção de maior prioridade pendente (externa, software e timer).
+		o_irq_cause    : out word_t;
+		-- Modo de mtvec: '1' é o vetorado (interrupção vai a BASE + 4 x causa), '0' o direto.
+		o_mtvec_vectored : out std_logic
 	);
 end entity csr_file;
 
@@ -144,8 +158,12 @@ architecture rtl of csr_file is
 	signal mstatus_mie       : std_logic;
 	-- Bit MPIE (bit 7) armazenado no registrador mstatus.
 	signal mstatus_mpie      : std_logic;
-	-- Valor registrado do CSR mtvec.
+	-- Valor registrado de BASE no CSR mtvec (bits 31 a 2; os dois bits baixos são sempre zero).
 	signal mtvec_reg         : word_t;
+	-- Modo registrado de mtvec ('1' é o vetorado; sempre '0' sem has_interrupts).
+	signal mtvec_mode        : std_logic;
+	-- Palavra de mtvec como o programa a lê: BASE e o modo no bit 0.
+	signal mtvec_value       : word_t;
 	-- Valor registrado do CSR mscratch.
 	signal mscratch_reg      : word_t;
 	-- Valor registrado do CSR mepc.
@@ -277,6 +295,12 @@ architecture rtl of csr_file is
 	signal mtvec_we          : std_logic;
 	-- Próximo valor alinhado para escrita em mtvec.
 	signal mtvec_nxt         : word_t;
+	-- Modo vetorado pedido pela escrita em mtvec (bit 0 do valor escrito, só com has_interrupts).
+	signal mtvec_mode_nxt    : std_logic;
+	-- Bits 5 a 2 de BASE como serão gravados: zero no modo vetorado (alinhamento de 64 bytes).
+	signal mtvec_base_low    : std_logic_vector(3 downto 0);
+	-- Interrupções pendentes e habilitadas em mie, na ordem software, timer e externa.
+	signal irq_pend_vec      : std_logic_vector(IRQ_COUNT - 1 downto 0);
 	-- Habilitação de escrita em mscratch.
 	signal mscratch_we       : std_logic;
 	-- Habilitação de escrita em mepc (por trap ou instrução CSR).
@@ -307,7 +331,7 @@ begin
 		old_value <=
 			mstatus_value when ADDR_MSTATUS,
 			misa_value    when ADDR_MISA,
-			mtvec_reg     when ADDR_MTVEC,
+			mtvec_value   when ADDR_MTVEC,
 			mscratch_reg  when ADDR_MSCRATCH,
 			mepc_reg      when ADDR_MEPC,
 			mcause_reg    when ADDR_MCAUSE,
@@ -324,7 +348,8 @@ begin
 			is_cntr_addr or is_ext_addr when others;
 
 	o_rdata <= old_value;
-	o_mtvec <= mtvec_reg;
+	o_mtvec <= mtvec_reg(31 downto 2) & BYTE_OFFSET_0;
+	o_mtvec_vectored <= mtvec_mode;
 	o_mepc  <= mepc_reg;
 
 	-- Cálculo do valor modificado conforme os bits [1:0] de i_op (escrita, set ou clear de bits).
@@ -353,7 +378,10 @@ begin
 
 	-- Controle de atualização dos CSRs de 32 bits.
 	mtvec_we    <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and i_mret_take = '0') else '0';
-	mtvec_nxt   <= new_value(31 downto 2) & BYTE_OFFSET_0;
+	mtvec_mode_nxt <= new_value(0) when has_interrupts else '0';
+	mtvec_base_low <= (others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2);
+	mtvec_nxt      <= new_value(31 downto 6) & mtvec_base_low & BYTE_OFFSET_0;
+	mtvec_value    <= mtvec_reg(31 downto 2) & '0' & mtvec_mode;
 
 	mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and i_mret_take = '0') else '0';
 
@@ -383,7 +411,12 @@ begin
 	irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);
 	irq_en_nxt(IRQ_IDX_SOFTWARE) <= new_value(IRQ_BIT_SOFTWARE);
 
-	o_irq_pending <= '1' when (irq_in and irq_en_reg) /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
+	irq_pend_vec  <= irq_in and irq_en_reg;
+	o_irq_pending <= '1' when irq_pend_vec /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
+	o_irq_take    <= mstatus_mie when irq_pend_vec /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
+	o_irq_cause   <= CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else
+	                 CAUSE_IRQ_SOFTWARE when irq_pend_vec(IRQ_IDX_SOFTWARE) = '1' else
+	                 CAUSE_IRQ_TIMER;
 
 	gen_irq : if has_interrupts generate
 		irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and i_mret_take = '0') else '0';
@@ -405,6 +438,22 @@ begin
 		irq_en_we  <= '0';
 		irq_en_reg <= (others => '0');
 	end generate gen_no_irq;
+
+	-- O modo de mtvec só existe com interrupções: sem elas MODE lê sempre zero.
+	gen_mtvec_mode : if has_interrupts generate
+		u_mtvec_mode_ff : entity work.flip_flop
+			port map (
+				i_d      => mtvec_mode_nxt,
+				o_d      => mtvec_mode,
+				i_enable => mtvec_we,
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
+	end generate gen_mtvec_mode;
+
+	gen_no_mtvec_mode : if not has_interrupts generate
+		mtvec_mode <= '0';
+	end generate gen_no_mtvec_mode;
 
 	-- Contadores da extensão Zicntr.
 	cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
