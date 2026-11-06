@@ -2,7 +2,15 @@
 
 The `FENCE.I` instruction synchronises the instruction stream with the earlier stores of the same hart. After it, an instruction fetch sees everything the program wrote to memory before. What the RISC-V manual requires is in [instructions.md](instructions.md). This document describes what it is for, how the Core executes it and what happens in the pipeline and in the caches.
 
-## 1. What It Is For
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 4, Zifencei Extension for Instruction-Fetch Fence, version 2.0 |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. What It Is For
 
 Instruction fetch and stores use different paths. The instruction cache only reads memory and does not observe the hart's stores. A program that writes new code and jumps to it therefore needs a step that makes the write visible to the fetch.
 
@@ -13,7 +21,7 @@ Instruction fetch and stores use different paths. The instruction cache only rea
 
 Typical cases are a loader that copies a program into memory, code generation at run time and the replacement of a routine in use.
 
-## 2. Where the Instruction Has Effect
+## 3. Where the Instruction Has Effect
 
 Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_ROM is external: it belongs to the external window from `ext_base_kib`, to a ROM flagged `rom_external`, or to a RAM flagged `ram_external`. The limits come from the generics described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
@@ -27,7 +35,7 @@ Only code fetched through the instruction cache is affected. The BOOT_ROM is rea
 
 In the default map (`rom_external` false) the ROM is internal and read directly, so only code written to the external window (from `0x40000000`) changes its result with `FENCE.I`. With an external ROM, `FENCE.I` also applies to code written to it.
 
-## 3. Configuration
+## 4. Configuration
 
 Two Core parameters decide the behaviour.
 
@@ -45,7 +53,7 @@ The ordinary `FENCE` instruction, with `funct3 = 000`, is not handled by this un
 
 The decoder recognises `FENCE.I` by the `MISC-MEM` opcode and `funct3 = 001`, and ignores the `rd`, `rs1` and `funct12` fields, as the manual requires of base implementations.
 
-## 4. Execution Without a Data Cache
+## 5. Execution Without a Data Cache
 
 Without a write-back data cache, the stores are already in memory when they leave the MEM stage. `FENCE.I` completes in the same cycle in which it is valid in the EX stage and the pipeline advances. In that cycle the unit emits a completion pulse, which produces the three effects below.
 
@@ -53,7 +61,7 @@ Without a write-back data cache, the stores are already in memory when they leav
 2. Discards the instructions in IF/ID and ID/EX.
 3. Redirects the PC to $\text{PC} + 4$, the address of the instruction after `FENCE.I`.
 
-## 5. Execution With a Write-Back Data Cache
+## 6. Execution With a Write-Back Data Cache
 
 With the data cache, the earlier stores may be only in the cache. The unit flushes them before invalidating the instruction cache, because the invalidation only helps if the memory already has the new code.
 
@@ -66,9 +74,9 @@ The unit holds the instruction in EX and uses two flip-flops, one that arms the 
 | 2 onwards | The unit waits for the acknowledgement of the cache | Stalled |
 | Acknowledgement cycle | The acknowledgement arrives and the completion pulse goes out | Advances |
 
-The acknowledgement may arrive in the cycle of the flush pulse, for a cache that answers combinationally, or in any later cycle. The completion pulse goes out in the cycle in which the acknowledgement arrives, and produces the same three effects of section 4.
+The acknowledgement may arrive in the cycle of the flush pulse, for a cache that answers combinationally, or in any later cycle. The completion pulse goes out in the cycle in which the acknowledgement arrives, and produces the same three effects of section 5.
 
-## 6. Effect on the Pipeline
+## 7. Effect on the Pipeline
 
 | Element | Effect |
 | :--- | :--- |
@@ -81,7 +89,7 @@ The acknowledgement may arrive in the cycle of the flush pulse, for a cache that
 
 The two discarded instructions are fetched again from $\text{PC} + 4$, with the instruction cache already empty.
 
-## 7. Effect on the Caches
+## 8. Effect on the Caches
 
 | Cache | Operation | Result |
 | :--- | :--- | :--- |
@@ -91,7 +99,7 @@ The two discarded instructions are fetched again from $\text{PC} + 4$, with the 
 
 The duration of the flush depends on the data cache, which is external to the Core. It signals completion with a pulse, which the Core uses as the acknowledgement and which may arrive in the cycle of the request or in any later cycle.
 
-## 8. Use in a Program
+## 9. Use in a Program
 
 The correct sequence writes the code, executes `FENCE.I` and only then jumps to it.
 
@@ -103,7 +111,7 @@ The correct sequence writes the code, executes `FENCE.I` and only then jumps to 
 
 An instruction between the store and `FENCE.I` does not change the guarantee. The jump must come after `FENCE.I`, because only after it does the fetch see the new code.
 
-## 9. Cost
+## 10. Cost
 
 | Configuration | Cost of `FENCE.I` |
 | :--- | :--- |

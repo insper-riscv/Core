@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core implementa a extensão `Zicsr` e o tratamento de exceções síncronas do modo máquina que depende dela. As exigências do manual do RISC-V estão em [instructions.md](instructions.md). Os contadores acessados por CSR (`Zicntr` e `Zihpm`) estão documentados em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md) e não são tratados aqui.
 
-## 1. Visão Geral
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 5, Zicsr Extension for Control and Status Register (CSR) Instructions, versão 2.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Visão Geral
 
 A extensão é ligada pelo generic `has_zicsr` da entidade `core` (padrão `false`) e reúne três blocos.
 
@@ -14,7 +22,7 @@ A extensão é ligada pelo generic `has_zicsr` da entidade `core` (padrão `fals
 
 Os pacotes `csr_addr_consts`, `csr_value_consts`, `trap_consts` e `irq_consts` definem os endereços de CSR, os códigos de operação e de `misa`, e as constantes de `ECALL`, `EBREAK`, `MRET`, `WFI` e de `mcause`, além das posições de bit e das causas das interrupções de máquina. O Core implementa apenas o modo máquina, e `mstatus.MPP` lê sempre `11`.
 
-## 2. Decodificação no Estágio ID
+## 3. Decodificação no Estágio ID
 
 O `csr_decode` examina `opcode` e `funct3` da instrução.
 
@@ -26,9 +34,9 @@ O `csr_decode` examina `opcode` e `funct3` da instrução.
 
 O sinal `o_use_imm_i` obriga o extensor de imediato a produzir o campo tipo I (`instr[31:20]`), que leva o endereço de 12 bits do CSR (ou o `funct12` das instruções privilegiadas) até o estágio EX. O sinal `o_we_reg` habilita a escrita de `rd` com o valor antigo do CSR. A unidade de detecção de hazards conta `SYSTEM` entre as instruções que leem `rs1`, e insere um ciclo de parada quando um load imediatamente anterior produz esse registrador.
 
-## 3. Execução no Estágio EX
+## 4. Execução no Estágio EX
 
-### 3.1. Operando e Ponto de Efetivação
+### 4.1. Operando e Ponto de Efetivação
 
 O operando de escrita depende do bit 2 de `funct3`.
 
@@ -43,7 +51,7 @@ $$\text{commit} = \text{is\_csr} \land \text{valid} \land \text{pipe\_run}$$
 
 O valor antigo sai do banco por leitura combinacional e entra no mesmo multiplexador de resultado da ULA e do multiplicador, de modo que atravessa `EX/MEM` e `MEM/WB` e é adiantado como qualquer resultado de ULA, sem ciclos extras. A instrução seguinte lê o CSR já atualizado.
 
-### 3.2. Regras de Escrita
+### 4.2. Regras de Escrita
 
 O banco decide a operação pelos bits `[1:0]` de `funct3`.
 
@@ -55,15 +63,15 @@ O banco decide a operação pelos bits `[1:0]` de `funct3`.
 
 A fonte é considerada nula quando o campo `rs1` da instrução é `x0` (nas formas imediatas, `uimm = 0`). Uma instrução tem efeito de escrita quando é de escrita (`CSRRW` e `CSRRWI`, mesmo com `rd = x0`) ou quando a fonte não é nula. Com `rs1 = x0`, `CSRRS` e `CSRRC` leem sem escrever e não geram exceção em CSR somente leitura, como exige o manual. O banco sempre lê o CSR, inclusive em `CSRRW` com `rd = x0`; como nenhum CSR do Core tem efeito colateral de leitura, a diferença não é observável.
 
-### 3.3. Acesso Ilegal
+### 4.3. Acesso Ilegal
 
 O banco sinaliza acesso ilegal quando a expressão abaixo vale.
 
 $$\text{illegal} = \lnot\,\text{endereço\_conhecido} \;\lor\; (\text{tem\_efeito\_de\_escrita} \land \text{addr}[11{:}10] = 11)$$
 
-Um acesso ilegal vira exceção de instrução ilegal (seção 5). Uma escrita só altera o estado quando o endereço é conhecido, o CSR não é somente leitura e o `commit` vale, e nenhum trap, `MRET` ou exceção do estágio MEM ocorre no mesmo ciclo para `mtvec`, `mscratch`, `mepc`, `mcause` e `mtval`.
+Um acesso ilegal vira exceção de instrução ilegal (seção 6). Uma escrita só altera o estado quando o endereço é conhecido, o CSR não é somente leitura e o `commit` vale, e nenhum trap, `MRET` ou exceção do estágio MEM ocorre no mesmo ciclo para `mtvec`, `mscratch`, `mepc`, `mcause` e `mtval`.
 
-## 4. Banco de CSRs
+## 5. Banco de CSRs
 
 Os endereços e os nomes dos CSRs não são escolha do Core. Eles vêm da tabela de CSRs de nível de máquina do manual de arquitetura privilegiada ([Currently allocated RISC-V machine-level CSR addresses](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-2-4-currently-allocated-risc-v-machine-level-csr-addresses)), e a convenção dos bits do endereço (leitura e escrita nos bits [11:10], privilégio nos bits [9:8]) está na [seção 1.1.1 do mesmo volume](https://docs.riscv.org/reference/isa/v20260120/priv/priv-csrs.html#1-1-1-csr-address-mapping-conventions). A coluna Acesso segue as classes da tabela, com L para `MRO` (somente leitura) e L/E para `MRW` (leitura e escrita), e a coluna Definição leva à seção do manual que descreve cada registrador. O Core implementa só um subconjunto da tabela.
 
@@ -89,7 +97,7 @@ Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus
 
 Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` e as metades altas) também vêm da tabela do manual privilegiado, e só existem quando o perfil inclui `Zicntr` ou `Zihpm`, descritos em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md). Sem eles, esses endereços não são conhecidos e o acesso é ilegal. Qualquer outro endereço também não é conhecido. Sem `has_interrupts`, `mie` e `mip` leem zero e ignoram escritas.
 
-### 4.1. Interrupções de Máquina
+### 5.1. Interrupções de Máquina
 
 O generic `has_interrupts` (padrão `false`, exige `has_zicsr`) liga as três linhas de interrupção de máquina do `core` e faz `mip` e `mie` funcionarem. As linhas são de nível e pertencem ao domínio de clock do núcleo; uma fonte em outro domínio passa antes por um `synchronizer` do `Common-Components`.
 
@@ -99,7 +107,7 @@ O generic `has_interrupts` (padrão `false`, exige `has_zicsr`) liga as três li
 | `i_irq_timer` | Timer de máquina (`MTIP`, `MTIE`) | 7 |
 | `i_irq_external` | Externa de máquina (`MEIP`, `MEIE`) | 11 |
 
-O registrador `mip` é somente leitura e lê o nível atual das três linhas nos bits 3, 7 e 11; os demais bits leem zero. Uma escrita em `mip` é legal e não altera nada. O registrador `mie` guarda os bits 3, 7 e 11; os demais bits leem zero e ignoram a escrita, e o valor após o reset é zero. A escrita em `mie` segue as regras gerais da seção 3.2 e não ocorre no ciclo de um trap ou de um `MRET`.
+O registrador `mip` é somente leitura e lê o nível atual das três linhas nos bits 3, 7 e 11; os demais bits leem zero. Uma escrita em `mip` é legal e não altera nada. O registrador `mie` guarda os bits 3, 7 e 11; os demais bits leem zero e ignoram a escrita, e o valor após o reset é zero. A escrita em `mie` segue as regras gerais da seção 4.2 e não ocorre no ciclo de um trap ou de um `MRET`.
 
 O `csr_file` entrega a decisão de interrupção em três saídas. `o_irq_pending` indica interrupção pendente e habilitada em `mie`, sem considerar `mstatus.MIE`, e `o_irq_take` acrescenta `mstatus.MIE`. `o_irq_cause` traz o `mcause` da interrupção de maior prioridade entre as pendentes e habilitadas.
 
@@ -113,16 +121,16 @@ $$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0 \qquad
 
 Com `has_interrupts = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, `o_irq_pending` e `o_irq_take` valem `0` e `MODE` de `mtvec` lê zero. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`.
 
-## 5. Exceções Síncronas
+## 6. Exceções Síncronas
 
-### 5.1. Causas Geradas
+### 6.1. Causas Geradas
 
 A `trap_unit` avalia a instrução no estágio EX e sinaliza no máximo uma exceção por instrução, apenas quando a instrução é válida e o pipeline avança.
 
 | `mcause` | Exceção | Condição | `mtval` |
 | :---: | :--- | :--- | :--- |
 | 0 | Endereço de instrução desalinhado | Desvio, `JAL` ou `JALR` tomado com alvo de bits `[1:0]` diferentes de `00` | Endereço alvo |
-| 2 | Instrução ilegal | Encoding indefinido apontado pelo decodificador do estágio ID, instrução `SYSTEM` não suportada, ou acesso a CSR ilegal (seção 3.3) | Zero |
+| 2 | Instrução ilegal | Encoding indefinido apontado pelo decodificador do estágio ID, instrução `SYSTEM` não suportada, ou acesso a CSR ilegal (seção 4.3) | Zero |
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
 | 4 | Endereço de load desalinhado | Load desalinhado que o hardware não executa | Endereço efetivo |
 | 6 | Endereço de store desalinhado | Store desalinhado que o hardware não executa | Endereço efetivo |
@@ -132,7 +140,7 @@ As instruções `ECALL`, `EBREAK`, `MRET` e `WFI` só são reconhecidas com `fun
 
 Um desalinhamento de load ou store é definido pelas regras da extensão `Zicclsm`: o hardware executa o acesso desalinhado dentro da memória principal (RAM interna e SDRAM) quando `has_zicclsm = true`, e qualquer outro desalinhamento gera as causas 4 e 6. Com `has_zicsr = true`, essas duas causas são verificadas no estágio MEM por uma segunda instância da `trap_unit`, que lê o endereço efetivo já registrado em `EX/MEM`, e a instância do estágio EX não confere o endereço efetivo.
 
-### 5.2. Prioridade
+### 6.2. Prioridade
 
 Para a instância do estágio EX, a prioridade é a da tabela, de cima para baixo.
 
@@ -145,7 +153,7 @@ Para a instância do estágio EX, a prioridade é a da tabela, de cima para baix
 
 A exceção de load ou store (causas 4 e 6) pertence a uma instrução mais antiga que a do estágio EX e por isso tem prioridade sobre todas as causas de EX. Quando ela ocorre, a instrução de EX é descartada por inteiro, sem escrita de CSR, desvio, `MRET`, `FENCE.I` ou retirada.
 
-### 5.3. Entrada no Tratador
+### 6.3. Entrada no Tratador
 
 Ao tomar uma exceção, o banco de CSRs executa as seguintes ações no mesmo ciclo.
 
@@ -156,13 +164,13 @@ Ao tomar uma exceção, o banco de CSRs executa as seguintes ações no mesmo ci
 
 Se a exceção ocorre no estágio MEM, o PC salvo em `mepc` é o da instrução de load ou store, carregado em `EX/MEM`.
 
-### 5.4. Retorno com MRET
+### 6.4. Retorno com MRET
 
-A instrução `MRET` (`funct12 = 0x302`) é detectada em EX. Ela restaura `mstatus.MIE` com o valor de `mstatus.MPIE`, grava `mstatus.MPIE` com `1` e redireciona o PC para `mepc`. A instrução `WFI` (`funct12 = 0x105`) é aceita como instrução legal e executa como `NOP` (seção 6.6).
+A instrução `MRET` (`funct12 = 0x302`) é detectada em EX. Ela restaura `mstatus.MIE` com o valor de `mstatus.MPIE`, grava `mstatus.MPIE` com `1` e redireciona o PC para `mepc`. A instrução `WFI` (`funct12 = 0x105`) é aceita como instrução legal e executa como `NOP` (seção 7.6).
 
-### 5.5. Redirecionamento e Flush
+### 6.5. Redirecionamento e Flush
 
-O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FENCE.I`), o vetor de `mtvec` (em interrupção com `mtvec` vetorado, seção 6.5) e `BASE` de `mtvec` (nos demais casos). O seletor de PC dá ao redirecionamento a maior prioridade sobre desvios e `JALR`, e o registrador de PC aceita o novo valor mesmo com o pipeline congelado.
+O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FENCE.I`), o vetor de `mtvec` (em interrupção com `mtvec` vetorado, seção 7.5) e `BASE` de `mtvec` (nos demais casos). O seletor de PC dá ao redirecionamento a maior prioridade sobre desvios e `JALR`, e o registrador de PC aceita o novo valor mesmo com o pipeline congelado.
 
 | Evento | Registradores esvaziados | Observação |
 | :--- | :--- | :--- |
@@ -170,15 +178,15 @@ O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FE
 | Exceção em MEM | `IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB` | O acesso faltante não chega à memória e a instrução de EX é descartada |
 | `MRET` | `IF/ID`, `ID/EX` | A própria `MRET` segue no pipeline como instrução sem efeito em registrador |
 
-### 5.6. Latência
+### 6.6. Latência
 
 A exceção de EX é detectada de forma combinacional no ciclo em que a instrução está em EX e o pipeline avança. Os CSRs e o PC são gravados na borda de clock que encerra esse ciclo, de modo que a primeira instrução do tratador é buscada no ciclo seguinte. Duas instruções mais novas (nos estágios IF e ID) são descartadas, além da própria instrução faltante. A exceção de load ou store é detectada no ciclo em que o acesso chega a MEM, um ciclo depois da instrução ter passado por EX.
 
 A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
 
-## 6. Tomada de Interrupção
+## 7. Tomada de Interrupção
 
-### 6.1. Condição
+### 7.1. Condição
 
 A `trap_unit` toma a interrupção que o `csr_file` indica em `o_irq_take` sobre a instrução que está em EX. A interrupção só é tomada com instrução válida em EX e pipeline avançando, e nunca sobre `FENCE.I`.
 
@@ -186,18 +194,18 @@ $$\text{toma} = \text{mstatus.MIE} \land \left( (\text{mip} \land \text{mie}) \n
 
 Enquanto a condição não vale, a interrupção fica pendente e o programa segue. A linha é de nível, então ela é tomada assim que a condição passa a valer, e o tratador precisa reconhecê-la no periférico antes de retornar.
 
-### 6.2. Prioridade
+### 7.2. Prioridade
 
 | Ordem | Evento | `mcause` |
 | :---: | :--- | :---: |
 | 1 | Interrupção externa de máquina | `0x8000000B` |
 | 2 | Interrupção de software de máquina | `0x80000003` |
 | 3 | Interrupção de timer de máquina | `0x80000007` |
-| 4 | Exceção síncrona da instrução em EX (seção 5.2) | Código da exceção |
+| 4 | Exceção síncrona da instrução em EX (seção 6.2) | Código da exceção |
 
 A interrupção tem prioridade sobre a exceção síncrona e sobre o `MRET` da instrução em EX: ela é abortada e fica como a instrução de retorno, e a exceção só ocorre se a instrução for executada depois do retorno. A exceção de load ou store do estágio MEM é de uma instrução mais antiga e vence a interrupção: a instrução de EX é descartada pela exceção, e a interrupção continua pendente até o tratador devolver o controle.
 
-### 6.3. Ponto de Entrada
+### 7.3. Ponto de Entrada
 
 | Regra | Efeito |
 | :--- | :--- |
@@ -210,7 +218,7 @@ A interrupção tem prioridade sobre a exceção síncrona e sobre o `MRET` da i
 
 Uma instrução de acesso a CSR abortada não escreve nada: `mtvec`, `mscratch`, `mie`, os contadores e `mstatus` ficam como estavam, a não ser pelo efeito da própria tomada em `mstatus`, `mepc`, `mcause` e `mtval`.
 
-### 6.4. Casos que Adiam a Tomada
+### 7.4. Casos que Adiam a Tomada
 
 A tomada espera enquanto o pipeline não avança ou não há instrução válida em EX. Nenhum desses casos parte uma instrução ao meio.
 
@@ -225,7 +233,7 @@ A tomada espera enquanto o pipeline não avança ou não há instrução válida
 
 Uma linha que sobe de novo antes de a primeira instrução do programa retirar refaz a mesma entrada sem fim. Por isso o intervalo entre interrupções precisa exceder a duração do tratador somada à da instrução mais longa do programa, que é a divisão.
 
-### 6.5. Modos de `mtvec`
+### 7.5. Modos de `mtvec`
 
 | `MODE` (bit 0) | Destino de uma interrupção | Destino de uma exceção síncrona |
 | :---: | :--- | :--- |
@@ -240,11 +248,11 @@ Os modos `2` e `3` são reservados, e o bit 1 lê zero. No modo vetorado `BASE` 
 | 7 (timer) | `BASE + 28` |
 | 11 (externa) | `BASE + 44` |
 
-### 6.6. MRET e WFI
+### 7.6. MRET e WFI
 
-O `MRET` segue a seção 5.4. A `WFI` executa como `NOP`, como o manual privilegiado permite, então o núcleo não para à espera de interrupção. Uma interrupção tomada sobre a `WFI` devolve o controle à própria `WFI`, que executa como `NOP` no retorno.
+O `MRET` segue a seção 6.4. A `WFI` executa como `NOP`, como o manual privilegiado permite, então o núcleo não para à espera de interrupção. Uma interrupção tomada sobre a `WFI` devolve o controle à própria `WFI`, que executa como `NOP` no retorno.
 
-## 7. Core sem Zicsr
+## 8. Core sem Zicsr
 
 Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e não há registradores de trap. O Core mantém um detector de causas que apenas sinaliza a exceção nas saídas e não redireciona o PC.
 

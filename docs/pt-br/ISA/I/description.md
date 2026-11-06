@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core implementa a base inteira RV32I. Os requisitos do manual do RISC-V estão em [instructions.md](instructions.md), e a microarquitetura completa do pipeline em [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md).
 
-## 1. Módulos da Base
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 1, RV32I Base Integer Instruction Set, versão 2.1 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Módulos da Base
 
 | Módulo | Pasta | Responsabilidade |
 | :--- | :--- | :--- |
@@ -16,7 +24,7 @@ Este documento descreve como o Core implementa a base inteira RV32I. Os requisit
 | `forwarding_unit` e `hazard_detection_unit` | `src/shared/` | Adiantamento de operandos e parada por dependência de load |
 | `stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb` | `src/core/` | Os cinco estágios do pipeline |
 
-## 2. Distribuição das Instruções pelos Estágios
+## 3. Distribuição das Instruções pelos Estágios
 
 | Estágio | O que a base RV32I faz |
 | :--- | :--- |
@@ -26,7 +34,7 @@ Este documento descreve como o Core implementa a base inteira RV32I. Os requisit
 | MEM | Envia o endereço efetivo, o dado e a máscara à memória certa e espera a resposta quando o escravo é lento |
 | WB | Alinha e estende a palavra lida por um load, escolhe entre ela e o resultado da ULA e grava em `rd` |
 
-## 3. Unidade de Controle
+## 4. Unidade de Controle
 
 A unidade de controle é combinacional. Seus sinais partem de valores padrão que formam um `NOP` (sem escrita em registrador nem acesso à memória) e cada `opcode` os sobrescreve. A tabela completa por instrução está em [DECODER.md](DECODER.md); a tabela abaixo resume o papel dos sinais.
 
@@ -44,7 +52,7 @@ A unidade de controle é combinacional. Seus sinais partem de valores padrão qu
 
 Um segundo processo calcula `o_illegal`. A palavra é legal quando os bits 1 e 0 valem `11` e a combinação de `opcode`, `funct3` e `funct7` é uma das aceitas na seção 8 de [instructions.md](instructions.md). `FENCE` e as instruções SYSTEM são legais nesse processo, e o detector de exceções da extensão Zicsr decide depois quais SYSTEM são válidas.
 
-## 4. Imediatos
+## 5. Imediatos
 
 O extensor de imediato escolhe o formato por `o_ext_imm_op`.
 
@@ -59,7 +67,7 @@ O extensor de imediato escolhe o formato por `o_ext_imm_op`.
 
 Qualquer outro código produz zero. Nas instruções SYSTEM o estágio ID força o formato I, porque o detector de exceções lê o campo `funct12` pelo imediato.
 
-## 5. Desvios e Saltos
+## 6. Desvios e Saltos
 
 Os desvios e saltos são resolvidos em EX, sob a política de assumir desvio não tomado.
 
@@ -71,11 +79,11 @@ Os desvios e saltos são resolvidos em EX, sob a política de assumir desvio nã
 
 `JAL` e `JALR` gravam $\text{pc} + 4$ em `rd` pelo caminho normal do resultado de EX. Quando um desvio ou salto é tomado, os registradores IF/ID e ID/EX são descartados, o que custa dois ciclos. O seletor de `pc` e sua prioridade estão em [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.3.
 
-## 6. Acesso à Memória de Dados
+## 7. Acesso à Memória de Dados
 
 O endereço efetivo $x[rs1] + \text{imm}$ sai da ULA com a operação de soma. Os dois bits baixos dele escolhem a faixa de bytes.
 
-### 6.1. Stores
+### 7.1. Stores
 
 O gerenciador de stores, em EX, replica a posição do dado e gera a máscara de bytes. A máscara é nula quando a instrução não é um store.
 
@@ -87,7 +95,7 @@ O gerenciador de stores, em EX, replica a posição do dado e gera a máscara de
 
 No deslocamento 3 de `SH`, o acesso cruza a palavra e seu tratamento está em [Zicclsm/description.md](../Zicclsm/description.md). O mesmo vale para `SW` com deslocamento diferente de 0.
 
-### 6.2. Loads
+### 7.2. Loads
 
 O extensor de leitura, em WB, recebe a palavra lida e o deslocamento de bytes.
 
@@ -101,7 +109,7 @@ O extensor de leitura, em WB, recebe a palavra lida e o deslocamento de bytes.
 
 O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um load parte do registrador WB2, e não de MEM/WB. Acessos desalinhados, a largura da memória e as regiões do mapa têm documentos próprios ([Zicclsm/description.md](../Zicclsm/description.md) e [MEMORY_WIDTH.md](../../pipeline/MEMORY_WIDTH.md)).
 
-## 7. Banco de Registradores
+## 8. Banco de Registradores
 
 | Característica | Comportamento |
 | :--- | :--- |
@@ -111,7 +119,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | Leitura no ciclo da escrita | Um multiplexador entrega o dado que está sendo escrito quando o registrador lido é o mesmo, exceto `x0` |
 | Tamanho | 32 registradores; o genérico `has_e` verdadeiro seleciona o RV32E ([E/description.md](../E/description.md)) |
 
-## 8. Adiantamento e Hazards
+## 9. Adiantamento e Hazards
 
 | Situação | Tratamento | Custo | Detalhe |
 | :--- | :--- | :--- | :--- |
@@ -120,7 +128,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | Desvio ou salto tomado | Descarte de IF/ID e ID/EX | 2 ciclos | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.3 |
 | Espera de memória lenta | Congelamento global do pipeline | Tempo de espera | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), seção 2.4 |
 
-## 9. Genéricos que Afetam a Base
+## 10. Genéricos que Afetam a Base
 
 | Genérico | Efeito sobre a base RV32I |
 | :--- | :--- |
@@ -129,7 +137,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | `has_zicclsm` | Executa em hardware os loads e stores desalinhados da memória principal; desativado, todo acesso desalinhado gera exceção |
 | `has_zifencei` | Torna `FENCE.I` legal; `FENCE` é sempre legal |
 
-## 10. Casos Limite
+## 11. Casos Limite
 
 | Caso | Comportamento |
 | :--- | :--- |

@@ -2,7 +2,15 @@
 
 A instrução `FENCE.I` sincroniza o fluxo de instruções com os stores anteriores do mesmo núcleo. Depois dela, uma busca de instrução enxerga tudo que o programa gravou na memória antes. O que o manual do RISC-V exige está em [instructions.md](instructions.md). Este documento descreve para que ela serve, como o Core a executa e o que acontece no pipeline e nas caches.
 
-## 1. Para Que Serve
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 4, Zifencei Extension for Instruction-Fetch Fence, versão 2.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Para Que Serve
 
 A busca de instruções e os stores usam caminhos diferentes. A cache de instruções só lê a memória e não observa os stores do núcleo. Um programa que grava código novo e salta para ele precisa, portanto, de um passo que torne a escrita visível à busca.
 
@@ -13,7 +21,7 @@ A busca de instruções e os stores usam caminhos diferentes. A cache de instru�
 
 Casos típicos são um carregador que copia um programa para a memória, a geração de código em tempo de execução e a troca de uma rotina em uso.
 
-## 2. Onde a Instrução Tem Efeito
+## 3. Onde a Instrução Tem Efeito
 
 Só o código buscado pela cache de instruções é afetado. A BOOT_ROM é lida diretamente, e a ROM interna e a RAM interna também não passam pela cache. Uma busca passa pela cache de instruções quando o endereço fora da BOOT_ROM é externo: pertence à janela externa a partir de `ext_base_kib`, a uma ROM marcada com `rom_external` ou a uma RAM marcada com `ram_external`. Os limites vêm dos genéricos descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
@@ -27,7 +35,7 @@ Só o código buscado pela cache de instruções é afetado. A BOOT_ROM é lida 
 
 No mapa padrão (`rom_external` falso) a ROM é interna e lida diretamente, de modo que só o código gravado na janela externa (a partir de `0x40000000`) muda de resultado com o `FENCE.I`. Com ROM externa, o `FENCE.I` vale também para o código gravado nela.
 
-## 3. Configuração
+## 4. Configuração
 
 Dois parâmetros do Core decidem o comportamento.
 
@@ -45,7 +53,7 @@ A instrução `FENCE` comum, com `funct3 = 000`, não é tratada por esta unidad
 
 O decodificador reconhece o `FENCE.I` pelo opcode `MISC-MEM` e por `funct3 = 001`, e ignora os campos `rd`, `rs1` e `funct12`, como o manual exige das implementações base.
 
-## 4. Execução Sem Cache de Dados
+## 5. Execução Sem Cache de Dados
 
 Sem cache de dados write-back, os stores já estão na memória quando deixam o estágio MEM. O `FENCE.I` conclui no mesmo ciclo em que está válido no estágio EX e o pipeline avança. Nesse ciclo a unidade emite um pulso de conclusão, que produz os três efeitos abaixo.
 
@@ -53,7 +61,7 @@ Sem cache de dados write-back, os stores já estão na memória quando deixam o 
 2. Descarta as instruções de IF/ID e ID/EX.
 3. Redireciona o PC para $\text{PC} + 4$, o endereço da instrução seguinte ao `FENCE.I`.
 
-## 5. Execução Com Cache de Dados Write-Back
+## 6. Execução Com Cache de Dados Write-Back
 
 Com a cache de dados, os stores anteriores podem estar apenas na cache. A unidade as descarrega antes de invalidar a cache de instruções, porque a invalidação só ajuda se a memória já tem o código novo.
 
@@ -66,9 +74,9 @@ A unidade segura a instrução em EX e usa dois flip-flops, um que arma o pulso 
 | 2 em diante | A unidade espera a confirmação da cache | Parado |
 | Ciclo da confirmação | A confirmação chega e o pulso de conclusão sai | Avança |
 
-A confirmação pode chegar no ciclo do pulso de descarga, para uma cache que responde combinacionalmente, ou em qualquer ciclo depois. O pulso de conclusão sai no ciclo em que a confirmação chega, e produz os mesmos três efeitos da seção 4.
+A confirmação pode chegar no ciclo do pulso de descarga, para uma cache que responde combinacionalmente, ou em qualquer ciclo depois. O pulso de conclusão sai no ciclo em que a confirmação chega, e produz os mesmos três efeitos da seção 5.
 
-## 6. Efeito no Pipeline
+## 7. Efeito no Pipeline
 
 | Elemento | Efeito |
 | :--- | :--- |
@@ -81,7 +89,7 @@ A confirmação pode chegar no ciclo do pulso de descarga, para uma cache que re
 
 As duas instruções descartadas são buscadas de novo a partir de $\text{PC} + 4$, já com a cache de instruções vazia.
 
-## 7. Efeito nas Caches
+## 8. Efeito nas Caches
 
 | Cache | Operação | Resultado |
 | :--- | :--- | :--- |
@@ -91,7 +99,7 @@ As duas instruções descartadas são buscadas de novo a partir de $\text{PC} + 
 
 A duração da descarga depende da cache de dados, que é externa ao Core. Ela avisa a conclusão com um pulso, que o Core usa como confirmação e que pode chegar no ciclo do pedido ou em qualquer ciclo depois.
 
-## 8. Uso no Programa
+## 9. Uso no Programa
 
 A sequência correta grava o código, executa o `FENCE.I` e só então salta para ele.
 
@@ -103,7 +111,7 @@ A sequência correta grava o código, executa o `FENCE.I` e só então salta par
 
 Uma instrução entre o store e o `FENCE.I` não altera a garantia. O salto precisa vir depois do `FENCE.I`, porque só depois dele a busca vê o código novo.
 
-## 9. Custo
+## 10. Custo
 
 | Configuração | Custo do `FENCE.I` |
 | :--- | :--- |

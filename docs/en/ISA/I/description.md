@@ -2,7 +2,15 @@
 
 This document describes how the Core implements the RV32I base integer set. The RISC-V manual requirements are in [instructions.md](instructions.md), and the full pipeline microarchitecture is in [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md).
 
-## 1. Base Modules
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 1, RV32I Base Integer Instruction Set, version 2.1 |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Base Modules
 
 | Module | Folder | Responsibility |
 | :--- | :--- | :--- |
@@ -16,7 +24,7 @@ This document describes how the Core implements the RV32I base integer set. The 
 | `forwarding_unit` and `hazard_detection_unit` | `src/shared/` | Operand forwarding and stall on load dependence |
 | `stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb` | `src/core/` | The five pipeline stages |
 
-## 2. Instruction Distribution across Stages
+## 3. Instruction Distribution across Stages
 
 | Stage | What the RV32I base does |
 | :--- | :--- |
@@ -26,7 +34,7 @@ This document describes how the Core implements the RV32I base integer set. The 
 | MEM | Sends the effective address, data, and mask to the right memory and waits for the response when the slave is slow |
 | WB | Aligns and extends the word read by a load, chooses between it and the ALU result, and writes `rd` |
 
-## 3. Control Unit
+## 4. Control Unit
 
 The control unit is combinational. Its signals start from defaults that form a `NOP` (no register write and no memory access), and each `opcode` overrides them. The full per-instruction table is in [DECODER.md](DECODER.md); the table below summarizes the role of the signals.
 
@@ -44,7 +52,7 @@ The control unit is combinational. Its signals start from defaults that form a `
 
 A second process computes `o_illegal`. A word is legal when bits 1 and 0 are `11` and the combination of `opcode`, `funct3`, and `funct7` is one of those accepted in section 8 of [instructions.md](instructions.md). `FENCE` and the SYSTEM instructions are legal in this process, and the exception detector of the Zicsr extension later decides which SYSTEM instructions are valid.
 
-## 4. Immediates
+## 5. Immediates
 
 The immediate extender selects the format through `o_ext_imm_op`.
 
@@ -59,7 +67,7 @@ The immediate extender selects the format through `o_ext_imm_op`.
 
 Any other code produces zero. In SYSTEM instructions the ID stage forces the I format, because the exception detector reads the `funct12` field through the immediate.
 
-## 5. Branches and Jumps
+## 6. Branches and Jumps
 
 Branches and jumps resolve in EX, under the assume-not-taken policy.
 
@@ -71,11 +79,11 @@ Branches and jumps resolve in EX, under the assume-not-taken policy.
 
 `JAL` and `JALR` write $\text{pc} + 4$ to `rd` through the normal EX result path. When a branch or jump is taken, the IF/ID and ID/EX registers are discarded, which costs two cycles. The `pc` selector and its priority are in [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.3.
 
-## 6. Data-Memory Access
+## 7. Data-Memory Access
 
 The effective address $x[rs1] + \text{imm}$ leaves the ALU with the add operation. Its two low bits select the byte lane.
 
-### 6.1. Stores
+### 7.1. Stores
 
 The store manager, in EX, replicates the data position and generates the byte mask. The mask is null when the instruction is not a store.
 
@@ -87,7 +95,7 @@ The store manager, in EX, replicates the data position and generates the byte ma
 
 At offset 3 of `SH`, the access crosses the word and its handling is described in [Zicclsm/description.md](../Zicclsm/description.md). The same holds for `SW` at an offset other than 0.
 
-### 6.2. Loads
+### 7.2. Loads
 
 The load extender, in WB, receives the word read and the byte offset.
 
@@ -101,7 +109,7 @@ The load extender, in WB, receives the word read and the byte offset.
 
 The final data of a load exists only at the end of WB. For this reason load forwarding starts from the WB2 register, and not from MEM/WB. Misaligned accesses, memory width, and the map regions have their own documents ([Zicclsm/description.md](../Zicclsm/description.md) and [MEMORY_WIDTH.md](../../pipeline/MEMORY_WIDTH.md)).
 
-## 7. Register File
+## 8. Register File
 
 | Feature | Behavior |
 | :--- | :--- |
@@ -111,7 +119,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | Read in the write cycle | A multiplexer delivers the data being written when the register read is the same one, except `x0` |
 | Size | 32 registers; the `has_e` generic set to true selects RV32E ([E/description.md](../E/description.md)) |
 
-## 8. Forwarding and Hazards
+## 9. Forwarding and Hazards
 
 | Situation | Handling | Cost | Detail |
 | :--- | :--- | :--- | :--- |
@@ -120,7 +128,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | Taken branch or jump | Discard of IF/ID and ID/EX | 2 cycles | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.3 |
 | Slow-memory wait | Global pipeline freeze | Wait time | [ARCHITECTURE.md](../../pipeline/ARCHITECTURE.md), section 2.4 |
 
-## 9. Generics That Affect the Base
+## 10. Generics That Affect the Base
 
 | Generic | Effect on the RV32I base |
 | :--- | :--- |
@@ -129,7 +137,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | `has_zicclsm` | Runs misaligned main-memory loads and stores in hardware; disabled, every misaligned access raises an exception |
 | `has_zifencei` | Makes `FENCE.I` legal; `FENCE` is always legal |
 
-## 10. Corner Cases
+## 11. Corner Cases
 
 | Case | Behavior |
 | :--- | :--- |

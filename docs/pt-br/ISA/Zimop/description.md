@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core executa as 40 instruções da `Zimop`. O que o manual exige, com as codificações, está em [instructions.md](instructions.md).
 
-## 1. Configuração
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 9, Zimop Extension for May-Be-Operations, versão 1.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Configuração
 
 | Genérico | Padrão | Efeito |
 | :--- | :--- | :--- |
@@ -10,7 +18,7 @@ Este documento descreve como o Core executa as 40 instruções da `Zimop`. O que
 
 Com `has_zimop = false`, o decodificador não existe na elaboração e as 40 codificações seguem o caminho de qualquer instrução `SYSTEM` não suportada. Com `has_zicsr = true`, isso gera exceção de instrução ilegal (causa 2), e sem `has_zicsr` o sinal de exceção do núcleo sobe. O restante do núcleo não muda com a extensão ligada ou desligada.
 
-## 2. Decodificação no Estágio ID
+## 3. Decodificação no Estágio ID
 
 O decodificador reivindica uma palavra quando ela satisfaz uma das condições da tabela. Os campos `rd`, `rs1` e `rs2` e os bits de `n` não entram na decisão.
 
@@ -28,11 +36,11 @@ Uma palavra reivindicada ativa a escrita em `rd` e substitui dois sinais que seg
 
 O desvio `BGEU` só decide um desvio quando o `opcode` é o de desvios condicionais, e o `opcode` apresentado a EX é outro, então a MOP nunca altera o fluxo de controle.
 
-## 3. Caminho de Dados
+## 4. Caminho de Dados
 
 O zero percorre o mesmo caminho do resultado de uma instrução aritmética. Ele atravessa os registradores de barreira `EX/MEM` e `MEM/WB`, é adiantado às instruções seguintes pela unidade de `forwarding` e é gravado em `rd` no estágio WB. Uma MOP seguida de uma instrução que lê `rd` fornece zero a essa instrução sem parada. A escrita em `x0` é descartada pelo banco de registradores, como em qualquer instrução.
 
-## 4. Interações
+## 5. Interações
 
 | Item | Comportamento |
 | :--- | :--- |
@@ -40,7 +48,7 @@ O zero percorre o mesmo caminho do resultado de uma instrução aritmética. Ele
 | Zicsr | Nenhum CSR é lido nem escrito, e nenhuma exceção é gerada |
 | Hazard de load | A MOP é tratada como leitora de `rs1`, então um `load` imediatamente anterior ao mesmo registrador causa um ciclo de parada |
 
-## 5. Verificação
+## 6. Verificação
 
 | Nível | Cobertura |
 | :--- | :--- |

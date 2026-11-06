@@ -2,7 +2,15 @@
 
 This document describes how the Core executes the `Zicond` instructions. What the manual requires is in [instructions.md](instructions.md).
 
-## 1. Configuration
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 10, Zicond Extension for Integer Conditional Operations, version 1.0.0 |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Configuration
 
 | Generic | Default | Effect |
 | :--- | :--- | :--- |
@@ -10,7 +18,7 @@ This document describes how the Core executes the `Zicond` instructions. What th
 
 With `has_zicond = false`, no decoder claims the two encodings, and the control unit marks them as illegal instructions, like any encoding outside RV32I. The `rv32im_zicond` profile turns the generic on for the GHDL build.
 
-## 2. Decoding in the ID Stage
+## 3. Decoding in the ID Stage
 
 The decoder claims the instruction when the three fields in the table below match, whatever the values of `rd`, `rs1` and `rs2`.
 
@@ -29,7 +37,7 @@ For a claimed instruction, the decoder enables the write to `rd`, selects `rs1` 
 
 Neither code is an ALU operation, so the EX stage tells the instructions apart without a new signal in the ID/EX register. The ALU result selection stays that of an addition, and that result is not used.
 
-## 3. Execution in the EX Stage
+## 4. Execution in the EX Stage
 
 The execution unit is combinational and receives $rs1$ and $rs2$ after forwarding, so it reads the value produced by an earlier instruction still in the pipeline. With $c$ equal to 1 when $rs2 = 0$, the result is given below.
 
@@ -42,7 +50,7 @@ $$
 
 The result enters the EX stage result multiplexer, which picks it when the operation code is one of the two instructions. From there it follows the common path of an arithmetic instruction: forwarding to the following instructions and the write to `rd` in the WB stage. The instruction takes one cycle in the EX stage and does not stall the pipeline.
 
-## 4. Verification
+## 5. Verification
 
 | Check | What it covers |
 | :--- | :--- |

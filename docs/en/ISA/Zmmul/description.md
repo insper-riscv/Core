@@ -2,7 +2,15 @@
 
 This document describes how the Core executes the `Zmmul` instructions. What the manual requires is in [instructions.md](instructions.md). The decoder, the execution unit, the pipeline stall and the pair fusion are shared with `M` and are in [M](../M/description.md).
 
-## 1. Configuration
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 11, M Extension, section 11.1.3 (Zmmul, version 1.0) |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Configuration
 
 | Generic | Default | Effect |
 | :--- | :--- | :--- |
@@ -10,11 +18,11 @@ This document describes how the Core executes the `Zmmul` instructions. What the
 
 The divider is instantiated only with `has_m`, so `has_zmmul = true` with `has_m = false` gives the profile without division. Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
 
-## 2. Decoding without Division
+## 3. Decoding without Division
 
 The division parameter of the decoder receives the value of `has_m`. Without division, only the `funct3` values with bit 2 at zero are claimed, that is, the four multiplications. An instruction with `funct7 = 0000001` and a division `funct3` is not claimed, and the control unit marks it illegal. The rest of the decoding is in [M](../M/description.md).
 
-## 3. Radix-2 Booth Multiplier
+## 4. Radix-2 Booth Multiplier
 
 The multiplier performs the signed 32 by 32-bit multiplication and produces the 64-bit product. It keeps a 33-bit accumulator, the 32-bit multiplier, an auxiliary bit on the right and the multiplicand sign-extended to 33 bits. At each step it examines the pair formed by the least significant bit of the multiplier and the auxiliary bit.
 
@@ -34,7 +42,7 @@ $$
 
 In this expression, $s_A$ and $s_B$ are 1 when the respective operand is signed. For `MULH` the correction is null, for `MULHSU` only the term that adds $A$ applies and for `MULHU` both terms apply.
 
-## 4. Pipeline Stall
+## 5. Pipeline Stall
 
 Multiplication has a latency of 33 cycles in the unit, and the pipeline stalls for 35, because the stall also covers the final state and the cycle in which the result is captured. The stall logic and the cost of the other operations are in [M](../M/description.md).
 
