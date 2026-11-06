@@ -14,20 +14,7 @@ tree:
       zihintntl_decode: [formal/zihintntl_props.sv]
       zihintpause_decode: [formal/zihintpause_props.sv]
     # Entities without an entity test of their own, and why (changed only with a justification in the pull request).
-    exceptions:
-      fencei_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      misaligned_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      muldiv_fusion: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      pc_fetch: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_ex_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_id_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_if_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_mem_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_if: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+    exceptions: {}
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
   identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, ISA]
 references:
