@@ -147,6 +147,8 @@ architecture rtl of trap_unit is
 	signal misal_exec   : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
+	-- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem prioridade sobre o alvo desalinhado.
+	signal any_illegal : std_logic;
 
 	-- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
 	signal has_exc     : std_logic;
@@ -211,9 +213,14 @@ begin
 	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
 	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
 
-	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0) else '0';
+	any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
 
-	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
+	-- Um salto ou desvio de codificação reservada é ilegal (causa 2), e a Tabela 17 do manual privilegiado põe a
+	-- instrução ilegal acima do endereço de instrução desalinhado (causa 0): só o salto legal gera a causa 0. Só a
+	-- ilegalidade da decodificação importa aqui, porque as instruções SYSTEM nunca tomam desvio.
+	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0 and i_illegal = '0') else '0';
+
+	has_exc <= cf_misal or any_illegal or is_ebreak or
 	           ld_misal or st_misal or is_ecall;
 
 	is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
@@ -224,8 +231,8 @@ begin
 	o_irq       <= irq_go;
 
 	o_cause <= i_irq_cause when irq_go = '1' else
+	           CAUSE_ILLEGAL_INSTR when any_illegal = '1' else
 	           CAUSE_MISALIGNED_PC when cf_misal = '1' else
-	           CAUSE_ILLEGAL_INSTR when (i_illegal = '1' or sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else

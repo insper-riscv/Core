@@ -65,7 +65,7 @@ module props (input clk);
       if (cause == 2 || cause == 3 || cause == 11) assert (tval == 32'h0);
       if (cause == 2) assert (illegal || opcode == SYSTEM);
       if (cause == 4 || cause == 6) assert (tval == ea);
-      if (cause == 0) assert (cf_misal && tval == cf_target);
+      if (cause == 0) assert (cf_misal && !illegal && tval == cf_target);
       if (cause == 4) assert (opcode == LOAD);
       if (cause == 6) assert (opcode == STORE);
       if (cause == 3) assert (opcode == SYSTEM && no_regs && imm12 == 12'h001);
@@ -77,8 +77,8 @@ module props (input clk);
     if (active && opcode == SYSTEM && no_regs && imm12 == 12'h001 && !cf_misal) assert (take && cause == 3);
     if (active && opcode == SYSTEM && no_regs && imm12 == 12'h105) assert (!take && !mret_take);
 
-    // A flagged instruction traps with cause 2, unless its jump target is misaligned.
-    if (active && illegal && !cf_misal) assert (take && cause == 2);
+    // A flagged instruction traps with cause 2, even when its jump target is misaligned (Table 17).
+    if (active && illegal) assert (take && cause == 2 && tval == 32'h0);
 
     // Aligned accesses and aligned jumps do not trap.
 
@@ -137,6 +137,7 @@ module props (input clk);
   always @(*) begin
     cover (take && cause == 0);
     cover (take && cause == 2 && illegal);
+    cover (take && cause == 2 && illegal && cf_misal);
     cover (take && cause == 2 && opcode == SYSTEM && funct3 == 3'b001);
     cover (take && cause == 2 && opcode == SYSTEM && funct3 == 3'b000);
     cover (take && cause == 3);

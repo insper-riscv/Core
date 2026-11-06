@@ -333,7 +333,8 @@ mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
-mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or any_illegal or/has_exc <= cf_misal or/"
+mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
 
 # Mutants of the interrupt entry in the trap unit and in the CSR bank, one defect each.
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_keeps_mret   "s/ and (not irq_go);/;/"

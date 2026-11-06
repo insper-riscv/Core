@@ -254,15 +254,18 @@ async def test_undefined_encoding_needs_a_running_valid_instruction(dut):
 
 
 @cocotb.test()
-async def test_misaligned_target_goes_first(dut):
-    """Verifica misaligned target goes first.
+async def test_illegal_goes_before_misaligned_target(dut):
+    """Verifica illegal goes before misaligned target.
 
-    A misaligned target keeps cause 0 when the same instruction is also
-    flagged.
+    A flagged instruction with a misaligned target traps with cause 2 and
+    mtval zero (Table 17 of the privileged manual: illegal instruction
+    over instruction address misaligned).
     """
     take, _, cause, tval = await probe(
         dut, illegal=1, cf_taken=1, cf_target=0x102
     )
+    check_equal((take, cause, tval), (1, CAUSE_ILLEGAL, 0))
+    take, _, cause, tval = await probe(dut, cf_taken=1, cf_target=0x102)
     check_equal((take, cause, tval), (1, CAUSE_MISALIGNED_TARGET, 0x102))
 
 
