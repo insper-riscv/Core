@@ -93,7 +93,9 @@ entity csr_file is
 		-- Habilita as interrupções de máquina: mip espelha as portas i_irq_* e mie guarda as máscaras.
 		has_interrupts : boolean := false;
 		-- Habilita a extensão Sscofpmf (estouro de contador, LCOFI); só vale com has_zihpm e has_interrupts.
-		has_sscofpmf : boolean := false
+		has_sscofpmf : boolean := false;
+		-- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor lido só vale um ciclo depois de o endereço aparecer.
+		hpm_registered_read : boolean := false
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -112,6 +114,8 @@ entity csr_file is
 		i_src_zero   : in  std_logic;
 		-- Valor atual (antigo) de 32 bits lido combinacionalmente do CSR selecionado.
 		o_rdata      : out word_t;
+		-- O endereço é do banco do Zihpm e a leitura registrada (hpm_registered_read) vale um ciclo depois.
+		o_bank_read  : out std_logic;
 		-- Indica acesso a endereço CSR não implementado ou escrita em CSR somente-leitura.
 		o_illegal    : out std_logic;
 		-- Pulso que comanda o salvamento de contexto de exceção síncrona no modo máquina.
@@ -671,7 +675,8 @@ begin
 			generic map (
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_sscofpmf => SSCOF
+				has_sscofpmf => SSCOF,
+				registered_read => hpm_registered_read
 			)
 			port map (
 				i_clk         => i_clk,
@@ -691,11 +696,13 @@ begin
 
 		is_ext_addr <= is_inhibit_addr or
 		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (bool_to_sl(SSCOF) and in_eventh_range)));
+		o_bank_read <= is_ext_addr when hpm_registered_read else '0';
 	end generate gen_zihpm;
 
 	gen_no_zihpm : if not has_zihpm generate
 		ovf_irq     <= '0';
 		bank_rdata  <= (others => '0');
+		o_bank_read <= '0';
 		is_ext_addr <= is_inhibit_addr and bool_to_sl(has_zicntr);
 	end generate gen_no_zihpm;
 

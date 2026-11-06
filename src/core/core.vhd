@@ -176,6 +176,8 @@ architecture rtl of core is
 	signal pipe_stall        : std_logic;
 	-- Habilitação de avanço para o registrador ID/EX e estágios anteriores a MEM.
 	signal pipe_run          : std_logic;
+	-- Parada de um ciclo da instrução CSR que lê o banco do Zihpm (leitura registrada).
+	signal csr_wait          : std_logic;
 	-- Vetor de eventos dos contadores do Zihpm, um bit por código de evento.
 	signal hpm_events        : std_logic_vector(15 downto 0);
 	-- Valor de mis_stall no ciclo anterior (para o pulso de início de um acesso desalinhado).
@@ -485,9 +487,9 @@ architecture rtl of core is
 begin
 
 	-- Coordenação global de stalls e flushes entre os estágios.
-	mem_run       <= not (muldiv_stall or sdram_wait);
+	mem_run       <= not (muldiv_stall or sdram_wait or csr_wait);
 	base_run      <= mem_run and (not mis_stall);
-	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy or mis_stall;
+	pipe_stall    <= muldiv_stall or sdram_wait or csr_wait or fencei_busy or mis_stall;
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= mem_run;
 	-- Com CSRs, a exceção de endereço do load ou store é tomada em MEM (mem_trap_take): é de uma instrução mais
@@ -811,6 +813,7 @@ begin
 			o_fencei_busy     => fencei_busy,
 			o_dc_flush        => o_dc_flush,
 			o_muldiv_stall    => muldiv_stall,
+			o_csr_wait        => csr_wait,
 			o_muldiv_fused    => muldiv_fused
 		);
 
