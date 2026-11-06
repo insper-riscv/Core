@@ -65,7 +65,13 @@ entity core is
 		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
 		has_interrupts  : boolean := false;
 		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
-		has_sscofpmf    : boolean := false
+		has_sscofpmf    : boolean := false;
+		-- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
+		time_external   : boolean := false;
+		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa (BOOT_MEMORY, FLASH, RAM, janela externa e slots de periférico); exige Zicsr.
+		has_access_faults : boolean := false;
+		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
+		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -150,6 +156,8 @@ entity core is
 		i_hpm_ext_events : in  std_logic_vector(2 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do núcleo; fontes de outro domínio passam por um synchronizer.
 		i_irq_software  : in  std_logic := '0';
+		-- Valor de 64 bits do mtime da plataforma, que time e timeh espelham com time_external.
+		i_mtime         : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do núcleo.
 		i_irq_timer     : in  std_logic := '0';
 		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do núcleo.
@@ -405,6 +413,10 @@ architecture rtl of core is
 	signal exmem_in_main     : std_logic;
 	-- As duas palavras de um acesso que cruza o endereço em MEM ficam na mesma região, registrado em EX/MEM.
 	signal exmem_same_region : std_logic;
+	-- O endereço efetivo registrado em EX/MEM aceita leitura no mapa.
+	signal exmem_ok_rd : std_logic;
+	-- O endereço efetivo registrado em EX/MEM aceita escrita no mapa.
+	signal exmem_ok_wr : std_logic;
 	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
 	signal retire_pulse      : std_logic;
 	-- Pulso de retorno de exceção (MRET) gerado no estágio EX.
@@ -743,6 +755,8 @@ begin
 			hpm_width       => hpm_width,
 			has_interrupts  => has_interrupts,
 			has_sscofpmf    => has_sscofpmf,
+			time_external   => time_external,
+			has_access_faults => has_access_faults,
 			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
@@ -755,6 +769,7 @@ begin
 		port map (
 			i_hpm_events      => hpm_events,
 			i_irq_software    => i_irq_software,
+			i_mtime           => i_mtime,
 			i_irq_timer       => i_irq_timer,
 			i_irq_external    => i_irq_external,
 			i_clk             => i_clk,
@@ -826,7 +841,9 @@ begin
 			ram_end_kib     => ram_end_kib,
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib
+			periph_base_kib => periph_base_kib,
+			has_access_faults => has_access_faults,
+			periph_slots    => periph_slots
 		)
 		port map (
 			i_clk        => i_clk,
@@ -864,7 +881,9 @@ begin
 			o_is_flash   => exmem_is_flash,
 			o_is_sdram   => exmem_is_sdram,
 			o_in_main    => exmem_in_main,
-			o_same_region => exmem_same_region
+			o_same_region => exmem_same_region,
+			o_ok_rd       => exmem_ok_rd,
+			o_ok_wr       => exmem_ok_wr
 		);
 
 	-- =========================================================================
@@ -922,9 +941,12 @@ begin
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
 			periph_base_kib => periph_base_kib,
-			flags_registered => true
+			flags_registered => true,
+			has_access_faults => has_access_faults
 		)
 		port map (
+			i_flag_ok_rd    => exmem_ok_rd,
+			i_flag_ok_wr    => exmem_ok_wr,
 			i_flag_flash    => exmem_is_flash,
 			i_flag_sdram    => exmem_is_sdram,
 			i_flag_main     => exmem_in_main,

@@ -37,7 +37,11 @@ entity reg_ex_mem is
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal.
-		periph_base_kib : natural := 2097152
+		periph_base_kib : natural := 2097152;
+		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa; exige Zicsr.
+		has_access_faults : boolean := false;
+		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
+		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
 
 	port (
@@ -112,7 +116,11 @@ entity reg_ex_mem is
 		-- O endereço registrado está na memória principal.
 		o_in_main    : out std_logic;
 		-- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
-		o_same_region : out std_logic
+		o_same_region : out std_logic;
+		-- O endereço registrado aceita leitura no mapa (sempre '1' sem has_access_faults).
+		o_ok_rd       : out std_logic;
+		-- O endereço registrado aceita escrita no mapa (sempre '1' sem has_access_faults).
+		o_ok_wr       : out std_logic
 	);
 
 end entity reg_ex_mem;
@@ -155,6 +163,10 @@ architecture rtl of reg_ex_mem is
 	signal r_in_main    : std_logic    := '0';
 	-- As duas palavras de um acesso que cruza ficam na mesma região.
 	signal r_same       : std_logic    := '0';
+	-- O endereço registrado aceita leitura no mapa.
+	signal r_ok_rd      : std_logic    := '1';
+	-- O endereço registrado aceita escrita no mapa.
+	signal r_ok_wr      : std_logic    := '1';
 
 	-- Entrada de r_is_flash, decodificada do resultado da ULA.
 	signal in_is_flash  : std_logic;
@@ -164,6 +176,10 @@ architecture rtl of reg_ex_mem is
 	signal in_in_main   : std_logic;
 	-- Entrada de r_same, decodificada do resultado da ULA.
 	signal in_same      : std_logic;
+	-- Entrada de r_ok_rd, decodificada do resultado da ULA.
+	signal in_ok_rd     : std_logic;
+	-- Entrada de r_ok_wr, decodificada do resultado da ULA.
+	signal in_ok_wr     : std_logic;
 
 begin
 
@@ -173,6 +189,17 @@ begin
 	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
 	                         unsigned(i_ea) < kib_to_addr(periph_base_kib)) else '0';
 	in_same     <= '0' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
+
+	-- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
+	gen_faults : if has_access_faults generate
+		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib, periph_slots) else '0';
+		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib, periph_slots) else '0';
+	end generate gen_faults;
+
+	gen_no_faults : if not has_access_faults generate
+		in_ok_rd <= '1';
+		in_ok_wr <= '1';
+	end generate gen_no_faults;
 
 	process(i_clk)
 	begin
@@ -196,6 +223,8 @@ begin
 				r_is_sdram   <= '0';
 				r_in_main    <= '0';
 				r_same       <= '0';
+				r_ok_rd      <= '1';
+				r_ok_wr      <= '1';
 			elsif i_en = '1' then
 				r_valid      <= i_valid;
 				r_pc         <= i_pc;
@@ -215,6 +244,8 @@ begin
 				r_is_sdram   <= in_is_sdram;
 				r_in_main    <= in_in_main;
 				r_same       <= in_same;
+				r_ok_rd      <= in_ok_rd;
+				r_ok_wr      <= in_ok_wr;
 			end if;
 		end if;
 	end process;
@@ -237,5 +268,7 @@ begin
 	o_is_sdram   <= r_is_sdram;
 	o_in_main    <= r_in_main;
 	o_same_region <= r_same;
+	o_ok_rd       <= r_ok_rd;
+	o_ok_wr       <= r_ok_wr;
 
 end architecture rtl;

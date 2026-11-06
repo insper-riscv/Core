@@ -45,7 +45,9 @@ entity stage_mem is
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
 		periph_base_kib : natural := 2097152;
 		-- A classificação do endereço efetivo (FLASH, SDRAM, memória principal, mesma região) vem registrada do EX/MEM pelas portas i_flag_*, em vez de ser decodificada do endereço neste estágio.
-		flags_registered : boolean := false
+		flags_registered : boolean := false;
+		-- Gera as falhas de acesso de load e store (causas 5 e 7); as portas i_flag_ok_* trazem a validade do endereço.
+		has_access_faults : boolean := false
 	);
 	port (
 		-- Bit de validade da instrução no estágio MEM.
@@ -62,6 +64,10 @@ entity stage_mem is
 		i_flag_main     : in  std_logic := '0';
 		-- As duas palavras de um acesso que cruza ficam na mesma região (com flags_registered).
 		i_flag_same     : in  std_logic := '0';
+		-- O endereço efetivo aceita leitura no mapa (com has_access_faults).
+		i_flag_ok_rd    : in  std_logic := '1';
+		-- O endereço efetivo aceita escrita no mapa (com has_access_faults).
+		i_flag_ok_wr    : in  std_logic := '1';
 		-- Campo funct3 do load ou store, vindo do registrador EX/MEM.
 		i_funct3        : in  funct3_t;
 		-- Dado alinhado para escrita em memória vindo do registrador EX/MEM.
@@ -148,11 +154,14 @@ begin
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
 			periph_base_kib => periph_base_kib,
-			ea_flags_external => flags_registered
+			ea_flags_external => flags_registered,
+			has_access_faults => has_access_faults
 		)
 		port map (
 			i_ea_main        => i_flag_main,
 			i_ea_same_region => i_flag_same,
+			i_ea_rd_ok       => i_flag_ok_rd,
+			i_ea_wr_ok       => i_flag_ok_wr,
 			i_ex_valid    => i_valid,
 			i_run         => '1',
 			i_opcode      => mem_opcode,

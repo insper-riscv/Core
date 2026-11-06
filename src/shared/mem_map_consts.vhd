@@ -47,6 +47,38 @@ package mem_map_consts is
 		periph_kib   : natural
 	) return boolean;
 
+	-- O endereço está no intervalo de leitura válido do mapa: ROM, RAM, janela externa ou um slot de periférico ocupado.
+	function addr_readable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural;
+		periph_slots : std_logic_vector(7 downto 0)
+	) return boolean;
+
+	-- O endereço aceita escrita: o mapa válido sem a ROM (BOOT_MEMORY e FLASH são só de leitura).
+	function addr_writable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural;
+		periph_slots : std_logic_vector(7 downto 0)
+	) return boolean;
+
+	-- O endereço aceita busca de instrução: ROM, RAM e janela externa (nunca periférico).
+	function addr_executable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural
+	) return boolean;
+
 end package mem_map_consts;
 
 package body mem_map_consts is
@@ -122,5 +154,48 @@ package body mem_map_consts is
 		       (ext_base_kib > 0 and WORD = before(ext_base_kib)) or
 		       (periph_kib > 0 and WORD = before(periph_kib));
 	end function is_last_word;
+
+	function addr_executable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural
+	) return boolean is
+	begin
+		return addr < kib_to_addr(rom_end_kib) or
+		       (addr >= kib_to_addr(ram_base_kib) and addr < kib_to_addr(ram_end_kib)) or
+		       (addr >= kib_to_addr(ext_base_kib) and addr < kib_to_addr(periph_kib));
+	end function addr_executable;
+
+	function addr_writable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural;
+		periph_slots : std_logic_vector(7 downto 0)
+	) return boolean is
+	begin
+		return (addr >= kib_to_addr(ram_base_kib) and addr < kib_to_addr(ram_end_kib)) or
+		       (addr >= kib_to_addr(ext_base_kib) and addr < kib_to_addr(periph_kib)) or
+		       (addr >= kib_to_addr(periph_kib) and periph_slots(to_integer(addr(30 downto 28))) = '1');
+	end function addr_writable;
+
+	function addr_readable(
+		addr         : unsigned;
+		rom_end_kib  : natural;
+		ram_base_kib : natural;
+		ram_end_kib  : natural;
+		ext_base_kib : natural;
+		periph_kib   : natural;
+		periph_slots : std_logic_vector(7 downto 0)
+	) return boolean is
+	begin
+		return addr < kib_to_addr(rom_end_kib) or
+		       addr_writable(addr, rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_kib, periph_slots);
+	end function addr_readable;
 
 end package body mem_map_consts;

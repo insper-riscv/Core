@@ -22,6 +22,12 @@
 --          6         | Endereço de Store desalinhado que o     | i_ea
 --                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
+--          1         | Falha de acesso de instrução (busca fora   | i_pc
+--                    | de região executável, com has_access_faults)|
+--          5         | Falha de acesso de load (endereço fora do  | i_ea
+--                    | mapa válido, com has_access_faults)        |
+--          7         | Falha de acesso de store (fora do mapa ou  | i_ea
+--                    | em região só de leitura)                   |
 --   0x80000003, 7, B | Interrupção de software, timer, externa | 0x00000000
 -- =============================================================================
 
@@ -58,7 +64,9 @@ entity trap_unit is
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
 		periph_base_kib : natural := 2097152;
 		-- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
-		ea_flags_external : boolean := false
+		ea_flags_external : boolean := false;
+		-- Gera as falhas de acesso 1 (busca), 5 (load) e 7 (store) a partir de i_fetch_ok, i_ea_rd_ok e i_ea_wr_ok; a de dados exige check_ea.
+		has_access_faults : boolean := false
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -81,6 +89,14 @@ entity trap_unit is
 		i_ea_main        : in  std_logic := '0';
 		-- As duas palavras de um acesso que cruza estão na mesma região da memória principal (com ea_flags_external).
 		i_ea_same_region : in  std_logic := '0';
+		-- A busca da instrução em EX veio de região executável do mapa ('0' gera a causa 1 com has_access_faults).
+		i_fetch_ok    : in  std_logic := '1';
+		-- PC da instrução em EX (mtval da falha de acesso de instrução).
+		i_pc          : in  word_t    := (others => '0');
+		-- O endereço efetivo aceita leitura no mapa (um load com '0' gera a causa 5 com has_access_faults).
+		i_ea_rd_ok    : in  std_logic := '1';
+		-- O endereço efetivo aceita escrita no mapa (um store com '0' gera a causa 7 com has_access_faults).
+		i_ea_wr_ok    : in  std_logic := '1';
 		-- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
 		i_cf_taken    : in  std_logic;
 		-- Endereço alvo do desvio ou salto tomado no estágio EX.
@@ -147,6 +163,12 @@ architecture rtl of trap_unit is
 	signal misal_exec   : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
+	-- Indica busca de instrução fora de região executável.
+	signal fetch_fault : std_logic;
+	-- Indica load para endereço que o mapa não aceita ler.
+	signal ld_fault    : std_logic;
+	-- Indica store para endereço que o mapa não aceita escrever.
+	signal st_fault    : std_logic;
 	-- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem prioridade sobre o alvo desalinhado.
 	signal any_illegal : std_logic;
 
@@ -210,8 +232,13 @@ begin
 	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
 	              else '0';
 
-	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
-	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
+	-- A falha de acesso de dados é do endereço da primeira palavra e vem antes do desalinhamento (Tabela 17, o desalinhamento é o último).
+	ld_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0') else '0';
+	st_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0') else '0';
+	fetch_fault <= '1' when (has_access_faults and i_fetch_ok = '0') else '0';
+
+	ld_misal <= ld_unaligned and (not misal_exec) and (not ld_fault) when check_ea else '0';
+	st_misal <= st_unaligned and (not misal_exec) and (not st_fault) when check_ea else '0';
 
 	any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
 
@@ -220,8 +247,8 @@ begin
 	-- ilegalidade da decodificação importa aqui, porque as instruções SYSTEM nunca tomam desvio.
 	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0 and i_illegal = '0') else '0';
 
-	has_exc <= cf_misal or any_illegal or is_ebreak or
-	           ld_misal or st_misal or is_ecall;
+	has_exc <= fetch_fault or cf_misal or any_illegal or is_ebreak or
+	           ld_misal or st_misal or ld_fault or st_fault or is_ecall;
 
 	is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
 	irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
@@ -231,16 +258,20 @@ begin
 	o_irq       <= irq_go;
 
 	o_cause <= i_irq_cause when irq_go = '1' else
+	           CAUSE_FETCH_FAULT   when fetch_fault = '1' else
 	           CAUSE_ILLEGAL_INSTR when any_illegal = '1' else
 	           CAUSE_MISALIGNED_PC when cf_misal = '1' else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
+	           CAUSE_LOAD_FAULT    when ld_fault = '1' else
+	           CAUSE_STORE_FAULT   when st_fault = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
 	           CAUSE_MACHINE_ECALL;
 
 	o_tval  <= (others => '0') when irq_go = '1' else
+	           i_pc        when fetch_fault = '1' else
 	           i_cf_target when cf_misal = '1' else
-	           i_ea        when ((ld_misal = '1' or st_misal = '1') and i_illegal = '0') else
+	           i_ea        when ((ld_misal = '1' or st_misal = '1' or ld_fault = '1' or st_fault = '1') and i_illegal = '0') else
 	           (others => '0');
 
 end architecture rtl;
