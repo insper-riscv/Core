@@ -94,6 +94,8 @@ entity csr_file is
 		has_interrupts : boolean := false;
 		-- Habilita a extensão Sscofpmf (estouro de contador, LCOFI); só vale com has_zihpm e has_interrupts.
 		has_sscofpmf : boolean := false;
+		-- O CSR time espelha o mtime que a plataforma entrega em i_mtime (o CLINT), no lugar do contador próprio.
+		time_external : boolean := false;
 		-- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor lido só vale um ciclo depois de o endereço aparecer.
 		hpm_registered_read : boolean := false
 	);
@@ -138,6 +140,8 @@ entity csr_file is
 		o_mtvec      : out word_t;
 		-- Endereço de retorno de exceção armazenado no registrador mepc.
 		o_mepc       : out word_t;
+		-- Valor de 64 bits do mtime da plataforma, que time e timeh espelham quando time_external = true.
+		i_mtime        : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do core.
 		i_irq_software : in  std_logic := '0';
 		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do core.
@@ -597,29 +601,38 @@ begin
 				o_hi    => minstret_hi
 			);
 
-		-- Divisor que gera o tick do contador time.
-		u_time_tick : entity work.tick_divider
-			generic map (
-				tick_cycles => tick_cycles
-			)
-			port map (
-				i_clk  => i_clk,
-				i_rst  => i_rst,
-				o_tick => time_tick
-			);
+		gen_time_own : if not time_external generate
+			-- Divisor que gera o tick do contador time.
+			u_time_tick : entity work.tick_divider
+				generic map (
+					tick_cycles => tick_cycles
+				)
+				port map (
+					i_clk  => i_clk,
+					i_rst  => i_rst,
+					o_tick => time_tick
+				);
 
-		-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
-		u_time : entity work.counter64
-			port map (
-				i_clk   => i_clk,
-				i_rst   => i_rst,
-				i_inc   => time_tick,
-				i_we_lo => '0',
-				i_we_hi => '0',
-				i_wdata => (others => '0'),
-				o_lo    => time_lo,
-				o_hi    => time_hi
-			);
+			-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
+			u_time : entity work.counter64
+				port map (
+					i_clk   => i_clk,
+					i_rst   => i_rst,
+					i_inc   => time_tick,
+					i_we_lo => '0',
+					i_we_hi => '0',
+					i_wdata => (others => '0'),
+					o_lo    => time_lo,
+					o_hi    => time_hi
+				);
+		end generate gen_time_own;
+
+		-- O time é o sombreamento somente leitura do mtime da plataforma (seção 3.2.1 do volume privilegiado).
+		gen_time_platform : if time_external generate
+			time_tick <= '0';
+			time_lo   <= i_mtime(31 downto 0);
+			time_hi   <= i_mtime(63 downto 32);
+		end generate gen_time_platform;
 
 	end generate gen_zicntr;
 
