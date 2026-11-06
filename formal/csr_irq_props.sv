@@ -21,6 +21,10 @@ module props (input clk);
   (* anyseq *) wire [2:0] op;
   (* anyseq *) wire [31:0] wdata, trap_cause, trap_pc, trap_tval;
   (* anyseq *) wire irq_sw, irq_tm, irq_ex;
+  // Sondas: os registradores internos da unidade, ligados pelo script (formal/run.sh, PROBES) a nets da netlist.
+  wire [2:0] pr_en;
+  wire pr_mie, pr_mpie, pr_mode;
+  wire [31:0] pr_mtvec;
   wire [31:0] rdata, mtvec_o, mepc_o;
   wire illegal, pending, take, vec;
   wire [31:0] cause;
@@ -71,6 +75,14 @@ module props (input clk);
 
   // The registers clear asynchronously, so the properties about what they hold apply to the clocks without reset.
   always @(posedge clk) if (f_past && !reset) begin
+    // Invariante de indução: o modelo é o estado dos registradores internos.
+    assert (pr_en == {m_mie[11], m_mie[7], m_mie[3]});
+    assert (pr_mie == m_ie);
+    assert (pr_mpie == m_pie);
+    assert (pr_mode == m_mtvec[0]);
+    assert (!m_mtvec[1]);
+    assert ((m_mie & ~LINES_MASK) == 32'h0);
+    assert (pr_mtvec[31:2] == m_mtvec[31:2]);
     if (addr == 12'h344) assert (rdata == lines);
     if (addr == 12'h304) assert (rdata == m_mie);
     if (addr == 12'h304 || addr == 12'h344) assert (!illegal);
