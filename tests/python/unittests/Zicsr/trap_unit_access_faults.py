@@ -2,8 +2,8 @@
 
 trap_unit com has_access_faults: a busca fora de região executável gera a causa 1 (mtval = PC), o load que o mapa
 não aceita ler gera a causa 5 e o store que o mapa não aceita escrever gera a causa 7 (mtval = endereço efetivo).
-Prioridade da Tabela 17: a falha de busca vem antes da instrução ilegal, que vem antes da falha de dados, e a falha
-de acesso de dados vem antes do desalinhamento. Sem falha os acessos seguem como antes.
+Prioridade da Tabela 17: a falha de busca vem antes da instrução ilegal, que vem antes da falha de dados; o
+desalinhamento que o hardware não executa (fora da memória principal) mantém a causa 4 ou 6 (a ordem opcional do manual). Sem falha os acessos seguem como antes.
 """
 
 import cocotb
@@ -55,9 +55,11 @@ async def test_priorities(dut):
     check_equal((await drive(dut, OP_ALU, fetch_ok=0, cf_taken=1, cf_target=2))[2], 1)
     # ilegal vence a falha de dados: o decodificador marca o load como ilegal (funct3 reservado)
     check_equal((await drive(dut, OP_LOAD, 0b011, rd_ok=0, illegal=1, ea=4))[2:], (2, 0))
-    # a falha de acesso vence o desalinhamento (halfword no offset 1, fora da memória principal)
-    check_equal(await drive(dut, OP_STORE, SH, wr_ok=0, ea=0x1), (1, 0, 7, 0x1))
-    check_equal(await drive(dut, OP_LOAD, LW, rd_ok=0, ea=0x2), (1, 0, 5, 0x2))
+    # o desalinhamento fora da memória principal mantém a causa 4 ou 6, mesmo com o mapa recusando o endereço
+    check_equal(await drive(dut, OP_STORE, 0b010, wr_ok=0, ea=0x2), (1, 0, 6, 0x2))
+    check_equal(await drive(dut, OP_LOAD, LW, rd_ok=0, ea=0x2), (1, 0, 4, 0x2))
+    # o desalinhado que o hardware executa (na memória principal) com endereço recusado dá a falha de acesso
+    check_equal(await drive(dut, OP_LOAD, LW, rd_ok=0, ea=0x9001), (1, 0, 5, 0x9001))
 
 
 @cocotb.test()

@@ -208,7 +208,7 @@ The `has_access_faults` generic (default `false`, needs `has_zicsr`) turns on ca
 
 The read and write validity of the effective address is decided in the EX stage, from the ALU result, next to the address classification that `reg_ex_mem` already registers, and the MEM stage only checks the registered bit. The fetch validity comes from the PC of the instruction in EX, from a register, off the ALU path. With `has_access_faults = false` the validities are always `1` and none of this is synthesized.
 
-The fetch fault goes before the illegal instruction, and the data one before the misalignment, in the order of Table 17 of the privileged volume. A load or store fault belongs to the address of the first word, and the access does not reach the memories, as with misalignment.
+The fetch fault goes before the illegal instruction, in the order of Table 17 of the privileged volume. The misalignment the hardware does not execute (outside main memory) keeps cause 4 or 6, the optional order of the table, and the misaligned access it does execute only passes if the address is valid. A load or store fault belongs to the address of the first word, and the access does not reach the memories, as with misalignment.
 
 ## 7. Interrupt Entry
 

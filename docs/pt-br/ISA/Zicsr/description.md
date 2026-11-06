@@ -208,7 +208,7 @@ O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causa
 
 A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `has_access_faults = false` as validades valem sempre `1` e nada disso é sintetizado.
 
-A falha de busca vem antes da instrução ilegal, e a de dados vem antes do desalinhamento, na ordem da Tabela 17 do volume privilegiado. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
+A falha de busca vem antes da instrução ilegal, na ordem da Tabela 17 do volume privilegiado. O desalinhamento que o hardware não executa (fora da memória principal) mantém a causa 4 ou 6, a ordem opcional da tabela, e o acesso desalinhado que ele executa só passa se o endereço for válido. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
 
 ## 7. Tomada de Interrupção
 
