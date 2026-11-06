@@ -17,6 +17,7 @@ The formal proofs of the Core run in SymbiYosys over the Verilog netlist that GH
 | `csr_file` with Zihpm | `csr_hpm_props.sv` | BMC, cover, with 29, 5, 4, 3 and 2 real counters and widths from 0 to 64 bits |
 | `zicond_unit` | `zicond_props.sv` | induction, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | induction, cover |
+| `core` with Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |
 
 Each deliberate defect of the VHDL (a mutant) must make a proof fail, and that wanted result is `fail`. A proof by induction or by BMC wants `pass`, and a cover wants `pass` when the goal is reachable.
 
@@ -32,6 +33,7 @@ The engine is chosen by the `FORMAL_ENGINE` variable.
 | `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | about 35 s |
 
 `abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`trap_unit` and the Zicond blocks, which ABC refuses), which leaves 43 of the 136 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do.
+`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`trap_unit` and the Zicond blocks, which ABC refuses), which leaves 36 of the 118 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do.
 
 The times are from one run with 4 CPUs.
 

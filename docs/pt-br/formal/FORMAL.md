@@ -17,6 +17,7 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover, com 29, 5, 4, 3 e 2 contadores reais e larguras de 0 a 64 bits |
 | `zicond_unit` | `zicond_props.sv` | indução, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | indução, cover |
+| `core` com Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |
 
 Cada defeito proposital do VHDL (um mutante) precisa fazer uma prova falhar, e esse resultado esperado é `fail`. Uma prova de indução ou de BMC espera `pass`, e um cover espera `pass` quando o objetivo é alcançável.
 
@@ -32,6 +33,7 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 | `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | cerca de 35 s |
 
 O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 43 das 136 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
+O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 36 das 118 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
 
 Os tempos são de uma execução com 4 CPUs.
 

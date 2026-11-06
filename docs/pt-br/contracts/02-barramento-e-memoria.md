@@ -97,6 +97,7 @@ Sem Zicsr o core não tem CSRs para registrar uma exceção. O detector de causa
 | `o_trap` | Pulso de um ciclo em `'1'` quando uma exceção ocorre |
 | `o_trap_cause` | Código de causa no formato do `mcause` (2 instrução ilegal, 3 `EBREAK`, 4 e 6 acesso desalinhado que o hardware não executa, 11 `ECALL`) |
 | `o_trap_pc` | PC da instrução que gerou a exceção |
+| `o_trap_take` | Pulso de um ciclo em `'1'` quando o core toma uma exceção, com ou sem Zicsr (com Zicsr, `o_trap` fica em `'0'` e este pulso é o único sinal externo) |
 
 A instrução que gerou a exceção é anulada no estágio EX, sem escrita em `rd` e sem acesso à memória, e o programa segue na instrução seguinte. Qualquer instrução CSR é ilegal sem Zicsr, e um desvio para endereço desalinhado não é checado. Com Zicsr, `o_trap` fica em `'0'` e as outras duas saídas ficam em zero. Quem decide o que fazer com o sinal é o ambiente em volta do core.
 

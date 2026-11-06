@@ -253,8 +253,11 @@ Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e 
 | `o_trap` | Pulso de um ciclo em `1` quando uma exceção ocorre; fica em `0` com Zicsr |
 | `o_trap_cause` | Código de causa no formato de `mcause`; fica em zero com Zicsr |
 | `o_trap_pc` | PC da instrução que gerou a exceção; fica em zero com Zicsr |
+| `o_trap_take` | Pulso de um ciclo em `1` quando o Core toma uma exceção síncrona, com ou sem Zicsr |
 
 Nesse modo, toda instrução de acesso a CSR é ilegal (causa 2), `ECALL` gera a causa 11 e `EBREAK` a causa 3, e o desalinhamento de load e store (causas 4 e 6) é conferido no próprio estágio EX. O desalinhamento do alvo de desvio não é conferido, e `MRET` não tem efeito. A instrução faltante é anulada em EX, sem escrita em `rd` e sem acesso à memória, e o programa segue na instrução seguinte. A instrução que gerou a exceção não conta como retirada. O ambiente em volta do Core decide o que fazer com o sinal.
+
+A saída `o_trap_take` existe nos dois modos. Com Zicsr, ela pulsa no ciclo em que o Core desvia o PC para `mtvec`, quando `o_trap` fica em `0`, e é o sinal que um topo de síntese usa para mostrar a exceção, por exemplo num LED. Sem Zicsr, ela pulsa junto de `o_trap`. A interrupção de máquina, ao ser tomada, também deve pulsar `o_trap_take`.
 
 Um perfil exige `Zicsr` ou `Zicclsm`, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. `Zicntr` e `Zihpm` exigem `Zicsr`.
 

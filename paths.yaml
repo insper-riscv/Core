@@ -5,6 +5,7 @@ repository: Core
 tree:
   coverage:
     formal:
+      core: [formal/core_trap_take_props.sv]
       counter64: []
       csr_file: [formal/csr_file_props.sv, formal/csr_cntr_props.sv, formal/csr_hpm_props.sv, formal/csr_irq_props.sv]
       muldiv_fusion: []

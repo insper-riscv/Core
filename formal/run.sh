@@ -277,6 +277,24 @@ netlist "$zd" zicond_decode zd
 expect "exactly opcode 0110011, funct7 0000111 and funct3 101 or 111 are claimed, with their codes (induction)" PASS "$(prove zd.v "$zd_props" prove 2 '' zd_safety)"
 expect "cover: both claims and the near misses are reachable"                                               PASS "$(prove zd.v "$zd_props" cover 2 '-DCOVER' zd_cover)"
 
+echo "core: o_trap_take"
+core_file="$root/src/core/core.vhd"; core_props="$root/formal/core_trap_take_props.sv"
+# core_netlist <name> [ghdl generics]: the netlist of the whole core with Zicsr, on the sources of its profile, with
+# CORE_FILE (a mutant) in the place of core.vhd when it is set.
+core_netlist() {
+  local work="$out/work_$1" log="$out/$1.ghdl.log" file name="$1"
+  mkdir -p "$work"; : > "$log"
+  while read -r file; do
+    [ "$root/$file" = "$core_file" ] && [ -n "${CORE_FILE:-}" ] && file="$CORE_FILE" || file="$root/$file"
+    ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
+  done < <(sed -n 's/^  - //p' "$root/profiles/rv32im_zicsr.yaml" | grep '\.vhd$')
+  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:2} core > "$name.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  scan_warnings "$log"
+}
+core_netlist core_take -ghas_zicsr=true
+expect "Zicsr: o_trap stays low, a take retires nothing and never repeats in the next cycle (bounded, 10 cycles)" PASS "$(prove core_take.v "$core_props" bmc 10 '' core_take_safety)"
+expect "cover: a take is reachable" PASS "$(prove core_take.v "$core_props" cover 12 '-DCOVER' core_take_cover)"
+
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl generics] [bmc depth]
   local copy="$out/mut_$5.vhd"
@@ -415,6 +433,18 @@ mutant "$zd" "$zd_props" zicond_decode '' zd_codes_swapped "s/ALU_CZERO_EQZ when
 mutant "$zd" "$zd_props" zicond_decode '' zd_no_write "s/o_we_reg     <= is_eqz or is_nez;/o_we_reg     <= '0';/" "" 2
 mutant "$zd" "$zd_props" zicond_decode '' zd_no_rs1 "s/o_sel_pc_rs1 <= is_eqz or is_nez;/o_sel_pc_rs1 <= is_eqz;/" "" 2
 mutant "$zd" "$zd_props" zicond_decode '' zd_funct3_one_bit "s/funct3 = FUNCT3_CZERO_NEZ) else/funct3(1 downto 0) = FUNCT3_CZERO_NEZ(1 downto 0)) else/" "" 2
+
+# Mutants of o_trap_take in core.vhd, one defect each.
+core_mutant() {  # <name> <sed expression> <mode: bmc|cover> <defines>
+  local copy="$out/mut_$1.vhd"
+  sed "$2" "$core_file" > "$copy"
+  cmp -s "$core_file" "$copy" && { echo "mutant $1: the edit did not change the file"; exit 1; }
+  CORE_FILE="$copy" core_netlist "mut_$1" -ghas_zicsr=true
+  expect "mutant $1 is caught" FAIL "$(prove "mut_$1.v" "$core_props" "$3" 10 "$4" "mut_$1")"
+}
+core_mutant take_always "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
+core_mutant take_never  "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
+core_mutant take_with_retire "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
 
 [ -s "$warnings" ] && { echo "formal: $(wc -l < "$warnings") warning(s) found; a warning is an error (see above)"; fail=1; }
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }

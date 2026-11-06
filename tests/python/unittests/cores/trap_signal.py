@@ -68,6 +68,11 @@ async def test_trap_is_signalled_without_effect(dut):
         """Executa watch."""
         trap = int(dut.o_trap.value)
         cycles[0] += 1
+        check_equal(
+            int(dut.o_trap_take.value),
+            trap,
+            "o_trap_take differs from o_trap without Zicsr",
+        )
         # The first fetch answers with an empty word before the program
         # memory has been read.
         if trap and cycles[0] > MIN_TRAP_CYCLE:
