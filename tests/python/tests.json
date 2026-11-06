@@ -2609,6 +2609,32 @@
             "--std=08"
         ]
     },
+    "HpmCounterBankRegistered": {
+        "toplevel": "hpm_counter_bank",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd"
+        ],
+        "parameters": {
+            "hpm_counters": 4,
+            "hpm_width": 40,
+            "registered_read": true
+        },
+        "test_module": "tests.python.unittests.Zihpm.hpm_counter_bank_registered",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
     "HpmCounterBankOneNarrow": {
         "toplevel": "hpm_counter_bank",
         "sources": [
