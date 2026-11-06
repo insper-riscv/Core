@@ -2907,5 +2907,270 @@
         "test_args": [
             "--std=08"
         ]
+    },
+    "RegIfId": {
+        "toplevel": "reg_if_id",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/reg_if_id.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_if_id"
+    },
+    "RegIdEx": {
+        "toplevel": "reg_id_ex",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/fwd_consts.vhd",
+            "src/shared/reg_id_ex.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_id_ex"
+    },
+    "RegExMem": {
+        "toplevel": "reg_ex_mem",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/reg_ex_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_ex_mem"
+    },
+    "RegMemWb": {
+        "toplevel": "reg_mem_wb",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/reg_mem_wb.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_mem_wb"
+    },
+    "PcFetch": {
+        "toplevel": "pc_fetch",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/pc_src_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/adder.vhd",
+            "src/common/src/mux_4x1.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/shared/pc_fetch.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.pc_fetch"
+    },
+    "FenceiUnit": {
+        "toplevel": "fencei_unit",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/Zifencei/fencei_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zifencei.fencei_unit",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "FenceiUnitDcache": {
+        "toplevel": "fencei_unit",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/Zifencei/fencei_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zifencei.fencei_unit_dcache",
+        "parameters": {
+            "has_dcache": true
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "MuldivFusion": {
+        "toplevel": "muldiv_fusion",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/M/muldiv_fusion.vhd"
+        ],
+        "test_module": "tests.python.unittests.M.muldiv_fusion"
+    },
+    "MisalignedUnit": {
+        "toplevel": "misaligned_unit",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicclsm/misaligned_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicclsm.misaligned_unit"
+    },
+    "StageIf": {
+        "toplevel": "stage_if",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/pc_src_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/common/src/adder.vhd",
+            "src/common/src/mux_4x1.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/shared/pc_fetch.vhd",
+            "src/core/stage_if.vhd"
+        ],
+        "test_module": "tests.python.unittests.core.stage_if"
+    },
+    "StageId": {
+        "toplevel": "stage_id",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/funct7_consts.vhd",
+            "src/shared/alu_consts.vhd",
+            "src/shared/ext_imm_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/wb_sel_consts.vhd",
+            "src/shared/pc_src_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/shared/fwd_consts.vhd",
+            "src/Zicond/zicond_consts.vhd",
+            "src/M/muldiv_consts.vhd",
+            "src/Zicsr/trap_consts.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/Zimop/zimop_consts.vhd",
+            "src/Zihintntl/zihintntl_consts.vhd",
+            "src/Zihintpause/zihintpause_consts.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/common/src/mux_2x1.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/onehot_decoder.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/shared/reg_file.vhd",
+            "src/I-E/extender_imm.vhd",
+            "src/shared/control_unit.vhd",
+            "src/shared/bubble_mux.vhd",
+            "src/shared/forwarding_match.vhd",
+            "src/shared/hazard_detection_unit.vhd",
+            "src/M/m_decode.vhd",
+            "src/Zicond/zicond_decode.vhd",
+            "src/Zicsr/csr_decode.vhd",
+            "src/Zimop/zimop_decode.vhd",
+            "src/Zihintntl/zihintntl_decode.vhd",
+            "src/Zihintpause/zihintpause_decode.vhd",
+            "src/core/stage_id.vhd"
+        ],
+        "test_module": "tests.python.unittests.core.stage_id",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "StageEx": {
+        "toplevel": "stage_ex",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/funct7_consts.vhd",
+            "src/shared/alu_consts.vhd",
+            "src/shared/ext_imm_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/wb_sel_consts.vhd",
+            "src/shared/pc_src_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/shared/fwd_consts.vhd",
+            "src/Zicond/zicond_consts.vhd",
+            "src/M/muldiv_consts.vhd",
+            "src/Zicsr/trap_consts.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/Zimop/zimop_consts.vhd",
+            "src/Zihintntl/zihintntl_consts.vhd",
+            "src/Zihintpause/zihintpause_consts.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/common/src/adder.vhd",
+            "src/common/src/mux_2x1.vhd",
+            "src/common/src/mux_4x1.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/I-E/alu.vhd",
+            "src/common/src/onehot_decoder.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/I-E/store_manager.vhd",
+            "src/shared/forwarding_unit.vhd",
+            "src/M/booth_multiplier_rv32.vhd",
+            "src/M/non_restoring_divider_rv32.vhd",
+            "src/M/muldiv_fusion.vhd",
+            "src/M/multdiv.vhd",
+            "src/Zicond/zicond_unit.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd",
+            "src/Zicsr/csr_file.vhd",
+            "src/Zicsr/trap_unit.vhd",
+            "src/Zifencei/fencei_unit.vhd",
+            "src/core/stage_ex.vhd"
+        ],
+        "test_module": "tests.python.unittests.core.stage_ex",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "StageMem": {
+        "toplevel": "stage_mem",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/Zicsr/trap_consts.vhd",
+            "src/Zicsr/trap_unit.vhd",
+            "src/core/stage_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.core.stage_mem"
+    },
+    "StageWb": {
+        "toplevel": "stage_wb",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/common/src/mux_2x1.vhd",
+            "src/I-E/extender_ram.vhd",
+            "src/core/stage_wb.vhd"
+        ],
+        "test_module": "tests.python.unittests.core.stage_wb"
     }
 }
