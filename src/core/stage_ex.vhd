@@ -188,6 +188,8 @@ entity stage_ex is
 		o_dc_flush        : out std_logic;
 		-- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
 		o_muldiv_stall    : out std_logic;
+		-- Parada de um ciclo da instrução CSR que lê o banco do Zihpm: o valor lido sai de um registrador e só vale no ciclo seguinte.
+		o_csr_wait        : out std_logic;
 		-- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
 		o_muldiv_fused    : out std_logic
 	);
@@ -230,6 +232,12 @@ architecture rtl of stage_ex is
 	signal csr_wdata          : word_t;
 	-- Valor antigo lido do registrador CSR selecionado.
 	signal csr_rdata          : word_t;
+	-- O endereço da instrução CSR em EX é do banco do Zihpm (leitura registrada).
+	signal csr_bank_read      : std_logic;
+	-- Já houve o ciclo de parada da instrução CSR que está em EX.
+	signal csr_wait_done      : std_logic := '0';
+	-- Parada deste ciclo.
+	signal csr_wait_now       : std_logic;
 	-- Indica acesso ilegal a registrador CSR.
 	signal csr_illegal        : std_logic;
 	-- Pulso interno de tomada de trap síncrono.
@@ -465,6 +473,18 @@ begin
 		csr_trap_tval  <= i_mem_trap_tval  when i_mem_trap_take = '1' else trap_tval;
 
 		csr_commit   <= i_is_csr and i_valid and i_pipe_run;
+		csr_wait_now <= i_is_csr and i_valid_raw and csr_bank_read and (not csr_wait_done);
+		o_csr_wait   <= csr_wait_now;
+		process (i_clk)
+		begin
+			if rising_edge(i_clk) then
+				if i_rst = '1' then
+					csr_wait_done <= '0';
+				else
+					csr_wait_done <= csr_wait_now;
+				end if;
+			end if;
+		end process;
 		csr_src_zero <= '1' when i_rs1_idx = REG_ZERO else '0';
 		csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
 		                (31 downto 5 => '0') & i_rs1_idx;
@@ -478,7 +498,8 @@ begin
 				has_zihpm    => has_zihpm,
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_interrupts => has_interrupts
+				has_interrupts => has_interrupts,
+				hpm_registered_read => true
 			)
 			port map (
 				i_clk        => i_clk,
@@ -489,6 +510,7 @@ begin
 				i_wdata      => csr_wdata,
 				i_src_zero   => csr_src_zero,
 				o_rdata      => csr_rdata,
+				o_bank_read  => csr_bank_read,
 				o_illegal    => csr_illegal,
 				i_trap_take  => csr_trap_take,
 				i_trap_cause => csr_trap_cause,
@@ -598,9 +620,12 @@ begin
 		ex_cf_taken   <= '0';
 		ex_cf_target  <= (others => '0');
 		csr_commit    <= '0';
+		csr_wait_now  <= '0';
+		o_csr_wait    <= '0';
 		csr_src_zero  <= '0';
 		csr_wdata     <= (others => '0');
 		csr_rdata     <= (others => '0');
+		csr_bank_read <= '0';
 		csr_illegal   <= '0';
 	end generate gen_csr;
 

@@ -32,7 +32,9 @@ entity hpm_counter_bank is
 		-- Quantidade de contadores de eventos reais, de índices 3 a 2 + hpm_counters.
 		hpm_counters : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
 		-- Largura em bits de cada contador (0 deixa o banco sem contadores reais).
-		hpm_width    : natural range 0 to 64 := 64
+		hpm_width    : natural range 0 to 64 := 64;
+		-- A leitura sai de um registrador: o_rdata mostra, um ciclo depois, o valor do endereço dado em i_idx e nos seletores (a leitura dos 29 contadores sai do caminho combinacional do núcleo).
+		registered_read : boolean := false
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -97,6 +99,10 @@ architecture rtl of hpm_counter_bank is
 	signal inhibit_we   : std_logic;
 	-- Eventos da tabela, os únicos que um contador pode contar.
 	signal events_valid : std_logic_vector(EVENT_VECTOR_WIDTH - 1 downto 0);
+	-- Valor lido combinacionalmente do contador, do evento ou da inibição selecionado.
+	signal rdata_comb   : word_t;
+	-- Valor lido, registrado (com registered_read).
+	signal rdata_q      : word_t := (others => '0');
 
 begin
 
@@ -229,9 +235,23 @@ begin
 			o_d     => hi_word
 		);
 
-	o_rdata <= (event_word   and (word_t'range => i_sel_event)) or
+	rdata_comb <= (event_word   and (word_t'range => i_sel_event)) or
 	           (lo_word      and (word_t'range => i_sel_lo)) or
 	           (hi_word      and (word_t'range => i_sel_hi)) or
 	           (inhibit_word and (word_t'range => i_sel_inhibit));
+
+	gen_comb_read : if not registered_read generate
+		o_rdata <= rdata_comb;
+	end generate gen_comb_read;
+
+	gen_registered_read : if registered_read generate
+		process (i_clk)
+		begin
+			if rising_edge(i_clk) then
+				rdata_q <= rdata_comb;
+			end if;
+		end process;
+		o_rdata <= rdata_q;
+	end generate gen_registered_read;
 
 end architecture rtl;
