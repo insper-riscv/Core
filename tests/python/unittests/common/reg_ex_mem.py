@@ -1,6 +1,8 @@
 """Testes de reg_ex_mem: contrato do EX/MEM e o we_ok derivado."""
 
 import cocotb
+from cocotb.clock import Clock
+from cocotb.triggers import RisingEdge, Timer
 
 from tests.python.unittests.common.stage_register import (
     StageRegister,
@@ -33,3 +35,27 @@ def derived(values):
 async def test_stage_register(dut):
     """Verifica o contrato do registrador EX/MEM."""
     await check_stage_register(StageRegister(dut, FIELDS, derived))
+
+
+async def classify(dut, address):
+    """Registra um endereço efetivo e devolve (flash, sdram)."""
+    dut.i_ea.value = address
+    dut.i_en.value = 1
+    dut.i_flush.value = 0
+    await RisingEdge(dut.i_clk)
+    await Timer(1, unit="ns")
+    return int(dut.o_is_flash.value), int(dut.o_is_sdram.value)
+
+
+@cocotb.test()
+async def test_address_class_is_registered(dut):
+    """Verifica a classificação do endereço registrada em EX/MEM."""
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
+    dut.i_rst.value = 0
+    assert await classify(dut, 0x00000010) == (1, 0)
+    assert await classify(dut, 0x40000010) == (0, 1)
+    assert await classify(dut, 0x00010000) == (0, 0)
+    dut.i_flush.value = 1
+    await RisingEdge(dut.i_clk)
+    await Timer(1, unit="ns")
+    assert (int(dut.o_is_flash.value), int(dut.o_is_sdram.value)) == (0, 0)

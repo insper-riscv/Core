@@ -104,6 +104,10 @@ architecture rtl of stage_if is
 	signal if_in_sdram    : std_logic;
 	-- Indica que a busca na região de SDRAM está aguardando resposta da I-cache.
 	signal if_wait        : std_logic;
+	-- O PC avança neste ciclo sem depender da resposta da I-cache.
+	signal go_now         : std_logic;
+	-- O PC avança neste ciclo se a I-cache responder.
+	signal go_if_ready    : std_logic;
 
 begin
 
@@ -114,9 +118,12 @@ begin
 	          PC_SRC_PC4;
 
 	-- O PC avança quando liberado pela HDU e sem espera de I-cache, ou imediatamente em redirecionamentos.
-	pc_write_en <= (i_hdu_pc_we and (not if_wait)) or
-	               (((i_ex_branch_taken or i_ex_jalr_taken) and i_pipe_run) or
-	                i_trap_take or i_mret_take or i_fencei_take);
+	-- A única entrada tardia é i_ic_ready (sai das RAMs da cache): o resto é calculado antes e a habilitação fica
+	-- a uma porta de i_ic_ready, ou seja, pc_write_en = go_now ou (go_if_ready e i_ic_ready).
+	go_now      <= ((i_ex_branch_taken or i_ex_jalr_taken) and i_pipe_run) or
+	               i_trap_take or i_mret_take or i_fencei_take or (i_hdu_pc_we and (not if_in_sdram));
+	go_if_ready <= i_hdu_pc_we and if_in_sdram;
+	pc_write_en <= go_now or (go_if_ready and i_ic_ready);
 
 	u_pc_fetch : entity work.pc_fetch
 		port map (

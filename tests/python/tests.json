@@ -3106,6 +3106,7 @@
         "toplevel": "reg_ex_mem",
         "sources": [
             "src/shared/pipeline_types.vhd",
+            "src/shared/mem_map_consts.vhd",
             "src/shared/reg_ex_mem.vhd"
         ],
         "test_module": "tests.python.unittests.common.reg_ex_mem"

@@ -151,6 +151,8 @@ entity stage_ex is
 		-- Valor de mtval da exceção do estágio MEM.
 		i_mem_trap_tval   : in  word_t    := (others => '0');
 		-- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
+		-- Resultado da ULA antes da seleção do resultado final (o endereço efetivo de um load ou store).
+		o_alu_result      : out word_t;
 		o_final_result    : out word_t;
 		-- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
 		o_store_data      : out word_t;
@@ -655,6 +657,7 @@ begin
 	-- O endereço alvo de JALR ((rs1 + imm) & ~1) já é calculado por u_alu via ALU_JALR.
 	o_branch_target  <= branch_target_int;
 	o_jalr_target    <= ex_alu_result;
+	o_alu_result     <= ex_alu_result;
 	o_branch_taken   <= branch_taken_int;
 	o_jalr_taken     <= jalr_taken_int;
 

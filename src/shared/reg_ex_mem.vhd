@@ -57,6 +57,8 @@ entity reg_ex_mem is
 		i_funct3     : in  funct3_t;
 		-- Resultado final do estágio EX (endereço de memória ou resultado de operação).
 		i_alu_out    : in  word_t;
+		-- Resultado da ULA em EX, o endereço efetivo de um load ou store, de onde sai a classificação registrada do endereço.
+		i_ea         : in  word_t := (others => '0');
 		-- Dado alinhado para escrita em memória vindo do StoreManager.
 		i_store_data : in  word_t;
 		-- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
@@ -158,11 +160,11 @@ architecture rtl of reg_ex_mem is
 begin
 
 	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
-	in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
-	in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
-	in_in_main  <= '1' when (unsigned(i_alu_out) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
-	                         unsigned(i_alu_out) < kib_to_addr(periph_base_kib)) else '0';
-	in_same     <= '0' when is_last_word(unsigned(i_alu_out), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
+	in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end(rom_end_kib, rom_external) else '0';
+	in_is_sdram <= '1' when is_external_addr(unsigned(i_ea), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
+	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
+	                         unsigned(i_ea) < kib_to_addr(periph_base_kib)) else '0';
+	in_same     <= '0' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
 
 	process(i_clk)
 	begin

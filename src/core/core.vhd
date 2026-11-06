@@ -393,6 +393,8 @@ architecture rtl of core is
 	signal exmem_funct3      : funct3_t;
 	-- O endereço em MEM cai na FLASH de dados, classificado em EX e registrado em EX/MEM.
 	signal exmem_is_flash    : std_logic;
+	-- Resultado da ULA em EX (o endereço efetivo de um load ou store).
+	signal ex_alu_result     : word_t;
 	-- O endereço em MEM cai na janela externa (SDRAM), registrado em EX/MEM.
 	signal exmem_is_sdram    : std_logic;
 	-- O endereço em MEM está na memória principal, registrado em EX/MEM.
@@ -782,6 +784,7 @@ begin
 			i_memwb_alu_out   => memwb_alu_out,
 			i_wb2_data        => wb2_data,
 			i_dc_done         => i_dc_done,
+			o_alu_result      => ex_alu_result,
 			o_final_result    => ex_final_result,
 			o_store_data      => ex_store_data,
 			o_store_byte_mask => ex_store_byteena,
@@ -823,6 +826,7 @@ begin
 			i_pc         => ex_pc,
 			i_funct3     => ex_funct3,
 			i_alu_out    => ex_final_result,
+			i_ea         => ex_alu_result,
 			i_store_data => ex_store_data,
 			i_byte_mask  => ex_store_byteena,
 			i_rd         => ex_rd_idx,
