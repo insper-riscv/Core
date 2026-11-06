@@ -13,7 +13,7 @@ from tests.python.unittests.checks import check_equal
 from tests.python.unittests.Zicsr.csr_file import access, read
 
 RW = 0b001
-MSCRATCH, MIE, MIP = 0x340, 0x304, 0x344
+MSCRATCH, MIE, MTVEC, MIP = 0x340, 0x304, 0x305, 0x344
 ALL_ONES = 0xFFFFFFFF
 
 
@@ -45,3 +45,16 @@ async def test_lines_and_writes_are_ignored(dut):
     check_equal(await read(dut, MIP), 0)
     check_equal(await read(dut, MIE), 0)
     check_equal(int(dut.o_irq_pending.value), 0)
+
+
+@cocotb.test()
+async def test_take_and_vectored_mode_are_off(dut):
+    """Verifica que sem interrupções não há tomada nem modo vetorado."""
+    await _reset(dut)
+    dut.i_irq_timer.value = 1
+    await access(dut, MIE, RW, ALL_ONES)
+    await access(dut, MTVEC, RW, 0x00001001)
+    await Timer(1, unit="ns")
+    check_equal(int(dut.o_irq_take.value), 0)
+    check_equal(int(dut.o_mtvec_vectored.value), 0)
+    check_equal(await read(dut, MTVEC), 0x00001000)

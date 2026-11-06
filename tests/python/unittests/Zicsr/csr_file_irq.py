@@ -14,11 +14,16 @@ from tests.python.unittests.checks import check_equal
 from tests.python.unittests.Zicsr.csr_file import access, read
 
 RW, RS, RC = 0b001, 0b010, 0b011
-MSTATUS, MIE, MSCRATCH, MIP = 0x300, 0x304, 0x340, 0x344
+MSTATUS, MIE, MTVEC, MSCRATCH, MIP = 0x300, 0x304, 0x305, 0x340, 0x344
 SOFTWARE, TIMER, EXTERNAL = 1 << 3, 1 << 7, 1 << 11
 MASK = SOFTWARE | TIMER | EXTERNAL
 ALL_ONES = 0xFFFFFFFF
 MIE_BIT = 0x8
+CAUSE_SOFTWARE, CAUSE_TIMER, CAUSE_EXTERNAL = (
+    0x80000003,
+    0x80000007,
+    0x8000000B,
+)
 
 
 def _lines(dut, software=0, timer=0, external=0):
@@ -152,3 +157,72 @@ async def test_a_trap_cycle_does_not_write_mie(dut):
     await access(dut, MIE, RW, MASK)
     dut.i_trap_take.value = 0
     check_equal(await read(dut, MIE), 0)
+
+
+@cocotb.test()
+async def test_take_needs_mstatus_mie_and_a_pending_enabled_line(dut):
+    """Verifica o_irq_take: MIE, linha e máscara, os três em 1."""
+    await _reset(dut)
+    _lines(dut, 0, 1, 0)
+    await access(dut, MIE, RW, TIMER)
+    for value, want in ((0, 0), (MIE_BIT, 1)):
+        await access(dut, MSTATUS, RW, value)
+        await Timer(1, unit="ns")
+        check_equal(int(dut.o_irq_take.value), want, f"MIE {value:#x}")
+    await access(dut, MIE, RW, SOFTWARE | EXTERNAL)
+    await Timer(1, unit="ns")
+    check_equal(int(dut.o_irq_take.value), 0)
+    await access(dut, MIE, RW, TIMER)
+    _lines(dut, 0, 0, 0)
+    await Timer(1, unit="ns")
+    check_equal(int(dut.o_irq_take.value), 0)
+
+
+@cocotb.test()
+async def test_cause_priority_is_external_software_timer(dut):
+    """Verifica o_irq_cause: externa, software e timer, nessa ordem."""
+    await _reset(dut)
+    await access(dut, MIE, RW, MASK)
+    cases = (
+        ((1, 1, 1), CAUSE_EXTERNAL),
+        ((1, 1, 0), CAUSE_SOFTWARE),
+        ((0, 1, 1), CAUSE_EXTERNAL),
+        ((1, 0, 1), CAUSE_EXTERNAL),
+        ((0, 1, 0), CAUSE_TIMER),
+        ((1, 0, 0), CAUSE_SOFTWARE),
+        ((0, 0, 1), CAUSE_EXTERNAL),
+    )
+    for lines, want in cases:
+        _lines(dut, *lines)
+        await Timer(1, unit="ns")
+        check_equal(int(dut.o_irq_cause.value), want, f"linhas {lines}")
+
+
+@cocotb.test()
+async def test_cause_skips_a_masked_line(dut):
+    """Verifica que uma linha mascarada não toma a prioridade."""
+    await _reset(dut)
+    await access(dut, MIE, RW, TIMER | SOFTWARE)
+    _lines(dut, 1, 1, 1)
+    await Timer(1, unit="ns")
+    check_equal(int(dut.o_irq_cause.value), CAUSE_SOFTWARE)
+    await access(dut, MIE, RW, TIMER)
+    check_equal(int(dut.o_irq_cause.value), CAUSE_TIMER)
+
+
+@cocotb.test()
+async def test_mtvec_mode_bit_is_kept_and_base_is_aligned(dut):
+    """Verifica mtvec: modo vetorado no bit 0 e BASE de 64 bytes."""
+    await _reset(dut)
+    await access(dut, MTVEC, RW, 0x00001001)
+    check_equal(await read(dut, MTVEC), 0x00001001)
+    check_equal(int(dut.o_mtvec_vectored.value), 1)
+    check_equal(int(dut.o_mtvec.value), 0x00001000)
+    await access(dut, MTVEC, RW, 0x000010FD)
+    check_equal(await read(dut, MTVEC), 0x000010C1)
+    check_equal(int(dut.o_mtvec.value), 0x000010C0)
+    await access(dut, MTVEC, RW, 0x000010FC)
+    check_equal(await read(dut, MTVEC), 0x000010FC)
+    check_equal(int(dut.o_mtvec_vectored.value), 0)
+    await access(dut, MTVEC, RW, 0x00001003)
+    check_equal(await read(dut, MTVEC), 0x00001001)

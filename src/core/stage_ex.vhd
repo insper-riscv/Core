@@ -18,6 +18,7 @@ use ieee.std_logic_1164.all;
 use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.fwd_consts.all;
+use work.byte_mask_consts.all;
 
 entity stage_ex is
 	generic (
@@ -249,6 +250,16 @@ architecture rtl of stage_ex is
 	signal csr_mtvec          : word_t;
 	-- Endereço de retorno de trap armazenado em mepc.
 	signal csr_mepc           : word_t;
+	-- Há interrupção a tomar (pendente, habilitada e com mstatus.MIE em '1'), vinda do banco de CSRs.
+	signal irq_take_pending   : std_logic;
+	-- Código de mcause da interrupção a tomar.
+	signal irq_cause          : word_t;
+	-- A tomada de trap deste estágio é a de uma interrupção.
+	signal trap_is_irq        : std_logic;
+	-- Modo vetorado de mtvec.
+	signal csr_mtvec_vec      : std_logic;
+	-- Destino de uma interrupção no modo vetorado: BASE com os bits 5 a 2 trocados pelo código da causa.
+	signal irq_vector_pc      : word_t;
 	-- Indica que houve desvio ou salto tomado na instrução atual em EX.
 	signal ex_cf_taken        : std_logic;
 	-- Endereço alvo do desvio ou salto tomado em EX.
@@ -490,7 +501,10 @@ begin
 				i_irq_software => i_irq_software,
 				i_irq_timer    => i_irq_timer,
 				i_irq_external => i_irq_external,
-				o_irq_pending  => open
+				o_irq_pending  => open,
+				o_irq_take     => irq_take_pending,
+				o_irq_cause    => irq_cause,
+				o_mtvec_vectored => csr_mtvec_vec
 			);
 
 		-- O alvo desalinhado depende só do bit 1 do alvo, porque o bit 0 é zero: no JALR ele sai da soma dos dois
@@ -526,8 +540,11 @@ begin
 				i_cf_target   => ex_cf_target,
 				i_csr_illegal => csr_illegal,
 				i_illegal     => i_illegal,
+				i_irq_take    => irq_take_pending,
+				i_irq_cause   => irq_cause,
 				o_take        => trap_take_int,
 				o_mret_take   => mret_take_int,
+				o_irq         => trap_is_irq,
 				o_cause       => trap_cause,
 				o_tval        => trap_tval
 			);
@@ -561,12 +578,17 @@ begin
 				i_illegal     => i_illegal,
 				o_take        => sig_take,
 				o_mret_take   => sig_mret,
+				o_irq         => open,
 				o_cause       => sig_cause,
 				o_tval        => sig_tval
 			);
 
 		trap_take_int <= '0';
 		mret_take_int <= '0';
+		trap_is_irq   <= '0';
+		csr_mtvec_vec <= '0';
+		irq_take_pending <= '0';
+		irq_cause     <= (others => '0');
 		trap_cause    <= (others => '0');
 		trap_tval     <= (others => '0');
 		csr_mtvec     <= (others => '0');
@@ -586,8 +608,13 @@ begin
 	o_trap_sig_pc    <= i_pc      when sig_take = '1' else (others => '0');
 	o_mret_take   <= mret_take_int;
 
-	o_redirect_pc <= csr_mepc when mret_take_int   = '1' else
-	                 i_pc4    when fencei_take_int = '1' else
+	-- Uma interrupção no modo vetorado vai a BASE + 4 x causa; a BASE tem 64 bytes de alinhamento nesse modo e a
+	-- causa vale no máximo 11, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
+	irq_vector_pc <= csr_mtvec(31 downto 6) & trap_cause(3 downto 0) & BYTE_OFFSET_0;
+
+	o_redirect_pc <= csr_mepc       when mret_take_int   = '1' else
+	                 i_pc4          when fencei_take_int = '1' else
+	                 irq_vector_pc  when (trap_is_irq = '1' and csr_mtvec_vec = '1') else
 	                 csr_mtvec;
 
 	-- =========================================================================
