@@ -82,6 +82,7 @@ CASES = [
     (csrrs(6, 0x303, 0), 2, 0),  # mideleg
     (csrrs(6, 0x3A0, 0), 2, 0),  # pmpcfg0
     (csrrs(6, 0x3B0, 0), 2, 0),  # pmpaddr0
+    (csrrs(6, 0xDA0, 0), 2, 0),  # scountovf, da Sscofpmf, que pede o modo S
     (csrrs(6, 0x34A, 0), 2, 0),  # mtinst
     (csrrs(6, 0x34B, 0), 2, 0),  # mtval2
     (csrrs(6, 0x100, 0), 2, 0),  # sstatus

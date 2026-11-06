@@ -22,7 +22,7 @@
 -- Estouro (o_wrap): pulso de um ciclo quando uma soma leva o contador inteiro de todos os bits em '1' a zero, nunca
 -- por uma escrita. Num contador que cabe na metade baixa o pulso sai registrado, um ciclo depois da soma. Num
 -- contador com metade alta ele vale no ciclo em que o vai-um pendente leva a metade alta de todos os bits em '1'
--- a zero, sem uma escrita na metade alta no mesmo ciclo.
+-- a zero, que é o ciclo seguinte ao da soma: o estouro vale mesmo que uma escrita na metade alta caia nesse ciclo.
 -- =============================================================================
 
 library ieee;
@@ -164,7 +164,7 @@ begin
 
 		lo_wrap_nxt <= '0';
 		hi_all_ones <= '1' when hi = (hi'range => '1') else '0';
-		o_wrap      <= carry and hi_all_ones and (not i_we_hi);
+		o_wrap      <= carry and hi_all_ones;
 
 		o_hi <= std_logic_vector(resize(unsigned(hi_inc), word_t'length)) when carry = '1' else
 		        std_logic_vector(resize(unsigned(hi), word_t'length));
