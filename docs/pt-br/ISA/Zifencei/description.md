@@ -15,11 +15,11 @@ Casos típicos são um carregador que copia um programa para a memória, a gera�
 
 ## 2. Onde a Instrução Tem Efeito
 
-Só o código buscado pela cache de instruções é afetado. A BOOT_ROM é lida diretamente, e a ROM interna e a RAM interna também não passam pela cache. Uma busca passa pela cache de instruções quando o endereço fora da BOOT_ROM é externo: pertence à janela externa a partir de `ext_base_kib`, a uma ROM marcada com `rom_external` ou a uma RAM marcada com `ram_external`. Os limites vêm dos genéricos descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+Só o código buscado pela cache de instruções é afetado. A BOOT_MEMORY é lida diretamente, e a ROM interna e a RAM interna também não passam pela cache. Uma busca passa pela cache de instruções quando o endereço fora da BOOT_MEMORY é externo: pertence à janela externa a partir de `ext_base_kib`, a uma ROM marcada com `rom_external` ou a uma RAM marcada com `ram_external`. Os limites vêm dos genéricos descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
 | Região de busca | Passa pela cache de instruções |
 | :--- | :--- |
-| BOOT_ROM | Não |
+| BOOT_MEMORY | Não |
 | ROM com `rom_external` falso | Não |
 | ROM com `rom_external` verdadeiro | Sim |
 | RAM com `ram_external` verdadeiro | Sim |

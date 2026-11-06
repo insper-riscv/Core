@@ -15,11 +15,11 @@ Typical cases are a loader that copies a program into memory, code generation at
 
 ## 2. Where the Instruction Has Effect
 
-Only code fetched through the instruction cache is affected. The BOOT_ROM is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_ROM is external: it belongs to the external window from `ext_base_kib`, to a ROM flagged `rom_external`, or to a RAM flagged `ram_external`. The limits come from the generics described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+Only code fetched through the instruction cache is affected. The BOOT_MEMORY is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_MEMORY is external: it belongs to the external window from `ext_base_kib`, to a ROM flagged `rom_external`, or to a RAM flagged `ram_external`. The limits come from the generics described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
 | Fetch region | Goes through the instruction cache |
 | :--- | :--- |
-| BOOT_ROM | No |
+| BOOT_MEMORY | No |
 | ROM with `rom_external` false | No |
 | ROM with `rom_external` true | Yes |
 | RAM with `ram_external` true | Yes |
