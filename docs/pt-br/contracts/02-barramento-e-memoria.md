@@ -2,7 +2,7 @@
 
 ## 1. Mapa de Endereços do Processador
 
-Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) chegam ao `core` por genéricos de elaboração, que cada plataforma fixa no seu `config.yml`. O pacote `src/shared/mem_map_consts.vhd` traz as funções que os estágios usam para converter esses genéricos em endereços.
+Os limites do espaço de endereçamento de instruções (estágio IF) e de dados (estágios MEM e WB) chegam ao `core` por genéricos de elaboração, que cada plataforma fixa no seu `platform.yaml`. O pacote `src/shared/mem_map_consts.vhd` traz as funções que os estágios usam para converter esses genéricos em endereços.
 
 | Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |

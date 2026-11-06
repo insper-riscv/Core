@@ -2,7 +2,7 @@
 
 🌐 [Português](README.md) · [English](README.en.md)
 
-Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (`I`, `M`, `Zicsr` e `Zifencei`) sob a entidade de topo (`core`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
+Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5 estágios (IF, ID, EX, MEM e WB), modularizado por extensão da ISA (base `I` ou `E`, e as extensões `M`, `Zmmul`, `Zicsr`, `Zicntr`, `Zihpm`, `Zifencei`, `Zicclsm`, `Zicond`, `Zimop`, `Zihintntl` e `Zihintpause`) sob a entidade de topo (`core`), acompanhado de testes unitários por entidade via cocotb/GHDL e de verificação formal via SymbiYosys.
 
 ## 1. Documentação
 
@@ -23,6 +23,9 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [ISA/Zicsr/instructions.md](docs/pt-br/ISA/Zicsr/instructions.md) e [ISA/Zicsr/description.md](docs/pt-br/ISA/Zicsr/description.md): extensão Zicsr, com as instruções, a codificação e as regras de leitura e escrita exigidas pelo manual, e a implementação no Core (banco de CSRs, exceções síncronas, `MRET`, redirecionamento e comportamento sem Zicsr).
 - [ISA/Zicntr](docs/pt-br/ISA/Zicntr/description.md): contadores básicos `cycle`, `time` e `instret` (Zicntr), com o que o manual exige, o bloco contador de 64 bits, a retirada de instruções, o divisor de tick e o `mcountinhibit`.
 - [ISA/Zihpm](docs/pt-br/ISA/Zihpm/description.md): contadores de desempenho `hpmcounter` (Zihpm), com o que o manual exige, a organização dos contadores de eventos, a regra de contagem e a tabela de eventos.
+- [ISA/Zihpm/conformance.md](docs/pt-br/ISA/Zihpm/conformance.md): cada exigência do Zihpm confrontada com o comportamento do Core, com a evidência de cada linha.
+- [profile/description.md](docs/pt-br/profile/description.md): os arquivos que definem os perfis, as regras que geram a matriz completa e os perfis de referência de `profiles/`.
+- [timing/STALL_REGISTRADO_DO_MULTDIV.md](docs/pt-br/timing/STALL_REGISTRADO_DO_MULTDIV.md): a parada do multiplicador e do divisor vinda de um flip-flop, e o efeito no caminho crítico.
 - [ISA/M/instructions.md](docs/pt-br/ISA/M/instructions.md): instruções da extensão `M` conforme o manual do RISC-V (capítulo 11): codificação, divisão, divisão por zero e estouro.
 - [ISA/M/description.md](docs/pt-br/ISA/M/description.md): como o Core executa a `M`: decodificador, divisor não-restaurador, parada do pipeline, fusão de pares e verificação formal.
 - [ISA/Zmmul/instructions.md](docs/pt-br/ISA/Zmmul/instructions.md): instruções da extensão `Zmmul` (só multiplicação, seção 11.1.3 do manual): codificação e semântica.
@@ -46,6 +49,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `src/I-E/` | Blocos comuns às bases RV32I e RV32E (a RV32E só reduz o banco a 16 registradores), compostos pela ULA, extensor de imediatos, extensor de leitura de memória e gerenciador de alinhamento de stores |
 | `src/M/` | Extensão de multiplicação e divisão inteira RV32M, contendo decodificador dedicado, multiplicador sequencial de Booth radix-2, divisor não-restaurador de 34 bits e unidade integradora |
 | `src/Zicsr/` | Extensão de registradores de controle e estado (CSRs) do modo máquina e unidade de detecção de exceções síncronas e retorno de trap (`MRET`) |
+| `src/Zihpm/` | Extensão dos contadores de eventos `hpmcounter3` a `hpmcounter31`, com o banco de contadores e a tabela de eventos do núcleo |
 | `src/Zicntr/` | Extensão de contadores: `mcycle`, `minstret`, `time` e os espelhos `cycle`, `instret`, `time`, com o contador de 64 bits e o divisor do tempo |
 | `src/Zicclsm/` | Unidade de acesso desalinhado à memória principal (`misaligned_unit`), que divide em duas etapas o acesso que cruza a palavra |
 | `src/Zifencei/` | Extensão de sincronização da memória de instruções (`FENCE.I`), com suporte opcional a handshake de flush de cache de dados write-back |
@@ -55,7 +59,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `src/Zihintpause/` | Extensão da dica `pause`, que executa como `nop` |
 | `src/core/` | Entidades dos 5 estágios do pipeline (`stage_if`, `stage_id`, `stage_ex`, `stage_mem`, `stage_wb`) e topo estrutural do processador (`core`) |
 | `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_irq.yaml`, `rv32im_zicond.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) em ordem de dependência |
-| `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/FORMAL.md)) |
+| `formal/` | Propriedades em SystemVerilog (um arquivo `*_props.sv` por unidade provada), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/FORMAL.md)) |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
 
 ## 3. Perfis da ISA
@@ -67,6 +71,8 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 | M | `has_m` | `false` | As instruções M são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zmmul | `has_zmmul` | `false` | As instruções de multiplicação são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zicsr | `has_zicsr` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
+| Zicntr | `has_zicntr` | `false` | Sem os contadores `cycle`, `time` e `instret`; exige Zicsr |
+| Zihpm | `has_zihpm` | `false` | Sem os contadores de eventos `hpmcounter3` a `hpmcounter31`; exige Zicsr, e `hpm_counters` e `hpm_width` dimensionam o banco |
 | Zifencei | `has_zifencei` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zimop | `has_zimop` | `false` | As 40 codificações de `mop.r.n` e `mop.rr.n` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 | Zihintntl | `has_zihintntl` | `false` | As quatro dicas `ntl.*` seguem como `ADD` em `x0`, que também é um `nop` |
@@ -74,7 +80,7 @@ O topo estrutural `core` recebe um generic booleano por extensão, que habilita 
 | Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
 | Zicond | `has_zicond` | `false` | `czero.eqz` e `czero.nez` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 
-Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`has_e` falso) ou o RV32E (`has_e` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`, que não expande a Zicond; o perfil `rv32im_zicond` a liga na compilação do GHDL:
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`has_e` falso) ou o RV32E (`has_e` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 60 combinações de extensões, o que dá 120 perfis. A lista de perfis vem de `profiles/matrix.yaml`, que não expande a Zicond nem a Zimop; os perfis `rv32im_zicond` e `rv32im_zimop` as ligam na compilação do GHDL:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
