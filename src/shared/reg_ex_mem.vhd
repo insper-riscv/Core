@@ -15,9 +15,30 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.pipeline_types.all;
+use work.mem_map_consts.all;
 
 entity reg_ex_mem is
+
+	generic (
+		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
+		boot_rom_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		rom_end_kib     : natural := 32;
+		-- A ROM é externa quando é alcançada pela porta do núcleo.
+		rom_external    : boolean := false;
+		-- Base, em KiB, da RAM.
+		ram_base_kib    : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		ram_end_kib     : natural := 1048576;
+		-- A RAM é externa quando é alcançada pela porta do núcleo.
+		ram_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal.
+		periph_base_kib : natural := 2097152
+	);
 
 	port (
 		-- Sinal de clock.
@@ -81,7 +102,15 @@ entity reg_ex_mem is
 		-- PC da instrução registrado para o estágio MEM.
 		o_pc         : out word_t;
 		-- Campo funct3 registrado para o estágio MEM.
-		o_funct3     : out funct3_t
+		o_funct3     : out funct3_t;
+		-- O endereço registrado cai na FLASH de dados (decodificado em EX, registrado aqui).
+		o_is_flash   : out std_logic;
+		-- O endereço registrado cai na janela externa, a SDRAM.
+		o_is_sdram   : out std_logic;
+		-- O endereço registrado está na memória principal.
+		o_in_main    : out std_logic;
+		-- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
+		o_same_region : out std_logic
 	);
 
 end entity reg_ex_mem;
@@ -116,8 +145,24 @@ architecture rtl of reg_ex_mem is
 	signal r_ext_ram_op : ext_ram_op_t := (others => '0');
 	-- Seletor de write-back armazenado.
 	signal r_wb_sel     : wb_sel_t     := (others => '0');
+	signal r_is_flash   : std_logic    := '0';
+	signal r_is_sdram   : std_logic    := '0';
+	signal r_in_main    : std_logic    := '0';
+	signal r_same       : std_logic    := '0';
+
+	signal in_is_flash  : std_logic;
+	signal in_is_sdram  : std_logic;
+	signal in_in_main   : std_logic;
+	signal in_same      : std_logic;
 
 begin
+
+	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
+	in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
+	in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
+	in_in_main  <= '1' when (unsigned(i_alu_out) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
+	                         unsigned(i_alu_out) < kib_to_addr(periph_base_kib)) else '0';
+	in_same     <= '0' when is_last_word(unsigned(i_alu_out), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
 
 	process(i_clk)
 	begin
@@ -137,6 +182,10 @@ begin
 				r_en_ram     <= '0';
 				r_ext_ram_op <= (others => '0');
 				r_wb_sel     <= (others => '0');
+				r_is_flash   <= '0';
+				r_is_sdram   <= '0';
+				r_in_main    <= '0';
+				r_same       <= '0';
 			elsif i_en = '1' then
 				r_valid      <= i_valid;
 				r_pc         <= i_pc;
@@ -152,6 +201,10 @@ begin
 				r_en_ram     <= i_en_ram;
 				r_ext_ram_op <= i_ext_ram_op;
 				r_wb_sel     <= i_wb_sel;
+				r_is_flash   <= in_is_flash;
+				r_is_sdram   <= in_is_sdram;
+				r_in_main    <= in_in_main;
+				r_same       <= in_same;
 			end if;
 		end if;
 	end process;
@@ -170,5 +223,9 @@ begin
 	o_en_ram     <= r_en_ram;
 	o_ext_ram_op <= r_ext_ram_op;
 	o_wb_sel     <= r_wb_sel;
+	o_is_flash   <= r_is_flash;
+	o_is_sdram   <= r_is_sdram;
+	o_in_main    <= r_in_main;
+	o_same_region <= r_same;
 
 end architecture rtl;

@@ -391,6 +391,14 @@ architecture rtl of core is
 	signal exmem_pc          : word_t;
 	-- Campo funct3 da instrução em MEM trazido de EX/MEM.
 	signal exmem_funct3      : funct3_t;
+	-- O endereço em MEM cai na FLASH de dados, classificado em EX e registrado em EX/MEM.
+	signal exmem_is_flash    : std_logic;
+	-- O endereço em MEM cai na janela externa (SDRAM), registrado em EX/MEM.
+	signal exmem_is_sdram    : std_logic;
+	-- O endereço em MEM está na memória principal, registrado em EX/MEM.
+	signal exmem_in_main     : std_logic;
+	-- As duas palavras de um acesso que cruza o endereço em MEM ficam na mesma região, registrado em EX/MEM.
+	signal exmem_same_region : std_logic;
 	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
 	signal retire_pulse      : std_logic;
 	-- Pulso de retorno de exceção (MRET) gerado no estágio EX.
@@ -796,6 +804,16 @@ begin
 		);
 
 	u_reg_ex_mem : entity work.reg_ex_mem
+		generic map (
+			boot_rom_bits   => boot_rom_bits,
+			rom_end_kib     => rom_end_kib,
+			rom_external    => rom_external,
+			ram_base_kib    => ram_base_kib,
+			ram_end_kib     => ram_end_kib,
+			ram_external    => ram_external,
+			ext_base_kib    => ext_base_kib,
+			periph_base_kib => periph_base_kib
+		)
 		port map (
 			i_clk        => i_clk,
 			i_rst        => i_rst,
@@ -827,7 +845,11 @@ begin
 			o_ext_ram_op => exmem_ext_ram_op,
 			o_wb_sel     => exmem_wb_sel,
 			o_pc         => exmem_pc,
-			o_funct3     => exmem_funct3
+			o_funct3     => exmem_funct3,
+			o_is_flash   => exmem_is_flash,
+			o_is_sdram   => exmem_is_sdram,
+			o_in_main    => exmem_in_main,
+			o_same_region => exmem_same_region
 		);
 
 	-- =========================================================================
@@ -841,9 +863,11 @@ begin
 			ram_base_kib => ram_base_kib,
 			ram_end_kib  => ram_end_kib,
 			ram_external => ram_external,
-			ext_base_kib => ext_base_kib
+			ext_base_kib => ext_base_kib,
+			flags_registered => true
 		)
 		port map (
+			i_is_sdram    => exmem_is_sdram,
 			i_clk         => i_clk,
 			i_rst         => i_rst,
 			i_valid       => mis_valid,
@@ -882,9 +906,14 @@ begin
 			ram_end_kib     => ram_end_kib,
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib
+			periph_base_kib => periph_base_kib,
+			flags_registered => true
 		)
 		port map (
+			i_flag_flash    => exmem_is_flash,
+			i_flag_sdram    => exmem_is_sdram,
+			i_flag_main     => exmem_in_main,
+			i_flag_same     => exmem_same_region,
 			i_valid         => exmem_valid,
 			i_alu_out       => mem_addr,
 			i_ea            => exmem_alu_out,

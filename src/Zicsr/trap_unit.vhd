@@ -56,7 +56,9 @@ entity trap_unit is
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		periph_base_kib : natural := 2097152
+		periph_base_kib : natural := 2097152;
+		-- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
+		ea_flags_external : boolean := false
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -75,6 +77,10 @@ entity trap_unit is
 		i_imm12       : in  std_logic_vector(11 downto 0);
 		-- Endereço efetivo de memória calculado pela ULA no estágio EX.
 		i_ea          : in  word_t;
+		-- O endereço efetivo está na memória principal (com ea_flags_external).
+		i_ea_main        : in  std_logic := '0';
+		-- As duas palavras de um acesso que cruza estão na mesma região da memória principal (com ea_flags_external).
+		i_ea_same_region : in  std_logic := '0';
 		-- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
 		i_cf_taken    : in  std_logic;
 		-- Endereço alvo do desvio ou salto tomado no estágio EX.
@@ -177,7 +183,8 @@ begin
 
 	-- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
 	-- constantes de potência de 2 viram testes de bits na síntese.
-	in_main_mem <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
+	in_main_mem <= i_ea_main when ea_flags_external else
+	               '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
 	                         unsigned(i_ea) < kib_to_addr(periph_base_kib))
 	               else '0';
 
@@ -194,7 +201,7 @@ begin
 
 	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal
 	-- e não na última palavra da região, pois a palavra seguinte pertenceria à região vizinha.
-	same_region <= in_main_mem and (not last_word);
+	same_region <= i_ea_same_region when ea_flags_external else (in_main_mem and (not last_word));
 
 	misal_exec <= '1' when (misal_in_word = '1' or
 	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and

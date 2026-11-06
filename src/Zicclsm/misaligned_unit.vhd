@@ -47,7 +47,9 @@ entity misaligned_unit is
 		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		ext_base_kib : natural := 1048576
+		ext_base_kib : natural := 1048576;
+		-- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
+		flags_registered : boolean := false
 	);
 	port (
 		-- Sinal de clock principal.
@@ -66,6 +68,8 @@ entity misaligned_unit is
 		i_ext_op     : in  ext_ram_op_t;
 		-- Máscara de bytes do store em MEM, como saiu do store_manager.
 		i_byte_mask  : in  byte_mask_t;
+		-- O endereço efetivo cai na janela externa, a SDRAM (com flags_registered).
+		i_is_sdram   : in  std_logic := '0';
 		-- Endereço efetivo do acesso em MEM.
 		i_addr       : in  word_t;
 		-- Dado do store em MEM, como saiu do store_manager.
@@ -146,7 +150,8 @@ begin
 
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
 
-	is_sdram <= '1' when is_external_addr(unsigned(i_addr), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
+	is_sdram <= i_is_sdram when flags_registered else
+	            '1' when is_external_addr(unsigned(i_addr), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
 	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
 
 	first_done    <= cross and (not second) and step_ok and i_advance;

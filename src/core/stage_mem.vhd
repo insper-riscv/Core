@@ -43,7 +43,9 @@ entity stage_mem is
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		periph_base_kib : natural := 2097152
+		periph_base_kib : natural := 2097152;
+		-- A classificação do endereço efetivo (FLASH, SDRAM, memória principal, mesma região) vem registrada do EX/MEM pelas portas i_flag_*, em vez de ser decodificada do endereço neste estágio.
+		flags_registered : boolean := false
 	);
 	port (
 		-- Bit de validade da instrução no estágio MEM.
@@ -52,6 +54,14 @@ entity stage_mem is
 		i_alu_out       : in  word_t;
 		-- Endereço efetivo original do load ou store, vindo do registrador EX/MEM.
 		i_ea            : in  word_t;
+		-- O endereço efetivo cai na FLASH de dados (com flags_registered).
+		i_flag_flash    : in  std_logic := '0';
+		-- O endereço efetivo cai na janela externa, a SDRAM (com flags_registered).
+		i_flag_sdram    : in  std_logic := '0';
+		-- O endereço efetivo está na memória principal (com flags_registered).
+		i_flag_main     : in  std_logic := '0';
+		-- As duas palavras de um acesso que cruza ficam na mesma região (com flags_registered).
+		i_flag_same     : in  std_logic := '0';
 		-- Campo funct3 do load ou store, vindo do registrador EX/MEM.
 		i_funct3        : in  funct3_t;
 		-- Dado alinhado para escrita em memória vindo do registrador EX/MEM.
@@ -137,9 +147,12 @@ begin
 			ram_end_kib     => ram_end_kib,
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib
+			periph_base_kib => periph_base_kib,
+			ea_flags_external => flags_registered
 		)
 		port map (
+			i_ea_main        => i_flag_main,
+			i_ea_same_region => i_flag_same,
 			i_ex_valid    => i_valid,
 			i_run         => '1',
 			i_opcode      => mem_opcode,
@@ -162,8 +175,10 @@ begin
 	access_valid <= i_valid and (not trap_take_int);
 
 	-- A região sai da comparação do endereço com os limites constantes do mapa.
-	is_flash_data   <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
-	is_sdram        <= '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
+	is_flash_data   <= i_flag_flash when flags_registered else
+	                   '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
+	is_sdram        <= i_flag_sdram when flags_registered else
+	                   '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
 	is_ram_internal <= (not is_flash_data) and (not is_sdram);
 
 	o_flash_addr2   <= i_alu_out;
