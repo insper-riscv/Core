@@ -150,9 +150,9 @@ entity stage_ex is
 		i_mem_trap_pc     : in  word_t    := (others => '0');
 		-- Valor de mtval da exceção do estágio MEM.
 		i_mem_trap_tval   : in  word_t    := (others => '0');
-		-- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
 		-- Resultado da ULA antes da seleção do resultado final (o endereço efetivo de um load ou store).
 		o_alu_result      : out word_t;
+		-- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
 		o_final_result    : out word_t;
 		-- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
 		o_store_data      : out word_t;
