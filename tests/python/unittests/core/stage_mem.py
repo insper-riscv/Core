@@ -5,6 +5,8 @@ as habilitações. O acesso desalinhado que o hardware não executa gera a
 exceção de endereço e nenhuma memória é acessada.
 """
 
+import itertools
+
 import cocotb
 from cocotb.triggers import Timer
 
@@ -66,20 +68,18 @@ def expected(region, fields):
 @cocotb.test()
 async def test_region_routing(dut):
     """Cada região recebe só as suas habilitações."""
-    for region in (FLASH, RAM, SDRAM):
-        for valid in (0, 1):
-            for kind in ((0, 0), (1, 0), (0, 1)):
-                for enable in (0, 1):
-                    for ready in (0, 1):
-                        fields = {
-                            "valid": valid,
-                            "re_ram": kind[0],
-                            "we_ram": kind[1],
-                            "en_ram": enable,
-                            "sdram_ready": ready,
-                        }
-                        seen = await run(dut, region, fields)
-                        check_equal(seen, expected(region, fields), fields)
+    for region, valid, kind, enable, ready in itertools.product(
+        (FLASH, RAM, SDRAM), (0, 1), ((0, 0), (1, 0), (0, 1)), (0, 1), (0, 1)
+    ):
+        fields = {
+            "valid": valid,
+            "re_ram": kind[0],
+            "we_ram": kind[1],
+            "en_ram": enable,
+            "sdram_ready": ready,
+        }
+        seen = await run(dut, region, fields)
+        check_equal(seen, expected(region, fields), fields)
 
 
 @cocotb.test()
