@@ -449,7 +449,7 @@ mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_ran
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
 mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(31 downto 0);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
-mutant_bank "$csr" "$csr_time_props" '' time_not_external "s/gen_time_platform : if time_external generate/gen_time_platform : if false generate/" "$time_gens" 4
+mutant_bank "$csr" "$csr_time_props" '' time_hi_zero "s/time_hi   <= i_mtime(63 downto 32);/time_hi   <= (others => '0');/" "$time_gens" 4
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_request_ignores_of "s/ovf_req(n)     <= wrap and (not of_q);/ovf_req(n)     <= wrap;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d      <= wrap or i_wdata(31);/of_d      <= i_wdata(31);/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
