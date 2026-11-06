@@ -1,9 +1,12 @@
 # Every file path this repository's configuration references, checked by
 #   riscv-tools --root . check-paths --manifest paths.yaml
 # Run it before and after moving any file.
+repository: Core
 tree:
   coverage:
     formal:
+      core: [formal/core_trap_take_props.sv]
+      alu: [formal/alu_props.sv]
       counter64: []
       csr_file: [formal/csr_file_props.sv, formal/csr_cntr_props.sv, formal/csr_hpm_props.sv, formal/csr_irq_props.sv]
       muldiv_fusion: []
@@ -14,20 +17,7 @@ tree:
       zihintntl_decode: [formal/zihintntl_props.sv]
       zihintpause_decode: [formal/zihintpause_props.sv]
     # Entities without an entity test of their own, and why (changed only with a justification in the pull request).
-    exceptions:
-      fencei_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      misaligned_unit: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      muldiv_fusion: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      pc_fetch: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_ex_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_id_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_if_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      reg_mem_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_ex: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_id: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_if: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_mem: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
-      stage_wb: "Pipeline block that only works inside the core; exercised by the Core* system tests of tests.json (toplevel core)."
+    exceptions: {}
   # Folders named after an ISA extension keep their capitals: they are identifiers of the ISA.
   identifier_folders: [I, E, I-E, M, Zmmul, Zicsr, Zicntr, Zihpm, Zifencei, Zicclsm, Zicond, Zimop, Zihintntl, Zihintpause, ISA]
 references:
@@ -47,8 +37,8 @@ references:
   - {name: entry points, paths: [src/core, src/shared, src/common, tests/python/runner.py, docs/pt-br/contracts, docs/en/contracts]}
 
 provides:
-  # Each component lists its sources in GHDL dependency order and the components it needs. Every component also needs
-  # the shared blocks of src/common (the Common-Components submodule). The constants
+  # Each component lists its sources in GHDL dependency order and the components it needs. A requires with
+  # the prefix Common-Components/ names a block of the submodule at src/common. The constants
   # component groups the packages of every folder, because the decoders and units of one folder read the constants of the others.
   # A component is a folder of src/, so the name of an extension keeps its capitals.
   constants:
@@ -78,7 +68,7 @@ provides:
       - src/Zihintntl/zihintntl_consts.vhd
       - src/Zihintpause/zihintpause_consts.vhd
   shared:
-    requires: [constants]
+    requires: [constants, Common-Components/adder, Common-Components/registers, Common-Components/mux, Common-Components/onehot_decoder]
     sources:
       - src/shared/reg_file.vhd
       - src/shared/control_unit.vhd
@@ -92,14 +82,14 @@ provides:
       - src/shared/reg_ex_mem.vhd
       - src/shared/reg_mem_wb.vhd
   I-E:
-    requires: [constants]
+    requires: [constants, Common-Components/utils]
     sources:
       - src/I-E/alu.vhd
       - src/I-E/extender_imm.vhd
       - src/I-E/extender_ram.vhd
       - src/I-E/store_manager.vhd
   M:
-    requires: [constants]
+    requires: [constants, Common-Components/adder, Common-Components/registers, Common-Components/mux]
     sources:
       - src/M/m_decode.vhd
       - src/M/booth_multiplier_rv32.vhd
@@ -107,20 +97,20 @@ provides:
       - src/M/muldiv_fusion.vhd
       - src/M/multdiv.vhd
   Zicclsm:
-    requires: [constants]
+    requires: [constants, Common-Components/registers]
     sources:
       - src/Zicclsm/misaligned_unit.vhd
   Zicntr:
-    requires: [constants]
+    requires: [constants, Common-Components/registers]
     sources:
       - src/Zicntr/counter64.vhd
       - src/Zicntr/tick_divider.vhd
   Zihpm:
-    requires: [constants, Zicntr]
+    requires: [constants, Zicntr, Common-Components/registers, Common-Components/mux]
     sources:
       - src/Zihpm/hpm_counter_bank.vhd
   Zicsr:
-    requires: [constants, Zicntr, Zihpm]
+    requires: [constants, Zicntr, Zihpm, Common-Components/registers]
     sources:
       - src/Zicsr/csr_decode.vhd
       - src/Zicsr/csr_file.vhd
@@ -135,7 +125,7 @@ provides:
     sources:
       - src/Zimop/zimop_decode.vhd
   Zifencei:
-    requires: [constants]
+    requires: [constants, Common-Components/registers]
     sources:
       - src/Zifencei/fencei_unit.vhd
   Zihintntl:
@@ -147,7 +137,7 @@ provides:
     sources:
       - src/Zihintpause/zihintpause_decode.vhd
   core:
-    requires: [constants, shared, I-E, M, Zicclsm, Zicond, Zicsr, Zifencei, Zimop, Zihintntl, Zihintpause]
+    requires: [constants, shared, I-E, M, Zicclsm, Zicond, Zicsr, Zifencei, Zimop, Zihintntl, Zihintpause, Common-Components/adder, Common-Components/registers, Common-Components/mux]
     sources:
       - src/core/stage_if.vhd
       - src/core/stage_id.vhd

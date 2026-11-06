@@ -30,6 +30,7 @@ OPTIONS = {
     "sdram_stall",
     "imem",
     "flash_port_value",
+    "ic_latency",
 }
 DATA_PORTS = (
     "i_sdram_rdata",
@@ -75,6 +76,31 @@ class _DataMemories:
         if int(dut.o_flash_rden2.value):
             addr = int(dut.o_flash_addr2.value) & ~3
             self.flash_next = self.flash.get(addr, 0)
+
+
+class _IcWait:
+    """Cache de instruções que espera ciclos por endereço novo."""
+
+    def __init__(self, latency_for):
+        """Espera latency_for(n) ciclos no n-ésimo endereço novo."""
+        self.latency_for = latency_for
+        self.last_addr = None
+        self.wait = 0
+        self.fetches = 0
+
+    def drive(self, dut):
+        """Responde i_ic_ready desta busca, segurando-o na espera."""
+        if int(dut.o_ic_sel.value) != 1:
+            self.last_addr = None
+            dut.i_ic_ready.value = 1
+            return
+        addr = int(dut.o_if_addr.value) & ~3
+        if addr != self.last_addr:
+            self.wait = self.latency_for(self.fetches)
+            self.fetches += 1
+            self.last_addr = addr
+        dut.i_ic_ready.value = 1 if self.wait == 0 else 0
+        self.wait = max(self.wait - 1, 0)
 
 
 def _models(dut, program, options):
@@ -130,10 +156,14 @@ async def run_program(dut, program, max_cycles=4000, **options):
     for the SDRAM window; ``sdram_stall(n)`` gives the stall cycles of
     its n-th access. The slave holds ``i_sdram_ready`` until the core
     advances and commits the read data after that, the way the bridge of
-    the board does.
+    the board does. ``ic_latency(n)`` dá os ciclos de espera do n-ésimo
+    endereço novo buscado pela porta da cache de instruções
+    (``i_ic_ready``).
     """
     imem, memories, slave = _models(dut, program, options)
     monitor = options.get("monitor")
+    ic_latency = options.get("ic_latency")
+    ic_wait = None if ic_latency is None else _IcWait(ic_latency)
 
     await _start(dut, slave is not None)
     for _ in range(max_cycles):
@@ -141,6 +171,8 @@ async def run_program(dut, program, max_cycles=4000, **options):
         await Timer(1, unit="ns")
         memories.present(dut)
         _drive_fetch(dut, imem, options.get("flash_port_value"))
+        if ic_wait is not None:
+            ic_wait.drive(dut)
         memories.capture(dut)
         if slave is not None:
             await slave.step()

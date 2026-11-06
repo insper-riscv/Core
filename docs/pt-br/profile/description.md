@@ -69,7 +69,7 @@ A seção `provides` de `paths.yaml` divide `src/` em componentes, um por pasta,
 | `Zicsr` | `constants`, `Zicntr`, `Zihpm` |
 | `core` | todos os anteriores |
 
-Todo componente depende também dos blocos de `src/common/` (submódulo Common-Components). A ordem das fontes dentro de cada componente é a ordem de dependência do GHDL, e o `check-paths` confere que cada arquivo listado existe.
+Cada componente declara em `requires` os blocos de `src/common/` (submódulo Common-Components) que usa, no formato `Common-Components/<componente>`, e `riscv-tools sources core` os resolve no manifesto do submódulo. A ordem das fontes dentro de cada componente é a ordem de dependência do GHDL, e o `check-paths` confere que cada arquivo listado existe.
 
 ---
 

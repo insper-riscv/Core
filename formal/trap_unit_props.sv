@@ -6,16 +6,27 @@ module props (input clk);
   (* anyseq *) wire [4:0] rd_idx, rs1_idx;
   (* anyseq *) wire [11:0] imm12;
   (* anyseq *) wire [31:0] ea, cf_target;
-  wire take, mret_take; wire [31:0] cause, tval;
+  (* anyseq *) wire irq_take;
+  (* anyseq *) wire [31:0] irq_cause;
+  wire take, mret_take, irq; wire [31:0] cause, tval;
 
   trap_unit dut (.i_ex_valid(ex_valid), .i_run(run), .i_opcode(opcode), .i_funct3(funct3), .i_rd_idx(rd_idx),
     .i_rs1_idx(rs1_idx), .i_imm12(imm12), .i_ea(ea), .i_cf_taken(cf_taken), .i_cf_target(cf_target),
-    .i_csr_illegal(csr_illegal), .i_illegal(illegal), .o_take(take), .o_mret_take(mret_take), .o_cause(cause), .o_tval(tval));
+    .i_csr_illegal(csr_illegal), .i_illegal(illegal), .i_irq_take(irq_take), .i_irq_cause(irq_cause),
+    .o_take(take), .o_mret_take(mret_take), .o_irq(irq), .o_cause(cause), .o_tval(tval));
 
   localparam SYSTEM = 7'b1110011, LOAD = 7'b0000011, STORE = 7'b0100011;
   wire no_regs = funct3 == 3'b000 && rd_idx == 5'd0 && rs1_idx == 5'd0;
   wire cf_misal = cf_taken && cf_target[1:0] != 2'b00;
   wire active = ex_valid && run;
+  wire fence_i = opcode == 7'b0001111 && funct3 == 3'b001;
+  // An interrupt is taken on the instruction in EX when it is valid, advancing and not a FENCE.I.
+  wire irq_go = irq_take && active && !fence_i;
+
+`ifndef IRQ
+  // Without the interrupt proof the unit has no interrupt to take: the synchronous behaviour stands alone.
+  always @(*) assume (!irq_take);
+`endif
 
   // Only a branch, JAL or JALR is a taken control-flow instruction.
   // The decoder never flags SYSTEM: the trap unit decides it.
@@ -23,7 +34,22 @@ module props (input clk);
 
   always @(*) assume (!cf_taken || opcode == 7'b1100011 || opcode == 7'b1101111 || opcode == 7'b1100111);
 
+`ifdef IRQ
+  // The interrupt: it is taken exactly when there is one to take on a valid, advancing instruction that is not a
+  // FENCE.I; it carries the cause it was given, an mtval of zero, no MRET and the interrupt flag.
   always @(*) begin
+    assert (irq == irq_go);
+    if (irq_go) assert (take && !mret_take && cause == irq_cause && tval == 32'h0);
+    if (!irq_go) assert (!irq);
+    // MRET is aborted by an interrupt and executed without one.
+    if (active && opcode == SYSTEM && no_regs && imm12 == 12'h302) assert (mret_take == !irq_go);
+    // FENCE.I redirects the pipeline, so it is never aborted by an interrupt, and it raises nothing by itself.
+    if (fence_i) assert (!irq);
+    if (fence_i && active && !illegal && !cf_misal) assert (!take);
+  end
+`endif
+
+  always @(*) if (!irq_go) begin
     // An instruction that is not valid, or a pipeline that does not run, takes nothing.
     assert (!take || active);
     assert (!mret_take || active);
@@ -118,6 +144,14 @@ module props (input clk);
     cover (take && cause == 6);
     cover (take && cause == 11);
     cover (mret_take);
+`ifdef IRQ
+    cover (irq && opcode == SYSTEM && no_regs && imm12 == 12'h000);
+    cover (irq && opcode == SYSTEM && no_regs && imm12 == 12'h302);
+    cover (irq && illegal);
+    cover (irq && cf_misal);
+    cover (irq && opcode == LOAD);
+    cover (irq_take && active && fence_i);
+`endif
   end
 `endif
 endmodule

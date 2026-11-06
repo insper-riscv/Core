@@ -4,7 +4,12 @@
 -- Avalia combinacionalmente a instrução presente no estágio EX e sinaliza, no
 -- máximo, uma exceção síncrona do modo máquina (o_take = '1') ou o retorno de
 -- exceção (o_mret_take = '1') quando a instrução é válida (i_ex_valid = '1') e
--- o pipeline avança (i_run = '1'):
+-- o pipeline avança (i_run = '1'). Uma interrupção a tomar (i_irq_take = '1')
+-- tem prioridade sobre qualquer exceção e sobre o MRET da instrução em EX: a
+-- instrução é abortada (o_take = '1', o_irq = '1', causa de i_irq_cause e
+-- mtval zero) e o mepc recebe o endereço dela, a primeira que não completou.
+-- A única instrução que não é abortada é FENCE.I, que redireciona o pipeline
+-- para a instrução seguinte; a interrupção espera um ciclo por ela.
 --
 --   Código (o_cause) | Exceção                                 | Valor em o_tval
 --   -----------------+-----------------------------------------+------------------
@@ -17,6 +22,7 @@
 --          6         | Endereço de Store desalinhado que o     | i_ea
 --                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
+--   0x80000003, 7, B | Interrupção de software, timer, externa | 0x00000000
 -- =============================================================================
 
 library ieee;
@@ -77,10 +83,16 @@ entity trap_unit is
 		i_csr_illegal : in  std_logic;
 		-- Instrução inexistente apontada pela decodificação no estágio ID ('1' = ilegal).
 		i_illegal     : in  std_logic := '0';
+		-- Há interrupção a tomar: pendente, habilitada em mie e com mstatus.MIE em '1' (do csr_file).
+		i_irq_take    : in  std_logic := '0';
+		-- Código de mcause da interrupção a tomar (bit 31 em '1').
+		i_irq_cause   : in  word_t    := (others => '0');
 		-- Pulso que comanda a tomada de trap síncrono no ciclo atual.
 		o_take        : out std_logic;
 		-- Pulso que comanda o retorno de trap (instrução MRET) no ciclo atual.
 		o_mret_take   : out std_logic;
+		-- A tomada comandada por o_take é a de uma interrupção, e não a de uma exceção síncrona.
+		o_irq         : out std_logic;
 		-- Código da causa da exceção síncrona detectada (para gravação em mcause).
 		o_cause       : out word_t;
 		-- Valor adicional associado à exceção (endereço faltante ou zero, para gravação em mtval).
@@ -132,6 +144,10 @@ architecture rtl of trap_unit is
 
 	-- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
 	signal has_exc     : std_logic;
+	-- Indica decodificação da instrução FENCE.I, que redireciona o pipeline e por isso não é abortada.
+	signal is_fencei   : std_logic;
+	-- Indica que a interrupção a tomar é tomada neste ciclo: a instrução em EX é válida, avança e não é FENCE.I.
+	signal irq_go      : std_logic;
 
 begin
 
@@ -193,17 +209,23 @@ begin
 	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
 	           ld_misal or st_misal or is_ecall;
 
-	o_take      <= has_exc and i_ex_valid and i_run;
-	o_mret_take <= is_mret and i_ex_valid and i_run;
+	is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
+	irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
 
-	o_cause <= CAUSE_MISALIGNED_PC when cf_misal = '1' else
+	o_take      <= (has_exc and i_ex_valid and i_run) or irq_go;
+	o_mret_take <= is_mret and i_ex_valid and i_run and (not irq_go);
+	o_irq       <= irq_go;
+
+	o_cause <= i_irq_cause when irq_go = '1' else
+	           CAUSE_MISALIGNED_PC when cf_misal = '1' else
 	           CAUSE_ILLEGAL_INSTR when (i_illegal = '1' or sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
 	           CAUSE_MACHINE_ECALL;
 
-	o_tval  <= i_cf_target when cf_misal = '1' else
+	o_tval  <= (others => '0') when irq_go = '1' else
+	           i_cf_target when cf_misal = '1' else
 	           i_ea        when ((ld_misal = '1' or st_misal = '1') and i_illegal = '0') else
 	           (others => '0');
 

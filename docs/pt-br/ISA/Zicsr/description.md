@@ -74,7 +74,7 @@ Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus
 | `0x300` | `mstatus` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 e 11) fixo em `11`, `MPIE` (bit 7), `MIE` (bit 3); demais bits zero | Só `MIE` e `MPIE` são gravados; os demais bits são ignorados |
 | `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `has_m`, `0x40001100` (soma o bit 12, extensão `M`); com `has_e` verdadeiro (RV32E), o bit 4 (extensão `E`) substitui o bit 8, e o valor é `0x40000010` ou, com `has_m`, `0x40001010` | Ignorada |
 | `0x304` | `mie` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `has_interrupts`, as máscaras `MSIE`, `MTIE` e `MEIE` (bits 3, 7 e 11) | Com `has_interrupts`, grava os bits 3, 7 e 11; os demais são ignorados |
-| `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | Endereço base do tratador, com os bits `[1:0]` em zero | Grava os bits `[31:2]`; o modo é sempre direto |
+| `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | `BASE` nos bits `[31:2]` e `MODE` no bit 0 (`0` direto, `1` vetorado); o bit 1 lê zero. Sem `has_interrupts`, `MODE` lê sempre zero | Grava `BASE` e, com `has_interrupts`, `MODE`; no modo vetorado os bits `[5:2]` de `BASE` são gravados em zero (alinhamento de 64 bytes) |
 | `0x310` | `mstatush` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignorada |
 | `0x340` | `mscratch` | L/E | [2.1.1.13](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-13-machine-scratch-mscratch-register) | Valor gravado, 32 bits | Grava os 32 bits |
 | `0x341` | `mepc` | L/E | [2.1.1.14](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-14-machine-exception-program-counter-mepc-register) | PC salvo, com os bits `[1:0]` em zero | Grava os bits `[31:2]` |
@@ -101,11 +101,17 @@ O generic `has_interrupts` (padrão `false`, exige `has_zicsr`) liga as três li
 
 O registrador `mip` é somente leitura e lê o nível atual das três linhas nos bits 3, 7 e 11; os demais bits leem zero. Uma escrita em `mip` é legal e não altera nada. O registrador `mie` guarda os bits 3, 7 e 11; os demais bits leem zero e ignoram a escrita, e o valor após o reset é zero. A escrita em `mie` segue as regras gerais da seção 3.2 e não ocorre no ciclo de um trap ou de um `MRET`.
 
-A saída `o_irq_pending` do `csr_file` indica interrupção pendente e habilitada em `mie`, sem considerar `mstatus.MIE`.
+O `csr_file` entrega a decisão de interrupção em três saídas. `o_irq_pending` indica interrupção pendente e habilitada em `mie`, sem considerar `mstatus.MIE`, e `o_irq_take` acrescenta `mstatus.MIE`. `o_irq_cause` traz o `mcause` da interrupção de maior prioridade entre as pendentes e habilitadas.
 
-$$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0$$
+$$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0 \qquad \text{o\_irq\_take} = \text{mstatus.MIE} \land \text{o\_irq\_pending}$$
 
-Com `has_interrupts = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, e `o_irq_pending` vale `0`. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`: `0x80000003` (software), `0x80000007` (timer) e `0x8000000B` (externa).
+| Pendente e habilitada | `o_irq_cause` |
+| :--- | :---: |
+| Externa (`MEIP` e `MEIE`) | `0x8000000B` |
+| Software (`MSIP` e `MSIE`), sem externa | `0x80000003` |
+| Timer (`MTIP` e `MTIE`), sem as duas anteriores | `0x80000007` |
+
+Com `has_interrupts = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, `o_irq_pending` e `o_irq_take` valem `0` e `MODE` de `mtvec` lê zero. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`.
 
 ## 5. Exceções Síncronas
 
@@ -152,15 +158,15 @@ Se a exceção ocorre no estágio MEM, o PC salvo em `mepc` é o da instrução 
 
 ### 5.4. Retorno com MRET
 
-A instrução `MRET` (`funct12 = 0x302`) é detectada em EX. Ela restaura `mstatus.MIE` com o valor de `mstatus.MPIE`, grava `mstatus.MPIE` com `1` e redireciona o PC para `mepc`. A instrução `WFI` (`funct12 = 0x105`) é aceita como instrução legal e não faz nada.
+A instrução `MRET` (`funct12 = 0x302`) é detectada em EX. Ela restaura `mstatus.MIE` com o valor de `mstatus.MPIE`, grava `mstatus.MPIE` com `1` e redireciona o PC para `mepc`. A instrução `WFI` (`funct12 = 0x105`) é aceita como instrução legal e executa como `NOP` (seção 6.6).
 
 ### 5.5. Redirecionamento e Flush
 
-O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FENCE.I`) e `mtvec` (em exceção). O seletor de PC dá ao redirecionamento a maior prioridade sobre desvios e `JALR`, e o registrador de PC aceita o novo valor mesmo com o pipeline congelado.
+O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FENCE.I`), o vetor de `mtvec` (em interrupção com `mtvec` vetorado, seção 6.5) e `BASE` de `mtvec` (nos demais casos). O seletor de PC dá ao redirecionamento a maior prioridade sobre desvios e `JALR`, e o registrador de PC aceita o novo valor mesmo com o pipeline congelado.
 
 | Evento | Registradores esvaziados | Observação |
 | :--- | :--- | :--- |
-| Exceção em EX | `IF/ID`, `ID/EX`, `EX/MEM` | A instrução faltante não escreve `rd` nem acessa a memória |
+| Exceção ou interrupção em EX | `IF/ID`, `ID/EX`, `EX/MEM` | A instrução faltante ou abortada não escreve `rd` nem acessa a memória |
 | Exceção em MEM | `IF/ID`, `ID/EX`, `EX/MEM`, `MEM/WB` | O acesso faltante não chega à memória e a instrução de EX é descartada |
 | `MRET` | `IF/ID`, `ID/EX` | A própria `MRET` segue no pipeline como instrução sem efeito em registrador |
 
@@ -170,7 +176,75 @@ A exceção de EX é detectada de forma combinacional no ciclo em que a instruç
 
 A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
 
-## 6. Core sem Zicsr
+## 6. Tomada de Interrupção
+
+### 6.1. Condição
+
+A `trap_unit` toma a interrupção que o `csr_file` indica em `o_irq_take` sobre a instrução que está em EX. A interrupção só é tomada com instrução válida em EX e pipeline avançando, e nunca sobre `FENCE.I`.
+
+$$\text{toma} = \text{mstatus.MIE} \land \left( (\text{mip} \land \text{mie}) \ne 0 \right) \land \text{valid} \land \text{pipe\_run} \land \lnot\,\text{FENCE.I}$$
+
+Enquanto a condição não vale, a interrupção fica pendente e o programa segue. A linha é de nível, então ela é tomada assim que a condição passa a valer, e o tratador precisa reconhecê-la no periférico antes de retornar.
+
+### 6.2. Prioridade
+
+| Ordem | Evento | `mcause` |
+| :---: | :--- | :---: |
+| 1 | Interrupção externa de máquina | `0x8000000B` |
+| 2 | Interrupção de software de máquina | `0x80000003` |
+| 3 | Interrupção de timer de máquina | `0x80000007` |
+| 4 | Exceção síncrona da instrução em EX (seção 5.2) | Código da exceção |
+
+A interrupção tem prioridade sobre a exceção síncrona e sobre o `MRET` da instrução em EX: ela é abortada e fica como a instrução de retorno, e a exceção só ocorre se a instrução for executada depois do retorno. A exceção de load ou store do estágio MEM é de uma instrução mais antiga e vence a interrupção: a instrução de EX é descartada pela exceção, e a interrupção continua pendente até o tratador devolver o controle.
+
+### 6.3. Ponto de Entrada
+
+| Regra | Efeito |
+| :--- | :--- |
+| `mepc` recebe o PC da instrução em EX | É a primeira instrução que não completou, e o retorno por `MRET` a executa. O porte do FreeRTOS não soma 4 a `mepc` numa interrupção |
+| As instruções mais antigas completam | As que estão em MEM e WB terminam normalmente |
+| A instrução em EX e as mais novas são descartadas | `IF/ID`, `ID/EX` e `EX/MEM` são esvaziados; nenhuma escrita em registrador, store, escrita de CSR ou `FENCE.I` dessas instruções fica visível |
+| `mcause` recebe o código da interrupção, com o bit 31 em `1` | `mtval` recebe zero |
+| `mstatus.MPIE` recebe `mstatus.MIE`, e `mstatus.MIE` vai a zero | Igual à exceção síncrona |
+| A instrução abortada não conta em `minstret` | Ela conta quando executa depois do retorno |
+
+Uma instrução de acesso a CSR abortada não escreve nada: `mtvec`, `mscratch`, `mie`, os contadores e `mstatus` ficam como estavam, a não ser pelo efeito da própria tomada em `mstatus`, `mepc`, `mcause` e `mtval`.
+
+### 6.4. Casos que Adiam a Tomada
+
+A tomada espera enquanto o pipeline não avança ou não há instrução válida em EX. Nenhum desses casos parte uma instrução ao meio.
+
+| Situação em curso | Efeito |
+| :--- | :--- |
+| Multiplicação ou divisão | O pipeline fica parado até o término. No ciclo em que o resultado fica pronto a interrupção aborta a instrução, que refaz o cálculo depois do retorno |
+| Acesso desalinhado em duas etapas | As duas etapas terminam antes da tomada |
+| Espera de leitura ou escrita da SDRAM | O acesso termina antes da tomada |
+| Busca esperando `i_ic_ready` | Não há instrução válida em EX; a interrupção é tomada na primeira instrução válida que chega |
+| Bolha em EX (salto tomado, dependência de load) | A interrupção é tomada na primeira instrução válida que chega |
+| `FENCE.I` em EX | A instrução redireciona o pipeline para a seguinte e completa; a interrupção é tomada nessa seguinte |
+
+Uma linha que sobe de novo antes de a primeira instrução do programa retirar refaz a mesma entrada sem fim. Por isso o intervalo entre interrupções precisa exceder a duração do tratador somada à da instrução mais longa do programa, que é a divisão.
+
+### 6.5. Modos de `mtvec`
+
+| `MODE` (bit 0) | Destino de uma interrupção | Destino de uma exceção síncrona |
+| :---: | :--- | :--- |
+| `0` (direto) | `BASE` | `BASE` |
+| `1` (vetorado) | $\text{BASE} + 4 \times \text{causa}$ | `BASE` |
+
+Os modos `2` e `3` são reservados, e o bit 1 lê zero. No modo vetorado `BASE` tem alinhamento de 64 bytes, pois a maior causa de interrupção implementada é 11 e a tabela ocupa 16 entradas de 4 bytes. Com esse alinhamento a soma é a troca dos bits `[5:2]` de `BASE` pelos quatro bits baixos da causa, sem somador. A `ECALL` tem causa 11 e vai a `BASE`, porque o vetor vale só para interrupção.
+
+| Causa | Posição na tabela |
+| :---: | :---: |
+| 3 (software) | `BASE + 12` |
+| 7 (timer) | `BASE + 28` |
+| 11 (externa) | `BASE + 44` |
+
+### 6.6. MRET e WFI
+
+O `MRET` segue a seção 5.4. A `WFI` executa como `NOP`, como o manual privilegiado permite, então o núcleo não para à espera de interrupção. Uma interrupção tomada sobre a `WFI` devolve o controle à própria `WFI`, que executa como `NOP` no retorno.
+
+## 7. Core sem Zicsr
 
 Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e não há registradores de trap. O Core mantém um detector de causas que apenas sinaliza a exceção nas saídas e não redireciona o PC.
 
@@ -179,8 +253,11 @@ Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e 
 | `o_trap` | Pulso de um ciclo em `1` quando uma exceção ocorre; fica em `0` com Zicsr |
 | `o_trap_cause` | Código de causa no formato de `mcause`; fica em zero com Zicsr |
 | `o_trap_pc` | PC da instrução que gerou a exceção; fica em zero com Zicsr |
+| `o_trap_take` | Pulso de um ciclo em `1` quando o Core toma uma exceção síncrona, com ou sem Zicsr |
 
 Nesse modo, toda instrução de acesso a CSR é ilegal (causa 2), `ECALL` gera a causa 11 e `EBREAK` a causa 3, e o desalinhamento de load e store (causas 4 e 6) é conferido no próprio estágio EX. O desalinhamento do alvo de desvio não é conferido, e `MRET` não tem efeito. A instrução faltante é anulada em EX, sem escrita em `rd` e sem acesso à memória, e o programa segue na instrução seguinte. A instrução que gerou a exceção não conta como retirada. O ambiente em volta do Core decide o que fazer com o sinal.
+
+A saída `o_trap_take` existe nos dois modos. Com Zicsr, ela pulsa no ciclo em que o Core desvia o PC para `mtvec`, quando `o_trap` fica em `0`, e é o sinal que um topo de síntese usa para mostrar a exceção, por exemplo num LED. Sem Zicsr, ela pulsa junto de `o_trap`. A interrupção de máquina, ao ser tomada, também deve pulsar `o_trap_take`.
 
 Um perfil exige `Zicsr` ou `Zicclsm`, porque sem os dois um acesso desalinhado não teria trap nem execução em hardware, e a elaboração falha. `Zicntr` e `Zihpm` exigem `Zicsr`.
 
