@@ -16,6 +16,7 @@ This document describes how the Core implements the base counters `cycle`, `time
 | :--- | :--- | :--- | :--- |
 | `has_zicntr` | `core` | `false` | Instantiates `mcycle`, `minstret` and `time` with their mirrors, and the `mcountinhibit` register; requires `has_zicsr` |
 | `tick_cycles` | `core` | 50 | Clock cycles per `time` tick (50 gives 1 MHz at 50 MHz) |
+| `time_external` | `core` | `false` | `time` mirrors the `mtime` of the `i_mtime` port (the CLINT) in place of the own counter |
 
 Elaboration fails if `has_zicntr` is on without `has_zicsr`. Zicntr is independent of Zihpm.
 
@@ -66,7 +67,7 @@ The instruction in EX retires when it is valid, the pipeline advances and there 
 
 $$f_{time} = \frac{f_{clock}}{tick\_cycles}$$
 
-The Core has no external time input. `time` derives from the Core's own clock, and the resolution is set by `tick_cycles` (at least 1).
+Without `time_external`, `time` derives from the Core's own clock, and the resolution is set by `tick_cycles` (at least 1). With `time_external = true` (the platform has a CLINT) `time` and `timeh` are the read-only shadow of the 64-bit `mtime` that the platform delivers on the `i_mtime` port, as section 3.2.1 of the privileged volume demands: the own counter and the tick divider are not instantiated, and `time` follows a write to `mtime` and the `mtime` period of the CLINT (`mtime_hz` of `platform.yaml`).
 
 ## 5. `mcountinhibit`
 

@@ -12,6 +12,8 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | `trap_unit` com interrupção | `trap_unit_props.sv` | indução, cover |
 | `stage_ex` com interrupções | `stage_ex_irq_props.sv` | indução, cover, com `mepc`, `mcause`, `MIE`, o PC seguinte e o efeito nulo do acesso a CSR abortado |
 | `alu` | `alu_props.sv` | equivalência combinacional, cover |
+| `trap_unit` com falhas de acesso | `trap_af_props.sv` | indução, cover, com os mutantes da ordem e do `mtval` |
+| `csr_file` com `time_external` | `csr_time_props.sv` | BMC, cover |
 | `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits, incluindo o pulso de estouro `o_wrap` |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |

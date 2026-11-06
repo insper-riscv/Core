@@ -16,6 +16,7 @@ Este documento descreve como o Core implementa os contadores básicos `cycle`, `
 | :--- | :--- | :--- | :--- |
 | `has_zicntr` | `core` | `false` | Instancia `mcycle`, `minstret` e `time` com seus espelhos, e o registrador `mcountinhibit`; exige `has_zicsr` |
 | `tick_cycles` | `core` | 50 | Ciclos de clock por tick do `time` (50 dá 1 MHz a 50 MHz) |
+| `time_external` | `core` | `false` | O `time` espelha o `mtime` da porta `i_mtime` (o CLINT) no lugar do contador próprio |
 
 A elaboração falha se `has_zicntr` for ligado sem `has_zicsr`. O Zicntr independe do Zihpm.
 
@@ -66,7 +67,7 @@ O `time` soma 1 a cada pulso do divisor de tick. O divisor conta de 0 a $tick\_c
 
 $$f_{time} = \frac{f_{clock}}{tick\_cycles}$$
 
-O Core não tem entrada externa de tempo. O `time` deriva do clock do próprio Core, e a resolução é fixada por `tick_cycles` (no mínimo 1).
+Sem `time_external`, o `time` deriva do clock do próprio Core, e a resolução é fixada por `tick_cycles` (no mínimo 1). Com `time_external = true` (a plataforma tem CLINT) o `time` e o `timeh` são o sombreamento somente leitura do `mtime` de 64 bits que a plataforma entrega na porta `i_mtime`, como manda a seção 3.2.1 do volume privilegiado: o contador próprio e o divisor de tick não são instanciados, e o `time` segue uma escrita no `mtime` e o período do `mtime` do CLINT (`mtime_hz` do `platform.yaml`).
 
 ## 5. `mcountinhibit`
 
