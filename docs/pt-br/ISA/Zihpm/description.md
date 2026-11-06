@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core implementa os contadores de eventos do Zihpm. O que o manual exige está em [instructions.md](instructions.md), a conformidade de cada exigência está em [conformance.md](conformance.md), o bloco contador e o `time` estão em [Zicntr](../Zicntr/description.md), e o banco de CSRs que hospeda os contadores (leitura, escrita atômica, ilegalidade) está em [Zicsr](../Zicsr/description.md).
 
-## 1. Generics
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 6, Zicntr and Zihpm Extensions for Counters, versão 2.0 (seção 6.2, Zihpm) |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Generics
 
 | Generic | Entidade | Padrão | Efeito |
 | :--- | :--- | :--- | :--- |
@@ -14,7 +22,7 @@ A elaboração falha se `has_zihpm` for ligado sem `has_zicsr`. O Zihpm independ
 
 Com `hpm_width` igual a 0 nenhum índice tem contador real, como se `hpm_counters` fosse 0.
 
-## 2. Organização
+## 3. Organização
 
 Com `has_zihpm`, o Core define os 29 índices de 3 a 31 em cinco faixas de 32 endereços. O índice $K$ é o endereço de base da faixa mais $K$.
 
@@ -28,7 +36,7 @@ Com `has_zihpm`, o Core define os 29 índices de 3 a 31 em cinco faixas de 32 en
 
 O banco decodifica a faixa pelos 7 bits altos do endereço e o índice pelos 5 bits baixos, de modo que a decodificação não compara o endereço inteiro. Escrever em `hpmcounterK` ou `hpmcounterKh` é acesso ilegal em qualquer índice, por serem CSRs somente leitura. Os endereços que o manual privilegiado não define dentro das faixas (`0x321`, `0x322`, `0xB01` e `0xB81`) são ilegais.
 
-### 2.1. Índices reais e índices fixos em zero
+### 3.1. Índices reais e índices fixos em zero
 
 | Índice $K$ | Leitura de qualquer CSR do índice | Escrita |
 | :--- | :--- | :--- |
@@ -37,19 +45,19 @@ O banco decodifica a faixa pelos 7 bits altos do endereço e o índice pelos 5 b
 
 O manual permite fixar qualquer contador em zero, mas o endereço existe, e por isso o acesso a um índice sem contador não gera exceção. Um programa descobre quantos contadores o perfil tem escrevendo um padrão em `mhpmcounterK` e lendo de volta.
 
-### 2.2. Largura do contador
+### 3.2. Largura do contador
 
 Um contador de $W$ bits (`hpm_width`) guarda os $\min(W,32)$ bits baixos na metade baixa e os $W-32$ bits restantes na metade alta, quando $W>32$. Os bits de cada metade acima da largura leem zero, e uma escrita guarda só os bits que cabem. O contador volta a zero depois de $2^W-1$.
 
-## 3. Estrutura
+## 4. Estrutura
 
 O banco `hpm_counter_bank` tem, para cada contador real, um seletor de evento, um bit de inibição e um contador próprio. Os contadores não compartilham somador, e cada um é uma instância do bloco descrito em [Zicntr](../Zicntr/description.md), com a largura da metade alta definida por `hpm_width`. A leitura escolhe o registrador pelo índice com uma árvore de multiplexadores de 32 entradas por faixa, e o índice sem contador devolve zero.
 
-## 4. Regra de contagem
+## 5. Regra de contagem
 
 Um contador soma 1 em cada ciclo em que o bit do vetor de eventos escolhido pelo código vale `'1'`, o código não é zero e o bit de inibição do contador vale `'0'`. Um código fora da tabela de eventos não conta, mesmo que o bit do vetor valha `'1'`. Uma escrita explícita em uma metade vence o incremento do mesmo ciclo.
 
-## 5. Tabela de eventos
+## 6. Tabela de eventos
 
 O vetor de eventos tem 16 bits, um por código, e o bit 0 é sempre zero.
 
@@ -69,7 +77,7 @@ O vetor de eventos tem 16 bits, um por código, e o bit 0 é sempre zero.
 
 O evento 9 conta a fusão de pares de multiplicação ou divisão (por exemplo `MULH` seguido de `MUL` com os mesmos operandos), descrita em [M](../M/description.md). Os eventos 5 a 7 só contam se o SoC ligar a entrada externa de eventos do Core, que por padrão vale zero.
 
-## 6. `mcountinhibit`
+## 7. `mcountinhibit`
 
 O registrador `mcountinhibit` fica em `0x320`, e os bits de `mcycle` e `minstret` estão em [Zicntr](../Zicntr/description.md). O registrador existe com `has_zicntr` ou `has_zihpm`.
 
@@ -80,7 +88,7 @@ O registrador `mcountinhibit` fica em `0x320`, e os bits de `mcycle` e `minstret
 
 Um contador inibido mantém o valor e continua legível e gravável.
 
-## 7. Verificação
+## 8. Verificação
 
 | Camada | O que garante |
 | :--- | :--- |

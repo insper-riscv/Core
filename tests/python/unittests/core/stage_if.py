@@ -2,7 +2,7 @@
 
 O PC é carregado por redirecionamento (trap, MRET, FENCE.I), JALR ou
 desvio, nessa prioridade, ou avança de 4 em 4; o endereço escolhe a
-fonte da instrução (BOOT_ROM, FLASH ou I-cache da região SDRAM) e a
+fonte da instrução (BOOT_MEMORY, FLASH ou I-cache da região SDRAM) e a
 espera da I-cache congela o PC.
 """
 
@@ -25,7 +25,7 @@ IDLE = {
     "branch_target": 0x1111,
     "jalr_target": 0x2222,
     "redirect_pc": 0x3333,
-    "boot_rom_data": 0xB0B0B0B0,
+    "boot_memory_data": 0xB0B0B0B0,
     "flash_data": 0xF1A5F1A5,
     "ic_data": 0x1CAC4E00,
     "ic_ready": 1,
@@ -106,8 +106,8 @@ async def test_instruction_source_by_region(dut):
     """A região do PC escolhe a fonte da instrução."""
     await start(dut)
     for address, source, sdram in (
-        (BOOT, "boot_rom_data", 0),
-        (0xFFC, "boot_rom_data", 0),
+        (BOOT, "boot_memory_data", 0),
+        (0xFFC, "boot_memory_data", 0),
         (0x1000, "flash_data", 0),
         (FLASH, "flash_data", 0),
         (SDRAM, "ic_data", 1),

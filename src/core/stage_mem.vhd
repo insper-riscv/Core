@@ -28,9 +28,9 @@ entity stage_mem is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo do load ou store (exceção em MEM); '0' deixa essa conferência para o estágio EX.
 		check_ea        : boolean := true;
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
@@ -130,7 +130,7 @@ begin
 		generic map (
 			has_zicclsm     => has_zicclsm,
 			check_ea        => check_ea,
-			boot_rom_bits   => boot_rom_bits,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,

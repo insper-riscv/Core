@@ -24,7 +24,7 @@ RAM_BASE = 0x00008000
 TAKEN_BRANCH_FLAG = 0x800C
 DATA_PORTS = (
     "i_sdram_rdata",
-    "i_boot_rom_data",
+    "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
     "i_ram_rdata",
@@ -260,7 +260,7 @@ def _serve_fetch(dut, imem):
     """
     if dut.o_if_addr.value.is_resolvable:
         word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
-        dut.i_boot_rom_data.value = word
+        dut.i_boot_memory_data.value = word
         dut.i_flash_data.value = word
 
 

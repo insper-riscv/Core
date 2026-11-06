@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core executa a dica `pause`. A codificação está em [instructions.md](instructions.md).
 
-## 1. Configuração
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 8, Zihintpause Extension for Pause Hint, versão 2.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Configuração
 
 | Genérico | Padrão | Efeito |
 | :--- | :--- | :--- |
@@ -10,13 +18,13 @@ Este documento descreve como o Core executa a dica `pause`. A codificação est�
 
 A palavra de `pause` é um `FENCE` válido, então o núcleo a executa como `nop` com o genérico ligado ou desligado. Ligado, o estágio ID a identifica como dica e desabilita a escrita em `rd`.
 
-## 2. Decodificação no Estágio ID
+## 3. Decodificação no Estágio ID
 
 O decodificador reivindica exatamente a palavra `0x0100000F`, ou seja, `opcode = 0001111`, `funct3 = 000`, `rd` e `rs1` em `x0`, `fm = 0000`, `pred = 0001` e `succ = 0000`. As demais formas de `FENCE` não são reivindicadas.
 
 O pipeline é em ordem e de um único fio de execução, então não há outro fio a quem ceder recursos, e `pause` não insere espera.
 
-## 3. Verificação
+## 4. Verificação
 
 | Nível | Cobertura |
 | :--- | :--- |

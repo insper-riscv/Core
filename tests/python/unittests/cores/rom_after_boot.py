@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-The core with an external ROM right after the BOOT_ROM,
+The core with an external ROM right after the BOOT_MEMORY,
 [0x1000, 0x8000), and the internal RAM at 0x8000.
 
 Code in the ROM is fetched through the instruction cache port, a load
@@ -49,8 +49,8 @@ ROM_CODE = [
 
 
 @cocotb.test()
-async def test_rom_after_the_boot_rom(dut):
-    """Verifica a ROM externa logo depois da BOOT_ROM.
+async def test_rom_after_the_boot_memory(dut):
+    """Verifica a ROM externa logo depois da BOOT_MEMORY.
 
     The code runs from 0x1000, the ROM data comes from the external port
     and the RAM at 0x8000 stays internal.

@@ -54,7 +54,7 @@ def program(fence):
 
 
 INPUT_PORTS = (
-    "i_boot_rom_data",
+    "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
     "i_ram_rdata",
@@ -91,7 +91,7 @@ class _Model:
         addr = int(dut.o_if_addr.value) & ~3
         dut.i_ram_rdata.value = self.read_pending
         word = self.boot.get(addr, 0)
-        dut.i_boot_rom_data.value = word
+        dut.i_boot_memory_data.value = word
         dut.i_flash_data.value = word
         if int(dut.o_ic_sel.value) != 1:
             self.last_addr = None

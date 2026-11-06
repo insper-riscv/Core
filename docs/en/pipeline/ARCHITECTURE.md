@@ -23,7 +23,7 @@ The processor executes the 32-bit RISC-V instruction set in an in-order 5-stage 
 
 | Layer | Architectural role |
 | :--- | :--- |
-| Stage 1 (IF) | Holds the Program Counter (PC), computes $\text{PC} + 4$, selects the next PC source, and decodes the instruction fetch region across Boot ROM, Flash, and external instruction cache (SDRAM) |
+| Stage 1 (IF) | Holds the Program Counter (PC), computes $\text{PC} + 4$, selects the next PC source, and decodes the instruction fetch region across Boot memory, Flash, and external instruction cache (SDRAM) |
 | IF/ID Barrier | Registers validity (`o_valid`), `o_pc`, `o_pc4`, and the instruction `o_inst`, responding to freeze (`i_en = '0'`) and discard (`i_flush = '1'`) |
 | Stage 2 (ID) | Decodes base RV32I and active extension (`M` and `Zicsr`) control signals, extends the 32-bit immediate, reads `rs1` and `rs2` from the register file with internal write-through bypass, and detects load-use hazards |
 | ID/EX Barrier | Registers read operands, extended immediate, `rs1`, `rs2`, and `rd` indices, and all control signals for execution, memory, and write-back |

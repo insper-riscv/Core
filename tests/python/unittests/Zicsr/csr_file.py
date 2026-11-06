@@ -201,6 +201,8 @@ async def test_unknown_csr_is_illegal(dut):
         0x302,
         0x303,
         0x306,
+        0x30A,
+        0x31A,
         0x320,
         0x7A0,
         0xB00,

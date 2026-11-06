@@ -6,7 +6,7 @@
 --      ou endereço de redirecionamento de trap/MRET/FENCE.I).
 --   2. Instanciação da unidade pc_fetch (registrador de PC e somador PC + 4).
 --   3. Decodificação combinacional do espaço de endereços de código entre
---      BOOT_ROM, FLASH e cache de instruções externa (SDRAM) usando as
+--      BOOT_MEMORY, FLASH e cache de instruções externa (SDRAM) usando as
 --      constantes centralizadas em mem_map_consts.
 --   4. Controle de espera da cache de instruções (if_wait) e invalidação por
 --      instrução FENCE.I (o_ic_inval).
@@ -21,9 +21,9 @@ use work.mem_map_consts.all;
 
 entity stage_if is
 	generic (
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib   : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external  : boolean := false;
@@ -63,8 +63,8 @@ entity stage_if is
 		i_jalr_target     : in  word_t;
 		-- Endereço de redirecionamento prioritário (mtvec, mepc ou PC + 4 pós-FENCE.I).
 		i_redirect_pc     : in  word_t;
-		-- Palavra de instrução retornada pela memória BOOT_ROM.
-		i_boot_rom_data   : in  word_t;
+		-- Palavra de instrução retornada pela memória BOOT_MEMORY.
+		i_boot_memory_data   : in  word_t;
 		-- Palavra de instrução retornada pela memória FLASH (porta 1).
 		i_flash_data      : in  word_t;
 		-- Palavra de instrução retornada pela cache de instruções externa (SDRAM).
@@ -98,8 +98,8 @@ architecture rtl of stage_if is
 	signal pc_src         : pc_src_t;
 	-- Habilitação efetiva de escrita no registrador PC.
 	signal pc_write_en    : std_logic;
-	-- Indica que o endereço atual do PC aponta para a BOOT_ROM.
-	signal is_boot_rom_if : std_logic;
+	-- Indica que o endereço atual do PC aponta para a BOOT_MEMORY.
+	signal is_boot_memory_if : std_logic;
 	-- Indica que o endereço atual do PC aponta para a região de SDRAM.
 	signal if_in_sdram    : std_logic;
 	-- Indica que a busca na região de SDRAM está aguardando resposta da I-cache.
@@ -131,12 +131,12 @@ begin
 			o_pc4           => o_pc4
 		);
 
-	is_boot_rom_if <= '1' when unsigned(if_pc) < boot_rom_end(boot_rom_bits) else '0';
-	if_in_sdram    <= '1' when (is_boot_rom_if = '0' and
+	is_boot_memory_if <= '1' when unsigned(if_pc) < boot_memory_end(boot_memory_bits) else '0';
+	if_in_sdram    <= '1' when (is_boot_memory_if = '0' and
 	                            is_external_addr(unsigned(if_pc), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib)) else '0';
 	if_wait        <= if_in_sdram and (not i_ic_ready);
 
-	o_instr <= i_boot_rom_data when is_boot_rom_if = '1' else
+	o_instr <= i_boot_memory_data when is_boot_memory_if = '1' else
 	           i_ic_data       when (if_in_sdram = '1' or rom_external) else
 	           i_flash_data;
 
