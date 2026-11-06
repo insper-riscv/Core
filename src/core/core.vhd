@@ -139,6 +139,8 @@ entity core is
 		o_trap_cause    : out word_t;
 		-- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
 		o_trap_pc       : out word_t;
+		-- Pulso de um ciclo: o núcleo toma uma exceção síncrona, tratada em mtvec com Zicsr ou apenas sinalizada em o_trap sem ele.
+		o_trap_take     : out std_logic;
 		-- Pulso de um ciclo: uma instrução foi retirada em EX (válida, com o pipeline andando e sem exceção).
 		o_retire        : out std_logic;
 		-- Eventos das caches e da FLASH para os contadores do Zihpm: bit 0 falha da cache de instruções (evento 5),
@@ -484,6 +486,7 @@ begin
 	mis_valid     <= exmem_valid and (not mem_trap_take);
 
 	o_trap        <= trap_sig;
+	o_trap_take   <= any_trap_take or trap_sig;
 	retire_pulse  <= ex_valid_live and pipe_run and (not trap_take) and (not trap_sig);
 
 	-- Eventos do Zihpm (códigos de csr_event_consts): 1 parada de multdiv, 2 espera externa, 3 desvio tomado,

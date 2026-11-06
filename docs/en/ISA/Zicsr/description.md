@@ -179,8 +179,11 @@ With `has_zicsr = false`, `csr_file` and `csr_decode` are not instantiated and t
 | `o_trap` | One-cycle pulse at `1` when an exception occurs; stays at `0` with Zicsr |
 | `o_trap_cause` | Cause code in the `mcause` format; stays at zero with Zicsr |
 | `o_trap_pc` | PC of the instruction that raised the exception; stays at zero with Zicsr |
+| `o_trap_take` | One-cycle pulse at `1` when the Core takes a synchronous exception, with or without Zicsr |
 
 In this mode, every CSR access instruction is illegal (cause 2), `ECALL` raises cause 11 and `EBREAK` cause 3, and load and store misalignment (causes 4 and 6) is checked in the EX stage itself. Branch target misalignment is not checked, and `MRET` has no effect. The faulting instruction is annulled in EX, with no `rd` write and no memory access, and the program continues at the next instruction. The instruction that raised the exception does not count as retired. The environment around the Core decides what to do with the signal.
+
+The `o_trap_take` output exists in both modes. With Zicsr, it pulses in the cycle in which the Core redirects the PC to `mtvec`, when `o_trap` stays at `0`, and it is the signal a synthesis top uses to show the exception, for example on an LED. Without Zicsr, it pulses together with `o_trap`. A machine interrupt, when taken, must also pulse `o_trap_take`.
 
 A core with neither `Zicsr` nor `Zicclsm` is valid: the misaligned access is only signalled on `o_trap`. `Zicntr` and `Zihpm` require `Zicsr`, and elaboration fails without it.
 

@@ -97,6 +97,7 @@ Without Zicsr the core has no CSRs to record an exception. The cause detector st
 | `o_trap` | One-cycle pulse at `'1'` when an exception occurs |
 | `o_trap_cause` | Cause code in the `mcause` format (2 illegal instruction, 3 `EBREAK`, 4 and 6 misaligned access that the hardware does not run, 11 `ECALL`) |
 | `o_trap_pc` | PC of the instruction that raised the exception |
+| `o_trap_take` | One-cycle pulse at `'1'` when the core takes an exception, with or without Zicsr (with Zicsr, `o_trap` stays at `'0'` and this pulse is the only external signal) |
 
 The instruction that raised the exception is annulled in the EX stage, with no write to `rd` and no memory access, and the program goes on at the next instruction. Any CSR instruction is illegal without Zicsr, and a jump to a misaligned address is not checked. With Zicsr, `o_trap` stays at `'0'` and the other two outputs stay at zero. The environment around the core decides what to do with the signal.
 
