@@ -356,7 +356,7 @@ mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= fetch_fault or cf_misal or any_illegal or/has_exc <= fetch_fault or cf_misal or/"
 mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
 
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT   when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when (any_illegal = '1' and fetch_fault = '0') else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT   when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_after_misaligned "s/and (not st_fault) when check_ea/when check_ea/;s/CAUSE_STORE_FAULT   when st_fault = '1' else/CAUSE_MISALIGNED_ST when st_misal = '1' else CAUSE_STORE_FAULT   when st_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc        when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
