@@ -16,3 +16,4 @@ package zihintpause_consts is
 	constant ZIHINTPAUSE_REG_ZERO     : std_logic_vector(4 downto 0) := "00000";
 
 end package zihintpause_consts;
+-- onda1: teste do version-bump (mudanca em .vhd sem bump)
