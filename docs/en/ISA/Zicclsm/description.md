@@ -32,7 +32,7 @@ The start of the main memory is `ext_base_kib * 1024` when `rom_external` is tru
 | Main memory | `[start, periph_base_kib * 1024)` | Yes |
 | Peripherals | `[periph_base_kib * 1024, 2**32)` | No, raises an exception |
 
-Each platform fixes the generics in its `config.yml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
+Each platform fixes the generics in its `platform.yaml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
 
 | Map | `rom_external` | `rom_end_kib` | `ext_base_kib` | `periph_base_kib` | Main memory | Peripherals |
 | :--- | :---: | :---: | :---: | :---: | :--- | :--- |

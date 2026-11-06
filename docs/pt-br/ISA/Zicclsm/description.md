@@ -32,7 +32,7 @@ O início da memória principal é `ext_base_kib * 1024` quando `rom_external` �
 | Memória principal | `[início, periph_base_kib * 1024)` | Sim |
 | Periféricos | `[periph_base_kib * 1024, 2**32)` | Não, gera exceção |
 
-Cada plataforma fixa os genéricos no seu `config.yml`. A tabela mostra os dois mapas usados hoje, com a memória principal e os periféricos já convertidos em endereços.
+Cada plataforma fixa os genéricos no seu `platform.yaml`. A tabela mostra os dois mapas usados hoje, com a memória principal e os periféricos já convertidos em endereços.
 
 | Mapa | `rom_external` | `rom_end_kib` | `ext_base_kib` | `periph_base_kib` | Memória principal | Periféricos |
 | :--- | :---: | :---: | :---: | :---: | :--- | :--- |

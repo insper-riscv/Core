@@ -2,7 +2,7 @@
 
 ## 1. Processor Address Map
 
-The limits of the instruction address space (IF stage) and of the data address space (MEM and WB stages) reach the `core` as elaboration generics, which each platform fixes in its `config.yml`. The package `src/shared/mem_map_consts.vhd` holds the functions the stages use to turn these generics into addresses.
+The limits of the instruction address space (IF stage) and of the data address space (MEM and WB stages) reach the `core` as elaboration generics, which each platform fixes in its `platform.yaml`. The package `src/shared/mem_map_consts.vhd` holds the functions the stages use to turn these generics into addresses.
 
 | `core` generic | Default | Region it delimits |
 | :--- | :--- | :--- |
