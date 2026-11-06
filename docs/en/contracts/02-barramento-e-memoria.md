@@ -81,6 +81,8 @@ External handshake protocol rules:
 3. **Read-data preservation (`i_sdram_rdata`):** the `i_sdram_rdata` word remains stable until the WB cycle in which the load instruction is consumed by `stage_wb`.
 4. **Branch-flush inhibition during wait:** branches and jumps taken in the EX stage flush `reg_if_id` and `reg_id_ex` only when `pipe_run = '1'`, preserving the branch instruction in EX until the access in MEM completes.
 
+Contract K1 is this external port. In it, the port prefix is `ext` (`o_ext_*` and `i_ext_*`) and the behavior is that of the rules above, the same for any region behind it: an emulated backend (FPGA internal memory) or a device backend (the chip of the board). The core sees only the handshake, and never what implements the region.
+
 ## 4. Sub-Word Alignment and Misalignment Exceptions
 
 The data bus always operates on 32-bit words accompanied by `byteena`:
