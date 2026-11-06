@@ -6,15 +6,15 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 
 | Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |
-| `boot_rom_bits` | 12 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
-| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00001000 .. 0x00007FFF` por padrão) |
+| `boot_memory_bits` | 12 | A Memória de boot ocupa `[0, 2**boot_memory_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
+| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Memória de boot (`0x00001000 .. 0x00007FFF` por padrão) |
 | `rom_external` | `false` | A ROM é alcançada pela porta do núcleo (`o_sdram_*` ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Faixa da RAM em KiB (`0x00008000 .. 0x3FFFFFFF` por padrão) |
 | `ram_external` | `false` | A RAM é alcançada pela porta do núcleo (`o_sdram_*`) e o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM e periféricos (`0x40000000` por padrão), que sai sempre pela porta externa |
 | `periph_base_kib` | 2097152 | Base, em KiB, da janela de periféricos (`0x80000000` por padrão), que encerra a memória principal |
 
-O que não é BOOT_ROM, ROM interna nem externo é a RAM interna. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O acesso desalinhado em hardware atende a memória principal, de onde a RAM começa até `periph_base_kib`, e não atravessa o fim de uma região. O mapa da plataforma com FLASH externa em `0x20000000` usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` e `periph_base_kib => 1572864`. Uma ROM externa logo depois da Boot ROM usa `rom_external => true` e `rom_end_kib => 32`.
+O que não é BOOT_MEMORY, ROM interna nem externo é a RAM interna. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O acesso desalinhado em hardware atende a memória principal, de onde a RAM começa até `periph_base_kib`, e não atravessa o fim de uma região. O mapa da plataforma com FLASH externa em `0x20000000` usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` e `periph_base_kib => 1572864`. Uma ROM externa logo depois da Memória de boot usa `rom_external => true` e `rom_end_kib => 32`.
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 
@@ -24,7 +24,7 @@ O estágio IF (`src/core/stage_if.vhd`) apresenta o endereço atual do PC em `o_
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | Todas | Endereço de byte do Program Counter atual |
 | `o_if_rden` | `out` | Todas | Habilitação de leitura de instrução (fixa em `'1'`) |
-| `i_boot_rom_data` | `in` | `< 0x00001000` | Palavra de instrução de 32 bits retornada pela Boot ROM |
+| `i_boot_memory_data` | `in` | `< 0x00001000` | Palavra de instrução de 32 bits retornada pela Memória de boot |
 | `i_flash_data` | `in` | `0x00001000 .. 0x3FFFFFFF` | Palavra de instrução de 32 bits retornada pela porta 1 da memória Flash |
 | `o_ic_sel` | `out` | `>= 0x40000000` | Indica que o PC atual aponta para a região atendida pela cache de instruções externa (SDRAM) |
 | `i_ic_data` | `in` | `>= 0x40000000` | Palavra de instrução de 32 bits fornecida pela cache de instruções externa |

@@ -10,7 +10,7 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 
 | Ordem | Entidade | Arquivo | Função principal |
 | :--- | :--- | :--- | :--- |
-| 1 | `stage_if` | `src/core/stage_if.vhd` | Seleção de fonte do próximo PC, incremento $\text{PC} + 4$, decodificação de região de código (Boot ROM, Flash, I-cache SDRAM) e controle de espera de busca |
+| 1 | `stage_if` | `src/core/stage_if.vhd` | Seleção de fonte do próximo PC, incremento $\text{PC} + 4$, decodificação de região de código (Memória de boot, Flash, I-cache SDRAM) e controle de espera de busca |
 | Barreira 1 | `reg_if_id` | `src/shared/reg_if_id.vhd` | Registro síncrono de `o_valid`, `o_pc`, `o_pc4` e `o_inst` entre IF e ID |
 | 2 | `stage_id` | `src/core/stage_id.vhd` | Decodificação RV32I + extensões `M`/`Zicsr`, extensão de imediato, leitura/escrita do banco de registradores, detecção de hazard load-use e inserção de bolha |
 | Barreira 2 | `reg_id_ex` | `src/shared/reg_id_ex.vhd` | Registro síncrono de operandos, imediato, índices de registradores e sinais de controle entre ID e EX |
@@ -39,7 +39,7 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/sha
 
 | Faixa de endereço (`if_pc`) | Região selecionada | Palavra entregue em `o_instr` |
 | :--- | :--- | :--- |
-| `< 0x00001000` (`boot_rom_bits`) | Boot ROM | `i_boot_rom_data` |
+| `< 0x00001000` (`boot_memory_bits`) | Memória de boot | `i_boot_memory_data` |
 | `0x00001000 .. 0x3FFFFFFF` | Memória Flash (porta 1) | `i_flash_data` |
 | `>= 0x40000000` (`ext_base_kib`) | Cache de instruções externa (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (congela o PC e anula `o_instr_valid` enquanto `i_ic_ready = '0'`) |
 

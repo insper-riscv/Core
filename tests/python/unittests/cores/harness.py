@@ -34,7 +34,7 @@ OPTIONS = {
 }
 DATA_PORTS = (
     "i_sdram_rdata",
-    "i_boot_rom_data",
+    "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
     "i_ram_rdata",
@@ -133,7 +133,7 @@ async def _start(dut, with_sdram):
 def _drive_fetch(dut, imem, flash_port_value):
     """Answer the instruction fetch of this cycle."""
     word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
-    dut.i_boot_rom_data.value = word
+    dut.i_boot_memory_data.value = word
     dut.i_flash_data.value = (
         word if flash_port_value is None else flash_port_value
     )

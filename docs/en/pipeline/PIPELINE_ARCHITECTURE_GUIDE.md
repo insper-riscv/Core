@@ -10,7 +10,7 @@ The processor is divided into five stage entities located in `core/` and four ba
 
 | Order | Entity | File | Primary function |
 | :--- | :--- | :--- | :--- |
-| 1 | `stage_if` | `src/core/stage_if.vhd` | Next-PC source selection, $\text{PC} + 4$ increment, code-region decoding (Boot ROM, Flash, SDRAM I-cache), and fetch-wait control |
+| 1 | `stage_if` | `src/core/stage_if.vhd` | Next-PC source selection, $\text{PC} + 4$ increment, code-region decoding (Boot memory, Flash, SDRAM I-cache), and fetch-wait control |
 | Barrier 1 | `reg_if_id` | `src/shared/reg_if_id.vhd` | Synchronous registration of `o_valid`, `o_pc`, `o_pc4`, and `o_inst` between IF and ID |
 | 2 | `stage_id` | `src/core/stage_id.vhd` | RV32I + `M`/`Zicsr` decoding, immediate extension, register-file read/write, load-use hazard detection, and bubble insertion |
 | Barrier 2 | `reg_id_ex` | `src/shared/reg_id_ex.vhd` | Synchronous registration of operands, immediate, register indices, and control signals between ID and EX |
@@ -39,7 +39,7 @@ Instruction fetch address (`if_pc`) decoding uses the bounds from `src/shared/me
 
 | Address range (`if_pc`) | Selected region | Word delivered on `o_instr` |
 | :--- | :--- | :--- |
-| `< 0x00001000` (`boot_rom_bits`) | Boot ROM | `i_boot_rom_data` |
+| `< 0x00001000` (`boot_memory_bits`) | Boot memory | `i_boot_memory_data` |
 | `0x00001000 .. 0x3FFFFFFF` | Flash memory (port 1) | `i_flash_data` |
 | `>= 0x40000000` (`ext_base_kib`) | External instruction cache (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (freezes the PC and clears `o_instr_valid` while `i_ic_ready = '0'`) |
 
