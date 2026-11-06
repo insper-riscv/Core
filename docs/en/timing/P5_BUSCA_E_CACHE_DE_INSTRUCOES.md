@@ -1,6 +1,6 @@
 # Step F.P5: fetch loop and instruction cache
 
-🌐 [Português](../../pt-br/timing/P5_BUSCA_E_CACHE_DE_INSTRUCOES.md) · [English](P5_FETCH_AND_INSTRUCTION_CACHE.md)
+🌐 [Português](../../pt-br/timing/P5_BUSCA_E_CACHE_DE_INSTRUCOES.md) · [English](P5_BUSCA_E_CACHE_DE_INSTRUCOES.md)
 
 ## 1. Summary
 

@@ -1,6 +1,6 @@
 # Passo F.P4: classificação do endereço efetivo registrada em EX/MEM
 
-🌐 [Português](P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md) · [English](../../en/timing/P4_REGISTERED_ADDRESS_CLASS.md)
+🌐 [Português](P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md) · [English](../../en/timing/P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md)
 
 ## 1. Resumo
 

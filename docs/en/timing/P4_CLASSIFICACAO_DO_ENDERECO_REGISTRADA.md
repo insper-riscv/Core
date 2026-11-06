@@ -1,6 +1,6 @@
 # Step F.P4: effective-address class registered in EX/MEM
 
-🌐 [Português](../../pt-br/timing/P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md) · [English](P4_REGISTERED_ADDRESS_CLASS.md)
+🌐 [Português](../../pt-br/timing/P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md) · [English](P4_CLASSIFICACAO_DO_ENDERECO_REGISTRADA.md)
 
 ## 1. Summary
 

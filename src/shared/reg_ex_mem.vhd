@@ -147,14 +147,22 @@ architecture rtl of reg_ex_mem is
 	signal r_ext_ram_op : ext_ram_op_t := (others => '0');
 	-- Seletor de write-back armazenado.
 	signal r_wb_sel     : wb_sel_t     := (others => '0');
+	-- O endereço registrado cai na FLASH de dados.
 	signal r_is_flash   : std_logic    := '0';
+	-- O endereço registrado cai na janela externa (SDRAM).
 	signal r_is_sdram   : std_logic    := '0';
+	-- O endereço registrado está na memória principal.
 	signal r_in_main    : std_logic    := '0';
+	-- As duas palavras de um acesso que cruza ficam na mesma região.
 	signal r_same       : std_logic    := '0';
 
+	-- Entrada de r_is_flash, decodificada do resultado da ULA.
 	signal in_is_flash  : std_logic;
+	-- Entrada de r_is_sdram, decodificada do resultado da ULA.
 	signal in_is_sdram  : std_logic;
+	-- Entrada de r_in_main, decodificada do resultado da ULA.
 	signal in_in_main   : std_logic;
+	-- Entrada de r_same, decodificada do resultado da ULA.
 	signal in_same      : std_logic;
 
 begin

@@ -1,6 +1,6 @@
 # Passo F.P5: laço da busca e cache de instruções
 
-🌐 [Português](P5_BUSCA_E_CACHE_DE_INSTRUCOES.md) · [English](../../en/timing/P5_FETCH_AND_INSTRUCTION_CACHE.md)
+🌐 [Português](P5_BUSCA_E_CACHE_DE_INSTRUCOES.md) · [English](../../en/timing/P5_BUSCA_E_CACHE_DE_INSTRUCOES.md)
 
 ## 1. Resumo
 
