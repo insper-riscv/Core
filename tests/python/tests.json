@@ -2980,6 +2980,107 @@
             "--std=08"
         ]
     },
+    "CsrFileSscofpmf": {
+        "toplevel": "csr_file",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd",
+            "src/Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zihpm": true,
+            "hpm_counters": 4,
+            "hpm_width": 8,
+            "has_interrupts": true,
+            "has_sscofpmf": true
+        },
+        "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "CsrFileSscofpmfWide": {
+        "toplevel": "csr_file",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd",
+            "src/Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zihpm": true,
+            "hpm_counters": 4,
+            "hpm_width": 40,
+            "has_interrupts": true,
+            "has_sscofpmf": true
+        },
+        "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "CsrFileSscofpmfOff": {
+        "toplevel": "csr_file",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd",
+            "src/Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zihpm": true,
+            "hpm_counters": 4,
+            "hpm_width": 8,
+            "has_interrupts": true
+        },
+        "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
     "ZicondDecode": {
         "toplevel": "zicond_decode",
         "sources": [

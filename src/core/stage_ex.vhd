@@ -50,6 +50,8 @@ entity stage_ex is
 		hpm_width       : natural range 0 to 64 := 64;
 		-- Habilita as interrupções de máquina (mip e mie) no banco de CSRs; exige has_zicsr.
 		has_interrupts  : boolean := false;
+		-- Habilita a extensão Sscofpmf (interrupção de estouro de contador); exige has_zihpm e has_interrupts.
+		has_sscofpmf    : boolean := false;
 		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
@@ -478,7 +480,8 @@ begin
 				has_zihpm    => has_zihpm,
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_interrupts => has_interrupts
+				has_interrupts => has_interrupts,
+				has_sscofpmf => has_sscofpmf
 			)
 			port map (
 				i_clk        => i_clk,
@@ -611,7 +614,7 @@ begin
 	o_mret_take   <= mret_take_int;
 
 	-- Uma interrupção no modo vetorado vai a BASE + 4 x causa; a BASE tem 64 bytes de alinhamento nesse modo e a
-	-- causa vale no máximo 11, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
+	-- causa vale no máximo 13, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
 	irq_vector_pc <= csr_mtvec(31 downto 6) & trap_cause(3 downto 0) & BYTE_OFFSET_0;
 
 	o_redirect_pc <= csr_mepc       when mret_take_int   = '1' else

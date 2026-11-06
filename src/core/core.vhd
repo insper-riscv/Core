@@ -63,7 +63,9 @@ entity core is
 		-- Largura em bits de cada contador de eventos real, de 0 a 64.
 		hpm_width       : natural range 0 to 64 := 64;
 		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
-		has_interrupts  : boolean := false
+		has_interrupts  : boolean := false;
+		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
+		has_sscofpmf    : boolean := false
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -531,6 +533,11 @@ begin
 		report "has_interrupts exige has_zicsr"
 		severity failure;
 
+	-- A Sscofpmf tem as fontes de estouro no Zihpm e entrega a interrupção pelo mip e pelo mie.
+	assert (has_zihpm and has_interrupts) or (not has_sscofpmf)
+		report "has_sscofpmf exige has_zihpm e has_interrupts"
+		severity failure;
+
 
 	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
@@ -733,6 +740,7 @@ begin
 			hpm_counters    => hpm_counters,
 			hpm_width       => hpm_width,
 			has_interrupts  => has_interrupts,
+			has_sscofpmf    => has_sscofpmf,
 			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
