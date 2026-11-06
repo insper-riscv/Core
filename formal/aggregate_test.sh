@@ -80,8 +80,8 @@ guard_case warn  'Warnings: 2 unique messages, 2 total' "a summary of Yosys with
 guard_case clean 'Warnings: 0 unique messages, 0 total' "a summary of Yosys with a count of zero"
 guard_case clean 'reading formal/no_warnings.sv' "a file name that contains the word"
 guard_case clean 'assert property warning_count passed' "a name that contains the word"
-guard_case clean 'SBY 12:00:03 [safety] aig: Warning: Treating undriven bit props.\clk like $anyseq.' "an ABC message, in the abc-bmc3 engine" abc-bmc3
-guard_case clean 'SBY 12:00:03 [safety] aig: Warning: Treating a total of 7 undriven bits in props like $anyseq.' "an ABC message with a count, in the abc-bmc3 engine" abc-bmc3
+guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating undriven bit props.\clk like $anyseq.' "the clock as an undriven bit, in the abc-bmc3 engine" abc-bmc3
+guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating a total of 7 undriven bits in props like $anyseq.' "the count of undriven bits, in the abc-bmc3 engine" abc-bmc3
 guard_case clean 'SBY 12:00:03 [safety] engine_0: Warning: The last 2 outputs are interpreted as constraints.' "an ABC message about constraints, in the abc-bmc3 engine" abc-bmc3
 for e in yices bitwuzla boolector; do
   guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating undriven bit props.\clk like $anyseq.' "the same ABC message in $e" "$e"
