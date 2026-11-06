@@ -8,6 +8,7 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | indução, cover |
 | `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm |
+| `alu` | `alu_props.sv` | equivalência combinacional, cover |
 | `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |
@@ -28,7 +29,7 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 | `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | cerca de 60 s |
 | `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | cerca de 35 s |
 
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 55 das 92 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
+O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 46 das 125 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
 
 Os tempos são de uma execução com 4 CPUs.
 

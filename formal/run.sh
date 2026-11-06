@@ -252,6 +252,12 @@ netlist "$zd" zicond_decode zd
 expect "exactly opcode 0110011, funct7 0000111 and funct3 101 or 111 are claimed, with their codes (induction)" PASS "$(prove zd.v "$zd_props" prove 2 '' zd_safety)"
 expect "cover: both claims and the near misses are reachable"                                               PASS "$(prove zd.v "$zd_props" cover 2 '-DCOVER' zd_cover)"
 
+echo "alu"
+alu="$root/src/I-E/alu.vhd"; alu_props="$root/formal/alu_props.sv"
+netlist "$alu" alu alu
+expect "the data result and the branch flag are the plain operators for every operation (equivalence)" PASS "$(prove alu.v "$alu_props" prove 2 '' alu_safety)"
+expect "cover: the arithmetic shift, the sign-crossing comparisons, JALR and the branches are reachable" PASS "$(prove alu.v "$alu_props" cover 2 '-DCOVER' alu_cover)"
+
 # Mutants of the VHDL: each defect must make a proof fail.
 mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl generics] [bmc depth]
   local copy="$out/mut_$5.vhd"
@@ -359,6 +365,17 @@ mutant "$zd" "$zd_props" zicond_decode '' zd_codes_swapped "s/ALU_CZERO_EQZ when
 mutant "$zd" "$zd_props" zicond_decode '' zd_no_write "s/o_we_reg     <= is_eqz or is_nez;/o_we_reg     <= '0';/" "" 2
 mutant "$zd" "$zd_props" zicond_decode '' zd_no_rs1 "s/o_sel_pc_rs1 <= is_eqz or is_nez;/o_sel_pc_rs1 <= is_eqz;/" "" 2
 mutant "$zd" "$zd_props" zicond_decode '' zd_funct3_one_bit "s/funct3 = FUNCT3_CZERO_NEZ) else/funct3(1 downto 0) = FUNCT3_CZERO_NEZ(1 downto 0)) else/" "" 2
+
+mutant "$alu" "$alu_props" alu '' alu_sra_fill_ignored   "s/shift_fill   <= op_inv and i_a(data_width-1);/shift_fill   <= '0';/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_slt_wrong_bit      "s/else sum_ext(data_width-1);/else sum_ext(data_width);/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_jalr_keeps_bit0    "s/(sum_ext(0) and not is_jalr)/sum_ext(0)/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_srl_digit_two      "s/shift_right_fill(shr_stage(p), 2 \* 4 \*\* p, shift_fill) when SHIFT_DIGIT_2/shift_right_fill(shr_stage(p), 3 * 4 ** p, shift_fill) when SHIFT_DIGIT_2/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_sll_digit_one      "s/shift_left_zero(shl_stage(p), 1 \* 4 \*\* p)     when SHIFT_DIGIT_1/shift_left_zero(shl_stage(p), 2 * 4 ** p)     when SHIFT_DIGIT_1/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_bgeu_inverted      "s/is_branch and not lt_unsigned  *when FUNCT3_BGEU/is_branch and lt_unsigned when FUNCT3_BGEU/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_equal_low_bit      "s/'1' when i_a = i_b else '0'/'1' when i_a(data_width-1 downto 1) = i_b(data_width-1 downto 1) else '0'/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_lui_adds_a         "s/(others => '0') when is_lui = '1' else i_a/i_a/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_sub_no_carry       "s/carry_in  <= (0 => op_inv);/carry_in  <= (0 => '0');/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_xor_selects_or     "s/and (i_a xor i_b)/and (i_a or i_b)/" "" 2
 
 [ -s "$warnings" ] && { echo "formal: $(wc -l < "$warnings") warning(s) found; a warning is an error (see above)"; fail=1; }
 [ "$fail" -eq 0 ] && echo "formal: all expectations met" || { echo "formal: FAILED (logs in build/formal)"; exit 1; }
