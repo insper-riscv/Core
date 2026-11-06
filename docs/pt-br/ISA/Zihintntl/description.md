@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core executa as quatro dicas da `Zihintntl`. As codificações estão em [instructions.md](instructions.md).
 
-## 1. Configuração
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 7, Zihintntl Extension for Non-Temporal Locality Hints, versão 1.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Configuração
 
 | Genérico | Padrão | Efeito |
 | :--- | :--- | :--- |
@@ -10,7 +18,7 @@ Este documento descreve como o Core executa as quatro dicas da `Zihintntl`. As c
 
 Uma dica é um `ADD` válido em `x0`, então o núcleo a executa como `nop` com o genérico ligado ou desligado. A diferença é que, ligado, o estágio ID identifica a palavra como dica e desabilita a escrita em `rd`, de modo que nenhum registrador de destino chega aos estágios seguintes.
 
-## 2. Decodificação no Estágio ID
+## 3. Decodificação no Estágio ID
 
 O decodificador reivindica uma palavra quando todas as condições da tabela valem.
 
@@ -24,7 +32,7 @@ O decodificador reivindica uma palavra quando todas as condições da tabela val
 
 Uma palavra reivindicada não habilita a escrita em `rd`. O Core não tem hierarquia de cache com domínios de localidade, então a dica não altera mais nada.
 
-## 3. Verificação
+## 4. Verificação
 
 | Nível | Cobertura |
 | :--- | :--- |

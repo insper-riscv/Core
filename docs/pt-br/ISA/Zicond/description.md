@@ -2,7 +2,15 @@
 
 Este documento descreve como o Core executa as instruções da `Zicond`. O que o manual exige está em [instructions.md](instructions.md).
 
-## 1. Configuração
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 10, Zicond Extension for Integer Conditional Operations, versão 1.0.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. Configuração
 
 | Genérico | Padrão | Efeito |
 | :--- | :--- | :--- |
@@ -10,7 +18,7 @@ Este documento descreve como o Core executa as instruções da `Zicond`. O que o
 
 Com `has_zicond = false`, as duas codificações não são reivindicadas por nenhum decodificador, e a unidade de controle as marca como instruções ilegais, como qualquer codificação fora do RV32I. O perfil `rv32im_zicond` liga o genérico para a compilação no GHDL.
 
-## 2. Decodificação no Estágio ID
+## 3. Decodificação no Estágio ID
 
 O decodificador reivindica a instrução quando os três campos da tabela abaixo coincidem, qualquer que seja o valor de `rd`, `rs1` e `rs2`.
 
@@ -29,7 +37,7 @@ Para uma instrução reivindicada, o decodificador habilita a escrita em `rd`, s
 
 Nenhum dos dois códigos é de uma operação da ULA, então o estágio EX distingue as instruções sem um sinal novo no registrador ID/EX. A seleção do resultado da ULA continua a de uma soma, e esse resultado não é usado.
 
-## 3. Execução no Estágio EX
+## 4. Execução no Estágio EX
 
 A unidade de execução é combinacional e recebe $rs1$ e $rs2$ depois do adiantamento, de modo que lê o valor produzido por uma instrução anterior ainda no pipeline. Com $c$ valendo 1 quando $rs2 = 0$, o resultado é dado abaixo.
 
@@ -42,7 +50,7 @@ $$
 
 O resultado entra no multiplexador de resultado do estágio EX, que o escolhe quando o código de operação é o de uma das duas instruções. Dali segue pelo caminho comum de uma instrução aritmética: adiantamento para as instruções seguintes e escrita em `rd` no estágio WB. A instrução leva um ciclo no estágio EX e não para o pipeline.
 
-## 4. Verificação
+## 5. Verificação
 
 | Verificação | O que cobre |
 | :--- | :--- |

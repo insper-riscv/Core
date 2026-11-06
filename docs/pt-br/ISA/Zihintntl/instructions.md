@@ -1,6 +1,6 @@
 # Zihintntl: Instruções
 
-Capítulo 12 do manual ([Zihintntl Extension for Non-Temporal Locality Hints, Version 1.0](https://docs.riscv.org/reference/isa/v20260120/unpriv/zihintntl.html)).
+Capítulo 7 do manual ([Zihintntl Extension for Non-Temporal Locality Hints, Version 1.0](https://docs.riscv.org/reference/isa/v20260120/unpriv/zihintntl.html)).
 
 Este documento reúne o que o manual do RISC-V exige da extensão `Zihintntl`. A implementação no Core está em [description.md](description.md).
 
