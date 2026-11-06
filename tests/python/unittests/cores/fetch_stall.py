@@ -4,7 +4,7 @@ Instruction fetch from the SDRAM region, with a variable-latency
 instruction cache.
 
 The program lives at 0x40000000; a short boot word sequence in the
-BOOT_ROM jumps there. A Python model of the instruction cache answers
+BOOT_MEMORY jumps there. A Python model of the instruction cache answers
 ic_ready after a chosen number of cycles for every new fetch address and
 holds ic_data/ic_ready while the address stays. Every latency must give
 the same architectural result as no wait at all.
@@ -98,7 +98,7 @@ EXPECTED_RAM = {
 
 
 class _Model:
-    """Boot ROM, stalled instruction fetch and RAM around the core."""
+    """Boot memory, stalled instruction fetch and RAM around the core."""
 
     def __init__(self, latency_for):
         """Wait latency_for(n) cycles on the n-th new fetch address."""
@@ -120,7 +120,7 @@ class _Model:
         dut.i_ram_rdata.value = self.read_pending
 
         word = self.boot.get(addr, 0)
-        dut.i_boot_rom_data.value = word
+        dut.i_boot_memory_data.value = word
         dut.i_flash_data.value = word
 
         if int(dut.o_ic_sel.value) != 1:
@@ -162,7 +162,7 @@ async def run(dut, latency_for):
     model = _Model(latency_for)
 
     dut.i_rst.value = 1
-    dut.i_boot_rom_data.value = 0
+    dut.i_boot_memory_data.value = 0
     dut.i_flash_data.value = 0
     dut.i_flash_data2.value = 0
     dut.i_ram_rdata.value = 0

@@ -56,7 +56,7 @@ async def test_halfword_inside_a_word_is_executed_in_the_flash_and_the_sdram(
 async def test_halfword_inside_a_word_traps_elsewhere(dut):
     """Verifica halfword inside a word traps elsewhere.
 
-    The boot ROM, the unmapped holes and the peripherals do not run a
+    The boot memory, the unmapped holes and the peripherals do not run a
     misaligned access.
     """
     for opcode, funct3, cause in IN_WORD:
@@ -113,7 +113,7 @@ async def test_access_crossing_into_another_region_traps(dut):
     """Verifica access crossing into another region traps.
 
     The flash into the SDRAM, the SDRAM into the hole above it, and the
-    boot ROM end all trap.
+    boot memory end all trap.
     """
     for opcode, funct3, ea, cause in [
         (OP_LOAD, 0b010, 0x3FFFFFFD, CAUSE_LOAD_MISALIGNED),

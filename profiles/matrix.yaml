@@ -17,6 +17,8 @@ extensions:
   - {name: Zicntr,   generic: has_zicntr, implies: [has_zicsr]}
   - {name: Zihpm,    generic: has_zihpm,  implies: [has_zicsr]}
   - {name: Zifencei, generic: has_zifencei}
+  - {name: Zimop,    generic: has_zimop}
+  - {name: Zicond,   generic: has_zicond}
   - {name: Zmmul,    generic: has_zmmul}
   - {name: M,        generic: has_m, base_letter: m}
 mutually_exclusive:

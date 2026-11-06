@@ -2,7 +2,7 @@
 -- Funções do mapa de memória do processador RV32
 --
 -- O mapa é recebido pelo núcleo por genéricos de elaboração, e este pacote
--- reúne as conversões de que os pontos de decodificação precisam (BOOT_ROM,
+-- reúne as conversões de que os pontos de decodificação precisam (BOOT_MEMORY,
 -- ROM interna, janela externa e janela de periféricos). Cada projeto fixa os
 -- limites no `config.yml` da sua plataforma.
 -- =============================================================================
@@ -16,14 +16,14 @@ package mem_map_consts is
 	-- Converte um endereço dado em KiB para o endereço em bytes de 32 bits.
 	function kib_to_addr(arg : natural) return unsigned;
 
-	-- Endereço exclusivo do fim da BOOT_ROM, que ocupa [0, 2**bits).
-	function boot_rom_end(bits : natural) return unsigned;
+	-- Endereço exclusivo do fim da BOOT_MEMORY, que ocupa [0, 2**bits).
+	function boot_memory_end(bits : natural) return unsigned;
 
 	-- Endereço exclusivo do fim da ROM interna, ou zero quando a ROM é externa.
 	function internal_rom_end(end_kib : natural; external : boolean) return unsigned;
 
 	-- Início da memória principal: logo depois da ROM interna; com a ROM externa, a base externa quando a ROM é vazia
-	-- ou o fim da BOOT_ROM, pois a ROM externa, que começa ali, é lida e escrita pela porta externa como a RAM.
+	-- ou o fim da BOOT_MEMORY, pois a ROM externa, que começa ali, é lida e escrita pela porta externa como a RAM.
 	function main_mem_base(end_kib : natural; ext_kib : natural; external : boolean; boot_bits : natural) return unsigned;
 
 	-- O endereço sai pela porta externa: a janela externa, a ROM quando é externa ou a RAM quando é externa.
@@ -56,10 +56,10 @@ package body mem_map_consts is
 		return shift_left(to_unsigned(arg, 32), 10);
 	end function kib_to_addr;
 
-	function boot_rom_end(bits : natural) return unsigned is
+	function boot_memory_end(bits : natural) return unsigned is
 	begin
 		return shift_left(to_unsigned(1, 32), bits);
-	end function boot_rom_end;
+	end function boot_memory_end;
 
 	function internal_rom_end(end_kib : natural; external : boolean) return unsigned is
 	begin
@@ -75,7 +75,7 @@ package body mem_map_consts is
 			return kib_to_addr(ext_kib);
 		end if;
 		if external then
-			return boot_rom_end(boot_bits);
+			return boot_memory_end(boot_bits);
 		end if;
 		return kib_to_addr(end_kib);
 	end function main_mem_base;

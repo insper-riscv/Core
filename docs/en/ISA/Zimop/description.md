@@ -2,7 +2,15 @@
 
 This document describes how the Core executes the 40 `Zimop` instructions. What the manual requires, with the encodings, is in [instructions.md](instructions.md).
 
-## 1. Configuration
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 9, Zimop Extension for May-Be-Operations, version 1.0 |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Configuration
 
 | Generic | Default | Effect |
 | :--- | :--- | :--- |
@@ -10,7 +18,7 @@ This document describes how the Core executes the 40 `Zimop` instructions. What 
 
 With `has_zimop = false` the decoder is absent from the elaboration and the 40 encodings follow the path of any unsupported `SYSTEM` instruction. With `has_zicsr = true` this raises an illegal-instruction exception (cause 2), and without `has_zicsr` the exception signal of the core goes high. The rest of the core does not change with the extension on or off.
 
-## 2. Decoding in the ID Stage
+## 3. Decoding in the ID Stage
 
 The decoder claims a word when it satisfies one of the conditions in the table. The fields `rd`, `rs1` and `rs2` and the bits of `n` do not take part in the decision.
 
@@ -28,11 +36,11 @@ A claimed word enables the write to `rd` and replaces two signals that go on to 
 
 The `BGEU` operation only decides a branch when the `opcode` is the conditional-branch one, and the `opcode` shown to EX is another, so a MOP never changes the control flow.
 
-## 3. Datapath
+## 4. Datapath
 
 The zero follows the same path as the result of an arithmetic instruction. It crosses the `EX/MEM` and `MEM/WB` barrier registers, is forwarded to the following instructions by the forwarding unit and is written to `rd` in the WB stage. A MOP followed by an instruction that reads `rd` gives that instruction zero without a stall. The write to `x0` is discarded by the register file, as for any instruction.
 
-## 4. Interactions
+## 5. Interactions
 
 | Item | Behavior |
 | :--- | :--- |
@@ -40,7 +48,7 @@ The zero follows the same path as the result of an arithmetic instruction. It cr
 | Zicsr | No CSR is read or written, and no exception is raised |
 | Load hazard | The MOP counts as a reader of `rs1`, so a `load` right before it to the same register causes a one-cycle stall |
 
-## 5. Verification
+## 6. Verification
 
 | Level | Coverage |
 | :--- | :--- |

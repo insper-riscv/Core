@@ -1,6 +1,6 @@
 # Zihintpause: Instruções
 
-Capítulo 13 do manual ([Zihintpause Extension for Pause Hint, Version 2.0](https://docs.riscv.org/reference/isa/v20260120/unpriv/zihintpause.html)).
+Capítulo 8 do manual ([Zihintpause Extension for Pause Hint, Version 2.0](https://docs.riscv.org/reference/isa/v20260120/unpriv/zihintpause.html)).
 
 Este documento reúne o que o manual do RISC-V exige da extensão `Zihintpause`. A implementação no Core está em [description.md](description.md).
 

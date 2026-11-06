@@ -22,9 +22,9 @@ use work.mem_map_consts.all;
 entity reg_ex_mem is
 
 	generic (
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo.
 		rom_external    : boolean := false;
@@ -160,7 +160,7 @@ begin
 	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
 	in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end(rom_end_kib, rom_external) else '0';
 	in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
-	in_in_main  <= '1' when (unsigned(i_alu_out) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
+	in_in_main  <= '1' when (unsigned(i_alu_out) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
 	                         unsigned(i_alu_out) < kib_to_addr(periph_base_kib)) else '0';
 	in_same     <= '0' when is_last_word(unsigned(i_alu_out), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
 

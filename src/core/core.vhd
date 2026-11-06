@@ -40,9 +40,9 @@ entity core is
 		has_e           : boolean := false;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache      : boolean := false;
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
@@ -75,8 +75,8 @@ entity core is
 		o_if_addr       : out word_t;
 		-- Habilitação de leitura da memória de instruções no estágio IF.
 		o_if_rden       : out std_logic;
-		-- Palavra de instrução retornada pela BOOT_ROM.
-		i_boot_rom_data : in  word_t;
+		-- Palavra de instrução retornada pela BOOT_MEMORY.
+		i_boot_memory_data : in  word_t;
 		-- Palavra de instrução retornada pela memória FLASH (porta 1).
 		i_flash_data    : in  word_t;
 
@@ -539,7 +539,7 @@ begin
 	-- =========================================================================
 	u_stage_if : entity work.stage_if
 		generic map (
-			boot_rom_bits => boot_rom_bits,
+			boot_memory_bits => boot_memory_bits,
 			rom_end_kib   => rom_end_kib,
 			rom_external  => rom_external,
 			ram_base_kib  => ram_base_kib,
@@ -561,7 +561,7 @@ begin
 			i_branch_target   => ex_branch_target,
 			i_jalr_target     => ex_jalr_target,
 			i_redirect_pc     => ex_redirect_pc,
-			i_boot_rom_data   => i_boot_rom_data,
+			i_boot_memory_data   => i_boot_memory_data,
 			i_flash_data      => i_flash_data,
 			i_ic_data         => i_ic_data,
 			i_ic_ready        => i_ic_ready,
@@ -731,7 +731,7 @@ begin
 			hpm_counters    => hpm_counters,
 			hpm_width       => hpm_width,
 			has_interrupts  => has_interrupts,
-			boot_rom_bits   => boot_rom_bits,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
@@ -805,7 +805,7 @@ begin
 
 	u_reg_ex_mem : entity work.reg_ex_mem
 		generic map (
-			boot_rom_bits   => boot_rom_bits,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
@@ -899,7 +899,7 @@ begin
 		generic map (
 			has_zicclsm     => has_zicclsm,
 			check_ea        => has_zicsr,
-			boot_rom_bits   => boot_rom_bits,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
