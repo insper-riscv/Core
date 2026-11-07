@@ -19,6 +19,8 @@ use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.fwd_consts.all;
 use work.byte_mask_consts.all;
+use ieee.numeric_std.all;
+use work.mem_map_consts.all;
 
 entity stage_ex is
 	generic (
@@ -52,6 +54,10 @@ entity stage_ex is
 		has_interrupts  : boolean := false;
 		-- Habilita a extensão Sscofpmf (interrupção de estouro de contador); exige has_zihpm e has_interrupts.
 		has_sscofpmf    : boolean := false;
+		-- O CSR time espelha o mtime da plataforma (porta i_mtime) no lugar do contador próprio.
+		time_external   : boolean := false;
+		-- Gera a falha de acesso de instrução (causa 1) quando o PC da instrução em EX está fora das regiões executáveis; exige Zicsr.
+		has_access_faults : boolean := false;
 		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
@@ -74,6 +80,8 @@ entity stage_ex is
 		i_hpm_events      : in  std_logic_vector(15 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível.
 		i_irq_software    : in  std_logic := '0';
+		-- Valor de 64 bits do mtime da plataforma, que o CSR time espelha com time_external.
+		i_mtime           : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de timer de máquina (MTIP), de nível.
 		i_irq_timer       : in  std_logic := '0';
 		-- Interrupção externa de máquina (MEIP), de nível.
@@ -203,6 +211,10 @@ architecture rtl of stage_ex is
 	signal ex_forward_a       : std_logic_vector(1 downto 0);
 	-- Seletor de forwarding de 2 bits para o operando rs2.
 	signal ex_forward_b       : std_logic_vector(1 downto 0);
+	-- Os seletores do adiantamento alimentam 32 multiplexadores cada: o Quartus os replica para limitar o fan-out.
+	attribute maxfan : natural;
+	attribute maxfan of ex_forward_a : signal is 16;
+	attribute maxfan of ex_forward_b : signal is 16;
 	-- Valor do operando rs1 após seleção de forwarding.
 	signal ex_fwd_rs1_val     : word_t;
 	-- Valor do operando rs2 após seleção de forwarding.
@@ -226,6 +238,8 @@ architecture rtl of stage_ex is
 	signal csr_trap_cause     : word_t;
 	-- PC da instrução que gerou a exceção entregue ao banco de CSRs.
 	signal csr_trap_pc        : word_t;
+	-- A busca da instrução em EX veio de região executável.
+	signal fetch_ok           : std_logic;
 	-- Valor de mtval da exceção entregue ao banco de CSRs.
 	signal csr_trap_tval      : word_t;
 	-- Indica que o campo rs1/zimm da instrução CSR é igual a zero.
@@ -502,6 +516,7 @@ begin
 				hpm_width    => hpm_width,
 				has_interrupts => has_interrupts,
 				has_sscofpmf => has_sscofpmf,
+				time_external => time_external,
 				hpm_registered_read => true
 			)
 			port map (
@@ -525,6 +540,7 @@ begin
 				i_events     => i_hpm_events,
 				o_mtvec      => csr_mtvec,
 				o_mepc       => csr_mepc,
+				i_mtime        => i_mtime,
 				i_irq_software => i_irq_software,
 				i_irq_timer    => i_irq_timer,
 				i_irq_external => i_irq_external,
@@ -549,12 +565,18 @@ begin
 		sig_tval  <= (others => '0');
 		sig_mret  <= '0';
 
+		-- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho da ULA.
+		fetch_ok <= '1' when (not has_access_faults) or addr_executable(unsigned(i_pc), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else '0';
+
 		u_trap_unit : entity work.trap_unit
 			generic map (
 				has_zicclsm => has_zicclsm,
-				check_ea    => false
+				check_ea    => false,
+				has_access_faults => has_access_faults
 			)
 			port map (
+				i_fetch_ok    => fetch_ok,
+				i_pc          => i_pc,
 				i_ex_valid    => i_valid,
 				i_run         => i_pipe_run,
 				i_opcode      => i_opcode,

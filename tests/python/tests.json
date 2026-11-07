@@ -615,6 +615,38 @@
             "--std=08"
         ]
     },
+    "CsrFileTimeExternal": {
+        "toplevel": "csr_file",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/word_consts.vhd",
+            "src/common/src/flip_flop.vhd",
+            "src/common/src/generic_register.vhd",
+            "src/Zicsr/csr_addr_consts.vhd",
+            "src/Zicsr/csr_event_consts.vhd",
+            "src/Zicsr/csr_value_consts.vhd",
+            "src/Zicsr/irq_consts.vhd",
+            "src/common/src/utils_pkg.vhd",
+            "src/common/src/mux_tree.vhd",
+            "src/Zicntr/counter64.vhd",
+            "src/Zicntr/tick_divider.vhd",
+            "src/Zihpm/hpm_counter_bank.vhd",
+            "src/Zicsr/csr_file.vhd"
+        ],
+        "parameters": {
+            "has_zicntr": true,
+            "tick_cycles": 4,
+            "time_external": true
+        },
+        "test_module": "tests.python.unittests.Zicntr.csr_file_time_external",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
     "CsrFileZihpm": {
         "toplevel": "csr_file",
         "sources": [
@@ -693,6 +725,28 @@
         "test_args": [
             "--std=08"
         ]
+    },
+    "TrapUnitAccessFaults": {
+        "toplevel": "trap_unit",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/opcode_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/Zicsr/trap_consts.vhd",
+            "src/Zicsr/trap_unit.vhd"
+        ],
+        "test_module": "tests.python.unittests.Zicsr.trap_unit_access_faults",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ],
+        "parameters": {
+            "has_access_faults": true
+        }
     },
     "TrapUnitNoZicclsm": {
         "toplevel": "trap_unit",
@@ -3323,6 +3377,24 @@
             "src/shared/reg_ex_mem.vhd"
         ],
         "test_module": "tests.python.unittests.common.reg_ex_mem"
+    },
+    "RegExMemFaults": {
+        "toplevel": "reg_ex_mem",
+        "sources": [
+            "src/shared/pipeline_types.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/reg_ex_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_ex_mem_faults",
+        "parameters": {
+            "has_access_faults": true,
+            "rom_end_kib": 4,
+            "ram_base_kib": 8,
+            "ram_end_kib": 16,
+            "ext_base_kib": 2097152,
+            "periph_base_kib": 2097152,
+            "periph_slots": "00001001"
+        }
     },
     "RegMemWb": {
         "toplevel": "reg_mem_wb",

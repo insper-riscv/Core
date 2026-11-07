@@ -34,6 +34,10 @@ entity pc_fetch is
 		i_jalr_target   : in  word_t;
 		-- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
 		i_redirect_pc   : in  word_t := (others => '0');
+		-- Repete a busca de uma instrução que a cache de instruções não tinha: com i_pc_src em PC + 4, o próximo PC é i_replay_pc.
+		i_replay        : in  std_logic := '0';
+		-- Endereço da instrução a repetir (o PC da instrução que está em IF/ID).
+		i_replay_pc     : in  word_t := (others => '0');
 		-- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
 		o_pc            : out word_t;
 		-- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
@@ -48,6 +52,8 @@ architecture rtl of pc_fetch is
 	signal pc_reg   : word_t;
 	-- Resultado combinacional da soma PC + 4.
 	signal pc4_wire : word_t;
+	-- Entrada sequencial do multiplexador do PC: PC + 4, ou o endereço da instrução a repetir.
+	signal seq_next : word_t;
 	-- Próximo endereço selecionado pelo multiplexador de entrada do PC.
 	signal pc_next  : word_t;
 	-- Habilitação efetiva de atualização do registrador PC.
@@ -66,13 +72,15 @@ begin
 			o_d => pc4_wire
 		);
 
+	seq_next <= i_replay_pc when i_replay = '1' else pc4_wire;
+
 	-- Multiplexador 4x1 de seleção do próximo valor do PC.
 	u_pc_mux : entity work.mux_4x1
 		generic map (
 			data_width => word_t'length
 		)
 		port map (
-			i_d0  => pc4_wire,
+			i_d0  => seq_next,
 			i_d1  => i_branch_target,
 			i_d2  => i_jalr_target,
 			i_d3  => i_redirect_pc,

@@ -79,13 +79,20 @@ class _DataMemories:
 
 
 class _IcWait:
-    """Cache de instruções que espera ciclos por endereço novo."""
+    """Cache de instruções que espera ciclos por endereço novo.
+
+    A espera de um endereço corre mesmo que o núcleo mude de endereço
+    enquanto isso (o PC segue e volta à instrução sem resposta): o
+    endereço pronto responde quando o PC volta a ele.
+    """
 
     def __init__(self, latency_for):
         """Espera latency_for(n) ciclos no n-ésimo endereço novo."""
         self.latency_for = latency_for
         self.last_addr = None
+        self.pending = None
         self.wait = 0
+        self.done = None
         self.fetches = 0
 
     def drive(self, dut):
@@ -96,11 +103,17 @@ class _IcWait:
             return
         addr = int(dut.o_if_addr.value) & ~3
         if addr != self.last_addr:
-            self.wait = self.latency_for(self.fetches)
-            self.fetches += 1
             self.last_addr = addr
-        dut.i_ic_ready.value = 1 if self.wait == 0 else 0
-        self.wait = max(self.wait - 1, 0)
+            if addr != self.done and self.pending is None:
+                self.pending = addr
+                self.wait = self.latency_for(self.fetches)
+                self.fetches += 1
+        if self.pending is not None:
+            if self.wait == 0:
+                self.done, self.pending = self.pending, None
+            else:
+                self.wait -= 1
+        dut.i_ic_ready.value = int(addr == self.done)
 
 
 def _models(dut, program, options):

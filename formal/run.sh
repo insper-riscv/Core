@@ -201,6 +201,13 @@ echo "trap_unit with an interrupt to take"
 expect "the interrupt is taken on a valid, advancing instruction that is not FENCE.I, wins over every exception and MRET, carries its cause and mtval 0 (induction)" PASS "$(prove trap.v "$trap_props" prove 2 '-DIRQ' trap_irq)"
 expect "cover: an interrupt over ecall, over MRET, over an illegal instruction, over a misaligned jump and over a load, and a deferred FENCE.I are reachable" PASS "$(prove trap.v "$trap_props" cover 2 '-DIRQ -DCOVER' trap_irq_cover)"
 
+echo "trap_unit with access faults"
+trap_af_props="$root/formal/trap_af_props.sv"
+trap_af_gens="-ghas_access_faults=true"
+netlist "$trap" trap_unit trap_af "$trap_af_gens"
+expect "fetch fault is cause 1 with the PC and beats everything, a load or store the map refuses is cause 5 or 7 with the address, nothing else raises them (induction)" PASS "$(prove trap_af.v "$trap_af_props" prove 2 '' trap_af_safety)"
+expect "cover: causes 1, 5 and 7, a fetch fault over an illegal instruction and a misaligned load fault are reachable" PASS "$(prove trap_af.v "$trap_af_props" cover 2 '-DCOVER' trap_af_cover)"
+
 echo "counter64"
 cnt="$root/src/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
 netlist "$cnt" counter64 cnt
@@ -275,6 +282,12 @@ netlist "$csr" csr_file csrio "-ghas_interrupts=false"
 expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (induction)" PASS "$(prove csrio.v "$csr_irq_props" prove 4 '-DOFF' csrio_safety)"
 PROBES=""
 
+echo "csr_file with time_external"
+csr_time_props="$root/formal/csr_time_props.sv"
+time_gens="-ghas_zicntr=true -gtime_external=true"
+netlist "$csr" csr_file csrt "$time_gens"
+expect "time and timeh read the halves of the mtime port, a write to them is illegal and a read is not (bounded, 4 cycles)" PASS "$(prove csrt.v "$csr_time_props" bmc 4 '' csrt_safety)"
+expect "cover: a read of timeh with a nonzero mtime and a write to time are reachable" PASS "$(prove csrt.v "$csr_time_props" cover 6 '-DCOVER' csrt_cover)"
 echo "csr_file with Sscofpmf"
 csr_ofp_props="$root/formal/csr_ofp_props.sv"
 ofp_gens="-ghas_zihpm=true -ghpm_counters=2 -ghpm_width=3 -ghas_interrupts=true -ghas_sscofpmf=true"
@@ -340,8 +353,14 @@ mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
-mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or any_illegal or/has_exc <= cf_misal or/"
+mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= fetch_fault or cf_misal or any_illegal or/has_exc <= fetch_fault or cf_misal or/"
 mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
+
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT   when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned "s/ and st_misal = '0') else '0';/) else '0';/;s/CAUSE_MISALIGNED_ST when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc        when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT   when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
 
 # Mutants of the interrupt entry in the trap unit and in the CSR bank, one defect each.
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_keeps_mret   "s/ and (not irq_go);/;/"
@@ -429,6 +448,8 @@ mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
+mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(31 downto 0);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
+mutant_bank "$csr" "$csr_time_props" '' time_hi_zero "s/time_hi   <= i_mtime(63 downto 32);/time_hi   <= (others => '0');/" "$time_gens" 4
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_request_ignores_of "s/ovf_req(n)     <= wrap and (not of_q);/ovf_req(n)     <= wrap;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d      <= wrap or i_wdata(31);/of_d      <= i_wdata(31);/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10

@@ -136,8 +136,11 @@ A `trap_unit` avalia a instrução no estágio EX e sinaliza no máximo uma exce
 | 0 | Endereço de instrução desalinhado | Desvio, `JAL` ou `JALR` tomado com alvo de bits `[1:0]` diferentes de `00` | Endereço alvo |
 | 2 | Instrução ilegal | Encoding indefinido apontado pelo decodificador do estágio ID, instrução `SYSTEM` não suportada, ou acesso a CSR ilegal (seção 4.3) | Zero |
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
+| 1 | Falha de acesso de instrução | Busca de instrução fora das regiões executáveis do mapa, com `has_access_faults` (seção 6.7) | PC da instrução |
 | 4 | Endereço de load desalinhado | Load desalinhado que o hardware não executa | Endereço efetivo |
+| 5 | Falha de acesso de load | Load para endereço que o mapa não aceita ler, com `has_access_faults` (seção 6.7) | Endereço efetivo |
 | 6 | Endereço de store desalinhado | Store desalinhado que o hardware não executa | Endereço efetivo |
+| 7 | Falha de acesso de store | Store para endereço que o mapa não aceita escrever, com `has_access_faults` (seção 6.7) | Endereço efetivo |
 | 11 | Chamada de ambiente do modo máquina | `ECALL` (`funct12 = 0x000`) | Zero |
 
 As instruções `ECALL`, `EBREAK`, `MRET` e `WFI` só são reconhecidas com `funct3 = 000`, `rd = x0` e `rs1 = x0`. Qualquer outra instrução `SYSTEM` que não seja de acesso a CSR, inclusive `funct3 = 100`, `SRET` e `SFENCE.VMA`, é ilegal. O decodificador do estágio ID também marca como ilegal um registrador com índice acima de 15 quando o perfil é RV32E.
@@ -150,14 +153,15 @@ Para a instância do estágio EX, a prioridade é a da tabela, de cima para baix
 
 | Prioridade | `mcause` |
 | :---: | :---: |
-| 1 | 2 |
-| 2 | 0 |
-| 3 | 3 |
-| 4 | 11 |
+| 1 | 1 (falha de busca, com `has_access_faults`) |
+| 2 | 2 |
+| 3 | 0 |
+| 4 | 3 |
+| 5 | 11 |
 
 A ordem é a da Tabela 17 do volume privilegiado: a instrução ilegal vem antes do endereço de instrução desalinhado. Um `JALR` ou um desvio de codificação reservada com alvo desalinhado gera a causa 2 com `mtval` zero, e só o salto legal gera a causa 0.
 
-A exceção de load ou store (causas 4 e 6) pertence a uma instrução mais antiga que a do estágio EX e por isso tem prioridade sobre todas as causas de EX. Quando ela ocorre, a instrução de EX é descartada por inteiro, sem escrita de CSR, desvio, `MRET`, `FENCE.I` ou retirada.
+A exceção de load ou store (causas 4, 5, 6 e 7) pertence a uma instrução mais antiga que a do estágio EX e por isso tem prioridade sobre todas as causas de EX. Quando ela ocorre, a instrução de EX é descartada por inteiro, sem escrita de CSR, desvio, `MRET`, `FENCE.I` ou retirada.
 
 ### 6.3. Entrada no Tratador
 
@@ -189,6 +193,22 @@ O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FE
 A exceção de EX é detectada de forma combinacional no ciclo em que a instrução está em EX e o pipeline avança. Os CSRs e o PC são gravados na borda de clock que encerra esse ciclo, de modo que a primeira instrução do tratador é buscada no ciclo seguinte. Duas instruções mais novas (nos estágios IF e ID) são descartadas, além da própria instrução faltante. A exceção de load ou store é detectada no ciclo em que o acesso chega a MEM, um ciclo depois da instrução ter passado por EX.
 
 A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
+
+### 6.7. Falhas de Acesso
+
+O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causas 1, 5 e 7. O mapa válido vem dos mesmos genéricos do mapa de memória que o Core já recebe (`rom_end_kib`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` e `periph_base_kib`) e do genérico `periph_slots`, a máscara das janelas de 256 MiB do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits 30:28 iguais a $n$), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
+
+| Região | Leitura | Escrita | Busca |
+| :--- | :---: | :---: | :---: |
+| ROM, de zero a `rom_end_kib` (BOOT_MEMORY e FLASH) | Sim | Não | Sim |
+| RAM, de `ram_base_kib` a `ram_end_kib` | Sim | Sim | Sim |
+| Janela externa, de `ext_base_kib` a `periph_base_kib` | Sim | Sim | Sim |
+| Janela de periféricos ocupada, a partir de `periph_base_kib` | Sim | Sim | Não |
+| O que sobra (buracos entre as regiões, janelas de periférico vazias) | Não | Não | Não |
+
+A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `has_access_faults = false` as validades valem sempre `1` e nada disso é sintetizado.
+
+A falha de busca vem antes da instrução ilegal, na ordem da Tabela 17 do volume privilegiado. O desalinhamento que o hardware não executa (fora da memória principal) mantém a causa 4 ou 6, a ordem opcional da tabela, e o acesso desalinhado que ele executa só passa se o endereço for válido. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
 
 ## 7. Tomada de Interrupção
 

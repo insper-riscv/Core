@@ -84,6 +84,7 @@ class _Model:
         self.inval_pulses = 0
         self.read_pending = 0
         self.last_addr = None
+        self.pending_line = None
         self.wait = 0
 
     def serve_fetch(self, dut):
@@ -107,14 +108,20 @@ class _Model:
             dut.i_ic_ready.value = 0
 
     def _fill(self, addr, line):
-        """Count the miss latency down, then fetch the line."""
-        if addr != self.last_addr:
+        """Count the miss latency down, then fetch the line.
+
+        The fill runs on its own: it goes on while the core changes the
+        address (the fetch comes back to the instruction after a miss).
+        """
+        if self.pending_line is None:
+            self.pending_line = line
             self.wait = self.latency
-            self.last_addr = addr
         if self.wait == 0:
-            self.lines[line] = [
-                self.backing.get(line + 4 * k, 0) for k in range(4)
+            self.lines[self.pending_line] = [
+                self.backing.get(self.pending_line + 4 * k, 0)
+                for k in range(4)
             ]
+            self.pending_line = None
         else:
             self.wait -= 1
 

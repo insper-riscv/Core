@@ -3,7 +3,7 @@
 O PC é carregado por redirecionamento (trap, MRET, FENCE.I), JALR ou
 desvio, nessa prioridade, ou avança de 4 em 4; o endereço escolhe a
 fonte da instrução (BOOT_MEMORY, FLASH ou I-cache da região SDRAM) e a
-espera da I-cache congela o PC.
+falta da I-cache faz o PC voltar à instrução que ficou sem resposta.
 """
 
 import cocotb
@@ -29,6 +29,9 @@ IDLE = {
     "flash_data": 0xF1A5F1A5,
     "ic_data": 0x1CAC4E00,
     "ic_ready": 1,
+    "ifid_en": 1,
+    "flush_if_id": 0,
+    "ifid_pc": 0,
 }
 
 
@@ -120,16 +123,68 @@ async def test_instruction_source_by_region(dut):
 
 
 @cocotb.test()
-async def test_icache_wait_holds_pc(dut):
-    """Sem a palavra da I-cache o PC congela."""
+async def test_icache_miss_replays_the_fetch(dut):
+    """Sem a palavra da I-cache o PC segue e volta à instrução."""
     await start(dut)
     await goto(dut, SDRAM)
     for _ in range(3):
         await apply(dut, {"hdu_pc_we": 1, "ic_ready": 0})
-        check_equal(int(dut.o_instr_valid.value), 0, "espera")
+        check_equal(int(dut.o_instr_valid.value), 0, "sem resposta")
+        check_equal(int(dut.o_replay.value), 0, "ainda não repete")
         check_equal(
-            await step(dut, {"hdu_pc_we": 1, "ic_ready": 0}), SDRAM, "PC"
+            await step(dut, {"hdu_pc_we": 1, "ic_ready": 0}),
+            SDRAM + 4,
+            "o PC segue",
         )
+        await apply(dut, {"hdu_pc_we": 1, "ic_ready": 0, "ifid_pc": SDRAM})
+        check_equal(int(dut.o_replay.value), 1, "repete a busca")
+        check_equal(
+            await step(
+                dut, {"hdu_pc_we": 1, "ic_ready": 0, "ifid_pc": SDRAM}
+            ),
+            SDRAM,
+            "o PC volta",
+        )
+        # o IF/ID foi limpo pela repetição: a marca de falta cai
+        await apply(dut, {"hdu_pc_we": 0, "flush_if_id": 1})
+        await RisingEdge(dut.i_clk)
+        await Timer(1, unit="ns")
     check_equal(await step(dut, {"hdu_pc_we": 1}), SDRAM + 4, "libera")
+    await apply(dut, {"hdu_pc_we": 1, "ifid_pc": SDRAM})
+    check_equal(int(dut.o_replay.value), 0, "sem falta não repete")
+
+
+@cocotb.test()
+async def test_replay_waits_for_the_pipeline(dut):
+    """Com a HDU parada a repetição espera e o PC não muda."""
+    await start(dut)
+    await goto(dut, SDRAM)
+    await step(dut, {"hdu_pc_we": 1, "ic_ready": 0})
+    for _ in range(3):
+        await apply(dut, {"hdu_pc_we": 0, "ifid_en": 0, "ifid_pc": SDRAM})
+        check_equal(int(dut.o_replay.value), 0, "parada")
+        check_equal(
+            await step(
+                dut, {"hdu_pc_we": 0, "ifid_en": 0, "ifid_pc": SDRAM}
+            ),
+            SDRAM + 4,
+            "PC parado",
+        )
+    await apply(dut, {"hdu_pc_we": 1, "ifid_pc": SDRAM})
+    check_equal(int(dut.o_replay.value), 1, "repete ao liberar")
+    # um desvio tomado na mesma hora tem prioridade sobre a repetição
+    check_equal(
+        await step(
+            dut, {"hdu_pc_we": 1, "ifid_pc": SDRAM, "ex_branch_taken": 1}
+        ),
+        0x1111,
+        "desvio",
+    )
+
+
+@cocotb.test()
+async def test_icache_invalidation_is_passed_on(dut):
+    """A invalidação da I-cache é repassada."""
+    await start(dut)
     await apply(dut, {"ic_inval": 1})
     check_equal(int(dut.o_ic_inval.value), 1, "invalidação repassada")

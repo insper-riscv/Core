@@ -136,8 +136,11 @@ With `has_interrupts = false`, the ports are ignored, `mie` and `mip` read zero 
 | 0 | Instruction address misaligned | Taken branch, `JAL` or `JALR` with target bits `[1:0]` different from `00` | Target address |
 | 2 | Illegal instruction | Undefined encoding flagged by the ID-stage decoder, unsupported `SYSTEM` instruction, or illegal CSR access (section 4.3) | Zero |
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
+| 1 | Instruction access fault | Instruction fetch outside the executable regions of the map, with `has_access_faults` (section 6.7) | Instruction PC |
 | 4 | Load address misaligned | Misaligned load that the hardware does not execute | Effective address |
+| 5 | Load access fault | Load to an address the map does not accept for reading, with `has_access_faults` (section 6.7) | Effective address |
 | 6 | Store address misaligned | Misaligned store that the hardware does not execute | Effective address |
+| 7 | Store access fault | Store to an address the map does not accept for writing, with `has_access_faults` (section 6.7) | Effective address |
 | 11 | Machine-mode environment call | `ECALL` (`funct12 = 0x000`) | Zero |
 
 The `ECALL`, `EBREAK`, `MRET` and `WFI` instructions are recognized only with `funct3 = 000`, `rd = x0` and `rs1 = x0`. Any other non-CSR `SYSTEM` instruction, including `funct3 = 100`, `SRET` and `SFENCE.VMA`, is illegal. The ID-stage decoder also flags as illegal a register index above 15 when the profile is RV32E.
@@ -150,14 +153,15 @@ For the EX-stage instance, the priority is the one in the table, from top to bot
 
 | Priority | `mcause` |
 | :---: | :---: |
-| 1 | 2 |
-| 2 | 0 |
-| 3 | 3 |
-| 4 | 11 |
+| 1 | 1 (fetch fault, with `has_access_faults`) |
+| 2 | 2 |
+| 3 | 0 |
+| 4 | 3 |
+| 5 | 11 |
 
 The order is the one of Table 17 of the privileged volume: the illegal instruction comes before the misaligned instruction address. A `JALR` or a branch with a reserved encoding and a misaligned target raises cause 2 with `mtval` zero, and only the legal jump raises cause 0.
 
-The load or store exception (causes 4 and 6) belongs to an instruction older than the one in the EX stage and therefore has priority over all EX causes. When it occurs, the EX instruction is discarded entirely, with no CSR write, branch, `MRET`, `FENCE.I` or retirement.
+The load or store exception (causes 4, 5, 6 and 7) belongs to an instruction older than the one in the EX stage and therefore has priority over all EX causes. When it occurs, the EX instruction is discarded entirely, with no CSR write, branch, `MRET`, `FENCE.I` or retirement.
 
 ### 6.3. Handler Entry
 
@@ -189,6 +193,22 @@ The redirect PC is chosen among `mepc` (on `MRET`), `PC + 4` (on `FENCE.I`), the
 The EX exception is detected combinationally in the cycle in which the instruction is in EX and the pipeline advances. The CSRs and the PC are written at the clock edge that ends that cycle, so the first handler instruction is fetched in the following cycle. Two younger instructions (in the IF and ID stages) are discarded, besides the faulting instruction itself. The load or store exception is detected in the cycle in which the access reaches MEM, one cycle after the instruction passed through EX.
 
 The retirement of an instruction in EX adds to `minstret` one cycle later, and a MEM exception cancels that addition, so the failing access does not count as retired. Counter details are in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md).
+
+### 6.7. Access Faults
+
+The `has_access_faults` generic (default `false`, needs `has_zicsr`) turns on causes 1, 5 and 7. The valid map comes from the same memory-map generics the Core already receives (`rom_end_kib`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`) and from the `periph_slots` generic, the mask of the 256 MiB windows of the peripheral bus that hold a peripheral (bit $n$ for the addresses whose bits 30:28 equal $n$), which `riscv-tools` writes to the map package as `PERIPH_SLOTS`. The extension is turned on by `extras: [AccessFaults]` in `platform.yaml`.
+
+| Region | Read | Write | Fetch |
+| :--- | :---: | :---: | :---: |
+| ROM, from zero to `rom_end_kib` (BOOT_MEMORY and FLASH) | Yes | No | Yes |
+| RAM, from `ram_base_kib` to `ram_end_kib` | Yes | Yes | Yes |
+| External window, from `ext_base_kib` to `periph_base_kib` | Yes | Yes | Yes |
+| Occupied peripheral window, from `periph_base_kib` up | Yes | Yes | No |
+| The rest (gaps between regions, empty peripheral windows) | No | No | No |
+
+The read and write validity of the effective address is decided in the EX stage, from the ALU result, next to the address classification that `reg_ex_mem` already registers, and the MEM stage only checks the registered bit. The fetch validity comes from the PC of the instruction in EX, from a register, off the ALU path. With `has_access_faults = false` the validities are always `1` and none of this is synthesized.
+
+The fetch fault goes before the illegal instruction, in the order of Table 17 of the privileged volume. The misalignment the hardware does not execute (outside main memory) keeps cause 4 or 6, the optional order of the table, and the misaligned access it does execute only passes if the address is valid. A load or store fault belongs to the address of the first word, and the access does not reach the memories, as with misalignment.
 
 ## 7. Interrupt Entry
 
