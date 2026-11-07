@@ -19,6 +19,7 @@
 | A escrita acontece uma vez, no ciclo em que a instrução avança | `csr_commit` depende de `i_pipe_run`, que está em zero no ciclo da espera |
 | O custo é de um ciclo por leitura | Teste de núcleo `test_a_bank_read_costs_one_cycle`: 16 leituras seguidas de `mhpmcounter3` levam exatamente 16 ciclos a mais que 16 leituras de `mscratch` (diferença de `mcycle`) |
 | Uma leitura logo depois da escrita e o `csrrs` veem o valor certo | Teste de núcleo `test_a_read_right_after_a_write_sees_the_new_value` |
+| A leitura de um CSR logo depois de um contador do banco não recebe os bits dele | Teste de núcleo `test_a_counter_read_does_not_leak_into_the_next_csr_read` |
 | O banco registrado devolve o valor do ciclo do endereço | Teste de entidade `HpmCounterBankRegistered` (5 testes) |
 | `mcountinhibit` e `mhpmevent` continuam valendo | Provas formais do `csr_file` (modo combinacional) e testes de núcleo |
 

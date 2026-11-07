@@ -722,7 +722,8 @@ begin
 	-- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.
 	inhibit_word(2 downto 0)  <= inhibit_reg and (2 downto 0 => is_inhibit_addr);
 	inhibit_word(31 downto 3) <= (others => '0');
-	ext_value <= bank_rdata or inhibit_word;
+	-- O registrador de saída do banco guarda o valor do endereço anterior; só vale quando o endereço atual é do banco.
+	ext_value <= (bank_rdata and (word_t'range => is_ext_addr)) or inhibit_word;
 
 	-- Instâncias estruturais de flip_flop e generic_register para os CSRs.
 	u_mstatus_mie_ff : entity work.flip_flop

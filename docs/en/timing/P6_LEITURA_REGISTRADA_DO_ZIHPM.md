@@ -19,6 +19,7 @@
 | The write happens once, in the cycle the instruction advances | `csr_commit` depends on `i_pipe_run`, which is zero in the wait cycle |
 | The cost is one cycle per read | Core test `test_a_bank_read_costs_one_cycle`: 16 back-to-back reads of `mhpmcounter3` take exactly 16 cycles more than 16 reads of `mscratch` (`mcycle` difference) |
 | A read right after a write and the `csrrs` see the right value | Core test `test_a_read_right_after_a_write_sees_the_new_value` |
+| The read of a CSR right after a bank counter does not receive its bits | Core test `test_a_counter_read_does_not_leak_into_the_next_csr_read` |
 | The registered bank returns the value of the address cycle | Entity test `HpmCounterBankRegistered` (5 tests) |
 | `mcountinhibit` and `mhpmevent` still hold | Formal proofs of the `csr_file` (combinational mode) and core tests |
 
