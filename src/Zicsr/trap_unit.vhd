@@ -232,13 +232,15 @@ begin
 	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
 	              else '0';
 
-	-- A falha de acesso de dados é do endereço da primeira palavra e vem antes do desalinhamento (Tabela 17, o desalinhamento é o último).
-	ld_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0') else '0';
-	st_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0') else '0';
-	fetch_fault <= '1' when (has_access_faults and i_fetch_ok = '0') else '0';
+	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
+	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
 
-	ld_misal <= ld_unaligned and (not misal_exec) and (not ld_fault) when check_ea else '0';
-	st_misal <= st_unaligned and (not misal_exec) and (not st_fault) when check_ea else '0';
+	-- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do manual,
+	-- que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele executa
+	-- só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
+	ld_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and ld_misal = '0') else '0';
+	st_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and st_misal = '0') else '0';
+	fetch_fault <= '1' when (has_access_faults and i_fetch_ok = '0') else '0';
 
 	any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
 
@@ -262,10 +264,10 @@ begin
 	           CAUSE_ILLEGAL_INSTR when any_illegal = '1' else
 	           CAUSE_MISALIGNED_PC when cf_misal = '1' else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
-	           CAUSE_LOAD_FAULT    when ld_fault = '1' else
-	           CAUSE_STORE_FAULT   when st_fault = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
+	           CAUSE_LOAD_FAULT    when ld_fault = '1' else
+	           CAUSE_STORE_FAULT   when st_fault = '1' else
 	           CAUSE_MACHINE_ECALL;
 
 	o_tval  <= (others => '0') when irq_go = '1' else

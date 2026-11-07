@@ -5,7 +5,8 @@
 //  1. a valid, advancing instruction fetched from outside an executable region traps with cause 1 and mtval = PC,
 //     whatever else it is (an illegal instruction, a misaligned jump, an ecall);
 //  2. otherwise, an illegal instruction is cause 2, and a legal load the map refuses to read is cause 5 and a legal
-//     store it refuses to write is cause 7, both with mtval = effective address and ahead of the misalignment;
+//     store it refuses to write is cause 7, both with mtval = effective address, unless the access is a misaligned
+//     one the hardware does not execute (outside the main memory), which keeps cause 4 or 6 (the optional order of Table 17);
 //  3. cause 1, 5 and 7 never occur for any other reason, and an instruction that is not valid or does not advance
 //     takes nothing;
 //  4. a load or store the map accepts keeps the behaviour of the unit without faults (aligned accesses do not trap).
@@ -32,11 +33,16 @@ module props (input clk);
   always @(*) begin
     if (active && !fetch_ok) assert (take && cause == 1 && tval == pc);
     if (active && fetch_ok && illegal) assert (take && cause == 2);
-    if (active && fetch_ok && !illegal && is_ld && !rd_ok) assert (take && cause == 5 && tval == ea);
-    if (active && fetch_ok && !illegal && is_st && !wr_ok) assert (take && cause == 7 && tval == ea);
+    if (active && fetch_ok && !illegal && is_ld && !rd_ok && (funct3 == 3'b000 || funct3 == 3'b100 || (funct3 == 3'b010 && ea[1:0] == 0)))
+      assert (take && cause == 5 && tval == ea);
+    if (active && fetch_ok && !illegal && is_st && !wr_ok && (funct3 == 3'b000 || (funct3 == 3'b010 && ea[1:0] == 0)))
+      assert (take && cause == 7 && tval == ea);
+    // A misaligned access outside the main memory (below 0x8000 here) is still cause 4 or 6, even when the map refuses it.
+    if (active && fetch_ok && !illegal && is_ld && !rd_ok && funct3 == 3'b010 && ea[1:0] != 0 && ea < 32'h8000) assert (take && cause == 4);
+    if (active && fetch_ok && !illegal && is_st && !wr_ok && funct3 == 3'b010 && ea[1:0] != 0 && ea < 32'h8000) assert (take && cause == 6);
     if (take && cause == 1) assert (active && !fetch_ok);
-    if (take && cause == 5) assert (active && fetch_ok && !illegal && is_ld && !rd_ok);
-    if (take && cause == 7) assert (active && fetch_ok && !illegal && is_st && !wr_ok);
+    if (take && cause == 5) assert (active && fetch_ok && !illegal && is_ld && !rd_ok && tval == ea);
+    if (take && cause == 7) assert (active && fetch_ok && !illegal && is_st && !wr_ok && tval == ea);
     if (!active) assert (!take);
     if (active && fetch_ok && !illegal && !cf_taken && is_ld && rd_ok && funct3 == 3'b010 && ea[1:0] == 0) assert (!take);
     if (active && fetch_ok && !illegal && !cf_taken && is_st && wr_ok && funct3 == 3'b010 && ea[1:0] == 0) assert (!take);
@@ -46,6 +52,7 @@ module props (input clk);
     cover (take && cause == 7);
     cover (take && cause == 1 && illegal);
     cover (take && cause == 5 && ea[1:0] != 0);
+    cover (take && cause == 6 && !wr_ok);
 `endif
   end
 endmodule
