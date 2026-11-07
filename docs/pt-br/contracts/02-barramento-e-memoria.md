@@ -81,6 +81,8 @@ Regras do protocolo de handshake externo:
 3. **Preservação do dado lido (`i_sdram_rdata`):** a palavra `i_sdram_rdata` permanece estável até o ciclo WB em que a instrução de load é consumida por `stage_wb`.
 4. **Inibição de flush por desvio durante espera:** desvios e saltos tomados no estágio EX só aplicam flush em `reg_if_id` e `reg_id_ex` quando `pipe_run = '1'`, preservando a instrução de desvio em EX até que o acesso em MEM termine.
 
+O contrato K1 é esta porta externa. Nele, o prefixo das portas é `ext` (`o_ext_*` e `i_ext_*`) e o comportamento é o das regras acima, o mesmo para qualquer região por trás dela: um backend emulado (memória interna do FPGA) ou um backend de dispositivo (o chip da placa). O núcleo vê só o handshake, e nunca o que realiza a região.
+
 ## 4. Alinhamento de Sub-palavra e Exceções de Desalinhamento
 
 O barramento de dados opera sempre sobre palavras de 32 bits acompanhadas de `byteena`:
