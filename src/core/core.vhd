@@ -259,6 +259,8 @@ architecture rtl of core is
 	signal id_pc_we          : std_logic;
 	-- Habilitação de atualização do registrador IF/ID gerada pela HDU no estágio ID.
 	signal ifid_write_en     : std_logic;
+	-- Repetição da busca: a instrução de IF/ID veio sem resposta da I-cache.
+	signal if_replay         : std_logic;
 	-- Bit de validade de entrada do registrador ID/EX após filtragem de bolha.
 	signal id_valid_out      : std_logic;
 	-- Índice do registrador fonte rs1 decodificado no estágio ID.
@@ -553,7 +555,7 @@ begin
 		severity failure;
 
 
-	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
+	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take or if_replay;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
 	flush_ex_mem  <= trap_take or trap_sig or mem_trap_take or (fencei_busy and base_run);
 
@@ -581,6 +583,9 @@ begin
 			i_mret_take       => mret_take,
 			i_fencei_take     => fencei_take,
 			i_ic_inval        => fencei_inval,
+			i_ifid_en         => ifid_write_en,
+			i_flush_if_id     => flush_if_id,
+			i_ifid_pc         => ifid_pc,
 			i_branch_target   => ex_branch_target,
 			i_jalr_target     => ex_jalr_target,
 			i_redirect_pc     => ex_redirect_pc,
@@ -595,7 +600,8 @@ begin
 			o_if_addr         => o_if_addr,
 			o_if_rden         => o_if_rden,
 			o_ic_sel          => o_ic_sel,
-			o_ic_inval        => o_ic_inval
+			o_ic_inval        => o_ic_inval,
+			o_replay          => if_replay
 		);
 
 	u_reg_if_id : entity work.reg_if_id

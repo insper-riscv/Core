@@ -108,6 +108,8 @@ class _Model:
         self.ram = {}
         self.read_pending = 0
         self.last_addr = None
+        self.pending = None
+        self.done = None
         self.wait = 0
         self.fetches = 0
         self.waited_cycles = 0
@@ -128,16 +130,21 @@ class _Model:
             dut.i_ic_ready.value = 1
             return
         if addr != self.last_addr:
-            self.wait = self.latency_for(self.fetches)
-            self.fetches += 1
             self.last_addr = addr
+            if addr != self.done and self.pending is None:
+                self.pending = addr
+                self.wait = self.latency_for(self.fetches)
+                self.fetches += 1
         dut.i_ic_data.value = self.code.get(addr, 0)
-        if self.wait == 0:
-            dut.i_ic_ready.value = 1
-        else:
-            dut.i_ic_ready.value = 0
-            self.wait -= 1
-            self.waited_cycles += 1
+        # the wait of an address runs on even if the core goes to another
+        # address and comes back (replay of a fetch without a response)
+        if self.pending is not None:
+            if self.wait == 0:
+                self.done, self.pending = self.pending, None
+            else:
+                self.wait -= 1
+                self.waited_cycles += 1
+        dut.i_ic_ready.value = int(addr == self.done)
 
     def serve_ram(self, dut):
         """Latch the RAM read and record the RAM store of this cycle."""
