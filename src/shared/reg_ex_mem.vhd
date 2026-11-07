@@ -145,6 +145,9 @@ architecture rtl of reg_ex_mem is
 	signal r_we_reg     : std_logic    := '0';
 	-- Validade e escrita em registrador armazenadas juntas.
 	signal r_we_ok      : std_logic    := '0';
+	-- O registrador é duplicado pelo Quartus para que cada cópia alimente poucas portas (seleção do adiantamento e limpeza).
+	attribute maxfan : natural;
+	attribute maxfan of r_we_ok : signal is 12;
 	-- Habilitação de escrita na RAM armazenada.
 	signal r_we_ram     : std_logic    := '0';
 	-- Habilitação de leitura da RAM armazenada.
@@ -161,8 +164,8 @@ architecture rtl of reg_ex_mem is
 	signal r_is_sdram   : std_logic    := '0';
 	-- O endereço registrado está na memória principal.
 	signal r_in_main    : std_logic    := '0';
-	-- As duas palavras de um acesso que cruza ficam na mesma região.
-	signal r_same       : std_logic    := '0';
+	-- O endereço está na última palavra de uma região (a seguinte é de outra).
+	signal r_last       : std_logic    := '0';
 	-- O endereço registrado aceita leitura no mapa.
 	signal r_ok_rd      : std_logic    := '1';
 	-- O endereço registrado aceita escrita no mapa.
@@ -174,8 +177,8 @@ architecture rtl of reg_ex_mem is
 	signal in_is_sdram  : std_logic;
 	-- Entrada de r_in_main, decodificada do resultado da ULA.
 	signal in_in_main   : std_logic;
-	-- Entrada de r_same, decodificada do resultado da ULA.
-	signal in_same      : std_logic;
+	-- Entrada de r_last, decodificada do resultado da ULA.
+	signal in_last      : std_logic;
 	-- Entrada de r_ok_rd, decodificada do resultado da ULA.
 	signal in_ok_rd     : std_logic;
 	-- Entrada de r_ok_wr, decodificada do resultado da ULA.
@@ -188,7 +191,7 @@ begin
 	in_is_sdram <= '1' when is_external_addr(unsigned(i_ea), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
 	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
 	                         unsigned(i_ea) < kib_to_addr(periph_base_kib)) else '0';
-	in_same     <= '0' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else in_in_main;
+	in_last     <= '1' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else '0';
 
 	-- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
 	gen_faults : if has_access_faults generate
@@ -222,7 +225,7 @@ begin
 				r_is_flash   <= '0';
 				r_is_sdram   <= '0';
 				r_in_main    <= '0';
-				r_same       <= '0';
+				r_last       <= '0';
 				r_ok_rd      <= '1';
 				r_ok_wr      <= '1';
 			elsif i_en = '1' then
@@ -243,7 +246,7 @@ begin
 				r_is_flash   <= in_is_flash;
 				r_is_sdram   <= in_is_sdram;
 				r_in_main    <= in_in_main;
-				r_same       <= in_same;
+				r_last       <= in_last;
 				r_ok_rd      <= in_ok_rd;
 				r_ok_wr      <= in_ok_wr;
 			end if;
@@ -267,7 +270,8 @@ begin
 	o_is_flash   <= r_is_flash;
 	o_is_sdram   <= r_is_sdram;
 	o_in_main    <= r_in_main;
-	o_same_region <= r_same;
+	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
+	o_same_region <= r_in_main and (not r_last);
 	o_ok_rd       <= r_ok_rd;
 	o_ok_wr       <= r_ok_wr;
 
