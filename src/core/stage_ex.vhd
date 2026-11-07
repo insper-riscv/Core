@@ -211,10 +211,6 @@ architecture rtl of stage_ex is
 	signal ex_forward_a       : std_logic_vector(1 downto 0);
 	-- Seletor de forwarding de 2 bits para o operando rs2.
 	signal ex_forward_b       : std_logic_vector(1 downto 0);
-	-- Os seletores do adiantamento alimentam 32 multiplexadores cada: o Quartus os replica para limitar o fan-out.
-	attribute maxfan : natural;
-	attribute maxfan of ex_forward_a : signal is 16;
-	attribute maxfan of ex_forward_b : signal is 16;
 	-- Valor do operando rs1 após seleção de forwarding.
 	signal ex_fwd_rs1_val     : word_t;
 	-- Valor do operando rs2 após seleção de forwarding.

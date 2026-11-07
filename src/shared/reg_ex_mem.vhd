@@ -145,9 +145,6 @@ architecture rtl of reg_ex_mem is
 	signal r_we_reg     : std_logic    := '0';
 	-- Validade e escrita em registrador armazenadas juntas.
 	signal r_we_ok      : std_logic    := '0';
-	-- O registrador é duplicado pelo Quartus para que cada cópia alimente poucas portas (seleção do adiantamento e limpeza).
-	attribute maxfan : natural;
-	attribute maxfan of r_we_ok : signal is 12;
 	-- Habilitação de escrita na RAM armazenada.
 	signal r_we_ram     : std_logic    := '0';
 	-- Habilitação de leitura da RAM armazenada.
