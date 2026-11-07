@@ -30,7 +30,7 @@ IDLE = {
     "advance": 1,
     "base_run": 1,
     "ram_rdata": 0,
-    "sdram_rdata": 0,
+    "ext_rdata": 0,
 }
 
 
@@ -153,7 +153,7 @@ async def test_waits_for_advance_and_ready(dut):
             seen = await cycle(dut, values | {wait: 0})
             check_equal((seen["cross"], seen["stall"]), (1, 1), wait)
         await cycle(dut, values)
-        seen = await cycle(dut, values | {"sdram_rdata": 0x5A5A5A5A})
+        seen = await cycle(dut, values | {"ext_rdata": 0x5A5A5A5A})
         check_equal(seen["stall"], 0, f"{wait}: segunda passagem")
         await cycle(dut, values | {"base_run": 0})
         want = 0x5A5A5A5A if region == SDRAM_ADDR else 0

@@ -12,7 +12,7 @@
 --   2. Memória RAM interna (RAM_BASE_BYTES .. SDRAM_BASE_BYTES - 1): leitura e
 --      escrita síncrona de 1 ciclo de latência.
 --   3. Barramento externo de SDRAM e periféricos (>= SDRAM_BASE_BYTES): leitura
---      e escrita com handshake de latência variável (i_sdram_ready / o_sdram_wait).
+--      e escrita com handshake de latência variável (i_ext_ready / o_ext_wait).
 -- =============================================================================
 
 library ieee;
@@ -32,13 +32,13 @@ entity stage_mem is
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
 		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
@@ -81,7 +81,7 @@ entity stage_mem is
 		-- Habilitação geral de acesso à memória vinda do registrador EX/MEM.
 		i_en_ram        : in  std_logic;
 		-- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
-		i_sdram_ready   : in  std_logic;
+		i_ext_ready   : in  std_logic;
 		-- Endereço de leitura enviado à segunda porta da memória FLASH.
 		o_flash_addr2   : out word_t;
 		-- Habilitação de leitura enviada à segunda porta da memória FLASH.
@@ -99,17 +99,17 @@ entity stage_mem is
 		-- Máscara de bytes enviada à memória RAM interna.
 		o_ram_byteena   : out byte_mask_t;
 		-- Endereço de acesso enviado ao barramento externo SDRAM/periféricos.
-		o_sdram_addr    : out word_t;
+		o_ext_addr    : out word_t;
 		-- Dado de escrita enviado ao barramento externo SDRAM/periféricos.
-		o_sdram_wdata   : out word_t;
+		o_ext_wdata   : out word_t;
 		-- Máscara de bytes enviada ao barramento externo SDRAM/periféricos.
-		o_sdram_byteena : out byte_mask_t;
+		o_ext_byteena : out byte_mask_t;
 		-- Habilitação de leitura enviada ao barramento externo SDRAM/periféricos.
-		o_sdram_rden    : out std_logic;
+		o_ext_rden    : out std_logic;
 		-- Habilitação de escrita enviada ao barramento externo SDRAM/periféricos.
-		o_sdram_wren    : out std_logic;
+		o_ext_wren    : out std_logic;
 		-- Indica que o estágio MEM aguarda conclusão de acesso no barramento SDRAM.
-		o_sdram_wait    : out std_logic;
+		o_ext_wait    : out std_logic;
 		-- Exceção de endereço desalinhado do load ou store em MEM ('1' = tomar o trap neste ciclo).
 		o_trap_take     : out std_logic;
 		-- Código mcause da exceção (4 = load, 6 = store).
@@ -201,11 +201,11 @@ begin
 	o_ram_byteena   <= i_byte_mask;
 
 	sdram_access    <= access_valid and i_en_ram and is_sdram;
-	o_sdram_wait    <= sdram_access and (not i_sdram_ready);
-	o_sdram_addr    <= i_alu_out;
-	o_sdram_wdata   <= i_store_data;
-	o_sdram_byteena <= i_byte_mask;
-	o_sdram_wren    <= i_we_ram and sdram_access;
-	o_sdram_rden    <= i_re_ram and sdram_access;
+	o_ext_wait    <= sdram_access and (not i_ext_ready);
+	o_ext_addr    <= i_alu_out;
+	o_ext_wdata   <= i_store_data;
+	o_ext_byteena <= i_byte_mask;
+	o_ext_wren    <= i_we_ram and sdram_access;
+	o_ext_rden    <= i_re_ram and sdram_access;
 
 end architecture rtl;

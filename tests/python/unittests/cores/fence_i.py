@@ -59,7 +59,7 @@ INPUT_PORTS = (
     "i_flash_data2",
     "i_ram_rdata",
     "i_ic_data",
-    "i_sdram_rdata",
+    "i_ext_rdata",
 )
 RUN_CYCLES = 3000
 DONE_FLAG = 0x807C
@@ -155,14 +155,14 @@ class _Model:
         if int(dut.o_ic_inval.value):
             self.lines.clear()
             self.inval_pulses += 1
-        if int(dut.o_sdram_wren.value) and int(dut.o_mem_advance.value):
-            a = int(dut.o_sdram_addr.value) & ~3
+        if int(dut.o_ext_wren.value) and int(dut.o_mem_advance.value):
+            a = int(dut.o_ext_addr.value) & ~3
             target = self.backing if self.flush_latency is None else self.dirty
             base = target.get(a, self.backing.get(a, 0))
             target[a] = _bytes_merge(
                 base,
-                int(dut.o_sdram_wdata.value),
-                int(dut.o_sdram_byteena.value),
+                int(dut.o_ext_wdata.value),
+                int(dut.o_ext_byteena.value),
             )
         if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
             addr = int(dut.o_ram_addr.value) & ~3
@@ -190,7 +190,7 @@ async def run(dut, fence, latency=2, flush_latency=None):
     for sig in INPUT_PORTS:
         getattr(dut, sig).value = 0
     dut.i_ic_ready.value = 0
-    dut.i_sdram_ready.value = 1
+    dut.i_ext_ready.value = 1
     dut.i_dc_done.value = 0
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):

@@ -37,7 +37,7 @@ def expected_data(fields):
     if fields["is_flash"]:
         raw = fields["flash_data2"]
     elif fields["is_sdram"]:
-        raw = fields["sdram_rdata"]
+        raw = fields["ext_rdata"]
     else:
         raw = fields["ram_rdata"]
     offset = fields["alu_out"] & 3
@@ -57,7 +57,7 @@ def random_fields(prng):
             "flash_data2",
             "ram_rdata",
             "first_word",
-            "sdram_rdata",
+            "ext_rdata",
         )
     }
     fields["rd_idx"] = prng.getrandbits(5)

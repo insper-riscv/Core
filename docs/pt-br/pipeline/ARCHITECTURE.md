@@ -29,7 +29,7 @@ O processador executa o conjunto de instruções RISC-V de 32 bits em um pipelin
 | Barreira ID/EX | Registra os operandos lidos, o imediato estendido, os índices `rs1`, `rs2` e `rd` e todos os sinais de controle para execução, memória e write-back |
 | Estágio 3 (EX) | Aplica o adiantamento de operandos (forwarding), executa operações na ULA, coordena o multiplicador/divisor multiciclo (`M`), avalia desvios e saltos (`BRANCH`, `JAL`, `JALR`), formata escritas em memória e processa CSRs, exceções e `FENCE.I` |
 | Barreira EX/MEM | Registra o resultado final de execução, o dado e a máscara de bytes de store, o índice `rd` e os sinais de controle de memória e write-back |
-| Estágio 4 (MEM) | Decodifica o endereço efetivo entre Flash de dados, RAM interna e barramento externo SDRAM/periféricos, gerando o sinal de espera `o_sdram_wait` quando o escravo externo ainda não respondeu |
+| Estágio 4 (MEM) | Decodifica o endereço efetivo entre Flash de dados, RAM interna e barramento externo SDRAM/periféricos, gerando o sinal de espera `o_ext_wait` quando o escravo externo ainda não respondeu |
 | Barreira MEM/WB | Registra o resultado de execução `o_alu_out`, o destino `o_rd` e os seletores de extensão de leitura e write-back |
 | Estágio 5 (WB) | Seleciona a palavra bruta retornada pela memória acessada, aplica o alinhamento e a extensão de sinal ou zero para bytes e meias-palavras e escolhe o dado final a gravar no banco de registradores |
 

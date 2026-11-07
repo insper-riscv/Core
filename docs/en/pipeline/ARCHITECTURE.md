@@ -29,7 +29,7 @@ The processor executes the 32-bit RISC-V instruction set in an in-order 5-stage 
 | ID/EX Barrier | Registers read operands, extended immediate, `rs1`, `rs2`, and `rd` indices, and all control signals for execution, memory, and write-back |
 | Stage 3 (EX) | Applies operand forwarding, executes ALU operations, coordinates the multi-cycle multiplier/divider (`M`), evaluates branches and jumps (`BRANCH`, `JAL`, `JALR`), formats memory stores, and processes CSRs, exceptions, and `FENCE.I` |
 | EX/MEM Barrier | Registers the final execution result, store data and byte mask, destination `rd`, and memory/write-back control signals |
-| Stage 4 (MEM) | Decodes the effective address across data Flash, internal RAM, and the external SDRAM/peripheral bus, asserting `o_sdram_wait` while the external slave has not yet responded |
+| Stage 4 (MEM) | Decodes the effective address across data Flash, internal RAM, and the external SDRAM/peripheral bus, asserting `o_ext_wait` while the external slave has not yet responded |
 | MEM/WB Barrier | Registers the execution result `o_alu_out`, destination `o_rd`, and the read-extension and write-back selectors |
 | Stage 5 (WB) | Selects the raw word returned by the accessed memory, applies byte/halfword alignment and sign or zero extension, and chooses the final datum written to the register file |
 
