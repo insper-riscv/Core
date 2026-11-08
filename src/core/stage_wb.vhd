@@ -43,7 +43,7 @@ entity stage_wb is
 		-- Primeira palavra de um load desalinhado que cruzou a palavra, retida pela misaligned_unit.
 		i_first_word   : in  word_t;
 		-- Palavra de dados lida do barramento externo SDRAM.
-		i_sdram_rdata  : in  word_t;
+		i_ext_rdata  : in  word_t;
 		-- Habilitação final de escrita enviada ao banco de registradores (reg_file).
 		o_wb_we        : out std_logic;
 		-- Endereço final do registrador destino rd enviado ao banco de registradores.
@@ -71,7 +71,7 @@ architecture rtl of stage_wb is
 begin
 
 	mem_read_data    <= i_flash_data2 when i_is_flash = '1' else
-	                    i_sdram_rdata when i_is_sdram = '1' else
+	                    i_ext_rdata when i_is_sdram = '1' else
 	                    i_ram_rdata;
 
 	cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),

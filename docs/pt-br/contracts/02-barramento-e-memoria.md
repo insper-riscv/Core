@@ -6,15 +6,15 @@ Os limites do espaço de endereçamento de instruções (estágio IF) e de dados
 
 | Genérico do `core` | Padrão | Região demarcada |
 | :--- | :--- | :--- |
-| `boot_rom_bits` | 12 | A Boot ROM ocupa `[0, 2**boot_rom_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
-| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Boot ROM (`0x00001000 .. 0x00007FFF` por padrão) |
-| `rom_external` | `false` | A ROM é alcançada pela porta do núcleo (`o_sdram_*` ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
+| `boot_memory_bits` | 12 | A Memória de boot ocupa `[0, 2**boot_memory_bits)`, ou seja `0x00000000 .. 0x00000FFF` por padrão |
+| `rom_end_kib` | 32 | Fim exclusivo, em KiB, da ROM, que começa logo depois da Memória de boot (`0x00001000 .. 0x00007FFF` por padrão) |
+| `rom_external` | `false` | A ROM é alcançada pela porta do núcleo (`o_ext_*` ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Faixa da RAM em KiB (`0x00008000 .. 0x3FFFFFFF` por padrão) |
-| `ram_external` | `false` | A RAM é alcançada pela porta do núcleo (`o_sdram_*`) e o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
+| `ram_external` | `false` | A RAM é alcançada pela porta do núcleo (`o_ext_*`) e o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache |
 | `ext_base_kib` | 1048576 | Base, em KiB, da janela externa de SDRAM e periféricos (`0x40000000` por padrão), que sai sempre pela porta externa |
 | `periph_base_kib` | 2097152 | Base, em KiB, da janela de periféricos (`0x80000000` por padrão), que encerra a memória principal |
 
-O que não é BOOT_ROM, ROM interna nem externo é a RAM interna. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O acesso desalinhado em hardware atende a memória principal, de onde a RAM começa até `periph_base_kib`, e não atravessa o fim de uma região. O mapa da plataforma com FLASH externa em `0x20000000` usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` e `periph_base_kib => 1572864`. Uma ROM externa logo depois da Boot ROM usa `rom_external => true` e `rom_end_kib => 32`.
+O que não é BOOT_MEMORY, ROM interna nem externo é a RAM interna. Cada região sai da comparação do endereço com limites constantes, e as bases que são potências de 2 viram testes de bits na síntese. O acesso desalinhado em hardware atende a memória principal, de onde a RAM começa até `periph_base_kib`, e não atravessa o fim de uma região. O mapa da plataforma com FLASH externa em `0x20000000` usa `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` e `periph_base_kib => 1572864`. Uma ROM externa logo depois da Memória de boot usa `rom_external => true` e `rom_end_kib => 32`.
 
 ## 2. Interfaces de Busca de Instruções (Estágio IF)
 
@@ -24,7 +24,7 @@ O estágio IF (`src/core/stage_if.vhd`) apresenta o endereço atual do PC em `o_
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | Todas | Endereço de byte do Program Counter atual |
 | `o_if_rden` | `out` | Todas | Habilitação de leitura de instrução (fixa em `'1'`) |
-| `i_boot_rom_data` | `in` | `< 0x00001000` | Palavra de instrução de 32 bits retornada pela Boot ROM |
+| `i_boot_memory_data` | `in` | `< 0x00001000` | Palavra de instrução de 32 bits retornada pela Memória de boot |
 | `i_flash_data` | `in` | `0x00001000 .. 0x3FFFFFFF` | Palavra de instrução de 32 bits retornada pela porta 1 da memória Flash |
 | `o_ic_sel` | `out` | `>= 0x40000000` | Indica que o PC atual aponta para a região atendida pela cache de instruções externa (SDRAM) |
 | `i_ic_data` | `in` | `>= 0x40000000` | Palavra de instrução de 32 bits fornecida pela cache de instruções externa |
@@ -65,21 +65,23 @@ Todo acesso de leitura ou escrita com endereço a partir de `0x40000000` utiliza
 
 | Porta no topo `core` | Direção | Estágio | Significado |
 | :--- | :--- | :--- | :--- |
-| `o_sdram_addr` | `out` | MEM | Endereço de byte do acesso externo |
-| `o_sdram_wdata` | `out` | MEM | Dado de 32 bits alinhado para escrita |
-| `o_sdram_byteena` | `out` | MEM | Máscara de habilitação de bytes (4 bits) |
-| `o_sdram_rden` | `out` | MEM | Requisição de leitura ativa enquanto o acesso válido estiver em MEM |
-| `o_sdram_wren` | `out` | MEM | Requisição de escrita ativa enquanto o acesso válido estiver em MEM |
-| `i_sdram_rdata` | `in` | WB | Palavra de 32 bits retornada pelo escravo externo |
-| `i_sdram_ready` | `in` | MEM | Nível lógico que indica conclusão da transação externa (`'0'` retém o pipeline; padrão `'1'` quando desconectado) |
+| `o_ext_addr` | `out` | MEM | Endereço de byte do acesso externo |
+| `o_ext_wdata` | `out` | MEM | Dado de 32 bits alinhado para escrita |
+| `o_ext_byteena` | `out` | MEM | Máscara de habilitação de bytes (4 bits) |
+| `o_ext_rden` | `out` | MEM | Requisição de leitura ativa enquanto o acesso válido estiver em MEM |
+| `o_ext_wren` | `out` | MEM | Requisição de escrita ativa enquanto o acesso válido estiver em MEM |
+| `i_ext_rdata` | `in` | WB | Palavra de 32 bits retornada pelo escravo externo |
+| `i_ext_ready` | `in` | MEM | Nível lógico que indica conclusão da transação externa (`'0'` retém o pipeline; padrão `'1'` quando desconectado) |
 | `o_mem_advance` | `out` | Global | Indica ao escravo externo que o estágio MEM avançou na borda de clock atual (`base_run = '1'`) |
 
 Regras do protocolo de handshake externo:
 
-1. **Estabilidade durante espera:** enquanto `sdram_access = '1'` e `i_sdram_ready = '0'`, o sinal `o_sdram_wait` mantém `base_run = '0'`, congelando `reg_ex_mem` e mantendo `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden` e `o_sdram_wren` estáveis.
-2. **Confirmação em nível (`i_sdram_ready`):** o escravo externo deve manter `i_sdram_ready = '1'` até observar `o_mem_advance = '1'`, garantindo que a conclusão não seja perdida caso a unidade `multdiv` também esteja retendo o pipeline no mesmo ciclo.
-3. **Preservação do dado lido (`i_sdram_rdata`):** a palavra `i_sdram_rdata` permanece estável até o ciclo WB em que a instrução de load é consumida por `stage_wb`.
+1. **Estabilidade durante espera:** enquanto `sdram_access = '1'` e `i_ext_ready = '0'`, o sinal `o_ext_wait` mantém `base_run = '0'`, congelando `reg_ex_mem` e mantendo `o_ext_addr`, `o_ext_wdata`, `o_ext_byteena`, `o_ext_rden` e `o_ext_wren` estáveis.
+2. **Confirmação em nível (`i_ext_ready`):** o escravo externo deve manter `i_ext_ready = '1'` até observar `o_mem_advance = '1'`, garantindo que a conclusão não seja perdida caso a unidade `multdiv` também esteja retendo o pipeline no mesmo ciclo.
+3. **Preservação do dado lido (`i_ext_rdata`):** a palavra `i_ext_rdata` permanece estável até o ciclo WB em que a instrução de load é consumida por `stage_wb`.
 4. **Inibição de flush por desvio durante espera:** desvios e saltos tomados no estágio EX só aplicam flush em `reg_if_id` e `reg_id_ex` quando `pipe_run = '1'`, preservando a instrução de desvio em EX até que o acesso em MEM termine.
+
+O contrato K1 é esta porta externa. Nele, o prefixo das portas é `ext` (`o_ext_*` e `i_ext_*`) e o comportamento é o das regras acima, o mesmo para qualquer região por trás dela: um backend emulado (memória interna do FPGA) ou um backend de dispositivo (o chip da placa). O núcleo vê só o handshake, e nunca o que realiza a região.
 
 ## 4. Alinhamento de Sub-palavra e Exceções de Desalinhamento
 

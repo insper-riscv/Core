@@ -25,6 +25,12 @@ package trap_consts is
 
 	-- Código mcause para endereço de instrução desalinhado (0).
 	constant CAUSE_MISALIGNED_PC  : word_t := x"00000000";
+	-- Código mcause para falha de acesso de instrução (1).
+	constant CAUSE_FETCH_FAULT    : word_t := x"00000001";
+	-- Código mcause para falha de acesso de load (5).
+	constant CAUSE_LOAD_FAULT     : word_t := x"00000005";
+	-- Código mcause para falha de acesso de store ou AMO (7).
+	constant CAUSE_STORE_FAULT    : word_t := x"00000007";
 	-- Código mcause para instrução ilegal (2).
 	constant CAUSE_ILLEGAL_INSTR  : word_t := x"00000002";
 	-- Código mcause para breakpoint EBREAK (3).

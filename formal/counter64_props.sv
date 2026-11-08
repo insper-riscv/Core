@@ -9,9 +9,10 @@ module props (input clk);
   (* anyseq *) wire reset, inc, we_lo, we_hi;
   (* anyseq *) wire [31:0] wdata;
   wire [31:0] lo, hi;
+  wire wrap;
 
   counter64 dut (.i_clk(clk), .i_rst(reset), .i_inc(inc), .i_we_lo(we_lo), .i_we_hi(we_hi),
-    .i_wdata(wdata), .o_lo(lo), .o_hi(hi));
+    .i_wdata(wdata), .o_lo(lo), .o_hi(hi), .o_wrap(wrap));
 
   // The registers have no initial value: the first clock is a reset, as on the board.
   initial assume (reset);
@@ -35,18 +36,26 @@ module props (input clk);
   wire [31:0] lo_next   = we_lo ? (wdata & LO_MASK) : (inc ? ((model[31:0] + 32'd1) & LO_MASK) : model[31:0]);
   wire [31:0] hi_base   = we_hi ? (wdata & HI_MASK) : model[63:32];
   wire [31:0] hi_next   = (hi_base + {31'b0, carry_out}) & HI_MASK;
+  // The ideal overflow of the cycle: the increment takes the whole counter from all ones to zero.
+  wire [32:0] hi_sum    = {1'b0, hi_base & HI_MASK} + {32'b0, carry_out};
+  wire        ideal_ovf = W <= 32 ? carry_out : (hi_sum > {1'b0, HI_MASK});
+  reg         p_ovf = 0;
 
   always @(posedge clk) begin
     f_past <= 1;
     p_lo <= lo; p_hi <= hi;
     p_reset <= reset; p_inc <= inc; p_we_lo <= we_lo; p_we_hi <= we_hi;
     model <= reset ? 64'h0 : {hi_next, lo_next};
+    p_ovf <= reset ? 1'b0 : ideal_ovf;
   end
 
   // The registers clear asynchronously: while reset is high a read gives the reset value.
   always @(posedge clk) if (f_past && !reset) begin
     // 1. The value shown is the ideal 64-bit value, in every cycle.
     assert ({hi, lo} == model);
+    // 1b. The overflow pulse is the ideal overflow of the cycle before: a one-cycle pulse when an increment
+    // takes the counter from all ones to zero, never by a write, and not lost when a write follows it.
+    assert (wrap == p_ovf);
   end
 
 `ifdef MONOTONIC
@@ -60,6 +69,8 @@ module props (input clk);
   always @(posedge clk) if (f_past && !reset) begin
     cover (p_inc && p_lo == LO_MASK && lo == 32'h0 && HI_MASK != 32'h0 && hi == ((p_hi + 1) & HI_MASK));
     cover (p_we_hi && p_lo == LO_MASK && p_inc);
+    cover (wrap);
+    cover (wrap && p_we_hi);
   end
 `endif
 endmodule

@@ -4,7 +4,7 @@ Instruction fetch from the SDRAM region, with a variable-latency
 instruction cache.
 
 The program lives at 0x40000000; a short boot word sequence in the
-BOOT_ROM jumps there. A Python model of the instruction cache answers
+BOOT_MEMORY jumps there. A Python model of the instruction cache answers
 ic_ready after a chosen number of cycles for every new fetch address and
 holds ic_data/ic_ready while the address stays. Every latency must give
 the same architectural result as no wait at all.
@@ -98,7 +98,7 @@ EXPECTED_RAM = {
 
 
 class _Model:
-    """Boot ROM, stalled instruction fetch and RAM around the core."""
+    """Boot memory, stalled fetch and RAM around the core."""
 
     def __init__(self, latency_for):
         """Wait latency_for(n) cycles on the n-th new fetch address."""
@@ -108,6 +108,8 @@ class _Model:
         self.ram = {}
         self.read_pending = 0
         self.last_addr = None
+        self.pending = None
+        self.done = None
         self.wait = 0
         self.fetches = 0
         self.waited_cycles = 0
@@ -120,7 +122,7 @@ class _Model:
         dut.i_ram_rdata.value = self.read_pending
 
         word = self.boot.get(addr, 0)
-        dut.i_boot_rom_data.value = word
+        dut.i_boot_memory_data.value = word
         dut.i_flash_data.value = word
 
         if int(dut.o_ic_sel.value) != 1:
@@ -128,16 +130,22 @@ class _Model:
             dut.i_ic_ready.value = 1
             return
         if addr != self.last_addr:
-            self.wait = self.latency_for(self.fetches)
-            self.fetches += 1
             self.last_addr = addr
+            if addr != self.done and self.pending is None:
+                self.pending = addr
+                self.wait = self.latency_for(self.fetches)
+                self.fetches += 1
         dut.i_ic_data.value = self.code.get(addr, 0)
-        if self.wait == 0:
-            dut.i_ic_ready.value = 1
-        else:
-            dut.i_ic_ready.value = 0
-            self.wait -= 1
-            self.waited_cycles += 1
+        # the wait of an address runs on even if the core goes to
+        # another address and comes back (replay of a fetch without a
+        # response)
+        if self.pending is not None:
+            if self.wait == 0:
+                self.done, self.pending = self.pending, None
+            else:
+                self.wait -= 1
+                self.waited_cycles += 1
+        dut.i_ic_ready.value = int(addr == self.done)
 
     def serve_ram(self, dut):
         """Latch the RAM read and record the RAM store of this cycle."""
@@ -162,7 +170,7 @@ async def run(dut, latency_for):
     model = _Model(latency_for)
 
     dut.i_rst.value = 1
-    dut.i_boot_rom_data.value = 0
+    dut.i_boot_memory_data.value = 0
     dut.i_flash_data.value = 0
     dut.i_flash_data2.value = 0
     dut.i_ram_rdata.value = 0

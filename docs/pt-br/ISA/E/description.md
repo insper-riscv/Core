@@ -2,7 +2,15 @@
 
 O genérico booleano `has_e` do `core` escolhe quantos registradores de uso geral o processador tem. Falso, o padrão, dá um RV32I de 32 registradores. Verdadeiro dá um RV32E, que troca os registradores `x16` a `x31` por menos área. As exigências do manual estão em [instructions.md](instructions.md).
 
-## 1. O Que Muda
+## 1. Referência
+
+| Item | Valor |
+| :--- | :--- |
+| Capítulo | 2, RV32E and RV64E Base Integer Instruction Sets, versão 2.0 |
+| Fonte | Volume I do manual do RISC-V (ISA não privilegiada, versão 20260120), numeração sem a Introdução |
+| Requisitos do manual | [instructions.md](instructions.md) |
+
+## 2. O Que Muda
 
 | Item | `has_e = false` | `has_e = true` |
 | :--- | :--- | :--- |
@@ -13,7 +21,7 @@ O genérico booleano `has_e` do `core` escolhe quantos registradores de uso gera
 
 O `misa` segue o manual privilegiado ([seção 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), que liga o bit `E` na RV32E e define que ele lê como o complemento do bit `I`. O estágio ID calcula a largura do endereço do banco (5 bits com `has_e` falso, 4 bits com `has_e` verdadeiro) e liga ao banco apenas esses bits baixos dos índices `rs1`, `rs2` e `rd`.
 
-## 2. Instrução Ilegal
+## 3. Instrução Ilegal
 
 O manual reserva as codificações com `x16` a `x31` (seção 2.1.2), e o Core as trata como instrução ilegal. No RV32E o bit mais alto de cada campo de registrador que a instrução usa precisa ser zero. O estágio ID confere os três campos pela forma da instrução.
 
@@ -25,14 +33,14 @@ O manual reserva as codificações com `x16` a `x31` (seção 2.1.2), e o Core a
 
 Uma instrução ilegal não escreve nenhum registrador e segue a mesma via de exceção de qualquer outra instrução ilegal. Os campos que a instrução não usa, como o `rs2` de um load, não são conferidos.
 
-### 2.1. Destino da Exceção
+### 3.1. Destino da Exceção
 
 | Configuração | Efeito |
 | :--- | :--- |
 | Com `has_zicsr` | Trap síncrono com causa 2 (instrução ilegal) registrada no `mcause` |
 | Sem `has_zicsr` | Pulso de um ciclo na saída de trap do `core`, com a causa no formato do `mcause` e o PC da instrução |
 
-## 3. Compatibilidade
+## 4. Compatibilidade
 
 O banco menor não muda o pipeline nem o adiantamento, que seguem comparando índices de 5 bits. Como a verificação de ilegalidade só depende de `has_e`, ela é independente das demais extensões, e as 60 combinações de extensões de `profiles/matrix.yaml` valem tanto para a base de 32 registradores quanto para a de 16, o que dá 120 perfis.
 

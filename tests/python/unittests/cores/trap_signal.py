@@ -80,8 +80,7 @@ async def test_trap_is_signalled_without_effect(dut):
                 (int(dut.o_trap_pc.value), int(dut.o_trap_cause.value))
             )
         check_true(
-            not int(dut.o_sdram_rden.value)
-            and not int(dut.o_sdram_wren.value),
+            not int(dut.o_ext_rden.value) and not int(dut.o_ext_wren.value),
             "a trapped access reached the bus",
         )
 

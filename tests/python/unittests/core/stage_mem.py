@@ -19,9 +19,9 @@ OUTPUTS = (
     "ram_en",
     "ram_wren",
     "ram_rden",
-    "sdram_rden",
-    "sdram_wren",
-    "sdram_wait",
+    "ext_rden",
+    "ext_wren",
+    "ext_wait",
     "trap_take",
 )
 
@@ -38,7 +38,7 @@ async def run(dut, address, fields):
         "we_ram": 0,
         "re_ram": 0,
         "en_ram": 1,
-        "sdram_ready": 1,
+        "ext_ready": 1,
     } | fields
     for name, value in values.items():
         getattr(dut, f"i_{name}").value = value
@@ -58,9 +58,9 @@ def expected(region, fields):
         "ram_en": int(internal) & enabled,
         "ram_wren": int(internal) & writes,
         "ram_rden": int(internal) & reads,
-        "sdram_rden": access & fields["re_ram"],
-        "sdram_wren": access & fields["we_ram"],
-        "sdram_wait": access & (1 - fields["sdram_ready"]),
+        "ext_rden": access & fields["re_ram"],
+        "ext_wren": access & fields["we_ram"],
+        "ext_wait": access & (1 - fields["ext_ready"]),
         "trap_take": 0,
     }
 
@@ -76,7 +76,7 @@ async def test_region_routing(dut):
             "re_ram": kind[0],
             "we_ram": kind[1],
             "en_ram": enable,
-            "sdram_ready": ready,
+            "ext_ready": ready,
         }
         seen = await run(dut, region, fields)
         check_equal(seen, expected(region, fields), fields)
@@ -90,9 +90,9 @@ async def test_data_passes_through(dut):
     check_equal(int(dut.o_ram_wdata.value), 0xCAFEBABE, "dado da RAM")
     check_equal(int(dut.o_ram_byteena.value), 0b1111, "máscara da RAM")
     await run(dut, SDRAM, {"we_ram": 1, "byte_mask": 0b0110})
-    check_equal(int(dut.o_sdram_addr.value), SDRAM, "endereço da SDRAM")
-    check_equal(int(dut.o_sdram_wdata.value), 0xCAFEBABE, "dado da SDRAM")
-    check_equal(int(dut.o_sdram_byteena.value), 0b0110, "máscara da SDRAM")
+    check_equal(int(dut.o_ext_addr.value), SDRAM, "endereço da SDRAM")
+    check_equal(int(dut.o_ext_wdata.value), 0xCAFEBABE, "dado da SDRAM")
+    check_equal(int(dut.o_ext_byteena.value), 0b0110, "máscara da SDRAM")
     await run(dut, FLASH, {"re_ram": 1})
     check_equal(int(dut.o_flash_addr2.value), FLASH, "endereço da FLASH")
 

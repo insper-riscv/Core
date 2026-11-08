@@ -166,3 +166,113 @@ async def test_divider_stall_is_counted(dut):
         f"a division stalls for more than {MIN_DIV_STALL} cycles, "
         f"counted {ram[RAM_BASE]}",
     )
+
+
+MCYCLE, MSCRATCH = 0xB00, 0x340
+READS = 16
+
+
+def timing_program(addr):
+    """Mede em ciclos READS leituras seguidas do CSR addr.
+
+    Guarda a diferença de mcycle em RAM[0].
+    """
+    return [
+        NOP,
+        lui(7, RAM_BASE >> 12),
+        csrrs(10, MCYCLE),
+        *[csrrs(11, addr) for _ in range(READS)],
+        csrrs(12, MCYCLE),
+        *[NOP] * 3,
+        sub(13, 12, 10),
+        sw(13, 7, 0),
+        addi(14, 0, 1),
+        sw(14, 7, DONE_ADDR - RAM_BASE),
+        jal_self(),
+    ]
+
+
+def sub(rd, rs1, rs2):
+    """Executa sub."""
+    return (0x20 << 25) | (rs2 << 20) | (rs1 << 15) | (rd << 7) | 0x33
+
+
+def add(rd, rs1, rs2):
+    """Executa add."""
+    return (rs2 << 20) | (rs1 << 15) | (rd << 7) | 0x33
+
+
+@cocotb.test()
+async def test_a_bank_read_costs_one_cycle(dut):
+    """Verifica que cada CSR do banco do Zihpm custa um ciclo a mais."""
+    base = await run_program(dut, timing_program(MSCRATCH), max_cycles=3000)
+    bank = await run_program(
+        dut, timing_program(MHPMCOUNTER3), max_cycles=3000
+    )
+    check_equal(
+        bank[RAM_BASE] - base[RAM_BASE],
+        READS,
+        f"base {base[RAM_BASE]}, banco {bank[RAM_BASE]}",
+    )
+
+
+@cocotb.test()
+async def test_a_read_right_after_a_write_sees_the_new_value(dut):
+    """Verifica a escrita de um contador seguida da leitura e do uso."""
+    prog = [
+        NOP,
+        lui(7, RAM_BASE >> 12),
+        addi(5, 0, 0x55),
+        csrrw(0, MHPMCOUNTER3, 5),
+        csrrs(8, MHPMCOUNTER3),
+        add(9, 8, 8),
+        addi(5, 0, 0x0F),
+        csrrs(10, MHPMCOUNTER3, 5),
+        csrrs(11, MHPMCOUNTER3),
+        sw(8, 7, 0),
+        sw(9, 7, 4),
+        sw(10, 7, 8),
+        sw(11, 7, 12),
+        addi(14, 0, 1),
+        sw(14, 7, DONE_ADDR - RAM_BASE),
+        jal_self(),
+    ]
+    ram = await run_program(dut, prog, max_cycles=3000)
+    check_equal(ram[RAM_BASE], 0x55)
+    check_equal(ram[RAM_BASE + 4], 0xAA)
+    check_equal(ram[RAM_BASE + 8], 0x55, "csrrs devolve o valor antigo")
+    check_equal(ram[RAM_BASE + 12], 0x5F, "e escreve o valor OU a mascara")
+
+
+INSTRET = 0xC02
+HIGH_BIT = 0x40000000
+# Limite abaixo do qual o instret lido não carrega bits do contador.
+INSTRET_LIMIT = 0x1000
+
+
+@cocotb.test()
+async def test_a_counter_read_does_not_leak_into_the_next_csr_read(dut):
+    """Verifica que o valor lido do banco não vaza na leitura seguinte.
+
+    A leitura registrada do banco guarda o valor do contador lido; o CSR
+    lido logo depois (instret) nao pode receber esses bits.
+    """
+    prog = [
+        NOP,
+        lui(7, RAM_BASE >> 12),
+        lui(5, HIGH_BIT >> 12),
+        csrrw(0, MHPMCOUNTER3, 5),
+        csrrs(8, MHPMCOUNTER3),
+        csrrs(9, INSTRET),
+        sw(8, 7, 0),
+        sw(9, 7, 4),
+        addi(14, 0, 1),
+        sw(14, 7, DONE_ADDR - RAM_BASE),
+        jal_self(),
+    ]
+    ram = await run_program(dut, prog, max_cycles=3000)
+    check_equal(ram[RAM_BASE], HIGH_BIT, "o contador devolve o valor escrito")
+    check_true(
+        ram[RAM_BASE + 4] < INSTRET_LIMIT,
+        f"instret sem os bits do contador, leu {ram[RAM_BASE + 4]:#x}",
+    )

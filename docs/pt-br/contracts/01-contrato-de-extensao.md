@@ -93,6 +93,7 @@ Registradores CSR implementados no modo máquina:
 | `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `has_e` verdadeiro a base é a `E` e o valor é `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `has_interrupts`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem o generic, todos fixos em zero |
 | `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | `BASE` nos bits `[31:2]` e `MODE` no bit 0, que só grava com `has_interrupts` (vetorado); o bit 1 é fixo em `0`. No modo vetorado os bits `[5:2]` de `BASE` leem zero |
+| `0x723` a `0x73F` | `mhpmevent3h` a `mhpmevent31h` | Leitura e escrita | `0x00000000` | Só com `has_sscofpmf`: `OF` (bit 31) e `MINH` (bit 30) do contador de mesmo índice; sem o generic o endereço é inexistente. O bit 13 de `mie` e de `mip` é `LCOFIE` e `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
 | `0x310` | `mstatush` | Leitura e escrita | `0x00000000` | Todos os bits fixos em zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Leitura e escrita | `0x00000000` | 32 bits completos |
 | `0x341` | `mepc` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` |

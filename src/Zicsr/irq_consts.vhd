@@ -20,6 +20,9 @@ package irq_consts is
 	-- Posição do bit de interrupção externa de máquina (MEIP em mip, MEIE em mie).
 	constant IRQ_BIT_EXTERNAL : natural := 11;
 
+	-- Posição do bit de interrupção de estouro de contador (LCOFIP em mip, LCOFIE em mie), da extensão Sscofpmf.
+	constant IRQ_BIT_LCOFI    : natural := 13;
+
 	-- Índice de cada interrupção no vetor interno de 3 bits (software).
 	constant IRQ_IDX_SOFTWARE : natural := 0;
 	-- Índice de cada interrupção no vetor interno de 3 bits (timer).
@@ -36,5 +39,7 @@ package irq_consts is
 	constant CAUSE_IRQ_TIMER    : word_t := x"80000007";
 	-- Código mcause da interrupção externa de máquina (0x8000000B).
 	constant CAUSE_IRQ_EXTERNAL : word_t := x"8000000B";
+	-- Código mcause da interrupção de estouro de contador, LCOFI da Sscofpmf (0x8000000D).
+	constant CAUSE_IRQ_LCOFI    : word_t := x"8000000D";
 
 end package irq_consts;

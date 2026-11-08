@@ -12,7 +12,7 @@ A profile is a combination of RISC-V extensions that the `core` implements, sele
 
 ## 2. Matrix
 
-The matrix is the single source of the valid profiles. The command `riscv-tools profiles --spec profiles/matrix.yaml` expands it into 120 profiles, and the `profile-matrix` target of the `Makefile` elaborates each one with its generics.
+The matrix is the single source of the valid profiles. The command `riscv-tools profiles --spec profiles/matrix.yaml` expands it into 480 profiles, and the `profile-matrix` target of the `Makefile` elaborates each one with its generics.
 
 ### 2.1. Bases and extensions
 
@@ -25,6 +25,8 @@ The matrix is the single source of the valid profiles. The command `riscv-tools 
 | Zicntr | `has_zicntr` | Implies Zicsr |
 | Zihpm | `has_zihpm` | Implies Zicsr; parameterized by `hpm_counters` and `hpm_width` |
 | Zifencei | `has_zifencei` | `FENCE.I` instruction |
+| Zimop | `has_zimop` | The 40 `mop.r.n` and `mop.rr.n` encodings |
+| Zicond | `has_zicond` | `czero.eqz` and `czero.nez` |
 | Zmmul | `has_zmmul` | Multiplication without division |
 | M | `has_m` | Multiplication and division; implies Zmmul |
 

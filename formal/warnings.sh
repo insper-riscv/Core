@@ -3,11 +3,12 @@
 # defines abc_notes and scan_warnings, and is sourced by formal/run.sh and by formal/aggregate_test.sh, which
 # test it. The script that sources it sets root, engine and warnings (the file where the findings are recorded).
 
-# abc_notes: one exception, exact and only for the abc-bmc3 engine. ABC itself prints "Warning:" about the AIGER
-# file that SymbiYosys hands it (the clock input is consumed by the clk2ff step, and ABC announces how many outputs
-# it reads as constraints, or that there is none). They describe the tool's own file format, not the design or the
-# proofs, and cannot be removed from the design. Everything else still fails the run.
-abc_notes='(aig: Warning: Treating undriven bit props\.\\clk like \$anyseq\.|aig: Warning: Treating a total of [0-9]+ undriven bits in props like \$anyseq\.|engine_0: Warning: (The last (output is|[0-9]+ outputs are) interpreted as (a )?constraints?\.|The network has no constraints\.))$'
+# abc_notes: one exception, exact and only for the abc-bmc3 engine. ABC itself prints "Warning:" when it reads the
+# AIGER file that SymbiYosys hands it, to announce how many outputs it reads as constraints (the assumptions, and
+# the clock of the clk2ff step), or that there is none. They describe the tool's own file format, not the design or
+# the proofs. The warnings about the clock as an undriven bit are not accepted: prove flattens the design and purges
+# the aliases of the clock before the AIGER file is written. Everything else still fails the run.
+abc_notes='(engine_0: Warning: (The last (output is|[0-9]+ outputs are) interpreted as (a )?constraints?\.|The network has no constraints\.))$'
 
 # abc_combinational: the one more message ABC prints, right before it refuses a design without registers ("Error:
 # Does not work for combinational networks"). It is accepted only for a proof that formal/run.sh turns into a skip

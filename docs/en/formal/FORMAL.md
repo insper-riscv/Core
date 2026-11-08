@@ -7,15 +7,18 @@ The formal proofs of the Core run in SymbiYosys over the Verilog netlist that GH
 | Block | Properties | Kinds of proof |
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | induction, cover |
-| `trap_unit` | `trap_unit_props.sv` | induction, cover, with and without the address check and Zicclsm |
-| `csr_file` with interrupts | `csr_irq_props.sv` | BMC, cover, with the entry condition and priority and the `mtvec` modes |
+| `trap_unit` | `trap_unit_props.sv` | induction, cover, with and without the address check and Zicclsm, and with the illegal instruction before the misaligned target (Table 17) |
+| `csr_file` with interrupts | `csr_irq_props.sv` | induction, BMC, cover, with the entry condition and priority and the `mtvec` modes |
 | `trap_unit` with an interrupt | `trap_unit_props.sv` | induction, cover |
 | `stage_ex` with interrupts | `stage_ex_irq_props.sv` | induction, cover, with `mepc`, `mcause`, `MIE`, the next PC and the null effect of an aborted CSR access |
 | `alu` | `alu_props.sv` | combinational equivalence, cover |
-| `counter64` | `counter64_props.sv` | induction, cover, with widths from 1 to 64 bits |
+| `trap_unit` with access faults | `trap_af_props.sv` | induction, cover, with the order and `mtval` mutants |
+| `csr_file` with `time_external` | `csr_time_props.sv` | BMC, cover |
+| `counter64` | `counter64_props.sv` | induction, cover, with widths from 1 to 64 bits, including the `o_wrap` overflow pulse |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` with Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` with Zihpm | `csr_hpm_props.sv` | BMC, cover, with 29, 5, 4, 3 and 2 real counters and widths from 0 to 64 bits |
+| `csr_file` with Sscofpmf | `csr_ofp_props.sv` | BMC, cover, with `OF`, `MINH`, `LCOFIP`, `LCOFIE` and the timer priority over the overflow, on a symbolic index |
 | `zicond_unit` | `zicond_props.sv` | induction, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | induction, cover |
 | `core` with Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |
@@ -28,16 +31,14 @@ The engine is chosen by the `FORMAL_ENGINE` variable.
 
 | Engine | What it is | Induction | BMC | Cover | Typical time of `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| `bitwuzla` (default) | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | about 40 s |
-| `boolector` | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | about 45 s |
-| `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | about 60 s |
-| `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | about 35 s |
+| `bitwuzla` (default) | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 216 s |
+| `boolector` | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 226 s |
+| `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | 376 s |
+| `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | 346 s |
 
-`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`trap_unit` and the Zicond blocks, which ABC refuses), which leaves 43 of the 136 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do.
-`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`trap_unit` and the Zicond blocks, which ABC refuses), which leaves 36 of the 118 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do.
-`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`alu`, `trap_unit` and the Zicond blocks, which ABC refuses), which leaves 46 of the 125 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do.
+`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`alu`, `trap_unit` and the Zicond blocks, which ABC refuses), which leaves 53 of the 154 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do. The induction proofs of `mip`, `mie` and `mstatus.MIE` therefore have one more bounded form of 6 cycles (`csri_bounded`), the only one it answers.
 
-The times are from one run with 4 CPUs.
+The times are from one run with 4 CPUs and 8 GB, on a lab workstation with other jobs running in parallel.
 
 ## 3. Running
 
@@ -96,9 +97,20 @@ Any warning from GHDL, Yosys or SymbiYosys makes `formal/run.sh` fail, in the pr
 
 A warning means code outside the norm or at its limit, so the fix is in the VHDL or in the properties, never in an option that hides the warning (`-Wno-*`). Each mutant is analyzed in the place of the unit it replaces, so no entity is defined in two files.
 
-The `abc-bmc3` engine has one exact exception, only for the three messages that ABC itself prints about the AIGER file it receives (the clock consumed by the `clk2ff` step, the count of undriven bits and the count of outputs read as constraints), and only in the log of that engine. One more message, `The network is combinational.`, is accepted only in the proof that the engine refuses for being combinational and that the script records as `skip`. `yices`, `bitwuzla` and `boolector` have no exception, and any other warning of `abc-bmc3` still fails.
+The `abc-bmc3` engine has one exact exception, only for the messages ABC itself prints when it reads the AIGER file it receives (the count of outputs read as constraints, which are the assumptions and the clock of the `clk2ff` step, and `The network has no constraints.`), and only in the log of that engine. The warnings that the clock is an undriven bit are not accepted: the script of the proof flattens the design and purges the aliases of the clock before the AIGER file is written. One more message, `The network is combinational.`, is accepted only in the proof that the engine refuses for being combinational and that the script records as `skip`. `yices`, `bitwuzla` and `boolector` have no exception, and any other warning of `abc-bmc3` still fails.
 
 The tests of the guard run together with those of the aggregator, with `bash formal/aggregate_test.sh`.
+
+## 8. Interrupt proofs by induction
+
+A property that keeps a model of a register of the unit outside it cannot be proven by induction alone, because the induction starts from any state of the unit and the model is free. The fix is an invariant saying that the model is the register. `formal/run.sh` connects wires of `props` to nets of the flattened netlist (`PROBES`, the Yosys command `connect`), without changing the VHDL, and the proof asserts, at every cycle without reset, that the model is the register.
+
+| Proof | Registers connected | Property by induction |
+| :--- | :--- | :--- |
+| `csri_safety` | mask bits of `mie`, `mstatus.MIE` and `MPIE`, BASE and MODE of `mtvec` | `mip` reads the three lines at positions 3, 7 and 11, `mie` keeps only those bits, a write to `mip` changes nothing, `o_irq_pending` is lines and mask, `o_irq_take` needs `mstatus.MIE`, the cause has the priority external, software, timer, and `mtvec` keeps BASE and MODE |
+| `csrio_safety` | the same | without `has_interrupts` the lines are ignored and `mip` and `mie` read zero |
+
+The entry itself is proven by `stage_ex_irq_props.sv` and `trap_unit_props.sv` (both by induction): `mepc` is the address of the aborted instruction, `mcause` carries the cause and the line, `MIE` goes to 0 and `MPIE` to 1, the next PC is BASE or the vector, and the interrupt wins over every exception and `MRET`. The restore of `MIE` by `MRET` is proven by induction in `csr_mstatus`. The proofs of the counters (`csr_cntr_props.sv`, `csr_hpm_props.sv`) and of the fusion stay bounded, and the reason is in the comments of each file.
 
 ---
 

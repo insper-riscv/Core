@@ -7,15 +7,18 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | Bloco | Propriedades | Tipos de prova |
 | :--- | :--- | :--- |
 | `csr_file` | `csr_file_props.sv` | indução, cover |
-| `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm |
-| `csr_file` com interrupções | `csr_irq_props.sv` | BMC, cover, com a condição e a prioridade da tomada e os modos de `mtvec` |
+| `trap_unit` | `trap_unit_props.sv` | indução, cover, com e sem a verificação de endereço e o Zicclsm, e com a instrução ilegal antes do alvo desalinhado (Tabela 17) |
+| `csr_file` com interrupções | `csr_irq_props.sv` | indução, BMC, cover, com a condição e a prioridade da tomada e os modos de `mtvec` |
 | `trap_unit` com interrupção | `trap_unit_props.sv` | indução, cover |
 | `stage_ex` com interrupções | `stage_ex_irq_props.sv` | indução, cover, com `mepc`, `mcause`, `MIE`, o PC seguinte e o efeito nulo do acesso a CSR abortado |
 | `alu` | `alu_props.sv` | equivalência combinacional, cover |
-| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits |
+| `trap_unit` com falhas de acesso | `trap_af_props.sv` | indução, cover, com os mutantes da ordem e do `mtval` |
+| `csr_file` com `time_external` | `csr_time_props.sv` | BMC, cover |
+| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits, incluindo o pulso de estouro `o_wrap` |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover, com 29, 5, 4, 3 e 2 contadores reais e larguras de 0 a 64 bits |
+| `csr_file` com Sscofpmf | `csr_ofp_props.sv` | BMC, cover, com `OF`, `MINH`, `LCOFIP`, `LCOFIE` e a prioridade do timer sobre o estouro, em um índice simbólico |
 | `zicond_unit` | `zicond_props.sv` | indução, cover |
 | `zicond_decode` | `zicond_decode_props.sv` | indução, cover |
 | `core` com Zicsr (`o_trap_take`) | `core_trap_take_props.sv` | BMC, cover |
@@ -28,16 +31,14 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 
 | Engine | O que é | Indução | BMC | Cover | Tempo típico de `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
-| `bitwuzla` (padrão) | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | cerca de 40 s |
-| `boolector` | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | cerca de 45 s |
-| `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | cerca de 60 s |
-| `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | cerca de 35 s |
+| `bitwuzla` (padrão) | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 216 s |
+| `boolector` | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 226 s |
+| `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | 376 s |
+| `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | 346 s |
 
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 43 das 136 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 36 das 118 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 46 das 125 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz.
+O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 53 das 154 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz. As provas de indução do `mip`, do `mie` e do `mstatus.MIE` têm por isso uma forma limitada de 6 ciclos a mais (`csri_bounded`), a única que ele responde.
 
-Os tempos são de uma execução com 4 CPUs.
+Os tempos são de uma execução com 4 CPUs e 8 GB, numa estação de laboratório com outros jobs em paralelo.
 
 ## 3. Rodando
 
@@ -96,9 +97,20 @@ Qualquer aviso do GHDL, do Yosys ou do SymbiYosys faz o `formal/run.sh` falhar, 
 
 Um aviso indica código fora da norma ou no limite, então a correção é no VHDL ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Cada mutante é analisado no lugar da unidade que substitui, de modo que nenhuma entidade é definida em dois arquivos.
 
-O engine `abc-bmc3` tem uma exceção exata, só para as três mensagens que o próprio ABC imprime sobre o arquivo AIGER recebido (o clock consumido pelo passo `clk2ff`, a contagem de bits sem driver e a contagem de saídas lidas como restrições), e só no log desse engine. Uma mensagem a mais, `The network is combinational.`, é aceita apenas na prova que o engine recusa por ser combinacional e que o script registra como `skip`. O `yices`, o `bitwuzla` e o `boolector` não têm exceção, e qualquer outro aviso do `abc-bmc3` continua falhando.
+O engine `abc-bmc3` tem uma exceção exata, só para as mensagens que o próprio ABC imprime ao ler o arquivo AIGER recebido (a contagem de saídas lidas como restrições, que são as suposições e o clock do passo `clk2ff`, e `The network has no constraints.`), e só no log desse engine. Os avisos de que o clock é um bit sem driver não são aceitos: o script da prova achata o projeto e elimina os apelidos do clock antes de o arquivo AIGER ser escrito. Uma mensagem a mais, `The network is combinational.`, é aceita apenas na prova que o engine recusa por ser combinacional e que o script registra como `skip`. O `yices`, o `bitwuzla` e o `boolector` não têm exceção, e qualquer outro aviso do `abc-bmc3` continua falhando.
 
 Os testes da guarda rodam junto com os do agregador, em `bash formal/aggregate_test.sh`.
+
+## 8. Provas de interrupção por indução
+
+Uma propriedade que guarda um modelo de um registrador da unidade fora dela não se prova por indução sozinha, porque a indução parte de qualquer estado da unidade e o modelo é livre. A correção é uma invariante que diz que o modelo é o registrador. O `formal/run.sh` liga fios de `props` a redes da netlist achatada (`PROBES`, comando `connect` do Yosys), sem alterar o VHDL, e a prova afirma, a cada ciclo sem reset, que o modelo é o registrador.
+
+| Prova | Registradores ligados | Propriedade por indução |
+| :--- | :--- | :--- |
+| `csri_safety` | máscaras de `mie`, `mstatus.MIE` e `MPIE`, BASE e MODE de `mtvec` | `mip` lê as três linhas nas posições 3, 7 e 11, `mie` guarda só esses bits, escrever em `mip` não muda nada, `o_irq_pending` é linhas e máscara, `o_irq_take` exige `mstatus.MIE`, a causa tem prioridade externa, software, timer, e `mtvec` guarda BASE e MODE |
+| `csrio_safety` | os mesmos | sem `has_interrupts` as linhas são ignoradas e `mip` e `mie` leem zero |
+
+A tomada em si é provada pelo `stage_ex_irq_props.sv` e pelo `trap_unit_props.sv` (ambos por indução): `mepc` é o endereço da instrução abortada, `mcause` leva a causa e a linha, `MIE` vai a 0 e `MPIE` a 1, o PC seguinte é BASE ou o vetor, e a interrupção vence toda exceção e o `MRET`. A restauração de `MIE` pelo `MRET` é provada por indução em `csr_mstatus`. As provas de contadores (`csr_cntr_props.sv`, `csr_hpm_props.sv`) e a fusão continuam limitadas, e o motivo está nos comentários de cada arquivo.
 
 ---
 

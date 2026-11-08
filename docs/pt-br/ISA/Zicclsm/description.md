@@ -24,11 +24,11 @@ Um acesso que cruza a palavra ocupa os bytes finais de uma palavra de 32 bits e 
 
 O Core trata como memória principal, para efeito da extensão, as regiões de dados que ficam entre o fim da ROM interna (ou a base externa, quando a ROM é externa) e a base da janela de periféricos. Os limites vêm dos genéricos do mapa de memória (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` e `periph_base_kib`), descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
-O início da memória principal é `ext_base_kib * 1024` quando `rom_external` é verdadeiro e `rom_end_kib` vale 0, `2 ** boot_rom_bits` (o fim da BOOT_ROM, `0x00001000` por padrão) quando `rom_external` é verdadeiro e `rom_end_kib` é maior que 0, e `rom_end_kib * 1024` nos demais casos. O fim é `periph_base_kib * 1024`, onde começa a janela de periféricos. Os intervalos abaixo são semiabertos e valem para qualquer valor dos genéricos.
+O início da memória principal é `ext_base_kib * 1024` quando `rom_external` é verdadeiro e `rom_end_kib` vale 0, `2 ** boot_memory_bits` (o fim da BOOT_MEMORY, `0x00001000` por padrão) quando `rom_external` é verdadeiro e `rom_end_kib` é maior que 0, e `rom_end_kib * 1024` nos demais casos. O fim é `periph_base_kib * 1024`, onde começa a janela de periféricos. Os intervalos abaixo são semiabertos e valem para qualquer valor dos genéricos.
 
 | Região | Faixa em função dos genéricos | Acesso desalinhado em hardware |
 | :--- | :--- | :--- |
-| Abaixo da memória principal (BOOT_ROM, ROM interna e faixa sem memória) | `[0, início)` | Não, gera exceção |
+| Abaixo da memória principal (BOOT_MEMORY, ROM interna e faixa sem memória) | `[0, início)` | Não, gera exceção |
 | Memória principal | `[início, periph_base_kib * 1024)` | Sim |
 | Periféricos | `[periph_base_kib * 1024, 2**32)` | Não, gera exceção |
 

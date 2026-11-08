@@ -40,17 +40,17 @@ entity core is
 		has_e           : boolean := false;
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache      : boolean := false;
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
 		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
@@ -63,7 +63,15 @@ entity core is
 		-- Largura em bits de cada contador de eventos real, de 0 a 64.
 		hpm_width       : natural range 0 to 64 := 64;
 		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
-		has_interrupts  : boolean := false
+		has_interrupts  : boolean := false;
+		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
+		has_sscofpmf    : boolean := false;
+		-- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
+		time_external   : boolean := false;
+		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa (BOOT_MEMORY, FLASH, RAM, janela externa e slots de periférico); exige Zicsr.
+		has_access_faults : boolean := false;
+		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
+		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
 	port (
 		-- Sinal de clock principal do processador.
@@ -75,8 +83,8 @@ entity core is
 		o_if_addr       : out word_t;
 		-- Habilitação de leitura da memória de instruções no estágio IF.
 		o_if_rden       : out std_logic;
-		-- Palavra de instrução retornada pela BOOT_ROM.
-		i_boot_rom_data : in  word_t;
+		-- Palavra de instrução retornada pela BOOT_MEMORY.
+		i_boot_memory_data : in  word_t;
 		-- Palavra de instrução retornada pela memória FLASH (porta 1).
 		i_flash_data    : in  word_t;
 
@@ -103,19 +111,19 @@ entity core is
 		o_ram_byteena   : out byte_mask_t;
 
 		-- Endereço de acesso ao barramento externo de dados SDRAM/periféricos (estágio MEM).
-		o_sdram_addr    : out word_t;
+		o_ext_addr    : out word_t;
 		-- Palavra de dados alinhada para escrita no barramento externo SDRAM (estágio MEM).
-		o_sdram_wdata   : out word_t;
+		o_ext_wdata   : out word_t;
 		-- Máscara de habilitação de bytes no barramento externo SDRAM (estágio MEM).
-		o_sdram_byteena : out byte_mask_t;
+		o_ext_byteena : out byte_mask_t;
 		-- Habilitação de leitura no barramento externo SDRAM (estágio MEM).
-		o_sdram_rden    : out std_logic;
+		o_ext_rden    : out std_logic;
 		-- Habilitação de escrita no barramento externo SDRAM (estágio MEM).
-		o_sdram_wren    : out std_logic;
+		o_ext_wren    : out std_logic;
 		-- Palavra de dados lida do barramento externo SDRAM.
-		i_sdram_rdata   : in  word_t    := (others => '0');
+		i_ext_rdata   : in  word_t    := (others => '0');
 		-- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
-		i_sdram_ready   : in  std_logic := '1';
+		i_ext_ready   : in  std_logic := '1';
 		-- Indica ao escravo externo SDRAM que o estágio MEM avançou neste ciclo.
 		o_mem_advance   : out std_logic;
 
@@ -148,6 +156,8 @@ entity core is
 		i_hpm_ext_events : in  std_logic_vector(2 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do núcleo; fontes de outro domínio passam por um synchronizer.
 		i_irq_software  : in  std_logic := '0';
+		-- Valor de 64 bits do mtime da plataforma, que time e timeh espelham com time_external.
+		i_mtime         : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do núcleo.
 		i_irq_timer     : in  std_logic := '0';
 		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do núcleo.
@@ -174,6 +184,8 @@ architecture rtl of core is
 	signal pipe_stall        : std_logic;
 	-- Habilitação de avanço para o registrador ID/EX e estágios anteriores a MEM.
 	signal pipe_run          : std_logic;
+	-- Parada de um ciclo da instrução CSR que lê o banco do Zihpm (leitura registrada).
+	signal csr_wait          : std_logic;
 	-- Vetor de eventos dos contadores do Zihpm, um bit por código de evento.
 	signal hpm_events        : std_logic_vector(15 downto 0);
 	-- Valor de mis_stall no ciclo anterior (para o pulso de início de um acesso desalinhado).
@@ -247,6 +259,8 @@ architecture rtl of core is
 	signal id_pc_we          : std_logic;
 	-- Habilitação de atualização do registrador IF/ID gerada pela HDU no estágio ID.
 	signal ifid_write_en     : std_logic;
+	-- Repetição da busca: a instrução de IF/ID veio sem resposta da I-cache.
+	signal if_replay         : std_logic;
 	-- Bit de validade de entrada do registrador ID/EX após filtragem de bolha.
 	signal id_valid_out      : std_logic;
 	-- Índice do registrador fonte rs1 decodificado no estágio ID.
@@ -391,6 +405,20 @@ architecture rtl of core is
 	signal exmem_pc          : word_t;
 	-- Campo funct3 da instrução em MEM trazido de EX/MEM.
 	signal exmem_funct3      : funct3_t;
+	-- O endereço em MEM cai na FLASH de dados, classificado em EX e registrado em EX/MEM.
+	signal exmem_is_flash    : std_logic;
+	-- Resultado da ULA em EX (o endereço efetivo de um load ou store).
+	signal ex_alu_result     : word_t;
+	-- O endereço em MEM cai na janela externa (SDRAM), registrado em EX/MEM.
+	signal exmem_is_sdram    : std_logic;
+	-- O endereço em MEM está na memória principal, registrado em EX/MEM.
+	signal exmem_in_main     : std_logic;
+	-- As duas palavras de um acesso que cruza o endereço em MEM ficam na mesma região, registrado em EX/MEM.
+	signal exmem_same_region : std_logic;
+	-- O endereço efetivo registrado em EX/MEM aceita leitura no mapa.
+	signal exmem_ok_rd : std_logic;
+	-- O endereço efetivo registrado em EX/MEM aceita escrita no mapa.
+	signal exmem_ok_wr : std_logic;
 	-- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
 	signal retire_pulse      : std_logic;
 	-- Pulso de retorno de exceção (MRET) gerado no estágio EX.
@@ -473,9 +501,9 @@ architecture rtl of core is
 begin
 
 	-- Coordenação global de stalls e flushes entre os estágios.
-	mem_run       <= not (muldiv_stall or sdram_wait);
+	mem_run       <= not (muldiv_stall or sdram_wait or csr_wait);
 	base_run      <= mem_run and (not mis_stall);
-	pipe_stall    <= muldiv_stall or sdram_wait or fencei_busy or mis_stall;
+	pipe_stall    <= muldiv_stall or sdram_wait or csr_wait or fencei_busy or mis_stall;
 	pipe_run      <= base_run and (not fencei_busy);
 	o_mem_advance <= mem_run;
 	-- Com CSRs, a exceção de endereço do load ou store é tomada em MEM (mem_trap_take): é de uma instrução mais
@@ -521,8 +549,13 @@ begin
 		report "has_interrupts exige has_zicsr"
 		severity failure;
 
+	-- A Sscofpmf tem as fontes de estouro no Zihpm e entrega a interrupção pelo mip e pelo mie.
+	assert (has_zihpm and has_interrupts) or (not has_sscofpmf)
+		report "has_sscofpmf exige has_zihpm e has_interrupts"
+		severity failure;
 
-	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
+
+	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take or if_replay;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
 	flush_ex_mem  <= trap_take or trap_sig or mem_trap_take or (fencei_busy and base_run);
 
@@ -531,7 +564,7 @@ begin
 	-- =========================================================================
 	u_stage_if : entity work.stage_if
 		generic map (
-			boot_rom_bits => boot_rom_bits,
+			boot_memory_bits => boot_memory_bits,
 			rom_end_kib   => rom_end_kib,
 			rom_external  => rom_external,
 			ram_base_kib  => ram_base_kib,
@@ -550,10 +583,13 @@ begin
 			i_mret_take       => mret_take,
 			i_fencei_take     => fencei_take,
 			i_ic_inval        => fencei_inval,
+			i_ifid_en         => ifid_write_en,
+			i_flush_if_id     => flush_if_id,
+			i_ifid_pc         => ifid_pc,
 			i_branch_target   => ex_branch_target,
 			i_jalr_target     => ex_jalr_target,
 			i_redirect_pc     => ex_redirect_pc,
-			i_boot_rom_data   => i_boot_rom_data,
+			i_boot_memory_data   => i_boot_memory_data,
 			i_flash_data      => i_flash_data,
 			i_ic_data         => i_ic_data,
 			i_ic_ready        => i_ic_ready,
@@ -564,7 +600,8 @@ begin
 			o_if_addr         => o_if_addr,
 			o_if_rden         => o_if_rden,
 			o_ic_sel          => o_ic_sel,
-			o_ic_inval        => o_ic_inval
+			o_ic_inval        => o_ic_inval,
+			o_replay          => if_replay
 		);
 
 	u_reg_if_id : entity work.reg_if_id
@@ -723,7 +760,10 @@ begin
 			hpm_counters    => hpm_counters,
 			hpm_width       => hpm_width,
 			has_interrupts  => has_interrupts,
-			boot_rom_bits   => boot_rom_bits,
+			has_sscofpmf    => has_sscofpmf,
+			time_external   => time_external,
+			has_access_faults => has_access_faults,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
@@ -735,6 +775,7 @@ begin
 		port map (
 			i_hpm_events      => hpm_events,
 			i_irq_software    => i_irq_software,
+			i_mtime           => i_mtime,
 			i_irq_timer       => i_irq_timer,
 			i_irq_external    => i_irq_external,
 			i_clk             => i_clk,
@@ -774,6 +815,7 @@ begin
 			i_memwb_alu_out   => memwb_alu_out,
 			i_wb2_data        => wb2_data,
 			i_dc_done         => i_dc_done,
+			o_alu_result      => ex_alu_result,
 			o_final_result    => ex_final_result,
 			o_store_data      => ex_store_data,
 			o_store_byte_mask => ex_store_byteena,
@@ -792,10 +834,23 @@ begin
 			o_fencei_busy     => fencei_busy,
 			o_dc_flush        => o_dc_flush,
 			o_muldiv_stall    => muldiv_stall,
+			o_csr_wait        => csr_wait,
 			o_muldiv_fused    => muldiv_fused
 		);
 
 	u_reg_ex_mem : entity work.reg_ex_mem
+		generic map (
+			boot_memory_bits   => boot_memory_bits,
+			rom_end_kib     => rom_end_kib,
+			rom_external    => rom_external,
+			ram_base_kib    => ram_base_kib,
+			ram_end_kib     => ram_end_kib,
+			ram_external    => ram_external,
+			ext_base_kib    => ext_base_kib,
+			periph_base_kib => periph_base_kib,
+			has_access_faults => has_access_faults,
+			periph_slots    => periph_slots
+		)
 		port map (
 			i_clk        => i_clk,
 			i_rst        => i_rst,
@@ -805,6 +860,7 @@ begin
 			i_pc         => ex_pc,
 			i_funct3     => ex_funct3,
 			i_alu_out    => ex_final_result,
+			i_ea         => ex_alu_result,
 			i_store_data => ex_store_data,
 			i_byte_mask  => ex_store_byteena,
 			i_rd         => ex_rd_idx,
@@ -827,7 +883,13 @@ begin
 			o_ext_ram_op => exmem_ext_ram_op,
 			o_wb_sel     => exmem_wb_sel,
 			o_pc         => exmem_pc,
-			o_funct3     => exmem_funct3
+			o_funct3     => exmem_funct3,
+			o_is_flash   => exmem_is_flash,
+			o_is_sdram   => exmem_is_sdram,
+			o_in_main    => exmem_in_main,
+			o_same_region => exmem_same_region,
+			o_ok_rd       => exmem_ok_rd,
+			o_ok_wr       => exmem_ok_wr
 		);
 
 	-- =========================================================================
@@ -841,9 +903,11 @@ begin
 			ram_base_kib => ram_base_kib,
 			ram_end_kib  => ram_end_kib,
 			ram_external => ram_external,
-			ext_base_kib => ext_base_kib
+			ext_base_kib => ext_base_kib,
+			flags_registered => true
 		)
 		port map (
+			i_is_sdram    => exmem_is_sdram,
 			i_clk         => i_clk,
 			i_rst         => i_rst,
 			i_valid       => mis_valid,
@@ -854,11 +918,11 @@ begin
 			i_byte_mask   => exmem_byteena,
 			i_addr        => exmem_alu_out,
 			i_store_data  => exmem_store_data,
-			i_ready       => i_sdram_ready,
+			i_ready       => i_ext_ready,
 			i_advance     => mem_run,
 			i_base_run    => base_run,
 			i_ram_rdata   => i_ram_rdata,
-			i_sdram_rdata => i_sdram_rdata,
+			i_ext_rdata => i_ext_rdata,
 			o_cross       => mis_cross,
 			o_stall       => mis_stall,
 			o_addr        => mis_addr,
@@ -875,16 +939,24 @@ begin
 		generic map (
 			has_zicclsm     => has_zicclsm,
 			check_ea        => has_zicsr,
-			boot_rom_bits   => boot_rom_bits,
+			boot_memory_bits   => boot_memory_bits,
 			rom_end_kib     => rom_end_kib,
 			rom_external    => rom_external,
 			ram_base_kib    => ram_base_kib,
 			ram_end_kib     => ram_end_kib,
 			ram_external    => ram_external,
 			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib
+			periph_base_kib => periph_base_kib,
+			flags_registered => true,
+			has_access_faults => has_access_faults
 		)
 		port map (
+			i_flag_ok_rd    => exmem_ok_rd,
+			i_flag_ok_wr    => exmem_ok_wr,
+			i_flag_flash    => exmem_is_flash,
+			i_flag_sdram    => exmem_is_sdram,
+			i_flag_main     => exmem_in_main,
+			i_flag_same     => exmem_same_region,
 			i_valid         => exmem_valid,
 			i_alu_out       => mem_addr,
 			i_ea            => exmem_alu_out,
@@ -894,7 +966,7 @@ begin
 			i_we_ram        => exmem_we_ram,
 			i_re_ram        => exmem_re_ram,
 			i_en_ram        => exmem_en_ram,
-			i_sdram_ready   => i_sdram_ready,
+			i_ext_ready   => i_ext_ready,
 			o_flash_addr2   => o_flash_addr2,
 			o_flash_rden2   => o_flash_rden2,
 			o_ram_addr      => o_ram_addr,
@@ -903,12 +975,12 @@ begin
 			o_ram_wren      => o_ram_wren,
 			o_ram_rden      => o_ram_rden,
 			o_ram_byteena   => o_ram_byteena,
-			o_sdram_addr    => o_sdram_addr,
-			o_sdram_wdata   => o_sdram_wdata,
-			o_sdram_byteena => o_sdram_byteena,
-			o_sdram_rden    => o_sdram_rden,
-			o_sdram_wren    => o_sdram_wren,
-			o_sdram_wait    => sdram_wait,
+			o_ext_addr    => o_ext_addr,
+			o_ext_wdata   => o_ext_wdata,
+			o_ext_byteena => o_ext_byteena,
+			o_ext_rden    => o_ext_rden,
+			o_ext_wren    => o_ext_wren,
+			o_ext_wait    => sdram_wait,
 			o_trap_take     => mem_trap_take,
 			o_trap_cause    => mem_trap_cause,
 			o_trap_tval     => mem_trap_tval
@@ -963,7 +1035,7 @@ begin
 			i_flash_data2 => i_flash_data2,
 			i_ram_rdata   => i_ram_rdata,
 			i_first_word  => mis_first_word,
-			i_sdram_rdata => i_sdram_rdata,
+			i_ext_rdata => i_ext_rdata,
 			o_wb_we       => wb_we,
 			o_wb_rd       => wb_rd,
 			o_wb_data     => wb_data_raw

@@ -48,6 +48,12 @@
 --     ignoram a escrita, sem exceção. Os endereços do banco são decodificados pelos
 --     7 bits altos (a faixa) e pelos 5 bits baixos (o índice). Sem has_zihpm esses
 --     endereços são inexistentes.
+--   - Com has_sscofpmf = true (e has_zihpm e has_interrupts), a extensão Sscofpmf acrescenta os seletores
+--     mhpmeventNh (0x720 + N) com os bits OF (31) e MINH (30) de cada contador de eventos, a interrupção de
+--     estouro de contador (LCOFI, causa 13) e os bits 13 de mip (LCOFIP, de leitura e escrita) e de mie (LCOFIE).
+--     Um contador que estoura com OF em '0' põe OF em '1' e LCOFIP em '1'; o programa limpa os dois por escrita.
+--     LCOFI tem a menor prioridade, depois de externa, software e timer, e o modo vetorado a leva a BASE + 52.
+--     Sem a extensão os endereços de mhpmeventNh são inexistentes e o bit 13 de mip e de mie lê zero.
 --   - O registrador mcountinhibit (0x320) existe com has_zicntr ou has_zihpm: o bit 0
 --     inibe mcycle, o bit 2 inibe minstret e os bits de 3 a 2 + hpm_counters inibem os
 --     contadores de eventos; os demais bits leem zero e ignoram a escrita (o time não
@@ -85,7 +91,13 @@ entity csr_file is
 		-- Largura em bits de cada contador de eventos real (0 a 64).
 		hpm_width : natural range 0 to 64 := 64;
 		-- Habilita as interrupções de máquina: mip espelha as portas i_irq_* e mie guarda as máscaras.
-		has_interrupts : boolean := false
+		has_interrupts : boolean := false;
+		-- Habilita a extensão Sscofpmf (estouro de contador, LCOFI); só vale com has_zihpm e has_interrupts.
+		has_sscofpmf : boolean := false;
+		-- O CSR time espelha o mtime que a plataforma entrega em i_mtime (o CLINT), no lugar do contador próprio.
+		time_external : boolean := false;
+		-- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor lido só vale um ciclo depois de o endereço aparecer.
+		hpm_registered_read : boolean := false
 	);
 	port (
 		-- Sinal de clock do sistema.
@@ -104,6 +116,8 @@ entity csr_file is
 		i_src_zero   : in  std_logic;
 		-- Valor atual (antigo) de 32 bits lido combinacionalmente do CSR selecionado.
 		o_rdata      : out word_t;
+		-- O endereço é do banco do Zihpm e a leitura registrada (hpm_registered_read) vale um ciclo depois.
+		o_bank_read  : out std_logic;
 		-- Indica acesso a endereço CSR não implementado ou escrita em CSR somente-leitura.
 		o_illegal    : out std_logic;
 		-- Pulso que comanda o salvamento de contexto de exceção síncrona no modo máquina.
@@ -126,6 +140,8 @@ entity csr_file is
 		o_mtvec      : out word_t;
 		-- Endereço de retorno de exceção armazenado no registrador mepc.
 		o_mepc       : out word_t;
+		-- Valor de 64 bits do mtime da plataforma, que time e timeh espelham quando time_external = true.
+		i_mtime        : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do core.
 		i_irq_software : in  std_logic := '0';
 		-- Interrupção de timer de máquina (MTIP), de nível, no domínio de clock do core.
@@ -153,6 +169,9 @@ architecture rtl of csr_file is
 		end if;
 		return '0';
 	end function;
+
+	-- A Sscofpmf só existe com o Zihpm (as fontes de estouro) e com as interrupções (o destino).
+	constant SSCOF           : boolean := has_sscofpmf and has_zihpm and has_interrupts;
 
 	-- Bit MIE (bit 3) armazenado no registrador mstatus.
 	signal mstatus_mie       : std_logic;
@@ -254,6 +273,22 @@ architecture rtl of csr_file is
 	signal idx_is_hpm        : std_logic;
 	-- O endereço está na faixa de mcountinhibit e dos seletores de evento.
 	signal in_event_range    : std_logic;
+	-- O endereço está na faixa das metades altas dos seletores de evento (mhpmeventNh, Sscofpmf).
+	signal in_eventh_range   : std_logic;
+	-- Pedido de interrupção de estouro que o banco de contadores de eventos gera ('0' sem Sscofpmf).
+	signal ovf_irq           : std_logic;
+	-- Bit LCOFIP de mip.
+	signal lcofip            : std_logic;
+	-- Bit LCOFIE de mie.
+	signal lcofie            : std_logic;
+	-- Habilitação de escrita em LCOFIP: o pedido de estouro ou a escrita em mip.
+	signal lcofip_we         : std_logic;
+	-- Próximo valor de LCOFIP: o pedido de estouro põe '1' e a escrita traz o bit 13.
+	signal lcofip_nxt        : std_logic;
+	-- Interrupção de estouro pendente e habilitada em mie.
+	signal lcofi_pend        : std_logic;
+	-- Há alguma interrupção pendente e habilitada em mie (as três de sempre e a de estouro).
+	signal any_pend          : std_logic;
 	-- O endereço está numa faixa de metades baixas (de máquina ou espelho).
 	signal in_lo_range       : std_logic;
 	-- O endereço está numa faixa de metades altas (de máquina ou espelho).
@@ -398,11 +433,13 @@ begin
 	-- Interrupções de máquina: mip espelha as portas, mie guarda as máscaras.
 	irq_in <= (i_irq_external & i_irq_timer & i_irq_software) when has_interrupts else (others => '0');
 
-	mip_value <= (IRQ_BIT_EXTERNAL => irq_in(IRQ_IDX_EXTERNAL),
+	mip_value <= (IRQ_BIT_LCOFI    => lcofip,
+	              IRQ_BIT_EXTERNAL => irq_in(IRQ_IDX_EXTERNAL),
 	              IRQ_BIT_TIMER    => irq_in(IRQ_IDX_TIMER),
 	              IRQ_BIT_SOFTWARE => irq_in(IRQ_IDX_SOFTWARE),
 	              others           => '0');
-	mie_value <= (IRQ_BIT_EXTERNAL => irq_en_reg(IRQ_IDX_EXTERNAL),
+	mie_value <= (IRQ_BIT_LCOFI    => lcofie,
+	              IRQ_BIT_EXTERNAL => irq_en_reg(IRQ_IDX_EXTERNAL),
 	              IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),
 	              IRQ_BIT_SOFTWARE => irq_en_reg(IRQ_IDX_SOFTWARE),
 	              others           => '0');
@@ -412,10 +449,13 @@ begin
 	irq_en_nxt(IRQ_IDX_SOFTWARE) <= new_value(IRQ_BIT_SOFTWARE);
 
 	irq_pend_vec  <= irq_in and irq_en_reg;
-	o_irq_pending <= '1' when irq_pend_vec /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
-	o_irq_take    <= mstatus_mie when irq_pend_vec /= (IRQ_COUNT - 1 downto 0 => '0') else '0';
+	any_pend      <= '1' when (irq_pend_vec /= (IRQ_COUNT - 1 downto 0 => '0') or lcofi_pend = '1') else '0';
+	o_irq_pending <= any_pend;
+	o_irq_take    <= mstatus_mie when any_pend = '1' else '0';
+	-- Prioridade do manual (3.1.9): externa, software, timer e, por último, o estouro de contador.
 	o_irq_cause   <= CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else
 	                 CAUSE_IRQ_SOFTWARE when irq_pend_vec(IRQ_IDX_SOFTWARE) = '1' else
+	                 CAUSE_IRQ_LCOFI    when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else
 	                 CAUSE_IRQ_TIMER;
 
 	gen_irq : if has_interrupts generate
@@ -438,6 +478,41 @@ begin
 		irq_en_we  <= '0';
 		irq_en_reg <= (others => '0');
 	end generate gen_no_irq;
+
+	-- Interrupção de estouro de contador (Sscofpmf): LCOFIP pega com o pedido do banco de contadores e a escrita em mip
+	-- o altera quando não há pedido no mesmo ciclo; LCOFIE guarda o bit 13 escrito em mie.
+	gen_lcofi : if SSCOF generate
+		lcofip_we  <= ovf_irq or (csr_write_valid and bool_to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
+		lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
+
+		u_lcofip : entity work.flip_flop
+			port map (
+				i_d      => lcofip_nxt,
+				o_d      => lcofip,
+				i_enable => lcofip_we,
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
+
+		u_lcofie : entity work.flip_flop
+			port map (
+				i_d      => new_value(IRQ_BIT_LCOFI),
+				o_d      => lcofie,
+				i_enable => irq_en_we,
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
+
+		lcofi_pend <= lcofip and lcofie;
+	end generate gen_lcofi;
+
+	gen_no_lcofi : if not SSCOF generate
+		lcofip_we  <= '0';
+		lcofip_nxt <= '0';
+		lcofip     <= '0';
+		lcofie     <= '0';
+		lcofi_pend <= '0';
+	end generate gen_no_lcofi;
 
 	-- O modo de mtvec só existe com interrupções: sem elas MODE lê sempre zero.
 	gen_mtvec_mode : if has_interrupts generate
@@ -526,29 +601,38 @@ begin
 				o_hi    => minstret_hi
 			);
 
-		-- Divisor que gera o tick do contador time.
-		u_time_tick : entity work.tick_divider
-			generic map (
-				tick_cycles => tick_cycles
-			)
-			port map (
-				i_clk  => i_clk,
-				i_rst  => i_rst,
-				o_tick => time_tick
-			);
+		gen_time_own : if not time_external generate
+			-- Divisor que gera o tick do contador time.
+			u_time_tick : entity work.tick_divider
+				generic map (
+					tick_cycles => tick_cycles
+				)
+				port map (
+					i_clk  => i_clk,
+					i_rst  => i_rst,
+					o_tick => time_tick
+				);
 
-		-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
-		u_time : entity work.counter64
-			port map (
-				i_clk   => i_clk,
-				i_rst   => i_rst,
-				i_inc   => time_tick,
-				i_we_lo => '0',
-				i_we_hi => '0',
-				i_wdata => (others => '0'),
-				o_lo    => time_lo,
-				o_hi    => time_hi
-			);
+			-- time soma 1 a cada tick e não aceita escrita (os endereços 0xC01 e 0xC81 são somente leitura).
+			u_time : entity work.counter64
+				port map (
+					i_clk   => i_clk,
+					i_rst   => i_rst,
+					i_inc   => time_tick,
+					i_we_lo => '0',
+					i_we_hi => '0',
+					i_wdata => (others => '0'),
+					o_lo    => time_lo,
+					o_hi    => time_hi
+				);
+		end generate gen_time_own;
+
+		-- O time é o sombreamento somente leitura do mtime da plataforma (seção 3.2.1 do volume privilegiado).
+		gen_time_platform : if time_external generate
+			time_tick <= '0';
+			time_lo   <= i_mtime(31 downto 0);
+			time_hi   <= i_mtime(63 downto 32);
+		end generate gen_time_platform;
 
 	end generate gen_zicntr;
 
@@ -569,6 +653,7 @@ begin
 	addr_idx         <= i_addr(4 downto 0);
 	idx_is_hpm       <= '1' when unsigned(addr_idx) >= HPM_FIRST_INDEX else '0';
 	in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';
+	in_eventh_range  <= '1' when addr_range = RANGE_MHPMEVENTH else '0';
 	in_lo_range      <= '1' when (addr_range = RANGE_MHPMCOUNTER or addr_range = RANGE_HPMCOUNTER) else '0';
 	in_hi_range      <= '1' when (addr_range = RANGE_MHPMCOUNTERH or addr_range = RANGE_HPMCOUNTERH) else '0';
 	is_inhibit_addr  <= in_event_range and bool_to_sl(unsigned(addr_idx) = 0);
@@ -602,7 +687,9 @@ begin
 		u_hpm_bank : entity work.hpm_counter_bank
 			generic map (
 				hpm_counters => hpm_counters,
-				hpm_width    => hpm_width
+				hpm_width    => hpm_width,
+				has_sscofpmf => SSCOF,
+				registered_read => hpm_registered_read
 			)
 			port map (
 				i_clk         => i_clk,
@@ -611,26 +698,32 @@ begin
 				i_idx         => addr_idx,
 				i_sel_inhibit => is_inhibit_addr,
 				i_sel_event   => in_event_range,
+				i_sel_eventh  => in_eventh_range,
 				i_sel_lo      => in_lo_range,
 				i_sel_hi      => in_hi_range,
 				i_we          => cntr_write,
 				i_wdata       => new_value,
-				o_rdata       => bank_rdata
+				o_rdata       => bank_rdata,
+				o_ovf_irq     => ovf_irq
 			);
 
 		is_ext_addr <= is_inhibit_addr or
-		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range));
+		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (bool_to_sl(SSCOF) and in_eventh_range)));
+		o_bank_read <= is_ext_addr when hpm_registered_read else '0';
 	end generate gen_zihpm;
 
 	gen_no_zihpm : if not has_zihpm generate
+		ovf_irq     <= '0';
 		bank_rdata  <= (others => '0');
+		o_bank_read <= '0';
 		is_ext_addr <= is_inhibit_addr and bool_to_sl(has_zicntr);
 	end generate gen_no_zihpm;
 
 	-- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.
 	inhibit_word(2 downto 0)  <= inhibit_reg and (2 downto 0 => is_inhibit_addr);
 	inhibit_word(31 downto 3) <= (others => '0');
-	ext_value <= bank_rdata or inhibit_word;
+	-- O registrador de saída do banco guarda o valor do endereço anterior; só vale quando o endereço atual é do banco.
+	ext_value <= (bank_rdata and (word_t'range => is_ext_addr)) or inhibit_word;
 
 	-- Instâncias estruturais de flip_flop e generic_register para os CSRs.
 	u_mstatus_mie_ff : entity work.flip_flop

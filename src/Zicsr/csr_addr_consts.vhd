@@ -12,6 +12,7 @@
 --     base da faixa mais N, a saber mhpmeventN (0x320), mhpmcounterN (0xB00), mhpmcounterNh
 --     (0xB80), hpmcounterN (0xC00) e hpmcounterNh (0xC80). Os 7 bits altos do endereço
 --     identificam a faixa e os 5 bits baixos o índice.
+--   - Sscofpmf: mhpmeventNh em 0x720 + N (N de 3 a 31), a metade alta do seletor de evento com os bits OF e MINH.
 --   - 0xF11 a 0xF15: identificação, somente leitura (mvendorid a mconfigptr).
 -- Os bits [11:10] = "11" do endereço marcam o CSR como somente-leitura, regra
 -- que o csr_file usa para rejeitar escritas efetivas.
@@ -77,6 +78,8 @@ package csr_addr_consts is
 
   -- Faixa (bits [11:5] do endereço) de mcountinhibit, no índice 0, e dos seletores de evento mhpmeventN (0x320 a 0x33F).
   constant RANGE_MHPMEVENT    : std_logic_vector(6 downto 0) := ADDR_MCOUNTINHIBIT(11 downto 5);
+  -- Faixa (bits [11:5] do endereço) das metades altas dos seletores de evento da Sscofpmf, mhpmeventNh (0x720 a 0x73F).
+  constant RANGE_MHPMEVENTH   : std_logic_vector(6 downto 0) := "0111001";
   -- Faixa (bits [11:5] do endereço) das metades baixas dos contadores de máquina (0xB00 a 0xB1F).
   constant RANGE_MHPMCOUNTER  : std_logic_vector(6 downto 0) := ADDR_MCYCLE(11 downto 5);
   -- Faixa (bits [11:5] do endereço) das metades altas dos contadores de máquina (0xB80 a 0xB9F).

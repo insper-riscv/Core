@@ -18,6 +18,11 @@
 --   1. i_we_lo = '1': a metade baixa recebe i_wdata e não há vai-um neste ciclo.
 --   2. i_we_hi = '1': a metade alta recebe i_wdata e o vai-um pendente se perde.
 --   3. Sem escrita: a metade baixa soma 1 com i_inc = '1' e a alta soma o vai-um.
+--
+-- Estouro (o_wrap): pulso de um ciclo quando uma soma leva o contador inteiro de todos os bits em '1' a zero, nunca
+-- por uma escrita. Num contador que cabe na metade baixa o pulso sai registrado, um ciclo depois da soma. Num
+-- contador com metade alta ele vale no ciclo em que o vai-um pendente leva a metade alta de todos os bits em '1'
+-- a zero, que é o ciclo seguinte ao da soma: o estouro vale mesmo que uma escrita na metade alta caia nesse ciclo.
 -- =============================================================================
 
 library ieee;
@@ -46,7 +51,9 @@ entity counter64 is
 		-- Metade baixa do contador.
 		o_lo    : out word_t;
 		-- Metade alta do contador, já com o vai-um pendente somado.
-		o_hi    : out word_t
+		o_hi    : out word_t;
+		-- Pulso de estouro: o contador de width bits passou de todos os bits em '1' para zero por uma soma.
+		o_wrap  : out std_logic
 	);
 end entity counter64;
 
@@ -97,6 +104,10 @@ architecture rtl of counter64 is
 	signal lo_inc    : std_logic_vector(LO_WIDTH - 1 downto 0);
 	-- Metade alta mais 1.
 	signal hi_inc    : std_logic_vector(high_signal_width(HI_WIDTH) - 1 downto 0);
+	-- Valor da metade alta que, somado ao vai-um pendente, estoura o contador (todos os bits em '1').
+	signal hi_all_ones : std_logic;
+	-- A soma deste ciclo estoura um contador que cabe na metade baixa.
+	signal lo_wrap_nxt : std_logic;
 
 begin
 
@@ -128,6 +139,18 @@ begin
 		hi_nxt    <= (others => '0');
 		hi        <= (others => '0');
 		o_hi      <= (others => '0');
+		hi_all_ones <= '0';
+
+		lo_wrap_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = LO_ALL_ONES) else '0';
+
+		u_wrap : entity work.flip_flop
+			port map (
+				i_d      => lo_wrap_nxt,
+				o_d      => o_wrap,
+				i_enable => '1',
+				i_clk    => i_clk,
+				i_rst    => i_rst
+			);
 	end generate gen_no_hi;
 
 	gen_hi : if HI_WIDTH > 0 generate
@@ -138,6 +161,10 @@ begin
 		hi_en  <= i_we_hi or carry;
 
 		carry_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and lo = LO_ALL_ONES) else '0';
+
+		lo_wrap_nxt <= '0';
+		hi_all_ones <= '1' when hi = (hi'range => '1') else '0';
+		o_wrap      <= carry and hi_all_ones;
 
 		o_hi <= std_logic_vector(resize(unsigned(hi_inc), word_t'length)) when carry = '1' else
 		        std_logic_vector(resize(unsigned(hi), word_t'length));

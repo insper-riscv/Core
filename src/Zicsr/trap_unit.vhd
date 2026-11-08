@@ -22,6 +22,12 @@
 --          6         | Endereço de Store desalinhado que o     | i_ea
 --                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
+--          1         | Falha de acesso de instrução (busca fora   | i_pc
+--                    | de região executável, com has_access_faults)|
+--          5         | Falha de acesso de load (endereço fora do  | i_ea
+--                    | mapa válido, com has_access_faults)        |
+--          7         | Falha de acesso de store (fora do mapa ou  | i_ea
+--                    | em região só de leitura)                   |
 --   0x80000003, 7, B | Interrupção de software, timer, externa | 0x00000000
 -- =============================================================================
 
@@ -41,22 +47,26 @@ entity trap_unit is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
 		check_ea        : boolean := true;
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
 		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		periph_base_kib : natural := 2097152
+		periph_base_kib : natural := 2097152;
+		-- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
+		ea_flags_external : boolean := false;
+		-- Gera as falhas de acesso 1 (busca), 5 (load) e 7 (store) a partir de i_fetch_ok, i_ea_rd_ok e i_ea_wr_ok; a de dados exige check_ea.
+		has_access_faults : boolean := false
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -75,6 +85,18 @@ entity trap_unit is
 		i_imm12       : in  std_logic_vector(11 downto 0);
 		-- Endereço efetivo de memória calculado pela ULA no estágio EX.
 		i_ea          : in  word_t;
+		-- O endereço efetivo está na memória principal (com ea_flags_external).
+		i_ea_main        : in  std_logic := '0';
+		-- As duas palavras de um acesso que cruza estão na mesma região da memória principal (com ea_flags_external).
+		i_ea_same_region : in  std_logic := '0';
+		-- A busca da instrução em EX veio de região executável do mapa ('0' gera a causa 1 com has_access_faults).
+		i_fetch_ok    : in  std_logic := '1';
+		-- PC da instrução em EX (mtval da falha de acesso de instrução).
+		i_pc          : in  word_t    := (others => '0');
+		-- O endereço efetivo aceita leitura no mapa (um load com '0' gera a causa 5 com has_access_faults).
+		i_ea_rd_ok    : in  std_logic := '1';
+		-- O endereço efetivo aceita escrita no mapa (um store com '0' gera a causa 7 com has_access_faults).
+		i_ea_wr_ok    : in  std_logic := '1';
 		-- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
 		i_cf_taken    : in  std_logic;
 		-- Endereço alvo do desvio ou salto tomado no estágio EX.
@@ -141,6 +163,14 @@ architecture rtl of trap_unit is
 	signal misal_exec   : std_logic;
 	-- Indica desvio ou salto tomado para endereço alvo não alinhado a 4 bytes.
 	signal cf_misal    : std_logic;
+	-- Indica busca de instrução fora de região executável.
+	signal fetch_fault : std_logic;
+	-- Indica load para endereço que o mapa não aceita ler.
+	signal ld_fault    : std_logic;
+	-- Indica store para endereço que o mapa não aceita escrever.
+	signal st_fault    : std_logic;
+	-- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem prioridade sobre o alvo desalinhado.
+	signal any_illegal : std_logic;
 
 	-- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
 	signal has_exc     : std_logic;
@@ -177,7 +207,8 @@ begin
 
 	-- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
 	-- constantes de potência de 2 viram testes de bits na síntese.
-	in_main_mem <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_rom_bits) and
+	in_main_mem <= i_ea_main when ea_flags_external else
+	               '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
 	                         unsigned(i_ea) < kib_to_addr(periph_base_kib))
 	               else '0';
 
@@ -194,7 +225,7 @@ begin
 
 	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal
 	-- e não na última palavra da região, pois a palavra seguinte pertenceria à região vizinha.
-	same_region <= in_main_mem and (not last_word);
+	same_region <= i_ea_same_region when ea_flags_external else (in_main_mem and (not last_word));
 
 	misal_exec <= '1' when (misal_in_word = '1' or
 	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and
@@ -204,10 +235,22 @@ begin
 	ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
 	st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
 
-	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0) else '0';
+	-- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do manual,
+	-- que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele executa
+	-- só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
+	ld_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and ld_misal = '0') else '0';
+	st_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and st_misal = '0') else '0';
+	fetch_fault <= '1' when (has_access_faults and i_fetch_ok = '0') else '0';
 
-	has_exc <= cf_misal or i_illegal or sys_illegal or (is_csr and i_csr_illegal) or is_ebreak or
-	           ld_misal or st_misal or is_ecall;
+	any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
+
+	-- Um salto ou desvio de codificação reservada é ilegal (causa 2), e a Tabela 17 do manual privilegiado põe a
+	-- instrução ilegal acima do endereço de instrução desalinhado (causa 0): só o salto legal gera a causa 0. Só a
+	-- ilegalidade da decodificação importa aqui, porque as instruções SYSTEM nunca tomam desvio.
+	cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0 and i_illegal = '0') else '0';
+
+	has_exc <= fetch_fault or cf_misal or any_illegal or is_ebreak or
+	           ld_misal or st_misal or ld_fault or st_fault or is_ecall;
 
 	is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
 	irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
@@ -217,16 +260,20 @@ begin
 	o_irq       <= irq_go;
 
 	o_cause <= i_irq_cause when irq_go = '1' else
+	           CAUSE_FETCH_FAULT   when fetch_fault = '1' else
+	           CAUSE_ILLEGAL_INSTR when any_illegal = '1' else
 	           CAUSE_MISALIGNED_PC when cf_misal = '1' else
-	           CAUSE_ILLEGAL_INSTR when (i_illegal = '1' or sys_illegal = '1' or (is_csr = '1' and i_csr_illegal = '1')) else
 	           CAUSE_BREAKPOINT    when is_ebreak = '1' else
 	           CAUSE_MISALIGNED_LD when ld_misal = '1' else
 	           CAUSE_MISALIGNED_ST when st_misal = '1' else
+	           CAUSE_LOAD_FAULT    when ld_fault = '1' else
+	           CAUSE_STORE_FAULT   when st_fault = '1' else
 	           CAUSE_MACHINE_ECALL;
 
 	o_tval  <= (others => '0') when irq_go = '1' else
+	           i_pc        when fetch_fault = '1' else
 	           i_cf_target when cf_misal = '1' else
-	           i_ea        when ((ld_misal = '1' or st_misal = '1') and i_illegal = '0') else
+	           i_ea        when ((ld_misal = '1' or st_misal = '1' or ld_fault = '1' or st_fault = '1') and i_illegal = '0') else
 	           (others => '0');
 
 end architecture rtl;

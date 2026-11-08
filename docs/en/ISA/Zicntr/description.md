@@ -2,16 +2,25 @@
 
 This document describes how the Core implements the base counters `cycle`, `time` and `instret`, and the 64-bit counter block that Zihpm also uses. What the manual requires is in [instructions.md](instructions.md), the performance counters are in [Zihpm](../Zihpm/description.md), and the CSR file that hosts them (read, atomic write, illegality) is in [Zicsr](../Zicsr/description.md).
 
-## 1. Generics
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 6, Zicntr and Zihpm Extensions for Counters, version 2.0 (section 6.1, Zicntr) |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Generics
 
 | Generic | Entity | Default | Effect |
 | :--- | :--- | :--- | :--- |
 | `has_zicntr` | `core` | `false` | Instantiates `mcycle`, `minstret` and `time` with their mirrors, and the `mcountinhibit` register; requires `has_zicsr` |
 | `tick_cycles` | `core` | 50 | Clock cycles per `time` tick (50 gives 1 MHz at 50 MHz) |
+| `time_external` | `core` | `false` | `time` mirrors the `mtime` of the `i_mtime` port (the CLINT) in place of the own counter |
 
 Elaboration fails if `has_zicntr` is on without `has_zicsr`. Zicntr is independent of Zihpm.
 
-## 2. 64-bit counter block
+## 3. 64-bit counter block
 
 Every counter is an instance of `counter64`, which keeps the value in two halves. With the default width of 64 bits, each half has 32 bits. Zihpm instantiates the same block with a width $W$ from 1 to 64 bits, where the low half keeps the $\min(W,32)$ low bits and the high half the remaining $W-32$ (absent when $W \le 32$).
 
@@ -27,9 +36,9 @@ Every counter is an instance of `counter64`, which keeps the value in two halves
 
 A write wins over the increment of its own cycle, in each half.
 
-## 3. Zicntr counters
+## 4. Zicntr counters
 
-### 3.1. Addresses and rules
+### 4.1. Addresses and rules
 
 There are 3 counters of 64 bits. The Core does not implement `mcounteren`, and access to that address is illegal. The Core has only M-mode, and the privileged manual says that in harts without U-mode the `mcounteren` register should not exist ([section 2.1.1.11](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcounteren)).
 
@@ -41,7 +50,7 @@ There are 3 counters of 64 bits. The Core does not implement `mcounteren`, and a
 
 Addresses `0xB01` and `0xB81` do not exist, and `time` has no machine form. An effective write to `cycle`, `instret` or `time` is an illegal access (`mcause = 2`). Without `has_zicntr` the counter addresses are nonexistent and access is illegal.
 
-### 3.2. Instruction retirement
+### 4.2. Instruction retirement
 
 The instruction in EX retires when it is valid, the pipeline advances and there is no exception. The retire pulse stays pending for one cycle, so that a load or store exception taken in MEM cancels it, and the failing access does not count in `minstret`.
 
@@ -52,15 +61,15 @@ The instruction in EX retires when it is valid, the pipeline advances and there 
 | Write to `minstret` in the same cycle | The retirement of the writing instruction itself is dropped |
 | Instruction that raises an exception in EX | Produces no retire pulse |
 
-### 3.3. Tick divider and `time`
+### 4.3. Tick divider and `time`
 
 `time` adds 1 on every pulse of the tick divider. The divider counts from 0 to $tick\_cycles - 1$, emits the pulse in the cycle where the count reaches the end and returns to 0 in the next cycle. Reset clears the count.
 
 $$f_{time} = \frac{f_{clock}}{tick\_cycles}$$
 
-The Core has no external time input. `time` derives from the Core's own clock, and the resolution is set by `tick_cycles` (at least 1).
+Without `time_external`, `time` derives from the Core's own clock, and the resolution is set by `tick_cycles` (at least 1). With `time_external = true` (the platform has a CLINT) `time` and `timeh` are the read-only shadow of the 64-bit `mtime` that the platform delivers on the `i_mtime` port, as section 3.2.1 of the privileged volume demands: the own counter and the tick divider are not instantiated, and `time` follows a write to `mtime` and the `mtime` period of the CLINT (`mtime_hz` of `platform.yaml`).
 
-## 4. `mcountinhibit`
+## 5. `mcountinhibit`
 
 The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what the profile includes, and the other bits read zero and ignore writes. The register exists when there is `has_zicntr` or `has_zihpm`, and the event counter bits are in [Zihpm](../Zihpm/description.md).
 
@@ -72,11 +81,11 @@ The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what t
 
 An inhibited counter keeps its value and stays readable and writable. Inhibiting `minstret` also suspends the sum of the pending retirement that the read shows.
 
-## 5. Nonexistent address
+## 6. Nonexistent address
 
 Without `has_zicntr` the addresses of `mcycle`, `minstret`, `time`, their mirrors and `mcountinhibit` (when there is no event counter) are nonexistent. Reading or writing them signals an illegal CSR access, which the Core handles as an illegal-instruction exception (`mcause = 2`). There is no constant return value. The same holds for an effective write to `cycle`, `instret` and `time`.
 
-## 6. Formal verification
+## 7. Formal verification
 
 | Proof | File | What it guarantees |
 | :--- | :--- | :--- |

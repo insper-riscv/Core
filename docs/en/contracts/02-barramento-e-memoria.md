@@ -6,15 +6,15 @@ The limits of the instruction address space (IF stage) and of the data address s
 
 | `core` generic | Default | Region it delimits |
 | :--- | :--- | :--- |
-| `boot_rom_bits` | 12 | The Boot ROM occupies `[0, 2**boot_rom_bits)`, that is `0x00000000 .. 0x00000FFF` by default |
-| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot ROM (`0x00001000 .. 0x00007FFF` by default) |
-| `rom_external` | `false` | The ROM is reached through the core port (`o_sdram_*` or the instruction port): the instruction comes through the instruction port and the data through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
+| `boot_memory_bits` | 12 | The Boot memory occupies `[0, 2**boot_memory_bits)`, that is `0x00000000 .. 0x00000FFF` by default |
+| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot memory (`0x00001000 .. 0x00007FFF` by default) |
+| `rom_external` | `false` | The ROM is reached through the core port (`o_ext_*` or the instruction port): the instruction comes through the instruction port and the data through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
 | `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Range of the RAM in KiB (`0x00008000 .. 0x3FFFFFFF` by default) |
-| `ram_external` | `false` | The RAM is reached through the core port (`o_sdram_*`) and the data goes through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
+| `ram_external` | `false` | The RAM is reached through the core port (`o_ext_*`) and the data goes through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
 | `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM and peripherals (`0x40000000` by default), which always goes through the external port |
 | `periph_base_kib` | 2097152 | Base, in KiB, of the peripheral window (`0x80000000` by default), which ends the main memory |
 
-What is neither Boot ROM, internal ROM nor external is the internal RAM. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The hardware misaligned access serves the main memory, from where the RAM starts up to `periph_base_kib`, and does not cross the end of a region. The platform map with external FLASH at `0x20000000` uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` and `periph_base_kib => 1572864`. An external ROM right after the Boot ROM uses `rom_external => true` and `rom_end_kib => 32`.
+What is neither Boot memory, internal ROM nor external is the internal RAM. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The hardware misaligned access serves the main memory, from where the RAM starts up to `periph_base_kib`, and does not cross the end of a region. The platform map with external FLASH at `0x20000000` uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` and `periph_base_kib => 1572864`. An external ROM right after the Boot memory uses `rom_external => true` and `rom_end_kib => 32`.
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 
@@ -24,7 +24,7 @@ The IF stage (`src/core/stage_if.vhd`) presents the current PC address on `o_if_
 | :--- | :--- | :--- | :--- |
 | `o_if_addr` | `out` | All | Byte address of the current Program Counter |
 | `o_if_rden` | `out` | All | Instruction read enable (hardwired to `'1'`) |
-| `i_boot_rom_data` | `in` | `< 0x00001000` | 32-bit instruction word returned by the Boot ROM |
+| `i_boot_memory_data` | `in` | `< 0x00001000` | 32-bit instruction word returned by the Boot memory |
 | `i_flash_data` | `in` | `0x00001000 .. 0x3FFFFFFF` | 32-bit instruction word returned by port 1 of Flash memory |
 | `o_ic_sel` | `out` | `>= 0x40000000` | Indicates that the current PC points to the region served by the external instruction cache (SDRAM) |
 | `i_ic_data` | `in` | `>= 0x40000000` | 32-bit instruction word supplied by the external instruction cache |
@@ -65,21 +65,23 @@ Every read or write access with an address at or above `0x40000000` uses the pro
 
 | Port on top level `core` | Direction | Stage | Meaning |
 | :--- | :--- | :--- | :--- |
-| `o_sdram_addr` | `out` | MEM | Byte address of the external access |
-| `o_sdram_wdata` | `out` | MEM | 32-bit datum aligned for writing |
-| `o_sdram_byteena` | `out` | MEM | Byte enable mask (4 bits) |
-| `o_sdram_rden` | `out` | MEM | Read request active while the valid access remains in MEM |
-| `o_sdram_wren` | `out` | MEM | Write request active while the valid access remains in MEM |
-| `i_sdram_rdata` | `in` | WB | 32-bit word returned by the external slave |
-| `i_sdram_ready` | `in` | MEM | Logic level indicating completion of the external transaction (`'0'` holds the pipeline; defaults to `'1'` when unconnected) |
+| `o_ext_addr` | `out` | MEM | Byte address of the external access |
+| `o_ext_wdata` | `out` | MEM | 32-bit datum aligned for writing |
+| `o_ext_byteena` | `out` | MEM | Byte enable mask (4 bits) |
+| `o_ext_rden` | `out` | MEM | Read request active while the valid access remains in MEM |
+| `o_ext_wren` | `out` | MEM | Write request active while the valid access remains in MEM |
+| `i_ext_rdata` | `in` | WB | 32-bit word returned by the external slave |
+| `i_ext_ready` | `in` | MEM | Logic level indicating completion of the external transaction (`'0'` holds the pipeline; defaults to `'1'` when unconnected) |
 | `o_mem_advance` | `out` | Global | Signals to the external slave that the MEM stage is advancing on the current clock edge (`base_run = '1'`) |
 
 External handshake protocol rules:
 
-1. **Stability during wait:** while `sdram_access = '1'` and `i_sdram_ready = '0'`, `o_sdram_wait` keeps `base_run = '0'`, freezing `reg_ex_mem` and holding `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, and `o_sdram_wren` stable.
-2. **Level acknowledgment (`i_sdram_ready`):** the external slave must hold `i_sdram_ready = '1'` until it observes `o_mem_advance = '1'`, ensuring that completion is not lost if the `multdiv` unit is also stalling the pipeline on the same cycle.
-3. **Read-data preservation (`i_sdram_rdata`):** the `i_sdram_rdata` word remains stable until the WB cycle in which the load instruction is consumed by `stage_wb`.
+1. **Stability during wait:** while `sdram_access = '1'` and `i_ext_ready = '0'`, `o_ext_wait` keeps `base_run = '0'`, freezing `reg_ex_mem` and holding `o_ext_addr`, `o_ext_wdata`, `o_ext_byteena`, `o_ext_rden`, and `o_ext_wren` stable.
+2. **Level acknowledgment (`i_ext_ready`):** the external slave must hold `i_ext_ready = '1'` until it observes `o_mem_advance = '1'`, ensuring that completion is not lost if the `multdiv` unit is also stalling the pipeline on the same cycle.
+3. **Read-data preservation (`i_ext_rdata`):** the `i_ext_rdata` word remains stable until the WB cycle in which the load instruction is consumed by `stage_wb`.
 4. **Branch-flush inhibition during wait:** branches and jumps taken in the EX stage flush `reg_if_id` and `reg_id_ex` only when `pipe_run = '1'`, preserving the branch instruction in EX until the access in MEM completes.
+
+Contract K1 is this external port. In it, the port prefix is `ext` (`o_ext_*` and `i_ext_*`) and the behavior is that of the rules above, the same for any region behind it: an emulated backend (FPGA internal memory) or a device backend (the chip of the board). The core sees only the handshake, and never what implements the region.
 
 ## 4. Sub-Word Alignment and Misalignment Exceptions
 

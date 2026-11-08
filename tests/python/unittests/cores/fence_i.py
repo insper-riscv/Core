@@ -54,12 +54,12 @@ def program(fence):
 
 
 INPUT_PORTS = (
-    "i_boot_rom_data",
+    "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
     "i_ram_rdata",
     "i_ic_data",
-    "i_sdram_rdata",
+    "i_ext_rdata",
 )
 RUN_CYCLES = 3000
 DONE_FLAG = 0x807C
@@ -84,6 +84,7 @@ class _Model:
         self.inval_pulses = 0
         self.read_pending = 0
         self.last_addr = None
+        self.pending_line = None
         self.wait = 0
 
     def serve_fetch(self, dut):
@@ -91,7 +92,7 @@ class _Model:
         addr = int(dut.o_if_addr.value) & ~3
         dut.i_ram_rdata.value = self.read_pending
         word = self.boot.get(addr, 0)
-        dut.i_boot_rom_data.value = word
+        dut.i_boot_memory_data.value = word
         dut.i_flash_data.value = word
         if int(dut.o_ic_sel.value) != 1:
             self.last_addr = None
@@ -99,22 +100,28 @@ class _Model:
             return
         line = addr & ~0xF
         if line not in self.lines:
-            self._fill(addr, line)
+            self._fill(line)
         if line in self.lines:
             dut.i_ic_data.value = self.lines[line][(addr >> 2) & 3]
             dut.i_ic_ready.value = 1
         else:
             dut.i_ic_ready.value = 0
 
-    def _fill(self, addr, line):
-        """Count the miss latency down, then fetch the line."""
-        if addr != self.last_addr:
+    def _fill(self, line):
+        """Count the miss latency down, then fetch the line.
+
+        The fill runs on its own: it goes on while the core changes the
+        address (the fetch comes back to the instruction after a miss).
+        """
+        if self.pending_line is None:
+            self.pending_line = line
             self.wait = self.latency
-            self.last_addr = addr
         if self.wait == 0:
-            self.lines[line] = [
-                self.backing.get(line + 4 * k, 0) for k in range(4)
+            self.lines[self.pending_line] = [
+                self.backing.get(self.pending_line + 4 * k, 0)
+                for k in range(4)
             ]
+            self.pending_line = None
         else:
             self.wait -= 1
 
@@ -148,14 +155,14 @@ class _Model:
         if int(dut.o_ic_inval.value):
             self.lines.clear()
             self.inval_pulses += 1
-        if int(dut.o_sdram_wren.value) and int(dut.o_mem_advance.value):
-            a = int(dut.o_sdram_addr.value) & ~3
+        if int(dut.o_ext_wren.value) and int(dut.o_mem_advance.value):
+            a = int(dut.o_ext_addr.value) & ~3
             target = self.backing if self.flush_latency is None else self.dirty
             base = target.get(a, self.backing.get(a, 0))
             target[a] = _bytes_merge(
                 base,
-                int(dut.o_sdram_wdata.value),
-                int(dut.o_sdram_byteena.value),
+                int(dut.o_ext_wdata.value),
+                int(dut.o_ext_byteena.value),
             )
         if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
             addr = int(dut.o_ram_addr.value) & ~3
@@ -183,7 +190,7 @@ async def run(dut, fence, latency=2, flush_latency=None):
     for sig in INPUT_PORTS:
         getattr(dut, sig).value = 0
     dut.i_ic_ready.value = 0
-    dut.i_sdram_ready.value = 1
+    dut.i_ext_ready.value = 1
     dut.i_dc_done.value = 0
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):

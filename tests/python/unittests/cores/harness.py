@@ -33,8 +33,8 @@ OPTIONS = {
     "ic_latency",
 }
 DATA_PORTS = (
-    "i_sdram_rdata",
-    "i_boot_rom_data",
+    "i_ext_rdata",
+    "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
     "i_ram_rdata",
@@ -79,13 +79,20 @@ class _DataMemories:
 
 
 class _IcWait:
-    """Cache de instruções que espera ciclos por endereço novo."""
+    """Cache de instruções que espera ciclos por endereço novo.
+
+    A espera de um endereço corre mesmo que o núcleo mude de endereço
+    enquanto isso (o PC segue e volta à instrução sem resposta): o
+    endereço pronto responde quando o PC volta a ele.
+    """
 
     def __init__(self, latency_for):
         """Espera latency_for(n) ciclos no n-ésimo endereço novo."""
         self.latency_for = latency_for
         self.last_addr = None
+        self.pending = None
         self.wait = 0
+        self.done = None
         self.fetches = 0
 
     def drive(self, dut):
@@ -96,11 +103,17 @@ class _IcWait:
             return
         addr = int(dut.o_if_addr.value) & ~3
         if addr != self.last_addr:
-            self.wait = self.latency_for(self.fetches)
-            self.fetches += 1
             self.last_addr = addr
-        dut.i_ic_ready.value = 1 if self.wait == 0 else 0
-        self.wait = max(self.wait - 1, 0)
+            if addr != self.done and self.pending is None:
+                self.pending = addr
+                self.wait = self.latency_for(self.fetches)
+                self.fetches += 1
+        if self.pending is not None:
+            if self.wait == 0:
+                self.done, self.pending = self.pending, None
+            else:
+                self.wait -= 1
+        dut.i_ic_ready.value = int(addr == self.done)
 
 
 def _models(dut, program, options):
@@ -123,7 +136,7 @@ async def _start(dut, with_sdram):
     dut.i_rst.value = 1
     for port in DATA_PORTS:
         getattr(dut, port).value = 0
-    dut.i_sdram_ready.value = 0 if with_sdram else 1
+    dut.i_ext_ready.value = 0 if with_sdram else 1
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
         await RisingEdge(dut.i_clk)
@@ -133,7 +146,7 @@ async def _start(dut, with_sdram):
 def _drive_fetch(dut, imem, flash_port_value):
     """Answer the instruction fetch of this cycle."""
     word = imem.get(int(dut.o_if_addr.value) & ~3, 0)
-    dut.i_boot_rom_data.value = word
+    dut.i_boot_memory_data.value = word
     dut.i_flash_data.value = (
         word if flash_port_value is None else flash_port_value
     )
@@ -154,7 +167,7 @@ async def run_program(dut, program, max_cycles=4000, **options):
     ``i_flash_data`` instead of the instruction, to show that a fetch
     does not use it. ``sdram`` (a dict {address: word}) turns on a slave
     for the SDRAM window; ``sdram_stall(n)`` gives the stall cycles of
-    its n-th access. The slave holds ``i_sdram_ready`` until the core
+    its n-th access. The slave holds ``i_ext_ready`` until the core
     advances and commits the read data after that, the way the bridge of
     the board does. ``ic_latency(n)`` dá os ciclos de espera do n-ésimo
     endereço novo buscado pela porta da cache de instruções

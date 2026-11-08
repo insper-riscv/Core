@@ -2,7 +2,15 @@
 
 This document describes how the Core implements the Zihpm event counters. What the manual requires is in [instructions.md](instructions.md), the conformance of each requirement is in [conformance.md](conformance.md), the counter block and `time` are in [Zicntr](../Zicntr/description.md), and the CSR file that hosts the counters (read, atomic write, illegality) is in [Zicsr](../Zicsr/description.md).
 
-## 1. Generics
+## 1. Reference
+
+| Item | Value |
+| :--- | :--- |
+| Chapter | 6, Zicntr and Zihpm Extensions for Counters, version 2.0 (section 6.2, Zihpm) |
+| Source | Volume I of the RISC-V manual (unprivileged ISA, version 20260120), numbered without the Introduction |
+| Manual requirements | [instructions.md](instructions.md) |
+
+## 2. Generics
 
 | Generic | Entity | Default | Effect |
 | :--- | :--- | :--- | :--- |
@@ -14,7 +22,7 @@ Elaboration fails if `has_zihpm` is on without `has_zicsr`. Zihpm is independent
 
 With `hpm_width` equal to 0 no index has a real counter, as if `hpm_counters` were 0.
 
-## 2. Organization
+## 3. Organization
 
 With `has_zihpm`, the Core defines the 29 indices from 3 to 31 in five ranges of 32 addresses. Index $K$ is the base address of the range plus $K$.
 
@@ -28,7 +36,7 @@ With `has_zihpm`, the Core defines the 29 indices from 3 to 31 in five ranges of
 
 The bank decodes the range from the 7 upper bits of the address and the index from the 5 low bits, so the decoding does not compare the whole address. Writing `hpmcounterK` or `hpmcounterKh` is an illegal access at any index, because they are read-only CSRs. The addresses that the privileged manual does not define inside the ranges (`0x321`, `0x322`, `0xB01` and `0xB81`) are illegal.
 
-### 2.1. Real indices and indices fixed at zero
+### 3.1. Real indices and indices fixed at zero
 
 | Index $K$ | Read of any CSR of the index | Write |
 | :--- | :--- | :--- |
@@ -37,19 +45,19 @@ The bank decodes the range from the 7 upper bits of the address and the index fr
 
 The manual allows fixing any counter at zero, but the address exists, so an access to an index without a counter raises no exception. A program finds how many counters the profile has by writing a pattern to `mhpmcounterK` and reading it back.
 
-### 2.2. Counter width
+### 3.2. Counter width
 
 A counter of $W$ bits (`hpm_width`) keeps the $\min(W,32)$ low bits in the low half and the remaining $W-32$ bits in the high half, when $W>32$. The bits of each half above the width read zero, and a write keeps only the bits that fit. The counter returns to zero after $2^W-1$.
 
-## 3. Structure
+## 4. Structure
 
 The `hpm_counter_bank` has, for each real counter, an event selector, an inhibit bit and a counter of its own. The counters share no adder, and each one is an instance of the block described in [Zicntr](../Zicntr/description.md), with the width of the high half set by `hpm_width`. The read picks the register by index with a multiplexer tree of 32 entries per range, and an index without a counter returns zero.
 
-## 4. Counting rule
+## 5. Counting rule
 
 A counter adds 1 in every cycle where the bit of the event vector chosen by the code is `'1'`, the code is not zero and the counter's inhibit bit is `'0'`. A code outside the event table does not count, even if the bit of the vector is `'1'`. An explicit write to a half wins over the increment of the same cycle.
 
-## 5. Event table
+## 6. Event table
 
 The event vector has 16 bits, one per code, and bit 0 is always zero.
 
@@ -69,7 +77,7 @@ The event vector has 16 bits, one per code, and bit 0 is always zero.
 
 Event 9 counts the fusion of multiply or divide pairs (for example `MULH` followed by `MUL` with the same operands), described in [M](../M/description.md). Events 5 to 7 only count if the SoC drives the external event input of the Core, which is zero by default.
 
-## 6. `mcountinhibit`
+## 7. `mcountinhibit`
 
 The `mcountinhibit` register sits at `0x320`, and the bits of `mcycle` and `minstret` are in [Zicntr](../Zicntr/description.md). The register exists with `has_zicntr` or `has_zihpm`.
 
@@ -80,7 +88,7 @@ The `mcountinhibit` register sits at `0x320`, and the bits of `mcycle` and `mins
 
 An inhibited counter keeps its value and stays readable and writable.
 
-## 7. Verification
+## 8. Verification
 
 | Layer | What it guarantees |
 | :--- | :--- |

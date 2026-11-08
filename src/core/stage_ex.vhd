@@ -19,6 +19,8 @@ use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.fwd_consts.all;
 use work.byte_mask_consts.all;
+use ieee.numeric_std.all;
+use work.mem_map_consts.all;
 
 entity stage_ex is
 	generic (
@@ -50,17 +52,23 @@ entity stage_ex is
 		hpm_width       : natural range 0 to 64 := 64;
 		-- Habilita as interrupções de máquina (mip e mie) no banco de CSRs; exige has_zicsr.
 		has_interrupts  : boolean := false;
-		-- Expoente do tamanho da BOOT_ROM: ela ocupa os endereços [0, 2**boot_rom_bits).
-		boot_rom_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_ROM.
+		-- Habilita a extensão Sscofpmf (interrupção de estouro de contador); exige has_zihpm e has_interrupts.
+		has_sscofpmf    : boolean := false;
+		-- O CSR time espelha o mtime da plataforma (porta i_mtime) no lugar do contador próprio.
+		time_external   : boolean := false;
+		-- Gera a falha de acesso de instrução (causa 1) quando o PC da instrução em EX está fora das regiões executáveis; exige Zicsr.
+		has_access_faults : boolean := false;
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
 		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
@@ -72,6 +80,8 @@ entity stage_ex is
 		i_hpm_events      : in  std_logic_vector(15 downto 0) := (others => '0');
 		-- Interrupção de software de máquina (MSIP), de nível.
 		i_irq_software    : in  std_logic := '0';
+		-- Valor de 64 bits do mtime da plataforma, que o CSR time espelha com time_external.
+		i_mtime           : in  std_logic_vector(63 downto 0) := (others => '0');
 		-- Interrupção de timer de máquina (MTIP), de nível.
 		i_irq_timer       : in  std_logic := '0';
 		-- Interrupção externa de máquina (MEIP), de nível.
@@ -150,6 +160,8 @@ entity stage_ex is
 		i_mem_trap_pc     : in  word_t    := (others => '0');
 		-- Valor de mtval da exceção do estágio MEM.
 		i_mem_trap_tval   : in  word_t    := (others => '0');
+		-- Resultado da ULA antes da seleção do resultado final (o endereço efetivo de um load ou store).
+		o_alu_result      : out word_t;
 		-- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
 		o_final_result    : out word_t;
 		-- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
@@ -186,6 +198,8 @@ entity stage_ex is
 		o_dc_flush        : out std_logic;
 		-- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
 		o_muldiv_stall    : out std_logic;
+		-- Parada de um ciclo da instrução CSR que lê o banco do Zihpm: o valor lido sai de um registrador e só vale no ciclo seguinte.
+		o_csr_wait        : out std_logic;
 		-- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
 		o_muldiv_fused    : out std_logic
 	);
@@ -220,6 +234,8 @@ architecture rtl of stage_ex is
 	signal csr_trap_cause     : word_t;
 	-- PC da instrução que gerou a exceção entregue ao banco de CSRs.
 	signal csr_trap_pc        : word_t;
+	-- A busca da instrução em EX veio de região executável.
+	signal fetch_ok           : std_logic;
 	-- Valor de mtval da exceção entregue ao banco de CSRs.
 	signal csr_trap_tval      : word_t;
 	-- Indica que o campo rs1/zimm da instrução CSR é igual a zero.
@@ -228,6 +244,12 @@ architecture rtl of stage_ex is
 	signal csr_wdata          : word_t;
 	-- Valor antigo lido do registrador CSR selecionado.
 	signal csr_rdata          : word_t;
+	-- O endereço da instrução CSR em EX é do banco do Zihpm (leitura registrada).
+	signal csr_bank_read      : std_logic;
+	-- Já houve o ciclo de parada da instrução CSR que está em EX.
+	signal csr_wait_done      : std_logic := '0';
+	-- Parada deste ciclo.
+	signal csr_wait_now       : std_logic;
 	-- Indica acesso ilegal a registrador CSR.
 	signal csr_illegal        : std_logic;
 	-- Pulso interno de tomada de trap síncrono.
@@ -463,6 +485,18 @@ begin
 		csr_trap_tval  <= i_mem_trap_tval  when i_mem_trap_take = '1' else trap_tval;
 
 		csr_commit   <= i_is_csr and i_valid and i_pipe_run;
+		csr_wait_now <= i_is_csr and i_valid_raw and csr_bank_read and (not csr_wait_done);
+		o_csr_wait   <= csr_wait_now;
+		process (i_clk)
+		begin
+			if rising_edge(i_clk) then
+				if i_rst = '1' then
+					csr_wait_done <= '0';
+				else
+					csr_wait_done <= csr_wait_now;
+				end if;
+			end if;
+		end process;
 		csr_src_zero <= '1' when i_rs1_idx = REG_ZERO else '0';
 		csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
 		                (31 downto 5 => '0') & i_rs1_idx;
@@ -476,7 +510,10 @@ begin
 				has_zihpm    => has_zihpm,
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_interrupts => has_interrupts
+				has_interrupts => has_interrupts,
+				has_sscofpmf => has_sscofpmf,
+				time_external => time_external,
+				hpm_registered_read => true
 			)
 			port map (
 				i_clk        => i_clk,
@@ -487,6 +524,7 @@ begin
 				i_wdata      => csr_wdata,
 				i_src_zero   => csr_src_zero,
 				o_rdata      => csr_rdata,
+				o_bank_read  => csr_bank_read,
 				o_illegal    => csr_illegal,
 				i_trap_take  => csr_trap_take,
 				i_trap_cause => csr_trap_cause,
@@ -498,6 +536,7 @@ begin
 				i_events     => i_hpm_events,
 				o_mtvec      => csr_mtvec,
 				o_mepc       => csr_mepc,
+				i_mtime        => i_mtime,
 				i_irq_software => i_irq_software,
 				i_irq_timer    => i_irq_timer,
 				i_irq_external => i_irq_external,
@@ -522,12 +561,18 @@ begin
 		sig_tval  <= (others => '0');
 		sig_mret  <= '0';
 
+		-- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho da ULA.
+		fetch_ok <= '1' when (not has_access_faults) or addr_executable(unsigned(i_pc), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else '0';
+
 		u_trap_unit : entity work.trap_unit
 			generic map (
 				has_zicclsm => has_zicclsm,
-				check_ea    => false
+				check_ea    => false,
+				has_access_faults => has_access_faults
 			)
 			port map (
+				i_fetch_ok    => fetch_ok,
+				i_pc          => i_pc,
 				i_ex_valid    => i_valid,
 				i_run         => i_pipe_run,
 				i_opcode      => i_opcode,
@@ -554,7 +599,7 @@ begin
 			generic map (
 				has_zicclsm     => has_zicclsm,
 				check_ea        => true,
-				boot_rom_bits   => boot_rom_bits,
+				boot_memory_bits   => boot_memory_bits,
 				rom_end_kib     => rom_end_kib,
 				rom_external    => rom_external,
 				ram_base_kib    => ram_base_kib,
@@ -596,9 +641,12 @@ begin
 		ex_cf_taken   <= '0';
 		ex_cf_target  <= (others => '0');
 		csr_commit    <= '0';
+		csr_wait_now  <= '0';
+		o_csr_wait    <= '0';
 		csr_src_zero  <= '0';
 		csr_wdata     <= (others => '0');
 		csr_rdata     <= (others => '0');
+		csr_bank_read <= '0';
 		csr_illegal   <= '0';
 	end generate gen_csr;
 
@@ -609,7 +657,7 @@ begin
 	o_mret_take   <= mret_take_int;
 
 	-- Uma interrupção no modo vetorado vai a BASE + 4 x causa; a BASE tem 64 bytes de alinhamento nesse modo e a
-	-- causa vale no máximo 11, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
+	-- causa vale no máximo 13, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
 	irq_vector_pc <= csr_mtvec(31 downto 6) & trap_cause(3 downto 0) & BYTE_OFFSET_0;
 
 	o_redirect_pc <= csr_mepc       when mret_take_int   = '1' else
@@ -655,6 +703,7 @@ begin
 	-- O endereço alvo de JALR ((rs1 + imm) & ~1) já é calculado por u_alu via ALU_JALR.
 	o_branch_target  <= branch_target_int;
 	o_jalr_target    <= ex_alu_result;
+	o_alu_result     <= ex_alu_result;
 	o_branch_taken   <= branch_taken_int;
 	o_jalr_taken     <= jalr_taken_int;
 

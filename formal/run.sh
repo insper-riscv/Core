@@ -107,6 +107,13 @@ netlist_tree() {
   scan_warnings "$log"
 }
 
+# Probes: a property that keeps a model of a register outside the unit cannot be proven by induction on its own,
+# because the induction starts from any state of the unit and the model is free. The fix is an invariant that
+# says the model is the register, so prove connects (PROBES) wires of props to nets of the flattened netlist
+# (dut.<net>) with the yosys command connect. For abc-bmc3, the flatten and the opt_clean -purge drop the aliases
+# of the clock (dut.i_clk and the like): with them the AIGER writer takes an alias for the representative of the
+# clock net, which is not an input, and warns that the clock is an undriven bit.
+#
 # prove <netlist> <props> <mode: prove|bmc|cover> <depth> <defines> <tag>  ->  PASS, FAIL, SKIP or ERROR
 # PASS is sby exit code 0, FAIL is 2 (a counterexample or a goal that cannot be covered) and any other code
 # (4 unknown, 8 timeout, 16 error, 124 the FORMAL_TIMEOUT) is ERROR: the tool did not reach a verdict. The
@@ -115,7 +122,11 @@ netlist_tree() {
 # The verdict, the exit code and the milliseconds go to <tag>.res, and the tag to .last, for expect.
 prove() {
   echo "$6" > "$out/.last"
-  local engine_lines script_lines options_lines="" rc=0 verdict began ended
+  local engine_lines script_lines options_lines="" probe_lines="" probe rc=0 verdict began ended
+  # PROBES is a list of <wire of props>=<net of the netlist>: the wire is connected to the register of the unit, so that
+  # a property can state the invariant that ties the model to the state of the design (see "probes" above).
+  for probe in ${PROBES:-}; do probe_lines+=$'\n'"connect -set ${probe%%=*} ${probe#*=}"; done
+  [ -z "$probe_lines" ] || probe_lines=$'hierarchy -top props\nproc\nflatten\ncd props'"$probe_lines"$'\ncd'
   case "$engine" in
     abc-bmc3)
       if [ "$3" != bmc ]; then
@@ -123,7 +134,7 @@ prove() {
       fi
       engine_lines="abc bmc3"
       options_lines="aigsmt none"
-      script_lines=$'techmap\nopt -fast\nsetundef -anyseq' ;;
+      script_lines=$'flatten\nsetundef -undriven -anyseq\nopt_clean -purge\ntechmap\nopt -fast\nsetundef -anyseq' ;;
     *) engine_lines="smtbmc $engine"; script_lines="" ;;
   esac
   cat > "$6.sby" <<EOS
@@ -135,6 +146,7 @@ $options_lines
 $engine_lines
 [script]
 read_verilog -formal -sv $5 $1 $2
+$probe_lines
 prep -top props
 $script_lines
 [files]
@@ -188,6 +200,13 @@ expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (
 echo "trap_unit with an interrupt to take"
 expect "the interrupt is taken on a valid, advancing instruction that is not FENCE.I, wins over every exception and MRET, carries its cause and mtval 0 (induction)" PASS "$(prove trap.v "$trap_props" prove 2 '-DIRQ' trap_irq)"
 expect "cover: an interrupt over ecall, over MRET, over an illegal instruction, over a misaligned jump and over a load, and a deferred FENCE.I are reachable" PASS "$(prove trap.v "$trap_props" cover 2 '-DIRQ -DCOVER' trap_irq_cover)"
+
+echo "trap_unit with access faults"
+trap_af_props="$root/formal/trap_af_props.sv"
+trap_af_gens="-ghas_access_faults=true"
+netlist "$trap" trap_unit trap_af "$trap_af_gens"
+expect "fetch fault is cause 1 with the PC and beats everything, a load or store the map refuses is cause 5 or 7 with the address, nothing else raises them (induction)" PASS "$(prove trap_af.v "$trap_af_props" prove 2 '' trap_af_safety)"
+expect "cover: causes 1, 5 and 7, a fetch fault over an illegal instruction and a misaligned load fault are reachable" PASS "$(prove trap_af.v "$trap_af_props" cover 2 '-DCOVER' trap_af_cover)"
 
 echo "counter64"
 cnt="$root/src/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
@@ -251,12 +270,30 @@ expect "width 0: no real counter, all 29 indices read zero (bounded, 6 cycles)" 
 
 echo "csr_file with interrupts"
 csr_irq_props="$root/formal/csr_irq_props.sv"
-# The model keeps the three mask bits of mie, which the register holds outside the unit proven by induction, so the proofs are bounded from reset: they check the wiring (positions, read-only mip, mask, pending).
+# The model keeps the mask bits of mie, MIE and MPIE of mstatus and mtvec, which are registers of the unit. The
+# invariant that the model is the register uses probes (see "Probes" above), so the proofs are by induction.
+irq_probes="pr_en=dut.irq_en_reg pr_mie=dut.mstatus_mie pr_mpie=dut.mstatus_mpie pr_mode=dut.mtvec_mode pr_mtvec=dut.mtvec_reg"
+PROBES="$irq_probes"
 netlist "$csr" csr_file csri "-ghas_interrupts=true"
-expect "mip reads the three lines, mie keeps bits 3, 7 and 11, a write to mip changes nothing, pending is lines and mask (bounded, 6 cycles)" PASS "$(prove csri.v "$csr_irq_props" bmc 6 '' csri_safety)"
+expect "mip reads the three lines, mie keeps bits 3, 7 and 11, a write to mip changes nothing, pending is lines and mask, take needs MIE, the cause has the priority external, software, timer, mtvec keeps BASE and MODE (induction)" PASS "$(prove csri.v "$csr_irq_props" prove 4 '' csri_safety)"
+expect "the same properties, bounded from reset (bounded, 6 cycles; the only form the abc-bmc3 engine answers)" PASS "$(prove csri.v "$csr_irq_props" bmc 6 '' csri_bounded)"
 expect "cover: a pending timer alone, a mie write setting MTIE and a write to mip are reachable" PASS "$(prove csri.v "$csr_irq_props" cover 12 '-DCOVER' csri_cover)"
 netlist "$csr" csr_file csrio "-ghas_interrupts=false"
-expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (bounded, 6 cycles)" PASS "$(prove csrio.v "$csr_irq_props" bmc 6 '-DOFF' csrio_safety)"
+expect "without the generic the lines are ignored: mip and mie read zero, writes change nothing, pending is 0 (induction)" PASS "$(prove csrio.v "$csr_irq_props" prove 4 '-DOFF' csrio_safety)"
+PROBES=""
+
+echo "csr_file with time_external"
+csr_time_props="$root/formal/csr_time_props.sv"
+time_gens="-ghas_zicntr=true -gtime_external=true"
+netlist "$csr" csr_file csrt "$time_gens"
+expect "time and timeh read the halves of the mtime port, a write to them is illegal and a read is not (bounded, 4 cycles)" PASS "$(prove csrt.v "$csr_time_props" bmc 4 '' csrt_safety)"
+expect "cover: a read of timeh with a nonzero mtime and a write to time are reachable" PASS "$(prove csrt.v "$csr_time_props" cover 6 '-DCOVER' csrt_cover)"
+echo "csr_file with Sscofpmf"
+csr_ofp_props="$root/formal/csr_ofp_props.sv"
+ofp_gens="-ghas_zihpm=true -ghpm_counters=2 -ghpm_width=3 -ghas_interrupts=true -ghas_sscofpmf=true"
+netlist "$csr" csr_file csrof "$ofp_gens"
+expect "OF, MINH, LCOFIP and LCOFIE follow the model: the overflow sets OF and, with OF clear, LCOFIP; the timer goes before LCOFI; a counter past the real ones reads zero (bounded, 10 cycles)" PASS "$(prove csrof.v "$csr_ofp_props" bmc 10 '-DNHPM=2 -DWIDTH=3' csrof_safety)"
+expect "cover: an overflow with OF clear and with OF set, a pending LCOFI taken, both pending, OF and LCOFIP cleared by software, an event ignored because MINH is set are reachable" PASS "$(prove csrof.v "$csr_ofp_props" cover 14 '-DNHPM=2 -DWIDTH=3 -DCOVER' csrof_cover)"
 
 echo "stage_ex with interrupts"
 stage_props="$root/formal/stage_ex_irq_props.sv"
@@ -316,7 +353,14 @@ mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1/i_ea(1 downto 0) = BYTE_OFFSET_1/"
-mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= cf_misal or i_illegal or/has_exc <= cf_misal or/"
+mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= fetch_fault or cf_misal or any_illegal or/has_exc <= fetch_fault or cf_misal or/"
+mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
+
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT   when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned "s/ and st_misal = '0') else '0';/) else '0';/;s/CAUSE_MISALIGNED_ST when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc        when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT   when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
 
 # Mutants of the interrupt entry in the trap unit and in the CSR bank, one defect each.
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_keeps_mret   "s/ and (not irq_go);/;/"
@@ -326,6 +370,7 @@ mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_loses_to_exception "
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_run  "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_ex_valid and/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_valid "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_run and/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_flag_always  "s/o_irq       <= irq_go;/o_irq       <= i_irq_take;/"
+PROBES="$irq_probes"
 mutant "$csr" "$csr_irq_props" csr_file '' irq_take_ignores_mie "s/o_irq_take    <= mstatus_mie when/o_irq_take    <= '1' when/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_software_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_SOFTWARE when irq_pend_vec(IRQ_IDX_SOFTWARE) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_timer_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_TIMER when irq_pend_vec(IRQ_IDX_TIMER) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
@@ -333,6 +378,7 @@ mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_mode_lost "s/mtvec_mode_nxt
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_unaligned_vector "s/(others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2)/new_value(5 downto 2)/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_mtvec_mode_without_interrupts "s/mtvec_mode <= '0';/mtvec_mode <= i_wdata(0);/" "-ghas_interrupts=false" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_bit1_reads_mode "s/mtvec_reg(31 downto 2) \& '0' \& mtvec_mode;/mtvec_reg(31 downto 2) \& mtvec_mode \& mtvec_mode;/" "-ghas_interrupts=true" 6
+PROBES=""
 
 # Mutants of the interrupt entry in stage_ex, one defect each (the whole tree is analyzed again for each).
 ex_file="$root/src/core/stage_ex.vhd"
@@ -398,16 +444,30 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inh
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (bool_to_sl(SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
+# Mutants of the Sscofpmf extension.
+ofp="-DNHPM=2 -DWIDTH=3"
+mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(31 downto 0);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
+mutant_bank "$csr" "$csr_time_props" '' time_hi_zero "s/time_hi   <= i_mtime(63 downto 32);/time_hi   <= (others => '0');/" "$time_gens" 4
+mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_request_ignores_of "s/ovf_req(n)     <= wrap and (not of_q);/ovf_req(n)     <= wrap;/" "$ofp_gens" 10
+mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d      <= wrap or i_wdata(31);/of_d      <= i_wdata(31);/" "$ofp_gens" 10
+mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
+mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_of_not_sticky "s/of_en     <= wrap or eventh_we;/of_en     <= eventh_we;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI    when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost "s/lcofip_we  <= ovf_irq or (csr_write_valid and bool_to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofie_ignored "s/lcofi_pend <= lcofip and lcofie;/lcofi_pend <= lcofip;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range  <= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
 
 # Mutants of the interrupts in csr_file, one defect each.
+PROBES="$irq_probes"
 mutant "$csr" "$csr_irq_props" csr_file '' irq_lines_swapped "s/(i_irq_external \& i_irq_timer \& i_irq_software)/(i_irq_external \& i_irq_software \& i_irq_timer)/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/irq_pend_vec  <= irq_in and irq_en_reg;/irq_pend_vec  <= irq_in;/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_write_lost "s/i_enable => irq_en_we,/i_enable => '0',/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_bit_moved "s/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_EXTERNAL);/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_read_wrong_bit "s/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_SOFTWARE),/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_ports_not_gated "s/when has_interrupts else (others => '0');/when true else (others => '0');/" "-ghas_interrupts=false" 6
+PROBES=""
 
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_family_confused "s/i_funct3(2) = rec_funct3(2) and//" "" 10
@@ -420,6 +480,8 @@ mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = LO_ALL_ONES/lo
 mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=33' width_one_bit_wider "s/HI_WIDTH : natural := width - LO_WIDTH;/HI_WIDTH : natural := width - LO_WIDTH + 1;/" "-gwidth=33"
 mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata(LO_WIDTH - 1 downto 0) when/lo_nxt <= std_logic_vector(unsigned(i_wdata(LO_WIDTH - 1 downto 0)) + 1) when/"
 mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
+mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=33' wrap_without_hi "s/o_wrap      <= carry and hi_all_ones;/o_wrap      <= carry;/" "-gwidth=33"
+mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=20' wrap_on_lo_write "s/lo_wrap_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and/lo_wrap_nxt <= '1' when (i_inc = '1' and/" "-gwidth=20"
 
 mutant "$zc" "$zc_props" zicond_unit '' zc_eqz_inverted   "s/(is_eqz and rs2_zero)/(is_eqz and not rs2_zero)/" "" 2
 mutant "$zc" "$zc_props" zicond_unit '' zc_nez_inverted   "s/(is_nez and not rs2_zero)/(is_nez and rs2_zero)/" "" 2

@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-trap_unit with an external ROM that starts right after the BOOT_ROM
+trap_unit with an external ROM that starts right after the BOOT_MEMORY
 (256 KiB) and an external RAM at 0x40000000: the ROM is main memory, as
 the instruction cache and the data cache serve it like the RAM.
 """
@@ -51,10 +51,10 @@ async def test_access_crossing_a_word_is_executed_in_the_rom(dut):
 
 
 @cocotb.test()
-async def test_boot_rom_and_peripherals_trap(dut):
-    """Verifica que a boot rom e os perifericos nao executam o acesso.
+async def test_boot_memory_and_peripherals_trap(dut):
+    """Verifica que a memória de boot e os periféricos não acessam.
 
-    The BOOT_ROM and the addresses above the SDRAM take the trap.
+    The BOOT_MEMORY and the addresses above the SDRAM take the trap.
     """
     for opcode, funct3, cause in IN_WORD:
         for base in OUTSIDE_MAIN_MEMORY:
