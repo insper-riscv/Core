@@ -52,7 +52,7 @@ async def test_access_crossing_a_word_is_executed_in_the_rom(dut):
 
 @cocotb.test()
 async def test_boot_memory_and_peripherals_trap(dut):
-    """Verifica que a memória de boot e os perifericos nao executam o acesso.
+    """Verifica que a memória de boot e os periféricos não acessam.
 
     The BOOT_MEMORY and the addresses above the SDRAM take the trap.
     """

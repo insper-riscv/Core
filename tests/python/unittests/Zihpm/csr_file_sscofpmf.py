@@ -1,8 +1,10 @@
 """Testes do modulo.
 
-csr_file com a extensão Sscofpmf: os bits OF e MINH de mhpmeventNh, o pedido de interrupção de estouro (LCOFI,
-causa 13), os bits 13 de mip e mie e a prioridade da interrupção. Os genéricos vêm da entrada do tests.json:
-com has_sscofpmf desligado os endereços de mhpmeventNh são inexistentes e o bit 13 lê zero.
+csr_file com a extensão Sscofpmf: os bits OF e MINH de mhpmeventNh, o
+pedido de interrupção de estouro (LCOFI, causa 13), os bits 13 de mip e
+mie e a prioridade da interrupção. Os genéricos vêm da entrada do
+tests.json: com has_sscofpmf desligado os endereços de mhpmeventNh são
+inexistentes e o bit 13 lê zero.
 """
 
 import cocotb
@@ -24,10 +26,11 @@ LCOFI = 1 << 13
 CAUSE_LCOFI = 0x8000000D
 CAUSE_TIMER = 0x80000007
 CODE = 3
+WORD_BITS = 32
 
 
 def _generics(dut):
-    """Return (has_sscofpmf, hpm_counters, hpm_width) of the instance."""
+    """Return (has_sscofpmf, hpm_counters, hpm_width) of the DUT."""
     return (
         bool(int(dut.has_sscofpmf.value)),
         int(dut.hpm_counters.value),
@@ -36,13 +39,13 @@ def _generics(dut):
 
 
 async def _arm(dut, index, remaining):
-    """Select the event, set the counter `remaining` counts below its wrap."""
+    """Select the event, set the counter `remaining` below its wrap."""
     _, _, width = _generics(dut)
     await write(dut, EVENT + index, CODE)
     top = (1 << width) - remaining
     await write(dut, MLO + index, top & 0xFFFFFFFF)
-    if width > 32:
-        await write(dut, MHI + index, top >> 32)
+    if width > WORD_BITS:
+        await write(dut, MHI + index, top >> WORD_BITS)
 
 
 async def _lines(dut):
@@ -107,22 +110,23 @@ async def test_overflow_sets_of_and_lcofip_and_raises_the_interrupt(dut):
 
 
 @cocotb.test()
-async def test_a_write_never_overflows_and_an_overflow_with_of_set_asks_nothing(
-    dut,
-):
-    """Verifica a escrita não estoura e o OF em 1 desabilita o pedido."""
+async def test_a_write_never_overflows_and_of_set_asks_nothing(dut):
+    """Verifica que a escrita não estoura e o OF em 1 não pede."""
     present, _, width = _generics(dut)
     if not present:
         return
     await reset(dut)
     await write(dut, EVENT + 3, CODE)
-    await write(dut, MLO + 3, 0xFFFFFFFF if width >= 32 else (1 << width) - 1)
-    if width > 32:
-        await write(dut, MHI + 3, (1 << (width - 32)) - 1)
+    await write(
+        dut, MLO + 3, 0xFFFFFFFF if width >= WORD_BITS else (1 << width) - 1
+    )
+    if width > WORD_BITS:
+        await write(dut, MHI + 3, (1 << (width - WORD_BITS)) - 1)
     await pulses(dut, 0, 4)
     check_equal(await read(dut, EVENTH + 3), 0, "a write overflowed")
     check_equal(await read(dut, MIP), 0)
-    # Software sets OF (the interrupt is disabled for this counter): the overflow asks for nothing.
+    # Software sets OF (the interrupt is disabled for this counter): the
+    # overflow asks for nothing.
     await write(dut, EVENTH + 3, OF)
     await pulses(dut, CODE, 1)
     await pulses(dut, 0, 4)
@@ -135,7 +139,8 @@ async def test_a_write_never_overflows_and_an_overflow_with_of_set_asks_nothing(
     await pulses(dut, 0, 4)
     check_equal(await read(dut, EVENTH + 3), OF)
     check_equal(await read(dut, MIP), LCOFI)
-    # LCOFIP is cleared by a write to mip, and OF is only cleared by its own write.
+    # LCOFIP is cleared by a write to mip, and OF is only cleared by its
+    # own write.
     await write(dut, MIP, 0)
     check_equal(await read(dut, MIP), 0)
     check_equal(await read(dut, EVENTH + 3), OF)
@@ -180,7 +185,7 @@ async def test_lcofi_has_the_lowest_priority(dut):
 
 @cocotb.test()
 async def test_absent_counters_read_zero_in_the_high_selector(dut):
-    """Verifica os índices sem contador leem zero e ignoram a escrita."""
+    """Verifica que os índices sem contador leem zero."""
     present, counters, _ = _generics(dut)
     if not present:
         return

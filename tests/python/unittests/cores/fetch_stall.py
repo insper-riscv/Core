@@ -98,7 +98,7 @@ EXPECTED_RAM = {
 
 
 class _Model:
-    """Boot memory, stalled instruction fetch and RAM around the core."""
+    """Boot memory, stalled fetch and RAM around the core."""
 
     def __init__(self, latency_for):
         """Wait latency_for(n) cycles on the n-th new fetch address."""
@@ -136,8 +136,9 @@ class _Model:
                 self.wait = self.latency_for(self.fetches)
                 self.fetches += 1
         dut.i_ic_data.value = self.code.get(addr, 0)
-        # the wait of an address runs on even if the core goes to another
-        # address and comes back (replay of a fetch without a response)
+        # the wait of an address runs on even if the core goes to
+        # another address and comes back (replay of a fetch without a
+        # response)
         if self.pending is not None:
             if self.wait == 0:
                 self.done, self.pending = self.pending, None

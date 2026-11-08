@@ -246,11 +246,13 @@ async def test_a_read_right_after_a_write_sees_the_new_value(dut):
 
 INSTRET = 0xC02
 HIGH_BIT = 0x40000000
+# Limite abaixo do qual o instret lido não carrega bits do contador.
+INSTRET_LIMIT = 0x1000
 
 
 @cocotb.test()
 async def test_a_counter_read_does_not_leak_into_the_next_csr_read(dut):
-    """Verifica que o valor lido do banco nao se mistura com a leitura seguinte.
+    """Verifica que o valor lido do banco não vaza na leitura seguinte.
 
     A leitura registrada do banco guarda o valor do contador lido; o CSR
     lido logo depois (instret) nao pode receber esses bits.
@@ -271,6 +273,6 @@ async def test_a_counter_read_does_not_leak_into_the_next_csr_read(dut):
     ram = await run_program(dut, prog, max_cycles=3000)
     check_equal(ram[RAM_BASE], HIGH_BIT, "o contador devolve o valor escrito")
     check_true(
-        ram[RAM_BASE + 4] < 0x1000,
+        ram[RAM_BASE + 4] < INSTRET_LIMIT,
         f"instret sem os bits do contador, leu {ram[RAM_BASE + 4]:#x}",
     )

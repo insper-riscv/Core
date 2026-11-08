@@ -147,7 +147,7 @@ def build():
 
 @cocotb.test()
 async def test_trap_priority_and_csr_space(dut):
-    """Verifica a causa e o mtval de cada caso e que os legais não trapam."""
+    """Verifica a causa e o mtval de cada caso; os legais não trapam."""
     ram = await run_program(dut, build(), max_cycles=12000)
     slot = 0
     for index, (_word, cause, tval) in enumerate(CASES):

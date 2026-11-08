@@ -50,7 +50,7 @@ async def _reset(dut):
 
 
 async def _count(dut, idx, pulses):
-    """Escolhe o evento EVENT para o contador idx e conta pulses ciclos."""
+    """Escolhe o evento EVENT para o contador idx e conta os ciclos."""
     await _drive(dut, "event", idx, 1, EVENT)
     await _clock(dut)
     for _ in range(pulses):

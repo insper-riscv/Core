@@ -4,6 +4,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
+from tests.python.unittests.checks import check_equal
 from tests.python.unittests.common.stage_register import (
     StageRegister,
     check_stage_register,
@@ -52,10 +53,10 @@ async def test_address_class_is_registered(dut):
     """Verifica a classificação do endereço registrada em EX/MEM."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_rst.value = 0
-    assert await classify(dut, 0x00000010) == (1, 0)
-    assert await classify(dut, 0x40000010) == (0, 1)
-    assert await classify(dut, 0x00010000) == (0, 0)
+    check_equal(await classify(dut, 0x00000010), (1, 0))
+    check_equal(await classify(dut, 0x40000010), (0, 1))
+    check_equal(await classify(dut, 0x00010000), (0, 0))
     dut.i_flush.value = 1
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
-    assert (int(dut.o_is_flash.value), int(dut.o_is_sdram.value)) == (0, 0)
+    check_equal((int(dut.o_is_flash.value), int(dut.o_is_sdram.value)), (0, 0))

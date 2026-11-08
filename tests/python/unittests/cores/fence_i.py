@@ -100,14 +100,14 @@ class _Model:
             return
         line = addr & ~0xF
         if line not in self.lines:
-            self._fill(addr, line)
+            self._fill(line)
         if line in self.lines:
             dut.i_ic_data.value = self.lines[line][(addr >> 2) & 3]
             dut.i_ic_ready.value = 1
         else:
             dut.i_ic_ready.value = 0
 
-    def _fill(self, addr, line):
+    def _fill(self, line):
         """Count the miss latency down, then fetch the line.
 
         The fill runs on its own: it goes on while the core changes the

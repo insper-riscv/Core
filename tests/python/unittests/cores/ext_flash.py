@@ -83,8 +83,8 @@ async def test_the_same_result_with_stalls(dut):
 async def test_code_in_the_flash_is_fetched_through_the_instruction_cache(dut):
     """Verifica a busca de código da flash pela cache de instruções.
 
-    The PC moves from the boot memory into 0x20000000; the word comes from
-    the cache port, not the flash port.
+    The PC moves from the boot memory into 0x20000000; the word comes
+    from the cache port, not the flash port.
     """
     boot = [
         addi(0, 0, 0),

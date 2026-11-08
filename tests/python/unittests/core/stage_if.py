@@ -139,9 +139,7 @@ async def test_icache_miss_replays_the_fetch(dut):
         await apply(dut, {"hdu_pc_we": 1, "ic_ready": 0, "ifid_pc": SDRAM})
         check_equal(int(dut.o_replay.value), 1, "repete a busca")
         check_equal(
-            await step(
-                dut, {"hdu_pc_we": 1, "ic_ready": 0, "ifid_pc": SDRAM}
-            ),
+            await step(dut, {"hdu_pc_we": 1, "ic_ready": 0, "ifid_pc": SDRAM}),
             SDRAM,
             "o PC volta",
         )
@@ -164,9 +162,7 @@ async def test_replay_waits_for_the_pipeline(dut):
         await apply(dut, {"hdu_pc_we": 0, "ifid_en": 0, "ifid_pc": SDRAM})
         check_equal(int(dut.o_replay.value), 0, "parada")
         check_equal(
-            await step(
-                dut, {"hdu_pc_we": 0, "ifid_en": 0, "ifid_pc": SDRAM}
-            ),
+            await step(dut, {"hdu_pc_we": 0, "ifid_en": 0, "ifid_pc": SDRAM}),
             SDRAM + 4,
             "PC parado",
         )

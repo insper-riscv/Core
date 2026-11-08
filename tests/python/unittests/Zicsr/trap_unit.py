@@ -257,9 +257,9 @@ async def test_undefined_encoding_needs_a_running_valid_instruction(dut):
 async def test_illegal_goes_before_misaligned_target(dut):
     """Verifica illegal goes before misaligned target.
 
-    A flagged instruction with a misaligned target traps with cause 2 and
-    mtval zero (Table 17 of the privileged manual: illegal instruction
-    over instruction address misaligned).
+    A flagged instruction with a misaligned target traps with cause 2
+    and mtval zero (Table 17 of the privileged manual: illegal
+    instruction over instruction address misaligned).
     """
     take, _, cause, tval = await probe(
         dut, illegal=1, cf_taken=1, cf_target=0x102
