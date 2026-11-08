@@ -16,6 +16,7 @@ Todo código de hardware do projeto é escrito e validado sob a norma **IEEE 107
 | Instanciação de módulos | Usar instanciação direta de entidade (`u_nome : entity work.nome_da_entidade`), sem declarações `component` redundantes |
 | Mapeamento de portas (`port map`) | Associar sempre por nome (`i_porta => sinal`) e utilizar sinais intermediários para expressões lógicas ou fatias dinâmicas, pois o GHDL exige expressões globalmente estáticas nos formais/atuais de porta |
 | Inferência de latches | Todo sinal atribuído em processo combinacional ou atribuição condicional deve receber valor padrão explícito em todos os ramos (`else` / `when others =>`) |
+| Asserts de configuração | Toda dependência entre generics (por exemplo, "exige" no comentário) e toda faixa de generic têm um `assert ... severity failure` no topo da entidade, e a mensagem sempre traz o nome do generic e a causa (`has_zicntr exige has_zicsr: os contadores são CSRs`) |
 
 A norma de referência é a [IEEE Std 1076-2008, IEEE Standard VHDL Language Reference Manual](https://standards.ieee.org/ieee/1076/3666/). Em trabalhos acadêmicos, cite-a com a entrada BibTeX abaixo:
 

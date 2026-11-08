@@ -16,6 +16,7 @@ All hardware code in the project is written and validated under the **IEEE 1076-
 | Module instantiation | Use direct entity instantiation (`u_name : entity work.entity_name`), without redundant `component` declarations |
 | Port mapping (`port map`) | Always associate by name (`i_port => signal`) and use intermediate signals for logical expressions or dynamic slices, because GHDL requires globally static expressions in port map actuals |
 | Latch prevention | Every signal assigned in a combinational process or conditional assignment must receive an explicit default value across all branches (`else` / `when others =>`) |
+| Configuration asserts | Every dependency between generics (for example, "requires" in the comment) and every generic range has an `assert ... severity failure` at the top of the entity, and the message always carries the generic name and the cause (`has_zicntr requires has_zicsr: the counters are CSRs`) |
 
 The reference standard is [IEEE Std 1076-2008, IEEE Standard VHDL Language Reference Manual](https://standards.ieee.org/ieee/1076/3666/). In academic work, cite it with the BibTeX entry below:
 

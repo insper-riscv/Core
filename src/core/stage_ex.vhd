@@ -61,18 +61,23 @@ entity stage_ex is
 		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		rom_end_kib     : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ram_end_kib     : natural := 1048576;
 		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		periph_base_kib : natural := 2097152
 	);
 	port (
@@ -315,6 +320,41 @@ architecture rtl of stage_ex is
 	signal jalr_taken_int     : std_logic;
 
 begin
+
+	-- ---------------------------------------------------------------------------
+	-- Checagem de configuração dos generics: falha na elaboração, com o nome do
+	-- generic e a causa. Uma linha por dependência.
+	-- ---------------------------------------------------------------------------
+
+	-- Os contadores do Zicntr são CSRs do csr_file, que só existe com Zicsr.
+	assert has_zicsr or (not has_zicntr)
+		report "has_zicntr exige has_zicsr: os contadores são CSRs"
+		severity failure;
+
+	-- Os contadores de eventos do Zihpm são CSRs do csr_file.
+	assert has_zicsr or (not has_zihpm)
+		report "has_zihpm exige has_zicsr: os contadores de eventos são CSRs"
+		severity failure;
+
+	-- mip e mie são CSRs do csr_file.
+	assert has_zicsr or (not has_interrupts)
+		report "has_interrupts exige has_zicsr: mip e mie são CSRs"
+		severity failure;
+
+	-- A Sscofpmf tem as fontes de estouro no Zihpm.
+	assert has_zihpm or (not has_sscofpmf)
+		report "has_sscofpmf exige has_zihpm: as fontes de estouro são os contadores de eventos"
+		severity failure;
+
+	-- A Sscofpmf entrega a interrupção de estouro pelo mip e pelo mie.
+	assert has_interrupts or (not has_sscofpmf)
+		report "has_sscofpmf exige has_interrupts: a interrupção LCOFI sai pelo mip e pelo mie"
+		severity failure;
+
+	-- A falha de acesso de instrução é um trap da unidade de traps, que só existe com Zicsr.
+	assert has_zicsr or (not has_access_faults)
+		report "has_access_faults exige has_zicsr: as falhas de acesso são traps"
+		severity failure;
 
 	-- =========================================================================
 	-- Unidade de Forwarding e Muxes de Operandos

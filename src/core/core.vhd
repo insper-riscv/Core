@@ -14,16 +14,25 @@ use work.fwd_consts.all;
 
 entity core is
 	generic (
+		-- ---------------------------------------------------------------------------
+		-- Seção ISA: extensões e base do conjunto de instruções que o núcleo implementa.
+		-- ---------------------------------------------------------------------------
 		-- Habilita a extensão M de multiplicação e divisão inteira.
 		has_m           : boolean := false;
 		-- Habilita só a multiplicação (extensão Zmmul), sem divisão; has_m já a inclui.
 		has_zmmul       : boolean := false;
+		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15) e instrução ilegal para x16 a x31; falso é o RV32I, de 32 registradores.
+		has_e           : boolean := false;
 		-- Habilita a extensão Zicsr e o tratamento de exceções do modo máquina.
 		has_zicsr       : boolean := false;
 		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time); exige has_zicsr.
 		has_zicntr      : boolean := false;
-		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
-		tick_cycles     : positive := 50;
+		-- Habilita a extensão Zihpm com os 29 endereços de contador de eventos (índices 3 a 31); é o token da matriz de perfis. Exige has_zicsr.
+		has_zihpm       : boolean := false;
+		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
+		has_interrupts  : boolean := false;
+		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
+		has_sscofpmf    : boolean := false;
 		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
 		has_zifencei    : boolean := false;
 		-- Habilita a extensão Zicond (czero.eqz e czero.nez).
@@ -36,40 +45,47 @@ entity core is
 		has_zihintpause : boolean := false;
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
 		has_zicclsm     : boolean := true;
-		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15) e instrução ilegal para x16 a x31; falso é o RV32I, de 32 registradores.
-		has_e           : boolean := false;
+
+		-- ---------------------------------------------------------------------------
+		-- Seção implementação: como o núcleo é construído, sem mudar a ISA visível ao software.
+		-- ---------------------------------------------------------------------------
 		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
 		has_dcache      : boolean := false;
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external    : boolean := false;
-		-- Base, em KiB, da RAM.
-		ram_base_kib    : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external    : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		ext_base_kib    : natural := 1048576;
-		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		periph_base_kib : natural := 2097152;
-		-- Habilita a extensão Zihpm com os 29 endereços de contador de eventos (índices 3 a 31); é o token da matriz de perfis. Exige has_zicsr.
-		has_zihpm       : boolean := false;
+		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa (BOOT_MEMORY, FLASH, RAM, janela externa e slots de periférico); exige Zicsr.
+		has_access_faults : boolean := false;
+		-- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
+		time_external   : boolean := false;
+		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
+		tick_cycles     : positive := 50;
 		-- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters); os outros leem zero.
 		hpm_counters    : natural range 0 to 29 := 29;
 		-- Largura em bits de cada contador de eventos real, de 0 a 64.
 		hpm_width       : natural range 0 to 64 := 64;
-		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
-		has_interrupts  : boolean := false;
-		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
-		has_sscofpmf    : boolean := false;
-		-- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
-		time_external   : boolean := false;
-		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa (BOOT_MEMORY, FLASH, RAM, janela externa e slots de periférico); exige Zicsr.
-		has_access_faults : boolean := false;
+
+		-- ---------------------------------------------------------------------------
+		-- Seção mapa de memória: endereços do mapa do Core, vindos do platform.yaml.
+		-- ---------------------------------------------------------------------------
+		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
+		boot_memory_bits   : natural := 12;
+		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
+		rom_end_kib     : natural := 32;
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		rom_external    : boolean := false;
+		-- Base, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
+		ram_base_kib    : natural := 32;
+		-- Fim exclusivo, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
+		ram_end_kib     : natural := 1048576;
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		ram_external    : boolean := false;
+		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
+		ext_base_kib    : natural := 1048576;
+		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
+		periph_base_kib : natural := 2097152;
 		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
 		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
@@ -539,19 +555,59 @@ begin
 	               others => '0');
 	o_retire      <= retire_pulse;
 
-	-- Os contadores são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not (has_zicntr or has_zihpm))
-		report "has_zicntr e has_zihpm exigem has_zicsr"
+	-- ---------------------------------------------------------------------------
+	-- Checagem de configuração dos generics: falha na elaboração, antes de
+	-- gerar hardware, com o nome do generic e a causa. Uma linha por dependência.
+	-- ---------------------------------------------------------------------------
+
+	-- Os contadores do Zicntr são CSRs: sem Zicsr não há onde lê-los.
+	assert has_zicsr or (not has_zicntr)
+		report "has_zicntr exige has_zicsr: os contadores são CSRs"
+		severity failure;
+
+	-- Os contadores de eventos do Zihpm são CSRs: sem Zicsr não há onde lê-los.
+	assert has_zicsr or (not has_zihpm)
+		report "has_zihpm exige has_zicsr: os contadores de eventos são CSRs"
 		severity failure;
 
 	-- mip e mie são CSRs: sem Zicsr não há onde lê-los.
 	assert has_zicsr or (not has_interrupts)
-		report "has_interrupts exige has_zicsr"
+		report "has_interrupts exige has_zicsr: mip e mie são CSRs"
 		severity failure;
 
-	-- A Sscofpmf tem as fontes de estouro no Zihpm e entrega a interrupção pelo mip e pelo mie.
-	assert (has_zihpm and has_interrupts) or (not has_sscofpmf)
-		report "has_sscofpmf exige has_zihpm e has_interrupts"
+	-- As falhas de acesso entram pela unidade de traps, que só existe com Zicsr.
+	assert has_zicsr or (not has_access_faults)
+		report "has_access_faults exige has_zicsr: as falhas de acesso são traps"
+		severity failure;
+
+	-- A Sscofpmf tem as fontes de estouro no Zihpm.
+	assert has_zihpm or (not has_sscofpmf)
+		report "has_sscofpmf exige has_zihpm: as fontes de estouro são os contadores de eventos"
+		severity failure;
+
+	-- A Sscofpmf entrega a interrupção de estouro pelo mip e pelo mie.
+	assert has_interrupts or (not has_sscofpmf)
+		report "has_sscofpmf exige has_interrupts: a interrupção LCOFI sai pelo mip e pelo mie"
+		severity failure;
+
+	-- Faixa do mapa: a BOOT_MEMORY de 2**boot_memory_bits bytes cabe num inteiro e na conversão de KiB para endereço de 32 bits.
+	assert boot_memory_bits <= 30
+		report "boot_memory_bits acima de 30: 2**boot_memory_bits não cabe no endereço"
+		severity failure;
+
+	-- Faixa do mapa: a RAM não termina antes de começar.
+	assert ram_base_kib <= ram_end_kib
+		report "ram_base_kib maior que ram_end_kib: a RAM teria tamanho negativo"
+		severity failure;
+
+	-- Faixa do mapa: a BOOT_MEMORY ocupa [0, 2**boot_memory_bits) e a RAM não pode começar dentro dela.
+	assert (2 ** boot_memory_bits) / 1024 <= ram_base_kib
+		report "ram_base_kib menor que o fim da BOOT_MEMORY (2**boot_memory_bits bytes): a RAM sobreporia a BOOT_MEMORY"
+		severity failure;
+
+	-- Faixa do mapa: as bases em KiB viram endereços de 32 bits (kib_to_addr), então ficam abaixo de 2**22 KiB.
+	assert ext_base_kib < 4194304 and periph_base_kib < 4194304
+		report "ext_base_kib e periph_base_kib devem ser menores que 4194304 KiB (4 GiB)"
 		severity failure;
 
 

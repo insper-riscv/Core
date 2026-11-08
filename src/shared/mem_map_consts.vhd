@@ -4,7 +4,7 @@
 -- O mapa é recebido pelo núcleo por genéricos de elaboração, e este pacote
 -- reúne as conversões de que os pontos de decodificação precisam (BOOT_MEMORY,
 -- ROM interna, janela externa e janela de periféricos). Cada projeto fixa os
--- limites no `config.yml` da sua plataforma.
+-- limites no `platform.yaml` da sua plataforma.
 -- =============================================================================
 
 library ieee;
