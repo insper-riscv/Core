@@ -35,7 +35,7 @@ The engine is chosen by the `FORMAL_ENGINE` variable.
 | `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | 376 s |
 | `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | 346 s |
 
-`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`alu`, `trap_unit` and the Zicond blocks, which ABC refuses), which leaves 53 of the 154 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do. The induction proofs of `mip`, `mie` and `mstatus.MIE` therefore have one more bounded form of 6 cycles (`csri_bounded`), the only one it answers.
+`abc-bmc3` only checks bounded properties of designs with registers. It skips the proofs by induction, the covers and the combinational blocks (`alu`, `trap_unit` and the Zicond blocks, which ABC refuses), which leaves 97 of the 164 proofs without an answer from it. A skip is not a failure: it is a proof the engine does not do. The induction proofs of `mip`, `mie` and `mstatus.MIE` therefore have one more bounded form of 6 cycles (`csri_bounded`), the only one it answers.
 
 The times are from one run with 4 CPUs and 8 GB, on a lab workstation with other jobs running in parallel.
 
@@ -57,6 +57,8 @@ The `formal/run.sh` script classifies the exit code of `sby` per proof.
 | | `skip` | the engine does not do this kind of proof |
 
 An `error` fails the run of the engine, even when the wanted verdict is `fail`, so that a broken engine does not pass for a caught mutant.
+
+The memory map comes from the `config_pkg`. The `CONFIG_FILE` variable of `formal/run.sh` replaces, in the source list of a proof, `src/common/src/config_pkg.vhd` with another package of the same unit name. The variants are in `formal/configs.yaml`, and `formal/config_variant.sh <name> <file>` writes the package of one of them from the default of the Common-Components. `make test` generates the same variants in `build/configs/<name>/config_pkg.vhd` (target `make configs`), which the entries of `tests/python/tests.json` list in place of the default. The blocks of the Common-Components, such as `counter64`, are proven in their own repository.
 
 ## 4. Result file
 

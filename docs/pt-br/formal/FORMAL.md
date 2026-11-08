@@ -35,7 +35,7 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 | `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | 376 s |
 | `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | 346 s |
 
-O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 53 das 154 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz. As provas de indução do `mip`, do `mie` e do `mstatus.MIE` têm por isso uma forma limitada de 6 ciclos a mais (`csri_bounded`), a única que ele responde.
+O `abc-bmc3` só verifica propriedades limitadas de projetos com registradores. Ele pula as provas de indução, os covers e os blocos combinacionais (a `alu`, o `trap_unit` e os blocos da Zicond, que o ABC recusa), o que deixa 97 das 164 provas sem resposta dele. Um pulo não é uma falha: é uma prova que o engine não faz. As provas de indução do `mip`, do `mie` e do `mstatus.MIE` têm por isso uma forma limitada de 6 ciclos a mais (`csri_bounded`), a única que ele responde.
 
 Os tempos são de uma execução com 4 CPUs e 8 GB, numa estação de laboratório com outros jobs em paralelo.
 
@@ -57,6 +57,8 @@ O script `formal/run.sh` classifica o código de saída do `sby` por prova.
 | | `skip` | o engine não faz esse tipo de prova |
 
 Um `error` reprova a execução do engine, mesmo quando o veredito esperado é `fail`, para que um engine quebrado não passe por um mutante pego.
+
+O mapa de memória vem do `config_pkg`. A variável `CONFIG_FILE` do `formal/run.sh` troca, na lista de fontes de uma prova, o `src/common/src/config_pkg.vhd` por outro pacote de mesmo nome de unidade. As variantes estão em `formal/configs.yaml`, e `formal/config_variant.sh <nome> <arquivo>` escreve o pacote de uma delas a partir do padrão do Common-Components. O `make test` gera as mesmas variantes em `build/configs/<nome>/config_pkg.vhd` (alvo `make configs`), que as entradas de `tests/python/tests.json` listam no lugar do padrão. Os blocos do Common-Components, como o `counter64`, são provados no repositório deles.
 
 ## 4. Arquivo de resultado
 
