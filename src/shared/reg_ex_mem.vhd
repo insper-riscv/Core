@@ -16,33 +16,13 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
 
 entity reg_ex_mem is
 
 	generic (
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo.
-		rom_external    : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib    : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo.
-		ram_external    : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib    : natural := 1048576;
-		-- Base, em KiB, da janela de periféricos: o fim da memória principal.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		periph_base_kib : natural := 2097152;
 		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa; exige Zicsr.
 		has_access_faults : boolean := false;
 		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
@@ -189,16 +169,16 @@ architecture rtl of reg_ex_mem is
 begin
 
 	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
-	in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end(rom_end_kib, rom_external) else '0';
-	in_is_sdram <= '1' when is_external_addr(unsigned(i_ea), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
-	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
-	                         unsigned(i_ea) < kib_to_addr(periph_base_kib)) else '0';
-	in_last     <= '1' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else '0';
+	in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end else '0';
+	in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
+	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base and
+	                         unsigned(i_ea) < PERIPH_BASE) else '0';
+	in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
 	-- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
 	gen_faults : if has_access_faults generate
-		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib, periph_slots) else '0';
-		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib, periph_slots) else '0';
+		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), periph_slots) else '0';
+		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), periph_slots) else '0';
 	end generate gen_faults;
 
 	gen_no_faults : if not has_access_faults generate

@@ -196,14 +196,14 @@ The retirement of an instruction in EX adds to `minstret` one cycle later, and a
 
 ### 6.7. Access Faults
 
-The `has_access_faults` generic (default `false`, needs `has_zicsr`) turns on causes 1, 5 and 7. The valid map comes from the same memory-map generics the Core already receives (`rom_end_kib`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`) and from the `periph_slots` generic, the mask of the 256 MiB windows of the peripheral bus that hold a peripheral (bit $n$ for the addresses whose bits 30:28 equal $n$), which `riscv-tools` writes to the map package as `PERIPH_SLOTS`. The extension is turned on by `extras: [AccessFaults]` in `platform.yaml`.
+The `has_access_faults` generic (default `false`, needs `has_zicsr`) turns on causes 1, 5 and 7. The valid map comes from the memory map constants of the `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` and `PERIPH_BASE`) and from the `periph_slots` generic, the mask of the 256 MiB windows of the peripheral bus that hold a peripheral (bit $n$ for the addresses whose bits 30:28 equal $n$), which `riscv-tools` writes to the map package as `PERIPH_SLOTS`. The extension is turned on by `extras: [AccessFaults]` in `platform.yaml`.
 
 | Region | Read | Write | Fetch |
 | :--- | :---: | :---: | :---: |
-| ROM, from zero to `rom_end_kib` (BOOT_MEMORY and FLASH) | Yes | No | Yes |
-| RAM, from `ram_base_kib` to `ram_end_kib` | Yes | Yes | Yes |
-| External window, from `ext_base_kib` to `periph_base_kib` | Yes | Yes | Yes |
-| Occupied peripheral window, from `periph_base_kib` up | Yes | Yes | No |
+| ROM, from zero to `ROM_END` (BOOT_MEMORY and FLASH) | Yes | No | Yes |
+| RAM, from `RAM_BASE` to `RAM_END` | Yes | Yes | Yes |
+| External window, from `EXT_BASE` to `PERIPH_BASE` | Yes | Yes | Yes |
+| Occupied peripheral window, from `PERIPH_BASE` up | Yes | Yes | No |
 | The rest (gaps between regions, empty peripheral windows) | No | No | No |
 
 The read and write validity of the effective address is decided in the EX stage, from the ALU result, next to the address classification that `reg_ex_mem` already registers, and the MEM stage only checks the registered bit. The fetch validity comes from the PC of the instruction in EX, from a register, off the ALU path. With `has_access_faults = false` the validities are always `1` and none of this is synthesized.

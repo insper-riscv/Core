@@ -22,22 +22,22 @@ An access that crosses the word occupies the last bytes of a 32-bit word and the
 
 ## 2. When the Hardware Executes the Access
 
-For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map generics (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` and `periph_base_kib`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). 
+For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map constants of the `config_pkg` (`ROM_END`, `ROM_EXTERNAL`, `RAM_BASE`, `RAM_END`, `EXT_BASE` and `PERIPH_BASE`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). 
 
-The start of the main memory is `ext_base_kib * 1024` when `rom_external` is true and `rom_end_kib` is 0, `2 ** boot_memory_bits` (the end of the BOOT_MEMORY, `0x00001000` by default) when `rom_external` is true and `rom_end_kib` is greater than 0, and `rom_end_kib * 1024` otherwise. The end is `periph_base_kib * 1024`, where the peripheral window starts. The intervals below are half-open and hold for any value of the generics.
+The start of the main memory is `EXT_BASE` when `ROM_EXTERNAL` is true and `ROM_END` is 0, `2 ** BOOT_MEMORY_BITS` (the end of the BOOT_MEMORY, `0x00001000` by default) when `ROM_EXTERNAL` is true and `ROM_END` is greater than 0, and `ROM_END` otherwise. The end is `PERIPH_BASE`, where the peripheral window starts. The intervals below are half-open and hold for any value of the constants.
 
-| Region | Range as a function of the generics | Misaligned access in hardware |
+| Region | Range as a function of the constants | Misaligned access in hardware |
 | :--- | :--- | :--- |
 | Below the main memory (BOOT_MEMORY, internal ROM and unmapped range) | `[0, start)` | No, raises an exception |
-| Main memory | `[start, periph_base_kib * 1024)` | Yes |
-| Peripherals | `[periph_base_kib * 1024, 2**32)` | No, raises an exception |
+| Main memory | `[start, PERIPH_BASE)` | Yes |
+| Peripherals | `[PERIPH_BASE, 2**ADDR_BITS)` | No, raises an exception |
 
-Each platform fixes the generics in its `platform.yaml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
+Each platform fixes the constants in its `platform.yaml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
 
-| Map | `rom_external` | `rom_end_kib` | `ext_base_kib` | `periph_base_kib` | Main memory | Peripherals |
+| Map | `ROM_EXTERNAL` | `ROM_END` | `EXT_BASE` | `PERIPH_BASE` | Main memory | Peripherals |
 | :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| Default, with internal RAM | `false` | 32 | 1048576 | 2097152 | `0x00008000` to `0x7FFFFFFF` | `0x80000000` onwards |
-| Platform with external FLASH | `true` | 0 | 524288 | 1572864 | `0x20000000` to `0x5FFFFFFF` | `0x60000000` onwards |
+| Default, with internal RAM | `false` | `0x00008000` | `0x40000000` | `0x80000000` | `0x00008000` to `0x7FFFFFFF` | `0x80000000` onwards |
+| Platform with external FLASH | `true` | `0x00000000` | `0x20000000` | `0x60000000` | `0x20000000` to `0x5FFFFFFF` | `0x60000000` onwards |
 
 A misaligned access that fits in one word (`LH`, `LHU` and `SH` with $o = 1$) is executed when the address is in the main memory. An access that crosses the word is executed only when it meets the two conditions below.
 

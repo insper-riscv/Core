@@ -23,17 +23,17 @@ Casos típicos são um carregador que copia um programa para a memória, a gera�
 
 ## 3. Onde a Instrução Tem Efeito
 
-Só o código buscado pela cache de instruções é afetado. A BOOT_MEMORY é lida diretamente, e a ROM interna e a RAM interna também não passam pela cache. Uma busca passa pela cache de instruções quando o endereço fora da BOOT_MEMORY é externo: pertence à janela externa a partir de `ext_base_kib`, a uma ROM marcada com `rom_external` ou a uma RAM marcada com `ram_external`. Os limites vêm dos genéricos descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+Só o código buscado pela cache de instruções é afetado. A BOOT_MEMORY é lida diretamente, e a ROM interna e a RAM interna também não passam pela cache. Uma busca passa pela cache de instruções quando o endereço fora da BOOT_MEMORY é externo: pertence à janela externa a partir de `EXT_BASE`, a uma ROM marcada com `ROM_EXTERNAL` ou a uma RAM marcada com `RAM_EXTERNAL`. Os limites vêm das constantes descritas em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
 | Região de busca | Passa pela cache de instruções |
 | :--- | :--- |
 | BOOT_MEMORY | Não |
-| ROM com `rom_external` falso | Não |
-| ROM com `rom_external` verdadeiro | Sim |
-| RAM com `ram_external` verdadeiro | Sim |
-| Janela externa a partir de `ext_base_kib` | Sim |
+| ROM com `ROM_EXTERNAL` falso | Não |
+| ROM com `ROM_EXTERNAL` verdadeiro | Sim |
+| RAM com `RAM_EXTERNAL` verdadeiro | Sim |
+| Janela externa a partir de `EXT_BASE` | Sim |
 
-No mapa padrão (`rom_external` falso) a ROM é interna e lida diretamente, de modo que só o código gravado na janela externa (a partir de `0x40000000`) muda de resultado com o `FENCE.I`. Com ROM externa, o `FENCE.I` vale também para o código gravado nela.
+No mapa padrão (`ROM_EXTERNAL` falso) a ROM é interna e lida diretamente, de modo que só o código gravado na janela externa (a partir de `0x40000000`) muda de resultado com o `FENCE.I`. Com ROM externa, o `FENCE.I` vale também para o código gravado nela.
 
 ## 4. Configuração
 

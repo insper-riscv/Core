@@ -22,22 +22,22 @@ Um acesso que cruza a palavra ocupa os bytes finais de uma palavra de 32 bits e 
 
 ## 2. Quando o Hardware Executa o Acesso
 
-O Core trata como memória principal, para efeito da extensão, as regiões de dados que ficam entre o fim da ROM interna (ou a base externa, quando a ROM é externa) e a base da janela de periféricos. Os limites vêm dos genéricos do mapa de memória (`rom_end_kib`, `rom_external`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` e `periph_base_kib`), descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+O Core trata como memória principal, para efeito da extensão, as regiões de dados que ficam entre o fim da ROM interna (ou a base externa, quando a ROM é externa) e a base da janela de periféricos. Os limites vêm das constantes do mapa de memória do `config_pkg` (`ROM_END`, `ROM_EXTERNAL`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`), descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
-O início da memória principal é `ext_base_kib * 1024` quando `rom_external` é verdadeiro e `rom_end_kib` vale 0, `2 ** boot_memory_bits` (o fim da BOOT_MEMORY, `0x00001000` por padrão) quando `rom_external` é verdadeiro e `rom_end_kib` é maior que 0, e `rom_end_kib * 1024` nos demais casos. O fim é `periph_base_kib * 1024`, onde começa a janela de periféricos. Os intervalos abaixo são semiabertos e valem para qualquer valor dos genéricos.
+O início da memória principal é `EXT_BASE` quando `ROM_EXTERNAL` é verdadeiro e `ROM_END` vale 0, `2 ** BOOT_MEMORY_BITS` (o fim da BOOT_MEMORY, `0x00001000` por padrão) quando `ROM_EXTERNAL` é verdadeiro e `ROM_END` é maior que 0, e `ROM_END` nos demais casos. O fim é `PERIPH_BASE`, onde começa a janela de periféricos. Os intervalos abaixo são semiabertos e valem para qualquer valor das constantes.
 
-| Região | Faixa em função dos genéricos | Acesso desalinhado em hardware |
+| Região | Faixa em função das constantes | Acesso desalinhado em hardware |
 | :--- | :--- | :--- |
 | Abaixo da memória principal (BOOT_MEMORY, ROM interna e faixa sem memória) | `[0, início)` | Não, gera exceção |
-| Memória principal | `[início, periph_base_kib * 1024)` | Sim |
-| Periféricos | `[periph_base_kib * 1024, 2**32)` | Não, gera exceção |
+| Memória principal | `[início, PERIPH_BASE)` | Sim |
+| Periféricos | `[PERIPH_BASE, 2**ADDR_BITS)` | Não, gera exceção |
 
-Cada plataforma fixa os genéricos no seu `platform.yaml`. A tabela mostra os dois mapas usados hoje, com a memória principal e os periféricos já convertidos em endereços.
+Cada plataforma fixa as constantes no seu `platform.yaml`. A tabela mostra os dois mapas usados hoje, com a memória principal e os periféricos já convertidos em endereços.
 
-| Mapa | `rom_external` | `rom_end_kib` | `ext_base_kib` | `periph_base_kib` | Memória principal | Periféricos |
+| Mapa | `ROM_EXTERNAL` | `ROM_END` | `EXT_BASE` | `PERIPH_BASE` | Memória principal | Periféricos |
 | :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| Padrão, com RAM interna | `false` | 32 | 1048576 | 2097152 | `0x00008000` a `0x7FFFFFFF` | `0x80000000` em diante |
-| Plataforma com FLASH externa | `true` | 0 | 524288 | 1572864 | `0x20000000` a `0x5FFFFFFF` | `0x60000000` em diante |
+| Padrão, com RAM interna | `false` | `0x00008000` | `0x40000000` | `0x80000000` | `0x00008000` a `0x7FFFFFFF` | `0x80000000` em diante |
+| Plataforma com FLASH externa | `true` | `0x00000000` | `0x20000000` | `0x60000000` | `0x20000000` a `0x5FFFFFFF` | `0x60000000` em diante |
 
 Um acesso desalinhado que cabe numa palavra (`LH`, `LHU` e `SH` com $o = 1$) é executado quando o endereço está na memória principal. Um acesso que cruza a palavra é executado apenas quando atende às duas condições abaixo.
 

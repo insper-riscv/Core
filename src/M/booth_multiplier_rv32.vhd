@@ -13,6 +13,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 
 entity booth_multiplier_rv32 is

@@ -14,7 +14,6 @@ The formal proofs of the Core run in SymbiYosys over the Verilog netlist that GH
 | `alu` | `alu_props.sv` | combinational equivalence, cover |
 | `trap_unit` with access faults | `trap_af_props.sv` | induction, cover, with the order and `mtval` mutants |
 | `csr_file` with `time_external` | `csr_time_props.sv` | BMC, cover |
-| `counter64` | `counter64_props.sv` | induction, cover, with widths from 1 to 64 bits, including the `o_wrap` overflow pulse |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` with Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` with Zihpm | `csr_hpm_props.sv` | BMC, cover, with 29, 5, 4, 3 and 2 real counters and widths from 0 to 64 bits |

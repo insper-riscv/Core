@@ -9,6 +9,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 
 package irq_consts is

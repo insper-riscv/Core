@@ -15,31 +15,12 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.pc_src_consts.all;
 use work.mem_map_consts.all;
 
 entity stage_if is
-	generic (
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib   : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external  : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib  : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib   : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external  : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib  : natural := 1048576
-	);
 	port (
 		-- Sinal de clock principal do processador.
 		i_clk             : in  std_logic;
@@ -165,13 +146,13 @@ begin
 			o_pc4           => o_pc4
 		);
 
-	is_boot_memory_if <= '1' when unsigned(if_pc) < boot_memory_end(boot_memory_bits) else '0';
+	is_boot_memory_if <= '1' when unsigned(if_pc) < boot_memory_end else '0';
 	if_in_sdram    <= '1' when (is_boot_memory_if = '0' and
-	                            is_external_addr(unsigned(if_pc), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib)) else '0';
+	                            is_external_addr(unsigned(if_pc))) else '0';
 	if_wait        <= if_in_sdram and (not i_ic_ready);
 
 	o_instr <= i_boot_memory_data when is_boot_memory_if = '1' else
-	           i_ic_data       when (if_in_sdram = '1' or rom_external) else
+	           i_ic_data       when (if_in_sdram = '1' or ROM_EXTERNAL) else
 	           i_flash_data;
 
 	o_pc          <= if_pc;

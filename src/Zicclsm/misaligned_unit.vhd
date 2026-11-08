@@ -27,6 +27,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.byte_mask_consts.all;
 use work.ext_ram_consts.all;
@@ -36,22 +37,6 @@ entity misaligned_unit is
 	generic (
 		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' desliga a unidade.
 		has_zicclsm  : boolean := true;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib  : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib  : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib : natural := 1048576;
 		-- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
 		flags_registered : boolean := false
 	);
@@ -155,7 +140,7 @@ begin
 	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
 
 	is_sdram <= i_is_sdram when flags_registered else
-	            '1' when is_external_addr(unsigned(i_addr), rom_end_kib, rom_external, ram_base_kib, ram_end_kib, ram_external, ext_base_kib) else '0';
+	            '1' when is_external_addr(unsigned(i_addr)) else '0';
 	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
 
 	first_done    <= cross and (not second) and step_ok and i_advance;

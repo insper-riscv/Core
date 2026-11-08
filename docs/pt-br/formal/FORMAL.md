@@ -14,7 +14,6 @@ As provas formais do Core rodam no SymbiYosys sobre o netlist Verilog que o GHDL
 | `alu` | `alu_props.sv` | equivalência combinacional, cover |
 | `trap_unit` com falhas de acesso | `trap_af_props.sv` | indução, cover, com os mutantes da ordem e do `mtval` |
 | `csr_file` com `time_external` | `csr_time_props.sv` | BMC, cover |
-| `counter64` | `counter64_props.sv` | indução, cover, com larguras de 1 a 64 bits, incluindo o pulso de estouro `o_wrap` |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` com Zicntr | `csr_cntr_props.sv` | BMC, cover |
 | `csr_file` com Zihpm | `csr_hpm_props.sv` | BMC, cover, com 29, 5, 4, 3 e 2 contadores reais e larguras de 0 a 64 bits |

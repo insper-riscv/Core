@@ -196,14 +196,14 @@ A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma ex
 
 ### 6.7. Falhas de Acesso
 
-O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causas 1, 5 e 7. O mapa válido vem dos mesmos genéricos do mapa de memória que o Core já recebe (`rom_end_kib`, `ram_base_kib`, `ram_end_kib`, `ext_base_kib` e `periph_base_kib`) e do genérico `periph_slots`, a máscara das janelas de 256 MiB do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits 30:28 iguais a $n$), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
+O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causas 1, 5 e 7. O mapa válido vem das constantes do mapa de memória do `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`) e do genérico `periph_slots`, a máscara das janelas de 256 MiB do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits 30:28 iguais a $n$), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
 
 | Região | Leitura | Escrita | Busca |
 | :--- | :---: | :---: | :---: |
-| ROM, de zero a `rom_end_kib` (BOOT_MEMORY e FLASH) | Sim | Não | Sim |
-| RAM, de `ram_base_kib` a `ram_end_kib` | Sim | Sim | Sim |
-| Janela externa, de `ext_base_kib` a `periph_base_kib` | Sim | Sim | Sim |
-| Janela de periféricos ocupada, a partir de `periph_base_kib` | Sim | Sim | Não |
+| ROM, de zero a `ROM_END` (BOOT_MEMORY e FLASH) | Sim | Não | Sim |
+| RAM, de `RAM_BASE` a `RAM_END` | Sim | Sim | Sim |
+| Janela externa, de `EXT_BASE` a `PERIPH_BASE` | Sim | Sim | Sim |
+| Janela de periféricos ocupada, a partir de `PERIPH_BASE` | Sim | Sim | Não |
 | O que sobra (buracos entre as regiões, janelas de periférico vazias) | Não | Não | Não |
 
 A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `has_access_faults = false` as validades valem sempre `1` e nada disso é sintetizado.

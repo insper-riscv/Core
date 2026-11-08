@@ -9,8 +9,11 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.fwd_consts.all;
+use work.mem_map_consts.all;
 
 entity core is
 	generic (
@@ -61,31 +64,6 @@ entity core is
 		hpm_counters    : natural range 0 to 29 := 29;
 		-- Largura em bits de cada contador de eventos real, de 0 a 64.
 		hpm_width       : natural range 0 to 64 := 64;
-
-		-- ---------------------------------------------------------------------------
-		-- Seção mapa de memória: endereços do mapa do Core, vindos do platform.yaml.
-		-- ---------------------------------------------------------------------------
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external    : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib    : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external    : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib    : natural := 1048576;
-		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		periph_base_kib : natural := 2097152;
 		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
 		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
@@ -590,24 +568,24 @@ begin
 		report "has_sscofpmf exige has_interrupts: a interrupção LCOFI sai pelo mip e pelo mie"
 		severity failure;
 
-	-- Faixa do mapa: a BOOT_MEMORY de 2**boot_memory_bits bytes cabe num inteiro e na conversão de KiB para endereço de 32 bits.
-	assert boot_memory_bits <= 30
-		report "boot_memory_bits acima de 30: 2**boot_memory_bits não cabe no endereço"
+	-- Faixa do mapa: a BOOT_MEMORY de 2**BOOT_MEMORY_BITS bytes cabe no espaço de endereços.
+	assert BOOT_MEMORY_BITS < ADDR_BITS
+		report "BOOT_MEMORY_BITS não menor que ADDR_BITS: 2**BOOT_MEMORY_BITS não cabe no endereço"
 		severity failure;
 
 	-- Faixa do mapa: a RAM não termina antes de começar.
-	assert ram_base_kib <= ram_end_kib
-		report "ram_base_kib maior que ram_end_kib: a RAM teria tamanho negativo"
+	assert RAM_BASE <= RAM_END
+		report "RAM_BASE maior que RAM_END: a RAM teria tamanho negativo"
 		severity failure;
 
-	-- Faixa do mapa: a BOOT_MEMORY ocupa [0, 2**boot_memory_bits) e a RAM não pode começar dentro dela.
-	assert (2 ** boot_memory_bits) / 1024 <= ram_base_kib
-		report "ram_base_kib menor que o fim da BOOT_MEMORY (2**boot_memory_bits bytes): a RAM sobreporia a BOOT_MEMORY"
+	-- Faixa do mapa: a BOOT_MEMORY ocupa [0, 2**BOOT_MEMORY_BITS) e a RAM não pode começar dentro dela.
+	assert boot_memory_end <= RAM_BASE
+		report "RAM_BASE menor que o fim da BOOT_MEMORY (2**BOOT_MEMORY_BITS bytes): a RAM sobreporia a BOOT_MEMORY"
 		severity failure;
 
-	-- Faixa do mapa: as bases em KiB viram endereços de 32 bits (kib_to_addr), então ficam abaixo de 2**22 KiB.
-	assert ext_base_kib < 4194304 and periph_base_kib < 4194304
-		report "ext_base_kib e periph_base_kib devem ser menores que 4194304 KiB (4 GiB)"
+	-- Faixa do mapa: as bases da janela externa e da janela de periféricos cabem no espaço de endereços.
+	assert EXT_BASE(ADDR_BITS) = '0' and PERIPH_BASE(ADDR_BITS) = '0'
+		report "EXT_BASE e PERIPH_BASE devem ser menores que 2**ADDR_BITS bytes"
 		severity failure;
 
 
@@ -619,15 +597,6 @@ begin
 	-- 1. Estágio IF (Instruction Fetch) + Registrador IF/ID
 	-- =========================================================================
 	u_stage_if : entity work.stage_if
-		generic map (
-			boot_memory_bits => boot_memory_bits,
-			rom_end_kib   => rom_end_kib,
-			rom_external  => rom_external,
-			ram_base_kib  => ram_base_kib,
-			ram_end_kib   => ram_end_kib,
-			ram_external  => ram_external,
-			ext_base_kib  => ext_base_kib
-		)
 		port map (
 			i_clk             => i_clk,
 			i_rst             => i_rst,
@@ -818,15 +787,7 @@ begin
 			has_interrupts  => has_interrupts,
 			has_sscofpmf    => has_sscofpmf,
 			time_external   => time_external,
-			has_access_faults => has_access_faults,
-			boot_memory_bits   => boot_memory_bits,
-			rom_end_kib     => rom_end_kib,
-			rom_external    => rom_external,
-			ram_base_kib    => ram_base_kib,
-			ram_end_kib     => ram_end_kib,
-			ram_external    => ram_external,
-			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib
+			has_access_faults => has_access_faults
 		)
 		port map (
 			i_hpm_events      => hpm_events,
@@ -896,14 +857,6 @@ begin
 
 	u_reg_ex_mem : entity work.reg_ex_mem
 		generic map (
-			boot_memory_bits   => boot_memory_bits,
-			rom_end_kib     => rom_end_kib,
-			rom_external    => rom_external,
-			ram_base_kib    => ram_base_kib,
-			ram_end_kib     => ram_end_kib,
-			ram_external    => ram_external,
-			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib,
 			has_access_faults => has_access_faults,
 			periph_slots    => periph_slots
 		)
@@ -954,12 +907,6 @@ begin
 	u_misaligned_unit : entity work.misaligned_unit
 		generic map (
 			has_zicclsm  => has_zicclsm,
-			rom_end_kib  => rom_end_kib,
-			rom_external => rom_external,
-			ram_base_kib => ram_base_kib,
-			ram_end_kib  => ram_end_kib,
-			ram_external => ram_external,
-			ext_base_kib => ext_base_kib,
 			flags_registered => true
 		)
 		port map (
@@ -995,14 +942,6 @@ begin
 		generic map (
 			has_zicclsm     => has_zicclsm,
 			check_ea        => has_zicsr,
-			boot_memory_bits   => boot_memory_bits,
-			rom_end_kib     => rom_end_kib,
-			rom_external    => rom_external,
-			ram_base_kib    => ram_base_kib,
-			ram_end_kib     => ram_end_kib,
-			ram_external    => ram_external,
-			ext_base_kib    => ext_base_kib,
-			periph_base_kib => periph_base_kib,
 			flags_registered => true,
 			has_access_faults => has_access_faults
 		)
@@ -1043,14 +982,6 @@ begin
 		);
 
 	u_reg_mem_wb : entity work.reg_mem_wb
-		generic map (
-			rom_end_kib  => rom_end_kib,
-			rom_external => rom_external,
-			ram_base_kib => ram_base_kib,
-			ram_end_kib  => ram_end_kib,
-			ram_external => ram_external,
-			ext_base_kib => ext_base_kib
-		)
 		port map (
 			i_clk        => i_clk,
 			i_rst        => i_rst,

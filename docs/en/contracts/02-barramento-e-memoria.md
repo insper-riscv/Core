@@ -2,19 +2,19 @@
 
 ## 1. Processor Address Map
 
-The limits of the instruction address space (IF stage) and of the data address space (MEM and WB stages) reach the `core` as elaboration generics, which each platform fixes in its `platform.yaml`. The package `src/shared/mem_map_consts.vhd` holds the functions the stages use to turn these generics into addresses.
+The limits of the instruction address space (IF stage) and of the data address space (MEM and WB stages) reach the stages as constants of the `config_pkg`, which `riscv-tools` generates from the `platform.yaml` of each platform. The package `src/shared/mem_map_consts.vhd` holds the functions the stages use to decide the region of an address from these constants.
 
-| `core` generic | Default | Region it delimits |
+| `config_pkg` constant | Default | Region it delimits |
 | :--- | :--- | :--- |
-| `boot_memory_bits` | 12 | The Boot memory occupies `[0, 2**boot_memory_bits)`, that is `0x00000000 .. 0x00000FFF` by default |
-| `rom_end_kib` | 32 | Exclusive end, in KiB, of the ROM, which starts right after the Boot memory (`0x00001000 .. 0x00007FFF` by default) |
-| `rom_external` | `false` | The ROM is reached through the core port (`o_ext_*` or the instruction port): the instruction comes through the instruction port and the data through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
-| `ram_base_kib`, `ram_end_kib` | 32, 1048576 | Range of the RAM in KiB (`0x00008000 .. 0x3FFFFFFF` by default) |
-| `ram_external` | `false` | The RAM is reached through the core port (`o_ext_*`) and the data goes through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
-| `ext_base_kib` | 1048576 | Base, in KiB, of the external window of SDRAM and peripherals (`0x40000000` by default), which always goes through the external port |
-| `periph_base_kib` | 2097152 | Base, in KiB, of the peripheral window (`0x80000000` by default), which ends the main memory |
+| `BOOT_MEMORY_BITS` | 12 | The Boot memory occupies `[0, 2**BOOT_MEMORY_BITS)`, that is `0x00000000 .. 0x00000FFF` by default |
+| `ROM_END` | `0x00008000` | Exclusive end, in bytes, of the ROM, which starts right after the Boot memory (`0x00001000 .. 0x00007FFF` by default) |
+| `ROM_EXTERNAL` | `false` | The ROM is reached through the core port (`o_ext_*` or the instruction port): the instruction comes through the instruction port and the data through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
+| `RAM_BASE`, `RAM_END` | `0x00008000`, `0x40000000` | Range of the RAM in bytes, with the exclusive end (`0x00008000 .. 0x3FFFFFFF` by default) |
+| `RAM_EXTERNAL` | `false` | The RAM is reached through the core port (`o_ext_*`) and the data goes through the external port, and the memory behind it can be off-chip or an internal memory behind a cache |
+| `EXT_BASE` | `0x40000000` | Base, in bytes, of the external window of SDRAM and peripherals (`0x40000000` by default), which always goes through the external port |
+| `PERIPH_BASE` | `0x80000000` | Base, in bytes, of the peripheral window (`0x80000000` by default), which ends the main memory |
 
-What is neither Boot memory, internal ROM nor external is the internal RAM. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The hardware misaligned access serves the main memory, from where the RAM starts up to `periph_base_kib`, and does not cross the end of a region. The platform map with external FLASH at `0x20000000` uses `rom_external => true`, `rom_end_kib => 0`, `ext_base_kib => 524288`, `ram_base_kib => 1048576`, `ram_end_kib => 1572864` and `periph_base_kib => 1572864`. An external ROM right after the Boot memory uses `rom_external => true` and `rom_end_kib => 32`.
+What is neither Boot memory, internal ROM nor external is the internal RAM. Each region comes from comparing the address with constant limits, and the bases that are powers of 2 become bit tests in synthesis. The hardware misaligned access serves the main memory, from where the RAM starts up to `PERIPH_BASE`, and does not cross the end of a region. The platform map with external FLASH at `0x20000000` uses `ROM_EXTERNAL = true`, `ROM_END = 0x00000000`, `EXT_BASE = 0x20000000`, `RAM_BASE = 0x40000000`, `RAM_END = 0x60000000` and `PERIPH_BASE = 0x60000000`. An external ROM right after the Boot memory uses `ROM_EXTERNAL = true` and `ROM_END = 0x00008000`.
 
 ## 2. Instruction Fetch Interfaces (IF Stage)
 

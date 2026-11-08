@@ -66,6 +66,8 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.utils_pkg.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.csr_addr_consts.all;
 use work.csr_event_consts.all;
@@ -160,15 +162,6 @@ entity csr_file is
 end entity csr_file;
 
 architecture rtl of csr_file is
-
-	-- Converte um booleano em std_logic ('1' para verdadeiro).
-	function bool_to_sl(b : boolean) return std_logic is
-	begin
-		if b then
-			return '1';
-		end if;
-		return '0';
-	end function;
 
 	-- A Sscofpmf só existe com o Zihpm (as fontes de estouro) e com as interrupções (o destino).
 	constant SSCOF           : boolean := has_sscofpmf and has_zihpm and has_interrupts;
@@ -482,7 +475,7 @@ begin
 	-- Interrupção de estouro de contador (Sscofpmf): LCOFIP pega com o pedido do banco de contadores e a escrita em mip
 	-- o altera quando não há pedido no mesmo ciclo; LCOFIE guarda o bit 13 escrito em mie.
 	gen_lcofi : if SSCOF generate
-		lcofip_we  <= ovf_irq or (csr_write_valid and bool_to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
+		lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
 		lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
 
 		u_lcofip : entity work.flip_flop
@@ -534,10 +527,10 @@ begin
 	cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
 
 	mcycle_inc     <= not inhibit_reg(0);
-	mcycle_we_lo   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLE);
-	mcycle_we_hi   <= cntr_write and bool_to_sl(i_addr = ADDR_MCYCLEH);
-	minstret_we_lo <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRET);
-	minstret_we_hi <= cntr_write and bool_to_sl(i_addr = ADDR_MINSTRETH);
+	mcycle_we_lo   <= cntr_write and to_sl(i_addr = ADDR_MCYCLE);
+	mcycle_we_hi   <= cntr_write and to_sl(i_addr = ADDR_MCYCLEH);
+	minstret_we_lo <= cntr_write and to_sl(i_addr = ADDR_MINSTRET);
+	minstret_we_hi <= cntr_write and to_sl(i_addr = ADDR_MINSTRETH);
 
 	gen_zicntr : if has_zicntr generate
 
@@ -586,7 +579,7 @@ begin
 		-- O programa lê minstret já com a retirada pendente somada.
 		minstret_rd_lo <= std_logic_vector(unsigned(minstret_lo) + unsigned'(0 => retire_pending and (not inhibit_reg(2))));
 		minstret_rd_hi <= std_logic_vector(unsigned(minstret_hi) +
-		                  unsigned'(0 => retire_pending and (not inhibit_reg(2)) and bool_to_sl(minstret_lo = WORD_ALL_ONES)));
+		                  unsigned'(0 => retire_pending and (not inhibit_reg(2)) and to_sl(minstret_lo = WORD_ALL_ONES)));
 
 		-- minstret soma 1 a cada instrução retirada em EX, um ciclo depois da retirada e salvo cancelamento.
 		u_minstret : entity work.counter64
@@ -656,7 +649,7 @@ begin
 	in_eventh_range  <= '1' when addr_range = RANGE_MHPMEVENTH else '0';
 	in_lo_range      <= '1' when (addr_range = RANGE_MHPMCOUNTER or addr_range = RANGE_HPMCOUNTER) else '0';
 	in_hi_range      <= '1' when (addr_range = RANGE_MHPMCOUNTERH or addr_range = RANGE_HPMCOUNTERH) else '0';
-	is_inhibit_addr  <= in_event_range and bool_to_sl(unsigned(addr_idx) = 0);
+	is_inhibit_addr  <= in_event_range and to_sl(unsigned(addr_idx) = 0);
 
 	-- Bits de mcountinhibit de mcycle e minstret.
 	gen_inhibit : if has_zicntr generate
@@ -708,7 +701,7 @@ begin
 			);
 
 		is_ext_addr <= is_inhibit_addr or
-		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (bool_to_sl(SSCOF) and in_eventh_range)));
+		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(SSCOF) and in_eventh_range)));
 		o_bank_read <= is_ext_addr when hpm_registered_read else '0';
 	end generate gen_zihpm;
 
@@ -716,7 +709,7 @@ begin
 		ovf_irq     <= '0';
 		bank_rdata  <= (others => '0');
 		o_bank_read <= '0';
-		is_ext_addr <= is_inhibit_addr and bool_to_sl(has_zicntr);
+		is_ext_addr <= is_inhibit_addr and to_sl(has_zicntr);
 	end generate gen_no_zihpm;
 
 	-- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.

@@ -94,7 +94,7 @@ An inhibited counter keeps its value and stays readable and writable.
 | :--- | :--- |
 | Entity test of the bank | Each real index counts the chosen event, an index without a counter reads zero and ignores writes, inhibit acts per bit, an explicit write wins over the increment, the high half advances on the carry, the width truncates the high bits and a code outside the table counts zero, with 0, 1, 4 and 29 counters and widths of 1, 20, 32, 33, 40 and 64 bits |
 | Formal proof of `csr_file` with Zihpm | `formal/csr_hpm_props.sv`: the 29 indices of the five ranges, the illegality of the mirrors and of the undefined addresses, the zero read past `hpm_counters`, the model of each counter and the decoding without overlap, with 29, 4, 2, 5 and 3 counters and widths of 64, 40, 20 and 0 bits, plus one mutant per property |
-| Formal proof of `counter64` | Ideal value of the chosen width, from 1 to 64 bits, with truncated writes |
+| Formal proof of `counter64` (in the Common-Components) | Ideal value of the chosen width, from 1 to 64 bits, with truncated writes |
 
 The proof procedure is in [FORMAL.md](../../formal/FORMAL.md).
 
