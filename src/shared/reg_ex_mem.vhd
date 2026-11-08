@@ -25,18 +25,23 @@ entity reg_ex_mem is
 		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		rom_end_kib     : natural := 32;
 		-- A ROM é externa quando é alcançada pela porta do núcleo.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ram_end_kib     : natural := 1048576;
 		-- A RAM é externa quando é alcançada pela porta do núcleo.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		ext_base_kib    : natural := 1048576;
 		-- Base, em KiB, da janela de periféricos: o fim da memória principal.
+		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
 		periph_base_kib : natural := 2097152;
 		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa; exige Zicsr.
 		has_access_faults : boolean := false;

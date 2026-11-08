@@ -16,6 +16,7 @@ Todo código de hardware do projeto é escrito e validado sob a norma **IEEE 107
 | Instanciação de módulos | Usar instanciação direta de entidade (`u_nome : entity work.nome_da_entidade`), sem declarações `component` redundantes |
 | Mapeamento de portas (`port map`) | Associar sempre por nome (`i_porta => sinal`) e utilizar sinais intermediários para expressões lógicas ou fatias dinâmicas, pois o GHDL exige expressões globalmente estáticas nos formais/atuais de porta |
 | Inferência de latches | Todo sinal atribuído em processo combinacional ou atribuição condicional deve receber valor padrão explícito em todos os ramos (`else` / `when others =>`) |
+| Asserts de configuração | Toda dependência entre generics (por exemplo, "exige" no comentário) e toda faixa de generic têm um `assert ... severity failure` no topo da entidade, e a mensagem sempre traz o nome do generic e a causa (`has_zicntr exige has_zicsr: os contadores são CSRs`) |
 
 A norma de referência é a [IEEE Std 1076-2008, IEEE Standard VHDL Language Reference Manual](https://standards.ieee.org/ieee/1076/3666/). Em trabalhos acadêmicos, cite-a com a entrada BibTeX abaixo:
 
@@ -95,7 +96,7 @@ Todos os identificadores de código devem ser escritos em **inglês**, enquanto 
 
 ### 4.1. Cabeçalho Obrigatório de Arquivo
 
-Todo arquivo `.vhd` deve iniciar com um bloco de cabeçalho de 72 colunas (`-- ====...====`) em português descrevendo a responsabilidade arquitetural do pacote ou da entidade:
+Todo arquivo `.vhd` deve iniciar com um bloco de cabeçalho (`-- ====...====`) em português descrevendo a responsabilidade arquitetural do pacote ou da entidade. Nenhuma linha de VHDL passa de 120 caracteres, o padrão do VSG, e nenhum arquivo passa de 2000 linhas nem processo de 500:
 
 ```vhdl
 -- ============================================================================
@@ -106,7 +107,7 @@ Todo arquivo `.vhd` deve iniciar com um bloco de cabeçalho de 72 colunas (`-- =
 -- ============================================================================
 ```
 
-Seções internas de uma arquitetura devem utilizar separadores de 72 colunas com hífens simples (`-- ----...----`).
+Seções internas de uma arquitetura devem utilizar separadores com hífens simples (`-- ----...----`).
 
 ### 4.2. Docstring Individual Acima de Cada Declaração
 
