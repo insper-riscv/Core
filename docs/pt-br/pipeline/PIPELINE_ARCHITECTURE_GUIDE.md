@@ -16,7 +16,7 @@ O processador é dividido em cinco entidades de estágio localizadas em `core/` 
 | Barreira 2 | `reg_id_ex` | `src/shared/reg_id_ex.vhd` | Registro síncrono de operandos, imediato, índices de registradores e sinais de controle entre ID e EX |
 | 3 | `stage_ex` | `src/core/stage_ex.vhd` | Forwarding de operandos, execução na ULA, unidade MulDiv, banco de CSRs e Trap Unit, unidade `FENCE.I`, cálculo de desvios e alinhamento de store |
 | Barreira 3 | `reg_ex_mem` | `src/shared/reg_ex_mem.vhd` | Registro síncrono do resultado de EX, dados e máscara de bytes de store, destino `rd` e controles de memória/WB entre EX e MEM |
-| 4 | `stage_mem` | `src/core/stage_mem.vhd` | Decodificação do espaço de dados (Flash porta 2, RAM interna e janela externa SDRAM/periféricos) e controle de espera `o_sdram_wait` |
+| 4 | `stage_mem` | `src/core/stage_mem.vhd` | Decodificação do espaço de dados (Flash porta 2, RAM interna e janela externa SDRAM/periféricos) e controle de espera `o_ext_wait` |
 | Barreira 4 | `reg_mem_wb` | `src/shared/reg_mem_wb.vhd` | Registro síncrono de `o_alu_out`, `o_rd`, `o_we_reg`, `o_ext_ram_op` e `o_wb_sel` entre MEM e WB |
 | 5 | `stage_wb` | `src/core/stage_wb.vhd` | Seleção da palavra lida da memória, extensão de byte/meia-palavra (`extender_ram`) e seleção do valor final de escrita no banco de registradores |
 
@@ -115,13 +115,13 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 | :--- | :--- | :--- |
 | `< 0x00008000` (`rom_end_kib`) | Memória Flash (porta 2, somente leitura) | `o_flash_addr2`, `o_flash_rden2 = i_re_ram and i_valid` |
 | `0x00008000 .. 0x3FFFFFFF` | Memória RAM interna (1 ciclo de latência) | `o_ram_addr`, `o_ram_wdata`, `o_ram_byteena`, `o_ram_en`, `o_ram_wren`, `o_ram_rden` |
-| `>= 0x40000000` (`ext_base_kib`) | Barramento externo SDRAM e periféricos | `o_sdram_addr`, `o_sdram_wdata`, `o_sdram_byteena`, `o_sdram_rden`, `o_sdram_wren`, `o_sdram_wait = sdram_access and (not i_sdram_ready)` |
+| `>= 0x40000000` (`ext_base_kib`) | Barramento externo SDRAM e periféricos | `o_ext_addr`, `o_ext_wdata`, `o_ext_byteena`, `o_ext_rden`, `o_ext_wren`, `o_ext_wait = sdram_access and (not i_ext_ready)` |
 
 ### 2.5. Estágio 5: Write-Back (`stage_wb`)
 
 ![Estágio WB](../../figuras/wb.svg)
 
-No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_sdram_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
+No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_ext_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
 
 | Constante | Código (`i_ext_ram_op`) | Operação de alinhamento e extensão |
 | :--- | :--- | :--- |

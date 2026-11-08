@@ -33,7 +33,7 @@ OPTIONS = {
     "ic_latency",
 }
 DATA_PORTS = (
-    "i_sdram_rdata",
+    "i_ext_rdata",
     "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
@@ -136,7 +136,7 @@ async def _start(dut, with_sdram):
     dut.i_rst.value = 1
     for port in DATA_PORTS:
         getattr(dut, port).value = 0
-    dut.i_sdram_ready.value = 0 if with_sdram else 1
+    dut.i_ext_ready.value = 0 if with_sdram else 1
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
         await RisingEdge(dut.i_clk)
@@ -167,7 +167,7 @@ async def run_program(dut, program, max_cycles=4000, **options):
     ``i_flash_data`` instead of the instruction, to show that a fetch
     does not use it. ``sdram`` (a dict {address: word}) turns on a slave
     for the SDRAM window; ``sdram_stall(n)`` gives the stall cycles of
-    its n-th access. The slave holds ``i_sdram_ready`` until the core
+    its n-th access. The slave holds ``i_ext_ready`` until the core
     advances and commits the read data after that, the way the bridge of
     the board does. ``ic_latency(n)`` dá os ciclos de espera do n-ésimo
     endereço novo buscado pela porta da cache de instruções

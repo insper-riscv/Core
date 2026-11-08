@@ -44,13 +44,13 @@ entity core is
 		boot_memory_bits   : natural := 12;
 		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
 		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_sdram_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		rom_external    : boolean := false;
 		-- Base, em KiB, da RAM.
 		ram_base_kib    : natural := 32;
 		-- Fim exclusivo, em KiB, da RAM.
 		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_sdram_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
+		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
 		ram_external    : boolean := false;
 		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
 		ext_base_kib    : natural := 1048576;
@@ -111,19 +111,19 @@ entity core is
 		o_ram_byteena   : out byte_mask_t;
 
 		-- Endereço de acesso ao barramento externo de dados SDRAM/periféricos (estágio MEM).
-		o_sdram_addr    : out word_t;
+		o_ext_addr    : out word_t;
 		-- Palavra de dados alinhada para escrita no barramento externo SDRAM (estágio MEM).
-		o_sdram_wdata   : out word_t;
+		o_ext_wdata   : out word_t;
 		-- Máscara de habilitação de bytes no barramento externo SDRAM (estágio MEM).
-		o_sdram_byteena : out byte_mask_t;
+		o_ext_byteena : out byte_mask_t;
 		-- Habilitação de leitura no barramento externo SDRAM (estágio MEM).
-		o_sdram_rden    : out std_logic;
+		o_ext_rden    : out std_logic;
 		-- Habilitação de escrita no barramento externo SDRAM (estágio MEM).
-		o_sdram_wren    : out std_logic;
+		o_ext_wren    : out std_logic;
 		-- Palavra de dados lida do barramento externo SDRAM.
-		i_sdram_rdata   : in  word_t    := (others => '0');
+		i_ext_rdata   : in  word_t    := (others => '0');
 		-- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
-		i_sdram_ready   : in  std_logic := '1';
+		i_ext_ready   : in  std_logic := '1';
 		-- Indica ao escravo externo SDRAM que o estágio MEM avançou neste ciclo.
 		o_mem_advance   : out std_logic;
 
@@ -918,11 +918,11 @@ begin
 			i_byte_mask   => exmem_byteena,
 			i_addr        => exmem_alu_out,
 			i_store_data  => exmem_store_data,
-			i_ready       => i_sdram_ready,
+			i_ready       => i_ext_ready,
 			i_advance     => mem_run,
 			i_base_run    => base_run,
 			i_ram_rdata   => i_ram_rdata,
-			i_sdram_rdata => i_sdram_rdata,
+			i_ext_rdata => i_ext_rdata,
 			o_cross       => mis_cross,
 			o_stall       => mis_stall,
 			o_addr        => mis_addr,
@@ -966,7 +966,7 @@ begin
 			i_we_ram        => exmem_we_ram,
 			i_re_ram        => exmem_re_ram,
 			i_en_ram        => exmem_en_ram,
-			i_sdram_ready   => i_sdram_ready,
+			i_ext_ready   => i_ext_ready,
 			o_flash_addr2   => o_flash_addr2,
 			o_flash_rden2   => o_flash_rden2,
 			o_ram_addr      => o_ram_addr,
@@ -975,12 +975,12 @@ begin
 			o_ram_wren      => o_ram_wren,
 			o_ram_rden      => o_ram_rden,
 			o_ram_byteena   => o_ram_byteena,
-			o_sdram_addr    => o_sdram_addr,
-			o_sdram_wdata   => o_sdram_wdata,
-			o_sdram_byteena => o_sdram_byteena,
-			o_sdram_rden    => o_sdram_rden,
-			o_sdram_wren    => o_sdram_wren,
-			o_sdram_wait    => sdram_wait,
+			o_ext_addr    => o_ext_addr,
+			o_ext_wdata   => o_ext_wdata,
+			o_ext_byteena => o_ext_byteena,
+			o_ext_rden    => o_ext_rden,
+			o_ext_wren    => o_ext_wren,
+			o_ext_wait    => sdram_wait,
 			o_trap_take     => mem_trap_take,
 			o_trap_cause    => mem_trap_cause,
 			o_trap_tval     => mem_trap_tval
@@ -1035,7 +1035,7 @@ begin
 			i_flash_data2 => i_flash_data2,
 			i_ram_rdata   => i_ram_rdata,
 			i_first_word  => mis_first_word,
-			i_sdram_rdata => i_sdram_rdata,
+			i_ext_rdata => i_ext_rdata,
 			o_wb_we       => wb_we,
 			o_wb_rd       => wb_rd,
 			o_wb_data     => wb_data_raw

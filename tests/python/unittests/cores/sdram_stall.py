@@ -2,7 +2,7 @@
 
 The core runs a short program against Python models of the instruction
 memory, the internal RAM and an SDRAM slave. The slave answers after a
-chosen number of stall cycles, holds ``sdram_ready`` high until the core
+chosen number of stall cycles, holds ``ext_ready`` high until the core
 advances (it learns that from ``mem_advance``), and only then commits
 the read data, the way the real bridge does. Every latency must give the
 same architectural result.
@@ -23,7 +23,7 @@ SDRAM_BASE = 0x40000000
 RAM_BASE = 0x00008000
 TAKEN_BRANCH_FLAG = 0x800C
 DATA_PORTS = (
-    "i_sdram_rdata",
+    "i_ext_rdata",
     "i_boot_memory_data",
     "i_flash_data",
     "i_flash_data2",
@@ -190,12 +190,12 @@ class _SdramSlave:
         """Take the access that just appeared on the bus."""
         dut = self.dut
         self.access = {
-            "addr": int(dut.o_sdram_addr.value) & ~3,
-            "we": int(dut.o_sdram_wren.value),
-            "wdata": int(dut.o_sdram_wdata.value),
-            "be": int(dut.o_sdram_byteena.value),
+            "addr": int(dut.o_ext_addr.value) & ~3,
+            "we": int(dut.o_ext_wren.value),
+            "wdata": int(dut.o_ext_wdata.value),
+            "be": int(dut.o_ext_byteena.value),
         }
-        self.held_addr = int(dut.o_sdram_addr.value)
+        self.held_addr = int(dut.o_ext_addr.value)
         stall = self.stall_for(self.accesses) if self.stall_for else 0
         self.countdown = stall
         self.accesses += 1
@@ -206,7 +206,7 @@ class _SdramSlave:
         dut = self.dut
         check_true(active, "the access left the bus before it completed")
         check_equal(
-            int(dut.o_sdram_addr.value),
+            int(dut.o_ext_addr.value),
             self.held_addr,
             "address moved during the wait",
         )
@@ -229,19 +229,19 @@ class _SdramSlave:
             )
         else:
             self.pending_read = self.memory.get(access["addr"], 0)
-        dut.i_sdram_ready.value = 1
+        dut.i_ext_ready.value = 1
         self.state = "done"
 
     async def step(self):
         """Advance the slave by one cycle."""
         dut = self.dut
         if self.state == "done" and self.advance_seen:
-            dut.i_sdram_ready.value = 0
-            dut.i_sdram_rdata.value = self.pending_read
+            dut.i_ext_ready.value = 0
+            dut.i_ext_rdata.value = self.pending_read
             self.state, self.advance_seen = "idle", False
             self.held_addr = None
             await Timer(1, unit="ns")
-        active = int(dut.o_sdram_rden.value) or int(dut.o_sdram_wren.value)
+        active = int(dut.o_ext_rden.value) or int(dut.o_ext_wren.value)
         if self.state == "idle" and active:
             self._accept()
         if self.state == "wait":
@@ -286,7 +286,7 @@ async def _run(dut, stall_for):
     sdram = {0x40000008: 0xAA}
 
     dut.i_rst.value = 1
-    dut.i_sdram_ready.value = 0
+    dut.i_ext_ready.value = 0
     for port in DATA_PORTS:
         getattr(dut, port).value = 0
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
