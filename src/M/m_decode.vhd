@@ -19,38 +19,40 @@ use work.opcode_consts.all;
 use work.funct7_consts.all;
 
 entity m_decode is
-	port (
-		-- Instrução de 32 bits presente no estágio ID.
-		i_instr      : in  word_t;
-		-- Indica que a instrução pertence à extensão M (multiplicação ou divisão).
-		o_is_muldiv  : out std_logic;
-		-- Habilita a escrita no banco de registradores para a instrução M.
-		o_we_reg     : out std_logic;
-		-- Seleciona o registrador rs1 como primeiro operando no estágio EX.
-		o_sel_pc_rs1 : out std_logic
-	);
+    port (
+        -- Instrução de 32 bits presente no estágio ID.
+        i_instr      : in    word_t;
+        -- Indica que a instrução pertence à extensão M (multiplicação ou divisão).
+        o_is_muldiv  : out   std_logic;
+        -- Habilita a escrita no banco de registradores para a instrução M.
+        o_we_reg     : out   std_logic;
+        -- Seleciona o registrador rs1 como primeiro operando no estágio EX.
+        o_sel_pc_rs1 : out   std_logic
+    );
 end entity m_decode;
 
 architecture rtl of m_decode is
-	-- Alias para o campo opcode (bits [6:0]) da instrução.
-	alias opcode : opcode_t is i_instr(6 downto 0);
-	-- Alias para o campo funct7 (bits [31:25]) da instrução.
-	alias funct7 : funct7_t is i_instr(31 downto 25);
-	-- Alias para o campo funct3 (bits [14:12]) da instrução.
-	alias funct3 : funct3_t is i_instr(14 downto 12);
 
-	-- Sinal interno que indica reivindicação da instrução pela extensão M.
-	signal is_m_instr : std_logic;
-	-- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com HAS_M).
-	signal is_claimed_funct3 : std_logic;
+    -- Alias para o campo opcode (bits [6:0]) da instrução.
+    alias opcode : opcode_t is i_instr(6 downto 0);
+    -- Alias para o campo funct7 (bits [31:25]) da instrução.
+    alias funct7 : funct7_t is i_instr(31 downto 25);
+    -- Alias para o campo funct3 (bits [14:12]) da instrução.
+    alias funct3 : funct3_t is i_instr(14 downto 12);
+
+    -- Sinal interno que indica reivindicação da instrução pela extensão M.
+    signal is_m_instr        : std_logic;
+    -- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com HAS_M).
+    signal is_claimed_funct3 : std_logic;
+
 begin
 
-	is_claimed_funct3 <= '1' when (HAS_M or funct3(2) = '0') else '0';
+    is_claimed_funct3 <= '1' when (HAS_M or funct3(2) = '0') else '0';
 
-	is_m_instr <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_MULDIV and is_claimed_funct3 = '1') else '0';
+    is_m_instr <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_MULDIV and is_claimed_funct3 = '1') else '0';
 
-	o_is_muldiv  <= is_m_instr;
-	o_we_reg     <= is_m_instr;
-	o_sel_pc_rs1 <= is_m_instr;
+    o_is_muldiv  <= is_m_instr;
+    o_we_reg     <= is_m_instr;
+    o_sel_pc_rs1 <= is_m_instr;
 
 end architecture rtl;

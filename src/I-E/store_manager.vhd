@@ -18,82 +18,80 @@ use work.opcode_consts.all;
 use work.funct3_consts.all;
 
 entity store_manager is
-	port (
-		-- Campo opcode (bits [6:0]) da instrução no estágio EX.
-		i_opcode      : in  opcode_t;
-		-- Campo funct3 (bits [14:12]) que define a largura do store (FUNCT3_SB, FUNCT3_SH, FUNCT3_SW).
-		i_funct3      : in  funct3_t;
-		-- Deslocamento de byte dentro da palavra (bits [1:0] do endereço efetivo calculado).
-		i_byte_offset : in  std_logic_vector(1 downto 0);
-		-- Valor de 32 bits do registrador rs2 a ser armazenado na memória.
-		i_rs2_data    : in  word_t;
-		-- Palavra de 32 bits com o dado posicionado nos bytes correspondentes ao endereço.
-		o_data        : out word_t;
-		-- Máscara de habilitação de escrita por byte (1 bit por byte da palavra de 32 bits).
-		o_byte_mask   : out byte_mask_t
-	);
+    port (
+        -- Campo opcode (bits [6:0]) da instrução no estágio EX.
+        i_opcode      : in    opcode_t;
+        -- Campo funct3 (bits [14:12]) que define a largura do store (FUNCT3_SB, FUNCT3_SH, FUNCT3_SW).
+        i_funct3      : in    funct3_t;
+        -- Deslocamento de byte dentro da palavra (bits [1:0] do endereço efetivo calculado).
+        i_byte_offset : in    std_logic_vector(1 downto 0);
+        -- Valor de 32 bits do registrador rs2 a ser armazenado na memória.
+        i_rs2_data    : in    word_t;
+        -- Palavra de 32 bits com o dado posicionado nos bytes correspondentes ao endereço.
+        o_data        : out   word_t;
+        -- Máscara de habilitação de escrita por byte (1 bit por byte da palavra de 32 bits).
+        o_byte_mask   : out   byte_mask_t
+    );
 end entity store_manager;
 
 architecture rtl of store_manager is
-	-- Indica que a instrução atual corresponde a uma operação de escrita em memória (STORE).
-	signal is_store  : std_logic;
-	-- Meia-palavra de rs2 estendida com zeros à esquerda, antes do deslocamento (SH).
-	signal sh_base   : unsigned(31 downto 0);
-	-- Byte de rs2 estendido com zeros à esquerda, antes do deslocamento (SB).
-	signal sb_base   : unsigned(31 downto 0);
-	-- Palavra alinhada para escrita de meia-palavra (SH).
-	signal sh_data   : word_t;
-	-- Máscara de bytes para escrita de meia-palavra (SH).
-	signal sh_mask   : byte_mask_t;
-	-- Palavra alinhada para escrita de byte (SB).
-	signal sb_data   : word_t;
-	-- Máscara de bytes para escrita de byte (SB).
-	signal sb_mask   : byte_mask_t;
+
+    -- Indica que a instrução atual corresponde a uma operação de escrita em memória (STORE).
+    signal is_store : std_logic;
+    -- Meia-palavra de rs2 estendida com zeros à esquerda, antes do deslocamento (SH).
+    signal sh_base  : unsigned(31 downto 0);
+    -- Byte de rs2 estendido com zeros à esquerda, antes do deslocamento (SB).
+    signal sb_base  : unsigned(31 downto 0);
+    -- Palavra alinhada para escrita de meia-palavra (SH).
+    signal sh_data  : word_t;
+    -- Máscara de bytes para escrita de meia-palavra (SH).
+    signal sh_mask  : byte_mask_t;
+    -- Palavra alinhada para escrita de byte (SB).
+    signal sb_data  : word_t;
+    -- Máscara de bytes para escrita de byte (SB).
+    signal sb_mask  : byte_mask_t;
+
 begin
 
-	is_store <= '1' when i_opcode = OPCODE_STORE else '0';
+    is_store <= '1' when i_opcode = OPCODE_STORE else '0';
 
-	-- Alinhamento e máscara para Store Halfword (SH), com offset 0, 1 (bytes 1 e 2) ou 2.
-	sh_base <= resize(unsigned(i_rs2_data(15 downto 0)), sh_base'length);
+    -- Alinhamento e máscara para Store Halfword (SH), com offset 0, 1 (bytes 1 e 2) ou 2.
+    sh_base <= resize(unsigned(i_rs2_data(15 downto 0)), sh_base'length);
 
-	with i_byte_offset select
-		sh_data <=
-			std_logic_vector(sh_base)                                when BYTE_OFFSET_0,
-			std_logic_vector(shift_left(sh_base, BYTE_WIDTH))        when BYTE_OFFSET_1,
-			std_logic_vector(shift_left(sh_base, 2 * BYTE_WIDTH))    when others;
+    with i_byte_offset select sh_data <=
+        std_logic_vector(sh_base) when BYTE_OFFSET_0,
+        std_logic_vector(shift_left(sh_base, BYTE_WIDTH)) when BYTE_OFFSET_1,
+        std_logic_vector(shift_left(sh_base, 2 * BYTE_WIDTH)) when others;
 
-	with i_byte_offset select
-		sh_mask <=
-			BYTE_MASK_HALF_LOW  when BYTE_OFFSET_0,
-			BYTE_MASK_HALF_MID  when BYTE_OFFSET_1,
-			BYTE_MASK_HALF_HIGH when others;
+    with i_byte_offset select sh_mask <=
+        BYTE_MASK_HALF_LOW when BYTE_OFFSET_0,
+        BYTE_MASK_HALF_MID when BYTE_OFFSET_1,
+        BYTE_MASK_HALF_HIGH when others;
 
-	-- Alinhamento e máscara para Store Byte (SB).
-	sb_base <= resize(unsigned(i_rs2_data(7 downto 0)), sb_base'length);
+    -- Alinhamento e máscara para Store Byte (SB).
+    sb_base <= resize(unsigned(i_rs2_data(7 downto 0)), sb_base'length);
 
-	with i_byte_offset select
-		sb_data <=
-			std_logic_vector(sb_base)                                when BYTE_OFFSET_0,
-			std_logic_vector(shift_left(sb_base, BYTE_WIDTH))        when BYTE_OFFSET_1,
-			std_logic_vector(shift_left(sb_base, 2 * BYTE_WIDTH))    when BYTE_OFFSET_2,
-			std_logic_vector(shift_left(sb_base, 3 * BYTE_WIDTH))    when others;
+    with i_byte_offset select sb_data <=
+        std_logic_vector(sb_base) when BYTE_OFFSET_0,
+        std_logic_vector(shift_left(sb_base, BYTE_WIDTH)) when BYTE_OFFSET_1,
+        std_logic_vector(shift_left(sb_base, 2 * BYTE_WIDTH)) when BYTE_OFFSET_2,
+        std_logic_vector(shift_left(sb_base, 3 * BYTE_WIDTH)) when others;
 
-	with i_byte_offset select
-		sb_mask <=
-			BYTE_MASK_BYTE_0 when BYTE_OFFSET_0,
-			BYTE_MASK_BYTE_1 when BYTE_OFFSET_1,
-			BYTE_MASK_BYTE_2 when BYTE_OFFSET_2,
-			BYTE_MASK_BYTE_3 when others;
+    with i_byte_offset select sb_mask <=
+        BYTE_MASK_BYTE_0 when BYTE_OFFSET_0,
+        BYTE_MASK_BYTE_1 when BYTE_OFFSET_1,
+        BYTE_MASK_BYTE_2 when BYTE_OFFSET_2,
+        BYTE_MASK_BYTE_3 when others;
 
-	-- Seleção final do dado e da máscara de acordo com i_funct3 quando is_store = '1'.
-	o_data <= i_rs2_data      when (is_store = '1' and i_funct3 = FUNCT3_SW) else
-	          sh_data         when (is_store = '1' and i_funct3 = FUNCT3_SH) else
-	          sb_data         when (is_store = '1' and i_funct3 = FUNCT3_SB) else
-	          (others => '0');
+    -- Seleção final do dado e da máscara de acordo com i_funct3 quando is_store = '1'.
+    o_data <= i_rs2_data when (is_store = '1' and i_funct3 = FUNCT3_SW) else
+              sh_data when (is_store = '1' and i_funct3 = FUNCT3_SH) else
+              sb_data when (is_store = '1' and i_funct3 = FUNCT3_SB) else
+              (others => '0');
 
-	o_byte_mask <= BYTE_MASK_WORD when (is_store = '1' and i_funct3 = FUNCT3_SW) else
-	               sh_mask    when (is_store = '1' and i_funct3 = FUNCT3_SH) else
-	               sb_mask    when (is_store = '1' and i_funct3 = FUNCT3_SB) else
-	               BYTE_MASK_NONE;
+    o_byte_mask <= BYTE_MASK_WORD when (is_store = '1' and i_funct3 = FUNCT3_SW) else
+                   sh_mask when (is_store = '1' and i_funct3 = FUNCT3_SH) else
+                   sb_mask when (is_store = '1' and i_funct3 = FUNCT3_SB) else
+                   BYTE_MASK_NONE;
 
 end architecture rtl;

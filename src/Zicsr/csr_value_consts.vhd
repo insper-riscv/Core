@@ -13,24 +13,24 @@ use work.pipeline_types.all;
 
 package csr_value_consts is
 
-	-- Valor do registrador misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
-	constant MISA_BASE   : word_t := x"40000100";
-	-- Valor do registrador misa com MXL = 1 (RV32) e as extensões I e M.
-	constant MISA_WITH_M : word_t := x"40001100";
-	-- Valor do registrador misa com MXL = 1 (RV32) e a base E (bit 4) no lugar da I; a extensão M soma o bit 12.
-	constant MISA_E_BASE   : word_t := x"40000010";
-	-- Valor do registrador misa com MXL = 1 (RV32), a base E (bit 4) e a extensão M.
-	constant MISA_E_WITH_M : word_t := x"40001010";
+    -- Valor do registrador misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
+    constant MISA_BASE     : word_t := x"40000100";
+    -- Valor do registrador misa com MXL = 1 (RV32) e as extensões I e M.
+    constant MISA_WITH_M   : word_t := x"40001100";
+    -- Valor do registrador misa com MXL = 1 (RV32) e a base E (bit 4) no lugar da I; a extensão M soma o bit 12.
+    constant MISA_E_BASE   : word_t := x"40000010";
+    -- Valor do registrador misa com MXL = 1 (RV32), a base E (bit 4) e a extensão M.
+    constant MISA_E_WITH_M : word_t := x"40001010";
 
-	-- Operação de um acesso a CSR, bits [1:0] do funct3 (2 bits).
-	subtype csr_op_t is std_logic_vector(1 downto 0);
+    -- Operação de um acesso a CSR, bits [1:0] do funct3 (2 bits).
+    subtype csr_op_t is std_logic_vector(1 downto 0);
 
-	-- Escrita atômica do valor (CSRRW e CSRRWI).
-	constant CSR_OP_WRITE : csr_op_t := "01";
-	-- Set de bits atômico (CSRRS e CSRRSI).
-	constant CSR_OP_SET   : csr_op_t := "10";
+    -- Escrita atômica do valor (CSRRW e CSRRWI).
+    constant CSR_OP_WRITE : csr_op_t := "01";
+    -- Set de bits atômico (CSRRS e CSRRSI).
+    constant CSR_OP_SET   : csr_op_t := "10";
 
-	-- Bits [11:10] do endereço que marcam o CSR como somente leitura.
-	constant CSR_ADDR_READ_ONLY : std_logic_vector(1 downto 0) := "11";
+    -- Bits [11:10] do endereço que marcam o CSR como somente leitura.
+    constant CSR_ADDR_READ_ONLY : std_logic_vector(1 downto 0) := "11";
 
 end package csr_value_consts;

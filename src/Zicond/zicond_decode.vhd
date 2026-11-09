@@ -21,42 +21,44 @@ use work.opcode_consts.all;
 use work.zicond_consts.all;
 
 entity zicond_decode is
-	port (
-		-- Instrução de 32 bits presente no estágio ID.
-		i_instr      : in  word_t;
-		-- Indica que a instrução é czero.eqz ou czero.nez.
-		o_is_zicond  : out std_logic;
-		-- Código de operação entregue ao estágio EX; vale zero fora da extensão.
-		o_alu_op     : out alu_op_t;
-		-- Habilita a escrita no banco de registradores para a instrução da extensão.
-		o_we_reg     : out std_logic;
-		-- Seleciona o registrador rs1 como primeiro operando no estágio EX.
-		o_sel_pc_rs1 : out std_logic
-	);
+    port (
+        -- Instrução de 32 bits presente no estágio ID.
+        i_instr      : in    word_t;
+        -- Indica que a instrução é czero.eqz ou czero.nez.
+        o_is_zicond  : out   std_logic;
+        -- Código de operação entregue ao estágio EX; vale zero fora da extensão.
+        o_alu_op     : out   alu_op_t;
+        -- Habilita a escrita no banco de registradores para a instrução da extensão.
+        o_we_reg     : out   std_logic;
+        -- Seleciona o registrador rs1 como primeiro operando no estágio EX.
+        o_sel_pc_rs1 : out   std_logic
+    );
 end entity zicond_decode;
 
 architecture rtl of zicond_decode is
-	-- Alias para o campo opcode (bits [6:0]) da instrução.
-	alias opcode : opcode_t is i_instr(6 downto 0);
-	-- Alias para o campo funct7 (bits [31:25]) da instrução.
-	alias funct7 : funct7_t is i_instr(31 downto 25);
-	-- Alias para o campo funct3 (bits [14:12]) da instrução.
-	alias funct3 : funct3_t is i_instr(14 downto 12);
 
-	-- A instrução é czero.eqz.
-	signal is_eqz : std_logic;
-	-- A instrução é czero.nez.
-	signal is_nez : std_logic;
+    -- Alias para o campo opcode (bits [6:0]) da instrução.
+    alias opcode : opcode_t is i_instr(6 downto 0);
+    -- Alias para o campo funct7 (bits [31:25]) da instrução.
+    alias funct7 : funct7_t is i_instr(31 downto 25);
+    -- Alias para o campo funct3 (bits [14:12]) da instrução.
+    alias funct3 : funct3_t is i_instr(14 downto 12);
+
+    -- A instrução é czero.eqz.
+    signal is_eqz : std_logic;
+    -- A instrução é czero.nez.
+    signal is_nez : std_logic;
+
 begin
 
-	is_eqz <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_EQZ) else '0';
-	is_nez <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_NEZ) else '0';
+    is_eqz <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_EQZ) else '0';
+    is_nez <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_ZICOND and funct3 = FUNCT3_CZERO_NEZ) else '0';
 
-	o_is_zicond  <= is_eqz or is_nez;
-	o_we_reg     <= is_eqz or is_nez;
-	o_sel_pc_rs1 <= is_eqz or is_nez;
-	o_alu_op     <= ALU_CZERO_EQZ when is_eqz = '1' else
-	                ALU_CZERO_NEZ when is_nez = '1' else
-	                (others => '0');
+    o_is_zicond  <= is_eqz or is_nez;
+    o_we_reg     <= is_eqz or is_nez;
+    o_sel_pc_rs1 <= is_eqz or is_nez;
+    o_alu_op     <= ALU_CZERO_EQZ when is_eqz = '1' else
+                    ALU_CZERO_NEZ when is_nez = '1' else
+                    (others => '0');
 
 end architecture rtl;

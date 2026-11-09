@@ -22,242 +22,243 @@ use work.pipeline_types.all;
 use work.mem_map_consts.all;
 
 entity reg_ex_mem is
-
-	generic (
-		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
-		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
-	);
-
-	port (
-		-- Sinal de clock.
-		i_clk        : in  std_logic;
-		-- Sinal de reset síncrono ativo em '1'.
-		i_rst        : in  std_logic;
-		-- Habilita a atualização do registrador EX/MEM ('1' = avança, '0' = congela).
-		i_en         : in  std_logic;
-		-- Limpa o registrador injetando bolha ('1' = flush por exceção ou espera de FENCE.I).
-		i_flush      : in  std_logic;
-		-- Validade da instrução vinda do estágio EX.
-		i_valid      : in  std_logic;
-		-- PC da instrução vinda do estágio EX (vira o mepc se o acesso à memória gerar exceção).
-		i_pc         : in  word_t;
-		-- Campo funct3 da instrução vinda do estágio EX (tamanho e sinal do acesso à memória).
-		i_funct3     : in  funct3_t;
-		-- Resultado final do estágio EX (endereço de memória ou resultado de operação).
-		i_alu_out    : in  word_t;
-		-- Resultado da ULA em EX, o endereço efetivo de um load ou store, de onde sai a classificação registrada do endereço.
-		i_ea         : in  word_t := (others => '0');
-		-- Dado alinhado para escrita em memória vindo do StoreManager.
-		i_store_data : in  word_t;
-		-- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
-		i_byte_mask  : in  byte_mask_t;
-		-- Endereço do registrador destino rd.
-		i_rd         : in  reg_field_t;
-		-- Habilita escrita no banco de registradores no estágio WB.
-		i_we_reg     : in  std_logic;
-		-- Habilita escrita na memória de dados no estágio MEM.
-		i_we_ram     : in  std_logic;
-		-- Habilita leitura da memória de dados no estágio MEM.
-		i_re_ram     : in  std_logic;
-		-- Habilita acesso à memória de dados no estágio MEM.
-		i_en_ram     : in  std_logic;
-		-- Modo de extensão de leitura da memória de dados.
-		i_ext_ram_op : in  ext_ram_op_t;
-		-- Seletor da fonte de escrita no estágio WB.
-		i_wb_sel     : in  wb_sel_t;
-		-- Validade da instrução registrada no estágio MEM.
-		o_valid      : out std_logic;
-		-- Resultado do estágio EX registrado para o estágio MEM (e adiantamento EX/MEM).
-		o_alu_out    : out word_t;
-		-- Dado de escrita alinhado registrado para o estágio MEM.
-		o_store_data : out word_t;
-		-- Máscara de bytes registrada para o estágio MEM.
-		o_byte_mask  : out byte_mask_t;
-		-- Endereço de rd registrado para o estágio MEM (e Forwarding Unit).
-		o_rd         : out reg_field_t;
-		-- Habilitação de escrita em registrador registrada para o estágio MEM.
-		o_we_reg     : out std_logic;
-		-- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
-		o_we_ok      : out std_logic;
-		-- Habilitação de escrita na RAM registrada para o estágio MEM.
-		o_we_ram     : out std_logic;
-		-- Habilitação de leitura da RAM registrada para o estágio MEM.
-		o_re_ram     : out std_logic;
-		-- Habilitação de acesso à RAM registrada para o estágio MEM.
-		o_en_ram     : out std_logic;
-		-- Modo de extensão de leitura da RAM registrado para o estágio MEM.
-		o_ext_ram_op : out ext_ram_op_t;
-		-- Seletor de write-back registrado para o estágio MEM.
-		o_wb_sel     : out wb_sel_t;
-		-- PC da instrução registrado para o estágio MEM.
-		o_pc         : out word_t;
-		-- Campo funct3 registrado para o estágio MEM.
-		o_funct3     : out funct3_t;
-		-- O endereço registrado cai na FLASH de dados (decodificado em EX, registrado aqui).
-		o_is_flash   : out std_logic;
-		-- O endereço registrado cai na janela externa, a SDRAM.
-		o_is_sdram   : out std_logic;
-		-- O endereço registrado está na memória principal.
-		o_in_main    : out std_logic;
-		-- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
-		o_same_region : out std_logic;
-		-- O endereço registrado aceita leitura no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
-		o_ok_rd       : out std_logic;
-		-- O endereço registrado aceita escrita no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
-		o_ok_wr       : out std_logic
-	);
-
+    generic (
+        -- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
+        periph_slots : std_logic_vector(7 downto 0) := (others => '1')
+    );
+    port (
+        -- Sinal de clock.
+        i_clk         : in    std_logic;
+        -- Sinal de reset síncrono ativo em '1'.
+        i_rst         : in    std_logic;
+        -- Habilita a atualização do registrador EX/MEM ('1' = avança, '0' = congela).
+        i_en          : in    std_logic;
+        -- Limpa o registrador injetando bolha ('1' = flush por exceção ou espera de FENCE.I).
+        i_flush       : in    std_logic;
+        -- Validade da instrução vinda do estágio EX.
+        i_valid       : in    std_logic;
+        -- PC da instrução vinda do estágio EX (vira o mepc se o acesso à memória gerar exceção).
+        i_pc          : in    word_t;
+        -- Campo funct3 da instrução vinda do estágio EX (tamanho e sinal do acesso à memória).
+        i_funct3      : in    funct3_t;
+        -- Resultado final do estágio EX (endereço de memória ou resultado de operação).
+        i_alu_out     : in    word_t;
+        -- Resultado da ULA em EX, o endereço efetivo de um load ou store, de onde sai a classificação registrada do endereço.
+        i_ea          : in    word_t := (others => '0');
+        -- Dado alinhado para escrita em memória vindo do StoreManager.
+        i_store_data  : in    word_t;
+        -- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
+        i_byte_mask   : in    byte_mask_t;
+        -- Endereço do registrador destino rd.
+        i_rd          : in    reg_field_t;
+        -- Habilita escrita no banco de registradores no estágio WB.
+        i_we_reg      : in    std_logic;
+        -- Habilita escrita na memória de dados no estágio MEM.
+        i_we_ram      : in    std_logic;
+        -- Habilita leitura da memória de dados no estágio MEM.
+        i_re_ram      : in    std_logic;
+        -- Habilita acesso à memória de dados no estágio MEM.
+        i_en_ram      : in    std_logic;
+        -- Modo de extensão de leitura da memória de dados.
+        i_ext_ram_op  : in    ext_ram_op_t;
+        -- Seletor da fonte de escrita no estágio WB.
+        i_wb_sel      : in    wb_sel_t;
+        -- Validade da instrução registrada no estágio MEM.
+        o_valid       : out   std_logic;
+        -- Resultado do estágio EX registrado para o estágio MEM (e adiantamento EX/MEM).
+        o_alu_out     : out   word_t;
+        -- Dado de escrita alinhado registrado para o estágio MEM.
+        o_store_data  : out   word_t;
+        -- Máscara de bytes registrada para o estágio MEM.
+        o_byte_mask   : out   byte_mask_t;
+        -- Endereço de rd registrado para o estágio MEM (e Forwarding Unit).
+        o_rd          : out   reg_field_t;
+        -- Habilitação de escrita em registrador registrada para o estágio MEM.
+        o_we_reg      : out   std_logic;
+        -- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
+        o_we_ok       : out   std_logic;
+        -- Habilitação de escrita na RAM registrada para o estágio MEM.
+        o_we_ram      : out   std_logic;
+        -- Habilitação de leitura da RAM registrada para o estágio MEM.
+        o_re_ram      : out   std_logic;
+        -- Habilitação de acesso à RAM registrada para o estágio MEM.
+        o_en_ram      : out   std_logic;
+        -- Modo de extensão de leitura da RAM registrado para o estágio MEM.
+        o_ext_ram_op  : out   ext_ram_op_t;
+        -- Seletor de write-back registrado para o estágio MEM.
+        o_wb_sel      : out   wb_sel_t;
+        -- PC da instrução registrado para o estágio MEM.
+        o_pc          : out   word_t;
+        -- Campo funct3 registrado para o estágio MEM.
+        o_funct3      : out   funct3_t;
+        -- O endereço registrado cai na FLASH de dados (decodificado em EX, registrado aqui).
+        o_is_flash    : out   std_logic;
+        -- O endereço registrado cai na janela externa, a SDRAM.
+        o_is_sdram    : out   std_logic;
+        -- O endereço registrado está na memória principal.
+        o_in_main     : out   std_logic;
+        -- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
+        o_same_region : out   std_logic;
+        -- O endereço registrado aceita leitura no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
+        o_ok_rd       : out   std_logic;
+        -- O endereço registrado aceita escrita no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
+        o_ok_wr       : out   std_logic
+    );
 end entity reg_ex_mem;
 
 architecture rtl of reg_ex_mem is
 
-	-- Bit de validade armazenado no registrador EX/MEM.
-	signal r_valid      : std_logic    := '0';
-	-- PC da instrução armazenado.
-	signal r_pc         : word_t       := (others => '0');
-	-- Campo funct3 armazenado.
-	signal r_funct3     : funct3_t     := (others => '0');
-	-- Resultado do estágio EX armazenado.
-	signal r_alu_out    : word_t       := (others => '0');
-	-- Dado de escrita em memória armazenado.
-	signal r_store_data : word_t       := (others => '0');
-	-- Máscara de bytes armazenada.
-	signal r_byte_mask  : byte_mask_t  := (others => '0');
-	-- Endereço de rd armazenado.
-	signal r_rd         : reg_field_t        := (others => '0');
-	-- Habilitação de escrita em registrador armazenada.
-	signal r_we_reg     : std_logic    := '0';
-	-- Validade e escrita em registrador armazenadas juntas.
-	signal r_we_ok      : std_logic    := '0';
-	-- Habilitação de escrita na RAM armazenada.
-	signal r_we_ram     : std_logic    := '0';
-	-- Habilitação de leitura da RAM armazenada.
-	signal r_re_ram     : std_logic    := '0';
-	-- Habilitação de acesso à RAM armazenada.
-	signal r_en_ram     : std_logic    := '0';
-	-- Modo de extensão da RAM armazenado.
-	signal r_ext_ram_op : ext_ram_op_t := (others => '0');
-	-- Seletor de write-back armazenado.
-	signal r_wb_sel     : wb_sel_t     := (others => '0');
-	-- O endereço registrado cai na FLASH de dados.
-	signal r_is_flash   : std_logic    := '0';
-	-- O endereço registrado cai na janela externa (SDRAM).
-	signal r_is_sdram   : std_logic    := '0';
-	-- O endereço registrado está na memória principal.
-	signal r_in_main    : std_logic    := '0';
-	-- O endereço está na última palavra de uma região (a seguinte é de outra).
-	signal r_last       : std_logic    := '0';
-	-- O endereço registrado aceita leitura no mapa.
-	signal r_ok_rd      : std_logic    := '1';
-	-- O endereço registrado aceita escrita no mapa.
-	signal r_ok_wr      : std_logic    := '1';
+    -- Bit de validade armazenado no registrador EX/MEM.
+    signal r_valid      : std_logic    := '0';
+    -- PC da instrução armazenado.
+    signal r_pc         : word_t       := (others => '0');
+    -- Campo funct3 armazenado.
+    signal r_funct3     : funct3_t     := (others => '0');
+    -- Resultado do estágio EX armazenado.
+    signal r_alu_out    : word_t       := (others => '0');
+    -- Dado de escrita em memória armazenado.
+    signal r_store_data : word_t       := (others => '0');
+    -- Máscara de bytes armazenada.
+    signal r_byte_mask  : byte_mask_t  := (others => '0');
+    -- Endereço de rd armazenado.
+    signal r_rd         : reg_field_t  := (others => '0');
+    -- Habilitação de escrita em registrador armazenada.
+    signal r_we_reg     : std_logic    := '0';
+    -- Validade e escrita em registrador armazenadas juntas.
+    signal r_we_ok      : std_logic    := '0';
+    -- Habilitação de escrita na RAM armazenada.
+    signal r_we_ram     : std_logic    := '0';
+    -- Habilitação de leitura da RAM armazenada.
+    signal r_re_ram     : std_logic    := '0';
+    -- Habilitação de acesso à RAM armazenada.
+    signal r_en_ram     : std_logic    := '0';
+    -- Modo de extensão da RAM armazenado.
+    signal r_ext_ram_op : ext_ram_op_t := (others => '0');
+    -- Seletor de write-back armazenado.
+    signal r_wb_sel     : wb_sel_t     := (others => '0');
+    -- O endereço registrado cai na FLASH de dados.
+    signal r_is_flash   : std_logic    := '0';
+    -- O endereço registrado cai na janela externa (SDRAM).
+    signal r_is_sdram   : std_logic    := '0';
+    -- O endereço registrado está na memória principal.
+    signal r_in_main    : std_logic    := '0';
+    -- O endereço está na última palavra de uma região (a seguinte é de outra).
+    signal r_last       : std_logic    := '0';
+    -- O endereço registrado aceita leitura no mapa.
+    signal r_ok_rd      : std_logic    := '1';
+    -- O endereço registrado aceita escrita no mapa.
+    signal r_ok_wr      : std_logic    := '1';
 
-	-- Entrada de r_is_flash, decodificada do resultado da ULA.
-	signal in_is_flash  : std_logic;
-	-- Entrada de r_is_sdram, decodificada do resultado da ULA.
-	signal in_is_sdram  : std_logic;
-	-- Entrada de r_in_main, decodificada do resultado da ULA.
-	signal in_in_main   : std_logic;
-	-- Entrada de r_last, decodificada do resultado da ULA.
-	signal in_last      : std_logic;
-	-- Entrada de r_ok_rd, decodificada do resultado da ULA.
-	signal in_ok_rd     : std_logic;
-	-- Entrada de r_ok_wr, decodificada do resultado da ULA.
-	signal in_ok_wr     : std_logic;
+    -- Entrada de r_is_flash, decodificada do resultado da ULA.
+    signal in_is_flash : std_logic;
+    -- Entrada de r_is_sdram, decodificada do resultado da ULA.
+    signal in_is_sdram : std_logic;
+    -- Entrada de r_in_main, decodificada do resultado da ULA.
+    signal in_in_main  : std_logic;
+    -- Entrada de r_last, decodificada do resultado da ULA.
+    signal in_last     : std_logic;
+    -- Entrada de r_ok_rd, decodificada do resultado da ULA.
+    signal in_ok_rd    : std_logic;
+    -- Entrada de r_ok_wr, decodificada do resultado da ULA.
+    signal in_ok_wr    : std_logic;
 
-	-- Slots do barramento de periféricos que aceitam acesso: os ocupados (periph_slots) com os periféricos estritos
-	-- (STRICT_PERIPH), todos sem eles, e então um slot sem periférico responde como os demais e não gera falha.
-	constant ACCEPTED_SLOTS : std_logic_vector(7 downto 0) := periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH));
+    -- Slots do barramento de periféricos que aceitam acesso: os ocupados (periph_slots) com os periféricos estritos
+    -- (STRICT_PERIPH), todos sem eles, e então um slot sem periférico responde como os demais e não gera falha.
+    constant ACCEPTED_SLOTS : std_logic_vector(7 downto 0) := periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH));
 
 begin
 
-	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
-	in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end else '0';
-	in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
-	in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base and
-	                         unsigned(i_ea) < PERIPH_BASE) else '0';
-	in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
+    -- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
+    in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end else '0';
+    in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
+    in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base and
+                                unsigned(i_ea) < PERIPH_BASE) else
+                   '0';
+    in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
-	-- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
-	gen_faults : if HAS_ACCESS_FAULTS generate
-		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
-		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
-	end generate gen_faults;
+    -- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
 
-	gen_no_faults : if not HAS_ACCESS_FAULTS generate
-		in_ok_rd <= '1';
-		in_ok_wr <= '1';
-	end generate gen_no_faults;
+    gen_faults : if HAS_ACCESS_FAULTS generate
+        in_ok_rd <= '1' when addr_readable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
+        in_ok_wr <= '1' when addr_writable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
+    end generate gen_faults;
 
-	process(i_clk)
-	begin
-		if rising_edge(i_clk) then
-			if i_rst = '1' or i_flush = '1' then
-				r_valid      <= '0';
-				r_pc         <= (others => '0');
-				r_funct3     <= (others => '0');
-				r_alu_out    <= (others => '0');
-				r_store_data <= (others => '0');
-				r_byte_mask  <= (others => '0');
-				r_rd         <= (others => '0');
-				r_we_reg     <= '0';
-				r_we_ok      <= '0';
-				r_we_ram     <= '0';
-				r_re_ram     <= '0';
-				r_en_ram     <= '0';
-				r_ext_ram_op <= (others => '0');
-				r_wb_sel     <= (others => '0');
-				r_is_flash   <= '0';
-				r_is_sdram   <= '0';
-				r_in_main    <= '0';
-				r_last       <= '0';
-				r_ok_rd      <= '1';
-				r_ok_wr      <= '1';
-			elsif i_en = '1' then
-				r_valid      <= i_valid;
-				r_pc         <= i_pc;
-				r_funct3     <= i_funct3;
-				r_alu_out    <= i_alu_out;
-				r_store_data <= i_store_data;
-				r_byte_mask  <= i_byte_mask;
-				r_rd         <= i_rd;
-				r_we_reg     <= i_we_reg;
-				r_we_ok      <= i_we_reg and i_valid;
-				r_we_ram     <= i_we_ram;
-				r_re_ram     <= i_re_ram;
-				r_en_ram     <= i_en_ram;
-				r_ext_ram_op <= i_ext_ram_op;
-				r_wb_sel     <= i_wb_sel;
-				r_is_flash   <= in_is_flash;
-				r_is_sdram   <= in_is_sdram;
-				r_in_main    <= in_in_main;
-				r_last       <= in_last;
-				r_ok_rd      <= in_ok_rd;
-				r_ok_wr      <= in_ok_wr;
-			end if;
-		end if;
-	end process;
+    gen_no_faults : if not HAS_ACCESS_FAULTS generate
+        in_ok_rd <= '1';
+        in_ok_wr <= '1';
+    end generate gen_no_faults;
 
-	o_valid      <= r_valid;
-	o_pc         <= r_pc;
-	o_funct3     <= r_funct3;
-	o_alu_out    <= r_alu_out;
-	o_store_data <= r_store_data;
-	o_byte_mask  <= r_byte_mask;
-	o_rd         <= r_rd;
-	o_we_reg     <= r_we_reg;
-	o_we_ok      <= r_we_ok;
-	o_we_ram     <= r_we_ram;
-	o_re_ram     <= r_re_ram;
-	o_en_ram     <= r_en_ram;
-	o_ext_ram_op <= r_ext_ram_op;
-	o_wb_sel     <= r_wb_sel;
-	o_is_flash   <= r_is_flash;
-	o_is_sdram   <= r_is_sdram;
-	o_in_main    <= r_in_main;
-	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
-	o_same_region <= r_in_main and (not r_last);
-	o_ok_rd       <= r_ok_rd;
-	o_ok_wr       <= r_ok_wr;
+    process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_rst = '1' or i_flush = '1' then
+                r_valid      <= '0';
+                r_pc         <= (others => '0');
+                r_funct3     <= (others => '0');
+                r_alu_out    <= (others => '0');
+                r_store_data <= (others => '0');
+                r_byte_mask  <= (others => '0');
+                r_rd         <= (others => '0');
+                r_we_reg     <= '0';
+                r_we_ok      <= '0';
+                r_we_ram     <= '0';
+                r_re_ram     <= '0';
+                r_en_ram     <= '0';
+                r_ext_ram_op <= (others => '0');
+                r_wb_sel     <= (others => '0');
+                r_is_flash   <= '0';
+                r_is_sdram   <= '0';
+                r_in_main    <= '0';
+                r_last       <= '0';
+                r_ok_rd      <= '1';
+                r_ok_wr      <= '1';
+            elsif i_en = '1' then
+                r_valid      <= i_valid;
+                r_pc         <= i_pc;
+                r_funct3     <= i_funct3;
+                r_alu_out    <= i_alu_out;
+                r_store_data <= i_store_data;
+                r_byte_mask  <= i_byte_mask;
+                r_rd         <= i_rd;
+                r_we_reg     <= i_we_reg;
+                r_we_ok      <= i_we_reg and i_valid;
+                r_we_ram     <= i_we_ram;
+                r_re_ram     <= i_re_ram;
+                r_en_ram     <= i_en_ram;
+                r_ext_ram_op <= i_ext_ram_op;
+                r_wb_sel     <= i_wb_sel;
+                r_is_flash   <= in_is_flash;
+                r_is_sdram   <= in_is_sdram;
+                r_in_main    <= in_in_main;
+                r_last       <= in_last;
+                r_ok_rd      <= in_ok_rd;
+                r_ok_wr      <= in_ok_wr;
+            end if;
+        end if;
+
+    end process;
+
+    o_valid       <= r_valid;
+    o_pc          <= r_pc;
+    o_funct3      <= r_funct3;
+    o_alu_out     <= r_alu_out;
+    o_store_data  <= r_store_data;
+    o_byte_mask   <= r_byte_mask;
+    o_rd          <= r_rd;
+    o_we_reg      <= r_we_reg;
+    o_we_ok       <= r_we_ok;
+    o_we_ram      <= r_we_ram;
+    o_re_ram      <= r_re_ram;
+    o_en_ram      <= r_en_ram;
+    o_ext_ram_op  <= r_ext_ram_op;
+    o_wb_sel      <= r_wb_sel;
+    o_is_flash    <= r_is_flash;
+    o_is_sdram    <= r_is_sdram;
+    o_in_main     <= r_in_main;
+    -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
+    o_same_region <= r_in_main and (not r_last);
+    o_ok_rd       <= r_ok_rd;
+    o_ok_wr       <= r_ok_wr;
 
 end architecture rtl;

@@ -19,92 +19,90 @@ use work.pc_src_consts.all;
 use work.word_consts.all;
 
 entity pc_fetch is
-
-	port (
-		-- Sinal de clock.
-		i_clk           : in  std_logic;
-		-- Sinal de reset síncrono ativo em '1'.
-		i_rst           : in  std_logic;
-		-- Habilita a atualização do registrador PC ('1' = avança, '0' = congela em stall).
-		i_pc_we         : in  std_logic;
-		-- Seletor de 2 bits da fonte do próximo PC (definido em pc_src_consts).
-		i_pc_src        : in  pc_src_t;
-		-- Endereço-alvo de desvio condicional ou JAL calculado no estágio EX (PC + imm).
-		i_branch_target : in  word_t;
-		-- Endereço-alvo de salto indireto JALR calculado no estágio EX ((rs1 + imm) & ~1).
-		i_jalr_target   : in  word_t;
-		-- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
-		i_redirect_pc   : in  word_t := (others => '0');
-		-- Repete a busca de uma instrução que a cache de instruções não tinha: com i_pc_src em PC + 4, o próximo PC é i_replay_pc.
-		i_replay        : in  std_logic := '0';
-		-- Endereço da instrução a repetir (o PC da instrução que está em IF/ID).
-		i_replay_pc     : in  word_t := (others => '0');
-		-- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
-		o_pc            : out word_t;
-		-- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
-		o_pc4           : out word_t
-	);
-
+    port (
+        -- Sinal de clock.
+        i_clk           : in    std_logic;
+        -- Sinal de reset síncrono ativo em '1'.
+        i_rst           : in    std_logic;
+        -- Habilita a atualização do registrador PC ('1' = avança, '0' = congela em stall).
+        i_pc_we         : in    std_logic;
+        -- Seletor de 2 bits da fonte do próximo PC (definido em pc_src_consts).
+        i_pc_src        : in    pc_src_t;
+        -- Endereço-alvo de desvio condicional ou JAL calculado no estágio EX (PC + imm).
+        i_branch_target : in    word_t;
+        -- Endereço-alvo de salto indireto JALR calculado no estágio EX ((rs1 + imm) & ~1).
+        i_jalr_target   : in    word_t;
+        -- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
+        i_redirect_pc   : in    word_t    := (others => '0');
+        -- Repete a busca de uma instrução que a cache de instruções não tinha: com i_pc_src em PC + 4, o próximo PC é i_replay_pc.
+        i_replay        : in    std_logic := '0';
+        -- Endereço da instrução a repetir (o PC da instrução que está em IF/ID).
+        i_replay_pc     : in    word_t    := (others => '0');
+        -- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
+        o_pc            : out   word_t;
+        -- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
+        o_pc4           : out   word_t
+    );
 end entity pc_fetch;
 
 architecture rtl of pc_fetch is
 
-	-- Valor atual armazenado no registrador de Program Counter.
-	signal pc_reg   : word_t;
-	-- Resultado combinacional da soma PC + 4.
-	signal pc4_wire : word_t;
-	-- Entrada sequencial do multiplexador do PC: PC + 4, ou o endereço da instrução a repetir.
-	signal seq_next : word_t;
-	-- Próximo endereço selecionado pelo multiplexador de entrada do PC.
-	signal pc_next  : word_t;
-	-- Habilitação efetiva de atualização do registrador PC.
-	signal pc_en    : std_logic;
+    -- Valor atual armazenado no registrador de Program Counter.
+    signal pc_reg   : word_t;
+    -- Resultado combinacional da soma PC + 4.
+    signal pc4_wire : word_t;
+    -- Entrada sequencial do multiplexador do PC: PC + 4, ou o endereço da instrução a repetir.
+    signal seq_next : word_t;
+    -- Próximo endereço selecionado pelo multiplexador de entrada do PC.
+    signal pc_next  : word_t;
+    -- Habilitação efetiva de atualização do registrador PC.
+    signal pc_en    : std_logic;
 
 begin
 
-	-- Somador combinacional para cálculo de PC + 4.
-	u_pc4_adder : entity work.adder
-		generic map (
-			data_width => word_t'length
-		)
-		port map (
-			i_a => pc_reg,
-			i_b => INSTR_BYTES,
-			o_d => pc4_wire
-		);
+    -- Somador combinacional para cálculo de PC + 4.
+    u_pc4_adder : entity work.adder
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_a => pc_reg,
+            i_b => INSTR_BYTES,
+            o_d => pc4_wire
+        );
 
-	seq_next <= i_replay_pc when i_replay = '1' else pc4_wire;
+    seq_next <= i_replay_pc when i_replay = '1' else pc4_wire;
 
-	-- Multiplexador 4x1 de seleção do próximo valor do PC.
-	u_pc_mux : entity work.mux_4x1
-		generic map (
-			data_width => word_t'length
-		)
-		port map (
-			i_d0  => seq_next,
-			i_d1  => i_branch_target,
-			i_d2  => i_jalr_target,
-			i_d3  => i_redirect_pc,
-			i_sel => i_pc_src,
-			o_d   => pc_next
-		);
+    -- Multiplexador 4x1 de seleção do próximo valor do PC.
+    u_pc_mux : entity work.mux_4x1
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_d0  => seq_next,
+            i_d1  => i_branch_target,
+            i_d2  => i_jalr_target,
+            i_d3  => i_redirect_pc,
+            i_sel => i_pc_src,
+            o_d   => pc_next
+        );
 
-	pc_en <= '1' when (i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT) else '0';
+    pc_en <= '1' when (i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT) else '0';
 
-	-- Registrador estrutural de 32 bits do Program Counter.
-	u_pc_reg : entity work.generic_register
-		generic map (
-			data_width => word_t'length
-		)
-		port map (
-			i_clk    => i_clk,
-			i_rst    => i_rst,
-			i_enable => pc_en,
-			i_d      => pc_next,
-			o_d      => pc_reg
-		);
+    -- Registrador estrutural de 32 bits do Program Counter.
+    u_pc_reg : entity work.generic_register
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => pc_en,
+            i_d      => pc_next,
+            o_d      => pc_reg
+        );
 
-	o_pc  <= pc_reg;
-	o_pc4 <= pc4_wire;
+    o_pc  <= pc_reg;
+    o_pc4 <= pc4_wire;
 
 end architecture rtl;

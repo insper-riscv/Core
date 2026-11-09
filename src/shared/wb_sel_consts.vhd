@@ -11,9 +11,9 @@ use work.pipeline_types.all;
 
 package wb_sel_consts is
 
-	-- Seleciona o resultado do estágio EX (ULA, MulDiv, CSR e PC + 4 de JAL e JALR).
-	constant WB_SEL_ALU : wb_sel_t := "0";
-	-- Seleciona o dado lido e estendido da memória de dados (instruções de load).
-	constant WB_SEL_RAM : wb_sel_t := "1";
+    -- Seleciona o resultado do estágio EX (ULA, MulDiv, CSR e PC + 4 de JAL e JALR).
+    constant WB_SEL_ALU : wb_sel_t := "0";
+    -- Seleciona o dado lido e estendido da memória de dados (instruções de load).
+    constant WB_SEL_RAM : wb_sel_t := "1";
 
 end package wb_sel_consts;
