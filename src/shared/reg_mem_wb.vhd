@@ -101,10 +101,11 @@ begin
     in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out)) else '0';
     in_is_cross <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
-                                ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and i_alu_out(1 downto 0) = BYTE_OFFSET_3)) else
+                                ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and
+                                    i_alu_out(1 downto 0) = BYTE_OFFSET_3)) else
                    '0';
 
-    process (i_clk) is
+    p_reg_mem_wb_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
@@ -133,7 +134,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_reg_mem_wb_proc;
 
     o_valid      <= r_valid;
     o_alu_out    <= r_alu_out;

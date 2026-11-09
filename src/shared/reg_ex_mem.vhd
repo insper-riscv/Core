@@ -43,7 +43,8 @@ entity reg_ex_mem is
         i_funct3      : in    funct3_t;
         -- Resultado final do estágio EX (endereço de memória ou resultado de operação).
         i_alu_out     : in    word_t;
-        -- Resultado da ULA em EX, o endereço efetivo de um load ou store, de onde sai a classificação registrada do endereço.
+        -- Resultado da ULA em EX, o endereço efetivo de um load ou store, de onde sai a classificação registrada do
+        -- endereço.
         i_ea          : in    word_t := (others => '0');
         -- Dado alinhado para escrita em memória vindo do StoreManager.
         i_store_data  : in    word_t;
@@ -168,7 +169,8 @@ architecture rtl of reg_ex_mem is
 
 begin
 
-    -- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
+    -- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o
+    -- endereço.
     in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
     in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base and
@@ -176,7 +178,8 @@ begin
                    '0';
     in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
-    -- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
+    -- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir
+    -- o bit.
 
     gen_faults : if HAS_ACCESS_FAULTS generate
         in_ok_rd <= '1' when addr_readable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
@@ -188,7 +191,7 @@ begin
         in_ok_wr <= '1';
     end generate gen_no_faults;
 
-    process (i_clk) is
+    p_reg_ex_mem_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
@@ -237,7 +240,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_reg_ex_mem_proc;
 
     o_valid       <= r_valid;
     o_pc          <= r_pc;
@@ -256,7 +259,8 @@ begin
     o_is_flash    <= r_is_flash;
     o_is_sdram    <= r_is_sdram;
     o_in_main     <= r_in_main;
-    -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
+    -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não
+    -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
     o_same_region <= r_in_main and (not r_last);
     o_ok_rd       <= r_ok_rd;
     o_ok_wr       <= r_ok_wr;

@@ -6,7 +6,8 @@
 -- unidades de extensão do estágio EX:
 --   1. Unidade de adiantamento (forwarding_unit) e muxes de operandos rs1/rs2.
 --   2. ULA principal (alu) e somadores de endereço-alvo de branch/JAL e JALR.
---   3. Unidade de multiplicação e divisão inteira (multdiv, quando HAS_M = true; só a multiplicação quando HAS_ZMMUL = true).
+--   3. Unidade de multiplicação e divisão inteira (multdiv, quando HAS_M = true; só a multiplicação quando
+--      HAS_ZMMUL = true).
 --   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando HAS_ZICSR = true).
 --   5. Unidade de sincronização FENCE.I (fencei_unit, quando HAS_ZIFENCEI = true).
 --   6. Unidade de condicionais zero (zicond_unit, quando HAS_ZICOND = true).
@@ -103,7 +104,8 @@ entity stage_ex is
         i_wb2_ok          : in    std_logic;
         -- Valor calculado no estágio EX/MEM para adiantamento (forwarding).
         i_exmem_alu_out   : in    word_t;
-        -- Resultado do estágio EX da instrução em MEM/WB (registrado), para adiantamento. Um load nunca é adiantado daqui.
+        -- Resultado do estágio EX da instrução em MEM/WB (registrado), para adiantamento. Um load nunca é adiantado
+        -- daqui.
         i_memwb_alu_out   : in    word_t;
         -- Dado final do estágio WB já registrado (WB2), para adiantamento (forwarding).
         i_wb2_data        : in    word_t;
@@ -157,7 +159,8 @@ entity stage_ex is
         o_dc_flush        : out   std_logic;
         -- Indica que a unidade multdiv está ocupada ou concluindo captura de resultado.
         o_muldiv_stall    : out   std_logic;
-        -- Parada de um ciclo da instrução CSR que lê o banco do Zihpm: o valor lido sai de um registrador e só vale no ciclo seguinte.
+        -- Parada de um ciclo da instrução CSR que lê o banco do Zihpm: o valor lido sai de um registrador e só vale no
+        -- ciclo seguinte.
         o_csr_wait        : out   std_logic;
         -- Pulso de 1 ciclo no término de uma operação M fundida com a anterior (evento 9 do Zihpm).
         o_muldiv_fused    : out   std_logic
@@ -451,7 +454,7 @@ begin
         csr_wait_now <= i_is_csr and i_valid_raw and csr_bank_read and (not csr_wait_done);
         o_csr_wait   <= csr_wait_now;
 
-        process (i_clk) is
+        p_csr_wait_proc : process (i_clk) is
         begin
 
             if rising_edge(i_clk) then
@@ -462,7 +465,7 @@ begin
                 end if;
             end if;
 
-        end process;
+        end process p_csr_wait_proc;
 
         csr_src_zero <= '1' when i_rs1_idx = REG_ZERO else '0';
         csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
@@ -522,7 +525,8 @@ begin
         sig_tval  <= (others => '0');
         sig_mret  <= '0';
 
-        -- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho da ULA.
+        -- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho
+        -- da ULA.
         fetch_ok <= '1' when (not HAS_ACCESS_FAULTS) or addr_executable(unsigned(i_pc)) else '0';
 
         u_trap_unit : entity work.trap_unit

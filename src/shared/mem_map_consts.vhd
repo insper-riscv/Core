@@ -36,7 +36,8 @@ package mem_map_consts is
 
     function is_last_word (addr : unsigned) return boolean;
 
-    -- O endereço está no intervalo de leitura válido do mapa: ROM, RAM, janela externa ou um slot de periférico ocupado.
+    -- O endereço está no intervalo de leitura válido do mapa: ROM, RAM, janela externa ou um slot de periférico
+    -- ocupado.
 
     function addr_readable (addr : unsigned; periph_slots : std_logic_vector(7 downto 0)) return boolean;
 

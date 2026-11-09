@@ -41,7 +41,8 @@ entity hpm_counter_bank is
         hpm_counters    : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
         -- Largura em bits de cada contador (0 deixa o banco sem contadores reais).
         hpm_width       : natural range 0 to 64               := 64;
-        -- A leitura sai de um registrador: o_rdata mostra, um ciclo depois, o valor do endereço dado em i_idx e nos seletores (a leitura dos 29 contadores sai do caminho combinacional do núcleo).
+        -- A leitura sai de um registrador: o_rdata mostra, um ciclo depois, o valor do endereço dado em i_idx e nos
+        -- seletores (a leitura dos 29 contadores sai do caminho combinacional do núcleo).
         registered_read : boolean                             := false
     );
     port (
@@ -239,7 +240,8 @@ begin
                 of_d      <= wrap or i_wdata(31);
                 of_en     <= wrap or eventh_we;
 
-                -- O estouro põe OF em '1' mesmo que o programa escreva '0' no mesmo ciclo; a escrita do programa limpa ou põe o OF.
+                -- O estouro põe OF em '1' mesmo que o programa escreva '0' no mesmo ciclo; a escrita do programa limpa
+                -- ou põe o OF.
                 u_of : entity work.flip_flop
                     port map (
                         i_d      => of_d,
@@ -302,7 +304,8 @@ begin
             o_d     => lo_word
         );
 
-    -- A leitura de mhpmeventNh só existe com a extensão; sem ela as linhas valem zero e o multiplexador some na síntese.
+    -- A leitura de mhpmeventNh só existe com a extensão; sem ela as linhas valem zero e o multiplexador some na
+    -- síntese.
     u_eventh_mux : entity work.mux_tree
         generic map (
             data_width     => word_t'length,
@@ -339,14 +342,14 @@ begin
 
     gen_registered_read : if registered_read generate
 
-        process (i_clk) is
+        p_registered_read_proc : process (i_clk) is
         begin
 
             if rising_edge(i_clk) then
                 rdata_q <= rdata_comb;
             end if;
 
-        end process;
+        end process p_registered_read_proc;
 
         o_rdata <= rdata_q;
     end generate gen_registered_read;

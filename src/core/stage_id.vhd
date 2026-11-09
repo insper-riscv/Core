@@ -174,7 +174,8 @@ architecture rtl of stage_id is
     signal   cu_we_ram       : std_logic;
     -- Habilitação de leitura na RAM antes do bubble_mux.
     signal   cu_re_ram       : std_logic;
-    -- Largura do endereço do banco de registradores desta instância: 5 bits para 32 registradores (base I), 4 para 16 (base E).
+    -- Largura do endereço do banco de registradores desta instância: 5 bits para 32 registradores (base I), 4 para 16
+    -- (base E).
     constant REG_ADDR_WIDTH  : natural := REG_BITS;
 
     -- Habilitação geral da RAM antes do bubble_mux.
@@ -317,15 +318,19 @@ begin
     end generate gen_csr_decode;
 
     o_is_muldiv   <= id_is_muldiv;
-    id_is_fencei  <= '1' when (HAS_ZIFENCEI and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
+    id_is_fencei  <= '1' when (HAS_ZIFENCEI and id_opcode = OPCODE_MISC_MEM and
+                                  i_instr(14 downto 12) = FUNCT3_FENCE_I) else
+                     '0';
     -- No RV32E o bit mais alto de cada campo de registrador usado precisa ser zero.
     id_uses_rd    <= '1' when (id_opcode = OPCODE_LUI or id_opcode = OPCODE_AUIPC or id_opcode = OPCODE_JAL or
                                   id_opcode = OPCODE_JALR or id_opcode = OPCODE_LOAD or id_opcode = OPCODE_OP_IMM or
-                                  id_opcode = OPCODE_OP or (id_opcode = OPCODE_SYSTEM and i_instr(14 downto 12) /= FUNCT3_PRIV)) else
+                                  id_opcode = OPCODE_OP or
+                                  (id_opcode = OPCODE_SYSTEM and i_instr(14 downto 12) /= FUNCT3_PRIV)) else
                      '0';
     id_uses_rs1   <= '1' when (id_opcode = OPCODE_JALR or id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_LOAD or
                                   id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP_IMM or id_opcode = OPCODE_OP or
-                                  (id_opcode = OPCODE_SYSTEM and i_instr(14) = '0' and i_instr(14 downto 12) /= FUNCT3_PRIV)) else
+                                  (id_opcode = OPCODE_SYSTEM and i_instr(14) = '0' and
+                                      i_instr(14 downto 12) /= FUNCT3_PRIV)) else
                      '0';
     id_uses_rs2   <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP) else
                      '0';

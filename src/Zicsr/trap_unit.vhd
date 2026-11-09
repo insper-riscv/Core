@@ -44,9 +44,11 @@ use work.trap_consts.all;
 
 entity trap_unit is
     generic (
-        -- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
+        -- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o
+        -- conhece.
         check_ea          : boolean := true;
-        -- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
+        -- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas
+        -- portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
         ea_flags_external : boolean := false
     );
     port (
@@ -122,23 +124,28 @@ architecture rtl of trap_unit is
 
     -- Indica instrução da classe SYSTEM com codificação não suportada/ilegal.
     signal sys_illegal   : std_logic;
-    -- Indica instrução de leitura de memória (LOAD) com endereço desalinhado, já descontados os casos que o hardware executa.
+    -- Indica instrução de leitura de memória (LOAD) com endereço desalinhado, já descontados os casos que o hardware
+    -- executa.
     signal ld_misal      : std_logic;
-    -- Indica instrução de escrita em memória (STORE) com endereço desalinhado, já descontados os casos que o hardware executa.
+    -- Indica instrução de escrita em memória (STORE) com endereço desalinhado, já descontados os casos que o hardware
+    -- executa.
     signal st_misal      : std_logic;
     -- Indica LOAD com endereço desalinhado, executado ou não pelo hardware.
     signal ld_unaligned  : std_logic;
     -- Indica STORE com endereço desalinhado, executado ou não pelo hardware.
     signal st_unaligned  : std_logic;
-    -- Indica que o endereço efetivo está na memória principal (RAM interna ou SDRAM): fora da flash e da janela de periféricos.
+    -- Indica que o endereço efetivo está na memória principal (RAM interna ou SDRAM): fora da flash e da janela de
+    -- periféricos.
     signal in_main_mem   : std_logic;
     -- Indica que o acesso desalinhado cabe numa única palavra (LH, LHU ou SH com offset 1) e o hardware o executa.
     signal misal_in_word : std_logic;
     -- Indica acesso que ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
     signal crosses_word  : std_logic;
-    -- Indica que o endereço efetivo está na última palavra de uma região de 1 GiB (bits [29:2] todos em '1'): a palavra seguinte pertence à outra região.
+    -- Indica que o endereço efetivo está na última palavra de uma região de 1 GiB (bits [29:2] todos em '1'): a palavra
+    -- seguinte pertence à outra região.
     signal last_word     : std_logic;
-    -- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal (RAM interna ou SDRAM).
+    -- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal (RAM interna ou
+    -- SDRAM).
     signal same_region   : std_logic;
     -- Indica acesso desalinhado que o hardware executa (dentro da palavra ou cruzando, na memória principal).
     signal misal_exec    : std_logic;
@@ -150,7 +157,8 @@ architecture rtl of trap_unit is
     signal ld_fault      : std_logic;
     -- Indica store para endereço que o mapa não aceita escrever.
     signal st_fault      : std_logic;
-    -- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem prioridade sobre o alvo desalinhado.
+    -- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem
+    -- prioridade sobre o alvo desalinhado.
     signal any_illegal   : std_logic;
 
     -- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
@@ -198,7 +206,8 @@ begin
                      '0';
 
     crosses_word <= '1' when ((i_funct3 = FUNCT3_LW or i_funct3 = FUNCT3_SW) and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
-                             ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3) else
+                             ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and
+                        i_ea(1 downto 0) = BYTE_OFFSET_3) else
                     '0';
 
     last_word <= '1' when is_last_word(unsigned(i_ea)) else
@@ -216,11 +225,15 @@ begin
     ld_misal <= ld_unaligned and (not misal_exec) when check_ea else '0';
     st_misal <= st_unaligned and (not misal_exec) when check_ea else '0';
 
-    -- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do manual,
-    -- que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele executa
-    -- só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
-    ld_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and ld_misal = '0') else '0';
-    st_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and st_misal = '0') else '0';
+    -- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do
+    -- manual, que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele
+    -- executa só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
+    ld_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and
+                                ld_misal = '0') else
+                   '0';
+    st_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and
+                                st_misal = '0') else
+                   '0';
     fetch_fault <= '1' when (HAS_ACCESS_FAULTS and i_fetch_ok = '0') else '0';
 
     any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
@@ -254,7 +267,8 @@ begin
     o_tval <= (others => '0') when irq_go = '1' else
               i_pc when fetch_fault = '1' else
               i_cf_target when cf_misal = '1' else
-              i_ea when ((ld_misal = '1' or st_misal = '1' or ld_fault = '1' or st_fault = '1') and i_illegal = '0') else
+              i_ea when ((ld_misal = '1' or st_misal = '1' or ld_fault = '1' or st_fault = '1') and
+                            i_illegal = '0') else
               (others => '0');
 
 end architecture rtl;

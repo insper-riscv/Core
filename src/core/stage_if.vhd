@@ -111,8 +111,9 @@ begin
               PC_SRC_PC4;
 
     -- O PC avança quando liberado pela HDU e sem espera de I-cache, ou imediatamente em redirecionamentos.
-    -- O PC avança sem esperar a I-cache: a resposta tardia (i_ic_ready) só marca a instrução de IF/ID como sem resposta, e o
-    -- PC volta a ela no ciclo seguinte (replay). Assim a saída das RAMs da cache chega só a dois registradores.
+    -- O PC avança sem esperar a I-cache: a resposta tardia (i_ic_ready) só marca a instrução de IF/ID como sem
+    -- resposta, e o PC volta a ela no ciclo seguinte (replay). Assim a saída das RAMs da cache chega só a dois
+    -- registradores.
     pc_write_en <= i_hdu_pc_we or
                    (((i_ex_branch_taken or i_ex_jalr_taken) and i_pipe_run) or
                       i_trap_take or i_mret_take or i_fencei_take);
@@ -120,7 +121,7 @@ begin
     replay   <= miss_q and i_hdu_pc_we;
     o_replay <= replay;
 
-    process (i_clk) is
+    p_miss_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
@@ -131,7 +132,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_miss_proc;
 
     u_pc_fetch : entity work.pc_fetch
         port map (

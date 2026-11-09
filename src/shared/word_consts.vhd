@@ -2,7 +2,8 @@
 -- Constantes de valor da palavra de 32 bits do processador RV32
 --
 -- Centraliza os valores de palavra usados na lógica dos estágios e das
--- extensões: o passo sequencial do Program Counter e os dois valores especiais do resultado da divisão (divisão por zero e estouro).
+-- extensões: o passo sequencial do Program Counter e os dois valores especiais do resultado da divisão (divisão por
+-- zero e estouro).
 -- =============================================================================
 
 library ieee;

@@ -397,7 +397,7 @@ mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal 
 
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT \+when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned "s/ and st_misal = '0') else '0';/) else '0';/;s/CAUSE_MISALIGNED_ST when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned ":a;N;\$!ba;s/[[:space:]]\+and[[:space:]]\+st_misal[[:space:]]\+=[[:space:]]\+'0')[[:space:]]\+else[[:space:]]\+'0';/) else '0';/;s/CAUSE_MISALIGNED_ST[[:space:]]\+when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc \+when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT \+when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
 
@@ -483,7 +483,7 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inh
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(HAS_SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal ":a;N;\$!ba;s/(idx_is_hpm[[:space:]]\+and[[:space:]]\+(in_event_range[[:space:]]\+or[[:space:]]\+in_lo_range[[:space:]]\+or[[:space:]]\+in_hi_range[[:space:]]\+or[[:space:]]\+(to_sl(HAS_SSCOF)[[:space:]]\+and[[:space:]]\+in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range \+<= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
@@ -494,7 +494,7 @@ mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d 
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_of_not_sticky "s/of_en     <= wrap or eventh_we;/of_en     <= eventh_we;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI \+when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost "s/lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost ":a;N;\$!ba;s/lcofip_we[[:space:]]\+<=[[:space:]]\+ovf_irq[[:space:]]\+or[[:space:]]\+(csr_write_valid[[:space:]]\+and[[:space:]]\+to_sl(i_addr[[:space:]]\+=[[:space:]]\+ADDR_MIP)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_trap_take)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofie_ignored "s/lcofi_pend <= lcofip and lcofie;/lcofi_pend <= lcofip;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range \+<= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
 

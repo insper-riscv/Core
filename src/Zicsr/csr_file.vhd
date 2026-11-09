@@ -80,13 +80,15 @@ entity csr_file is
     generic (
         -- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
         tick_cycles         : positive                            := 50;
-        -- Quantidade de contadores de eventos reais da extensão Zihpm, de índices 3 a 2 + hpm_counters; os outros leem zero.
+        -- Quantidade de contadores de eventos reais da extensão Zihpm, de índices 3 a 2 + hpm_counters; os outros leem
+        -- zero.
         hpm_counters        : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
         -- Largura em bits de cada contador de eventos real (0 a 64).
         hpm_width           : natural range 0 to 64               := 64;
         -- O CSR time espelha o mtime que a plataforma entrega em i_mtime (o CLINT), no lugar do contador próprio.
         time_external       : boolean                             := false;
-        -- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor lido só vale um ciclo depois de o endereço aparecer.
+        -- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor
+        -- lido só vale um ciclo depois de o endereço aparecer.
         hpm_registered_read : boolean                             := false
     );
     port (
@@ -375,10 +377,14 @@ begin
     is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';
     o_illegal        <= (not is_known_addr) or (has_write_effect and is_read_only);
 
-    csr_write_valid <= '1' when (i_commit = '1' and has_write_effect = '1' and is_known_addr = '1' and is_read_only = '0') else '0';
+    csr_write_valid <= '1' when (i_commit = '1' and has_write_effect = '1' and is_known_addr = '1' and
+                                    is_read_only = '0') else
+                       '0';
 
     -- Controle de atualização de mstatus.MIE e mstatus.MPIE (prioridade: trap_take > mret_take > escrita CSR).
-    mie_we  <= '1' when (i_trap_take = '1' or i_mret_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MSTATUS)) else '0';
+    mie_we  <= '1' when (i_trap_take = '1' or i_mret_take = '1' or
+                            (csr_write_valid = '1' and i_addr = ADDR_MSTATUS)) else
+               '0';
     mie_nxt <= '0' when i_trap_take = '1' else
                mstatus_mpie when i_mret_take = '1' else
                new_value(3);
@@ -389,22 +395,32 @@ begin
                 new_value(7);
 
     -- Controle de atualização dos CSRs de 32 bits.
-    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and i_mret_take = '0') else '0';
+    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and
+                                   i_mret_take = '0') else
+                      '0';
     mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';
     mtvec_base_low <= (others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2);
     mtvec_nxt      <= new_value(31 downto 6) & mtvec_base_low & BYTE_OFFSET_0;
     mtvec_value    <= mtvec_reg(31 downto 2) & '0' & mtvec_mode;
 
-    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and i_mret_take = '0') else '0';
+    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and
+                                i_mret_take = '0') else
+                   '0';
 
-    mepc_we  <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else '0';
+    mepc_we  <= '1' when (i_trap_take = '1' or
+                             (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else
+                '0';
     mepc_nxt <= i_trap_pc(31 downto 2) & BYTE_OFFSET_0 when i_trap_take = '1' else
                 new_value(31 downto 2) & BYTE_OFFSET_0;
 
-    mcause_we  <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else '0';
+    mcause_we  <= '1' when (i_trap_take = '1' or
+                               (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else
+                  '0';
     mcause_nxt <= i_trap_cause when i_trap_take = '1' else new_value;
 
-    mtval_we  <= '1' when (i_trap_take = '1' or (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else '0';
+    mtval_we  <= '1' when (i_trap_take = '1' or
+                              (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else
+                 '0';
     mtval_nxt <= i_trap_tval when i_trap_take = '1' else new_value;
 
     -- Interrupções de máquina: mip espelha as portas, mie guarda as máscaras.
@@ -442,7 +458,9 @@ begin
                      CAUSE_IRQ_TIMER;
 
     gen_irq : if HAS_INTERRUPTS generate
-        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and i_mret_take = '0') else '0';
+        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and
+                                  i_mret_take = '0') else
+                     '0';
 
         u_irq_en_reg : entity work.generic_register
             generic map (
@@ -467,7 +485,8 @@ begin
     -- o altera quando não há pedido no mesmo ciclo; LCOFIE guarda o bit 13 escrito em mie.
 
     gen_lcofi : if HAS_SSCOF generate
-        lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
+        lcofip_we  <= ovf_irq or
+                      (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
         lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
 
         u_lcofip : entity work.flip_flop
@@ -559,7 +578,7 @@ begin
 
         -- A retirada de EX fica pendente por um ciclo, para que um trap tomado em MEM a cancele; uma escrita em
         -- minstret no mesmo ciclo descarta a retirada da própria instrução de escrita.
-        process (i_clk) is
+        p_retire_pending_proc : process (i_clk) is
         begin
 
             if rising_edge(i_clk) then
@@ -570,12 +589,13 @@ begin
                 end if;
             end if;
 
-        end process;
+        end process p_retire_pending_proc;
 
         minstret_inc <= retire_pending and (not i_retire_cancel) and (not inhibit_reg(2));
 
         -- O programa lê minstret já com a retirada pendente somada.
-        minstret_rd_lo <= std_logic_vector(unsigned(minstret_lo) + unsigned'(0 => retire_pending and (not inhibit_reg(2))));
+        minstret_rd_lo <= std_logic_vector(unsigned(minstret_lo) +
+                                           unsigned'(0 => retire_pending and (not inhibit_reg(2))));
         minstret_rd_hi <= std_logic_vector(unsigned(minstret_hi) +
 		                  unsigned'(0 => retire_pending and (not inhibit_reg(2)) and to_sl(minstret_lo = WORD_ALL_ONES)));
 
@@ -704,7 +724,8 @@ begin
             );
 
         is_ext_addr <= is_inhibit_addr or
-                       (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(HAS_SSCOF) and in_eventh_range)));
+                       (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or
+                                           (to_sl(HAS_SSCOF) and in_eventh_range)));
         o_bank_read <= is_ext_addr when hpm_registered_read else '0';
     end generate gen_zihpm;
 

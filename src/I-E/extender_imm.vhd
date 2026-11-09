@@ -41,9 +41,11 @@ begin
         -- Formato I-type shamt: zext(instr[24:20])
         (31 downto 5 => '0') & i_instr(24 downto 20) when EXT_IMM_I_SHAMT,
         -- Formato J-type (JAL): sext(instr[31] & instr[19:12] & instr[20] & instr[30:21] & '0')
-        (31 downto 21 => i_instr(31)) & i_instr(31) & i_instr(19 downto 12) & i_instr(20) & i_instr(30 downto 21) & '0' when EXT_IMM_J,
+        (31 downto 21 => i_instr(31)) & i_instr(31) & i_instr(19 downto 12) & i_instr(20) & i_instr(30 downto 21) &
+        '0' when EXT_IMM_J,
         -- Formato B-type (BRANCH): sext(instr[31] & instr[7] & instr[30:25] & instr[11:8] & '0')
-        (31 downto 13 => i_instr(31)) & i_instr(31) & i_instr(7) & i_instr(30 downto 25) & i_instr(11 downto 8) & '0' when EXT_IMM_B,
+        (31 downto 13 => i_instr(31)) & i_instr(31) & i_instr(7) & i_instr(30 downto 25) & i_instr(11 downto 8) &
+        '0' when EXT_IMM_B,
         -- Formato S-type (STORE): sext(instr[31:25] & instr[11:7])
         (31 downto 12 => i_instr(31)) & i_instr(31 downto 25) & i_instr(11 downto 7) when EXT_IMM_S,
         -- Valor padrão seguro para seletores não utilizados

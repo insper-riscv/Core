@@ -76,9 +76,11 @@ package csr_addr_consts is
     -- Endereço do CSR mconfigptr (Machine Configuration Pointer Register).
     constant ADDR_MCONFIGPTR    : std_logic_vector(11 downto 0) := x"F15";
 
-    -- Faixa (bits [11:5] do endereço) de mcountinhibit, no índice 0, e dos seletores de evento mhpmeventN (0x320 a 0x33F).
+    -- Faixa (bits [11:5] do endereço) de mcountinhibit, no índice 0, e dos seletores de evento mhpmeventN (0x320 a
+    -- 0x33F).
     constant RANGE_MHPMEVENT    : std_logic_vector(6 downto 0) := ADDR_MCOUNTINHIBIT(11 downto 5);
-    -- Faixa (bits [11:5] do endereço) das metades altas dos seletores de evento da Sscofpmf, mhpmeventNh (0x720 a 0x73F).
+    -- Faixa (bits [11:5] do endereço) das metades altas dos seletores de evento da Sscofpmf, mhpmeventNh (0x720 a
+    -- 0x73F).
     constant RANGE_MHPMEVENTH   : std_logic_vector(6 downto 0) := "0111001";
     -- Faixa (bits [11:5] do endereço) das metades baixas dos contadores de máquina (0xB00 a 0xB1F).
     constant RANGE_MHPMCOUNTER  : std_logic_vector(6 downto 0) := ADDR_MCYCLE(11 downto 5);

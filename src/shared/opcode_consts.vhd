@@ -28,7 +28,8 @@ package opcode_consts is
     constant OPCODE_AUIPC  : opcode_t := "0010111";
     -- Instruções de escrita em memória (SB, SH, SW).
     constant OPCODE_STORE  : opcode_t := "0100011";
-    -- Instruções registrador-registrador RV32I e extensão M (ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND, MUL/DIV/REM).
+    -- Instruções registrador-registrador RV32I e extensão M (ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND,
+    -- MUL/DIV/REM).
     constant OPCODE_OP     : opcode_t := "0110011";
     -- Carregamento de imediato superior (LUI).
     constant OPCODE_LUI    : opcode_t := "0110111";

@@ -70,7 +70,7 @@ begin
     -- Sinal o_busy sobe combinacionalmente no mesmo ciclo de i_start em S_IDLE (eager stall).
     o_busy <= '1' when (state = S_IDLE and i_start = '1' and start_inhibit = '0') else busy_reg;
 
-    process (i_clk) is
+    p_booth_proc : process (i_clk) is
 
         -- Acumulador do próximo ciclo (33 bits: soma ou subtração do multiplicando com o acumulador atual).
         variable acc_next   : signed(32 downto 0);
@@ -152,7 +152,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_booth_proc;
 
     o_result_hi <= std_logic_vector(acc_reg(31 downto 0));
     o_result_lo <= std_logic_vector(q_reg);

@@ -170,7 +170,8 @@ begin
                 std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
     raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
 
-    data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length), BYTE_WIDTH * to_integer(unsigned(offset))));
+    data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length),
+                                          BYTE_WIDTH * to_integer(unsigned(offset))));
     mask8  <= std_logic_vector(shift_left(resize(unsigned(raw_mask), mask8'length), to_integer(unsigned(offset))));
 
     next_word <= unsigned(i_addr(31 downto 2)) + 1;

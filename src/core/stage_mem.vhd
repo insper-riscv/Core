@@ -27,7 +27,8 @@ entity stage_mem is
     generic (
         -- Confere o endereço efetivo do load ou store (exceção em MEM); '0' deixa essa conferência para o estágio EX.
         check_ea         : boolean := true;
-        -- A classificação do endereço efetivo (FLASH, SDRAM, memória principal, mesma região) vem registrada do EX/MEM pelas portas i_flag_*, em vez de ser decodificada do endereço neste estágio.
+        -- A classificação do endereço efetivo (FLASH, SDRAM, memória principal, mesma região) vem registrada do EX/MEM
+        -- pelas portas i_flag_*, em vez de ser decodificada do endereço neste estágio.
         flags_registered : boolean := false
     );
     port (

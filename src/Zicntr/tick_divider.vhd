@@ -37,7 +37,7 @@ begin
     last   <= '1' when count = tick_cycles - 1 else '0';
     o_tick <= last;
 
-    process (i_clk) is
+    p_tick_count_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
@@ -48,6 +48,6 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_tick_count_proc;
 
 end architecture rtl;

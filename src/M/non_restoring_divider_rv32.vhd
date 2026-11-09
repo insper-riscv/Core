@@ -97,9 +97,11 @@ begin
 
     detect_div_by_zero <= '1' when unsigned(i_divisor) = 0 else '0';
 
-    detect_overflow <= '1' when (i_is_unsigned = '0' and i_dividend = WORD_INT_MIN and i_divisor = WORD_ALL_ONES) else '0';
+    detect_overflow <= '1' when (i_is_unsigned = '0' and i_dividend = WORD_INT_MIN and
+                                    i_divisor = WORD_ALL_ONES) else
+                       '0';
 
-    process (i_clk) is
+    p_divider_proc : process (i_clk) is
 
         -- Resto parcial deslocado de um bit com o próximo bit do dividendo (34 bits com sinal).
         variable rem_shifted    : signed(33 downto 0);
@@ -262,7 +264,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_divider_proc;
 
     o_quotient    <= q_result;
     o_remainder   <= r_result;

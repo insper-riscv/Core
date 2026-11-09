@@ -193,7 +193,7 @@ architecture rtl of reg_id_ex is
 
 begin
 
-    process (i_clk) is
+    p_reg_id_ex_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
@@ -254,7 +254,7 @@ begin
             end if;
         end if;
 
-    end process;
+    end process p_reg_id_ex_proc;
 
     o_valid         <= r_valid;
     o_pc            <= r_pc;

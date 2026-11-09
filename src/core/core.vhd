@@ -21,11 +21,13 @@ entity core is
         -- Seção implementação: como o núcleo é construído, sem mudar a ISA visível ao software. A ISA e o
         -- mapa de memória vêm do config_pkg.
         -- ---------------------------------------------------------------------------
-        -- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
+        -- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT
+        -- fica falso.
         time_external : boolean                      := false;
         -- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
         tick_cycles   : positive                     := 50;
-        -- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters); os outros leem zero.
+        -- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters); os outros leem
+        -- zero.
         hpm_counters  : natural range 0 to 29        := 29;
         -- Largura em bits de cada contador de eventos real, de 0 a 64.
         hpm_width     : natural range 0 to 64        := 64;
@@ -100,20 +102,23 @@ entity core is
         -- Pulso de confirmação de término do flush da cache de dados write-back.
         i_dc_done  : in    std_logic := '0';
 
-        -- Pulso de um ciclo: uma exceção ocorreu e o core não tem CSRs para registrá-la (só existe sem Zicsr; '0' com Zicsr).
+        -- Pulso de um ciclo: uma exceção ocorreu e o core não tem CSRs para registrá-la (só existe sem Zicsr; '0' com
+        -- Zicsr).
         o_trap           : out   std_logic;
         -- Código de causa da exceção sinalizada, no formato do mcause (zero com Zicsr).
         o_trap_cause     : out   word_t;
         -- PC da instrução que gerou a exceção sinalizada (zero com Zicsr).
         o_trap_pc        : out   word_t;
-        -- Pulso de um ciclo: o núcleo toma uma exceção síncrona, tratada em mtvec com Zicsr ou apenas sinalizada em o_trap sem ele.
+        -- Pulso de um ciclo: o núcleo toma uma exceção síncrona, tratada em mtvec com Zicsr ou apenas sinalizada em
+        -- o_trap sem ele.
         o_trap_take      : out   std_logic;
         -- Pulso de um ciclo: uma instrução foi retirada em EX (válida, com o pipeline andando e sem exceção).
         o_retire         : out   std_logic;
         -- Eventos das caches e da FLASH para os contadores do Zihpm: bit 0 falha da cache de instruções (evento 5),
         -- bit 1 falha da cache de dados (6), bit 2 ciclo de espera por FLASH (7); pulsos de um ciclo.
         i_hpm_ext_events : in    std_logic_vector(2 downto 0)  := (others => '0');
-        -- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do núcleo; fontes de outro domínio passam por um synchronizer.
+        -- Interrupção de software de máquina (MSIP), de nível, no domínio de clock do núcleo; fontes de outro domínio
+        -- passam por um synchronizer.
         i_irq_software   : in    std_logic                     := '0';
         -- Valor de 64 bits do mtime da plataforma, que time e timeh espelham com time_external.
         i_mtime          : in    std_logic_vector(63 downto 0) := (others => '0');
@@ -149,7 +154,8 @@ architecture rtl of core is
     signal hpm_events     : std_logic_vector(15 downto 0);
     -- Valor de mis_stall no ciclo anterior (para o pulso de início de um acesso desalinhado).
     signal mis_stall_q    : std_logic := '0';
-    -- Ciclo de parada por dependência de load: a HDU parou o IF/ID sem que o pipeline estivesse parado por outro motivo.
+    -- Ciclo de parada por dependência de load: a HDU parou o IF/ID sem que o pipeline estivesse parado por outro
+    -- motivo.
     signal load_use_stall : std_logic;
 
     -- Sinal de flush síncrono do registrador IF/ID.
@@ -160,7 +166,8 @@ architecture rtl of core is
     signal flush_ex_mem   : std_logic;
     -- Pulso de exceção sinalizada sem Zicsr, que mata a instrução em EX sem redirecionar o PC.
     signal trap_sig       : std_logic;
-    -- A memória avança neste ciclo: sem parada de multdiv nem espera da SDRAM, mesmo com a etapa 1 de um acesso desalinhado.
+    -- A memória avança neste ciclo: sem parada de multdiv nem espera da SDRAM, mesmo com a etapa 1 de um acesso
+    -- desalinhado.
     signal mem_run        : std_logic;
     -- O acesso em MEM cruza a palavra e é executado em duas etapas.
     signal mis_cross      : std_logic;
@@ -481,14 +488,14 @@ begin
     -- 9 operação fundida de multiplicação ou divisão.
     load_use_stall <= (not id_pc_we) and (not pipe_stall);
 
-    process (i_clk) is
+    p_mis_stall_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             mis_stall_q <= mis_stall;
         end if;
 
-    end process;
+    end process p_mis_stall_proc;
 
     hpm_events <=
     (
@@ -517,8 +524,10 @@ begin
             severity note;
     end generate gen_report;
 
-    flush_if_id  <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take or if_replay;
-    flush_id_ex  <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
+    flush_if_id  <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or
+                    fencei_take or if_replay;
+    flush_id_ex  <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or
+                    fencei_take;
     flush_ex_mem <= trap_take or trap_sig or mem_trap_take or (fencei_busy and base_run);
 
     -- =========================================================================

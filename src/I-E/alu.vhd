@@ -61,7 +61,7 @@ architecture rtl of alu is
     constant SHIFT_STAGES : natural := (SHAMT_WIDTH + 1) / 2;
 
     -- Vetor de estágios intermediários do deslocamento.
-    type stage_array_t is array (0 to SHIFT_STAGES) of std_logic_vector((data_width - 1) downto 0);
+    type stage_array_t is array(0 to SHIFT_STAGES) of std_logic_vector((data_width - 1) downto 0);
 
     -- Desloca x à direita de n posições, preenchendo com fill à esquerda.
 
@@ -196,7 +196,8 @@ begin
 
         gen_single : if 2 * p + 1 >= SHAMT_WIDTH generate
             shl_stage(p + 1) <= shift_left_zero(shl_stage(p), 4 ** p) when i_b(2 * p) = '1' else shl_stage(p);
-            shr_stage(p + 1) <= shift_right_fill(shr_stage(p), 4 ** p, shift_fill) when i_b(2 * p) = '1' else shr_stage(p);
+            shr_stage(p + 1) <= shift_right_fill(shr_stage(p), 4 ** p, shift_fill) when i_b(2 * p) = '1' else
+                                shr_stage(p);
         end generate gen_single;
 
     end generate gen_shift;

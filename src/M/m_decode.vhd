@@ -42,7 +42,8 @@ architecture rtl of m_decode is
 
     -- Sinal interno que indica reivindicação da instrução pela extensão M.
     signal is_m_instr        : std_logic;
-    -- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com HAS_M).
+    -- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com
+    -- HAS_M).
     signal is_claimed_funct3 : std_logic;
 
 begin

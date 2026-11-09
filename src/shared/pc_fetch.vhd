@@ -34,7 +34,8 @@ entity pc_fetch is
         i_jalr_target   : in    word_t;
         -- Endereço de redirecionamento prioritário para trap, MRET ou FENCE.I.
         i_redirect_pc   : in    word_t    := (others => '0');
-        -- Repete a busca de uma instrução que a cache de instruções não tinha: com i_pc_src em PC + 4, o próximo PC é i_replay_pc.
+        -- Repete a busca de uma instrução que a cache de instruções não tinha: com i_pc_src em PC + 4, o próximo PC é
+        -- i_replay_pc.
         i_replay        : in    std_logic := '0';
         -- Endereço da instrução a repetir (o PC da instrução que está em IF/ID).
         i_replay_pc     : in    word_t    := (others => '0');

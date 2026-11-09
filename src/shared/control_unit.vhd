@@ -83,7 +83,7 @@ begin
     -- ===========================================================================
     -- Decodificação combinacional das instruções RV32I base
     -- ===========================================================================
-    process (i_inst) is
+    p_decode_proc : process (i_inst) is
     begin
 
         -- Valores padrão seguros (NOP sem escrita em registrador nem acesso à memória).
@@ -390,10 +390,10 @@ begin
 
         end case;
 
-    end process;
+    end process p_decode_proc;
 
     -- Legalidade da instrução: cada formato lista os funct3 e funct7 que existem.
-    process (i_inst) is
+    p_legality_proc : process (i_inst) is
     begin
 
         o_illegal <= '1';
@@ -468,6 +468,6 @@ begin
 
         end if;
 
-    end process;
+    end process p_legality_proc;
 
 end architecture rtl;
