@@ -12,11 +12,11 @@ This document describes how the Core executes the `Zicond` instructions. What th
 
 ## 2. Configuration
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_zicond` | `false` | Instantiates the decoder in the ID stage and the execution unit in the EX stage |
+| `HAS_ZICOND` | `false` | Instantiates the decoder in the ID stage and the execution unit in the EX stage |
 
-With `has_zicond = false`, no decoder claims the two encodings, and the control unit marks them as illegal instructions, like any encoding outside RV32I. The `rv32im_zicond` profile turns the generic on for the GHDL build.
+With `HAS_ZICOND = false`, no decoder claims the two encodings, and the control unit marks them as illegal instructions, like any encoding outside RV32I. The `rv32im_zicond` profile turns the generic on for the GHDL build.
 
 ## 3. Decoding in the ID Stage
 
@@ -56,8 +56,8 @@ The result enters the EX stage result multiplexer, which picks it when the opera
 | :--- | :--- |
 | Decoder entity test | The two encodings, the independence from the register fields and the neighboring encodings that are not claimed |
 | Execution unit entity test | The truth table, each of the 32 bits of `rs1` and `rs2`, pseudorandom operands and the ALU operation codes that are not claimed |
-| Core test with `has_zicond` | `rs2` zero and nonzero, `rd` equal to `rs1`, `rd` equal to `x0`, `rs1` equal to `x0`, `rs1` and `rs2` in the same register and forwarding of the operand and of the result |
-| Core test without `has_zicond` | Both instructions raise the illegal-instruction exception (cause 2) |
+| Core test with `HAS_ZICOND` | `rs2` zero and nonzero, `rd` equal to `rs1`, `rd` equal to `x0`, `rs1` equal to `x0`, `rs1` and `rs2` in the same register and forwarding of the operand and of the result |
+| Core test without `HAS_ZICOND` | Both instructions raise the illegal-instruction exception (cause 2) |
 | Formal proofs | The semantics of the table in section 2 of [instructions.md](instructions.md) and the exactness of the claimed encoding, each property with VHDL mutants that must be caught |
 
 ---

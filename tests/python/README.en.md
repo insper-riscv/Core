@@ -39,7 +39,7 @@ Each key in `tests/python/tests.json` defines a test target with the following f
 | `toplevel` | Name of the VHDL entity under test (for example, `alu`, `reg_file`, `core`) |
 | `sources` | List of required VHDL files, relative to the repository root and in compilation dependency order |
 | `test_module` | Python module containing the `@cocotb.test()` coroutines |
-| `parameters` | Optional dictionary of generics passed to the simulator at elaboration (for example, `{"has_m": false, "has_zifencei": true}`) |
+| `parameters` | Optional dictionary of generics passed to the simulator at elaboration (for example, `{"tick_cycles": 4, "hpm_counters": 4}`); the extensions are not generics, and the entry chooses the `config_pkg` in its `sources` list (`build/configs/<variant>/config_pkg.vhd`, variants of `formal/configs.yaml`) |
 | `build_args` / `test_args` | Additional arguments forwarded to GHDL (for example, `["--std=08"]`) |
 | `skip` | Optional boolean; when `true`, skips the target during an unfiltered full run |
 

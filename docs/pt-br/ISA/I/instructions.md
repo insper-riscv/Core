@@ -111,7 +111,7 @@ Seção 1.1.6 do manual.
 
 O Core usa a ordem little-endian. Na palavra de 32 bits, o byte de endereço $4k + i$ ocupa os bits $[8i + 7 : 8i]$, e o gerenciador de stores e o extensor de leitura usam os dois bits baixos do endereço efetivo para escolher a faixa de bytes. Um load com destino `x0` acessa a memória e passa pela mesma verificação de alinhamento, apenas não grava o resultado.
 
-Acessos desalinhados que ficam na memória principal são executados em hardware quando o genérico `has_zicclsm` está ativo (padrão); os demais geram a exceção de load ou store desalinhado (causas 4 e 6). Os casos estão em [Zicclsm/description.md](../Zicclsm/description.md).
+Acessos desalinhados que ficam na memória principal são executados em hardware quando a constante `HAS_ZICCLSM` está ativo (padrão); os demais geram a exceção de load ou store desalinhado (causas 4 e 6). Os casos estão em [Zicclsm/description.md](../Zicclsm/description.md).
 
 ## 5. `FENCE`, `ECALL` e `EBREAK`
 
@@ -124,7 +124,7 @@ Seção 1.1.7 do manual. A instrução ordena operações de entrada e saída e 
 | Decodificação | Legal quando `opcode` é `0001111` e `funct3` é `000`, sem examinar `fm`, predecessor, sucessor, `rs1` nem `rd` |
 | Efeito | Nenhum; o decodificador entrega os sinais de um `NOP` (sem escrita em registrador nem acesso à memória) |
 | `FENCE.TSO` e valores reservados | Executam como o `FENCE` comum, porque o decodificador examina apenas `opcode` e `funct3` |
-| `FENCE.I` | Pertence à extensão Zifencei e é ilegal quando o genérico `has_zifencei` está desativado ([Zifencei/description.md](../Zifencei/description.md)) |
+| `FENCE.I` | Pertence à extensão Zifencei e é ilegal quando a constante `HAS_ZIFENCEI` está desativado ([Zifencei/description.md](../Zifencei/description.md)) |
 
 ### 5.2. `ECALL` e `EBREAK`
 

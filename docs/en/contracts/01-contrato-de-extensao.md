@@ -4,7 +4,7 @@
 
 The RISC-V specification defines the architectural semantics of each instruction (opcodes, `funct3`/`funct7` fields, and register effects). The extension contract defines how the hardware of an extension (`M/`, `Zicsr/`, `Zifencei/`) connects to the pipeline stages (`core/`) without coupling the base logic (`common/` and `I/`) to the internal details of each extension.
 
-Each extension resides in its own folder and is enabled at the top level `src/core/core.vhd` by a boolean generic (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_zicond`, `has_dcache`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
+Each extension resides in its own folder and is enabled at the top level `src/core/core.vhd` by a boolean constant of the `config_pkg` (`HAS_M`, `HAS_ZMMUL`, `HAS_ZICSR`, `HAS_ZIFENCEI`, `HAS_ZICOND`, `HAS_DCACHE`). When the corresponding generic is `false`, the instructions of that extension behave as `NOP` (no register write, no memory access, and no pipeline stall).
 
 The stages instantiate the unit of each extension directly with `entity work`, without a `component` declaration. For that reason every profile analyzes the files of all extensions, and a generic set to `false` removes the unit from the elaboration.
 
@@ -57,7 +57,7 @@ The `multdiv` unit encapsulates the radix-2 Booth multiplier (`booth_multiplier_
 
 ### 3.2. Zicsr Extension and Exceptions (`src/Zicsr/csr_file.vhd` and `src/Zicsr/trap_unit.vhd`)
 
-The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap unit operate in the EX stage:
+The `rv32im_zicsr` profile enables `HAS_ZICSR = true`. The CSR file and trap unit operate in the EX stage:
 
 | Aspect | Specification |
 | :--- | :--- |
@@ -66,18 +66,18 @@ The `rv32im_zicsr` profile enables `has_zicsr = true`. The CSR file and trap uni
 | Write operand | `ex_fwd_rs1_val` for register instructions (`i_funct3(2) = '0'`) or the 5-bit `i_rs1_idx` zero-extended to 32 bits for immediate forms (`i_funct3(2) = '1'`) |
 | Load-use hazard | The `hazard_detection_unit` includes `OPCODE_SYSTEM` among `rs1` readers, inserting a 1-cycle stall when preceded by a load to the same register |
 | Illegal access | `csr_file` asserts `o_illegal = '1'` for unimplemented CSR addresses or effective write attempts to read-only CSRs (`i_addr[11:10] = "11"`) |
-| `misa` | Reads RV32I, plus the M extension (bit 12) when `has_m = true`; Zmmul has no bit of its own; writes are ignored |
-| Interrupts | With `has_interrupts = true`, `mip` mirrors the ports `i_irq_software`, `i_irq_timer` and `i_irq_external`, `mie` holds bits 3, 7 and 11, and the `trap_unit` takes the highest-priority interrupt (external, software, timer) on the instruction in EX when `mstatus.MIE`, the `mie` bit and the `mip` bit are `1` (see [Zicsr](../ISA/Zicsr/description.md)); without the generic, `mie` and `mip` read zero and ignore writes |
-| Not implemented | The counters `cycle`, `time` and `instret` exist only with `has_zicntr = true`, and without it an access is an illegal CSR access |
+| `misa` | Reads RV32I, plus the M extension (bit 12) when `HAS_M = true`; Zmmul has no bit of its own; writes are ignored |
+| Interrupts | With `HAS_INTERRUPTS = true`, `mip` mirrors the ports `i_irq_software`, `i_irq_timer` and `i_irq_external`, `mie` holds bits 3, 7 and 11, and the `trap_unit` takes the highest-priority interrupt (external, software, timer) on the instruction in EX when `mstatus.MIE`, the `mie` bit and the `mip` bit are `1` (see [Zicsr](../ISA/Zicsr/description.md)); without the constant, `mie` and `mip` read zero and ignore writes |
+| Not implemented | The counters `cycle`, `time` and `instret` exist only with `HAS_ZICNTR = true`, and without it an access is an illegal CSR access |
 
-Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). Causes 4 and 6 come from the instance in the MEM stage when `has_zicsr = true`, one cycle after the others, and take precedence over the instruction in EX. The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `has_zicsr` there is no trap unit, and an undefined encoding executes as a `NOP`:
+Synchronous exceptions detected by `trap_unit` (at most one per instruction, with top-to-bottom priority). Causes 4 and 6 come from the instance in the MEM stage when `HAS_ZICSR = true`, one cycle after the others, and take precedence over the instruction in EX. The `control_unit` flags an undefined encoding in the ID stage, `m_decode` clears the flag for the M instructions, and the flag reaches EX through `reg_id_ex`. Without `HAS_ZICSR` there is no trap unit, and an undefined encoding executes as a `NOP`:
 
 | Code (`o_cause`) | Exception | Value written to `mtval` (`o_tval`) |
 | ---: | :--- | :--- |
 | `0` | Taken branch or jump target address with bits `[1:0] /= "00"` | Misaligned target address (`i_cf_target`) |
-| `2` | Unsupported `SYSTEM` instruction (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, or `ECALL`/`EBREAK`/`MRET`/`WFI` with `rd /= x0` or `rs1 /= x0`), illegal CSR access (`i_csr_illegal = '1'`), or any encoding that RV32IM does not define (`i_illegal = '1'`: a reserved opcode, an invalid `funct3` or `funct7`, all zeros, all ones, a compressed encoding, or `FENCE.I` when `has_zifencei = false`) | `0x00000000` |
+| `2` | Unsupported `SYSTEM` instruction (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, or `ECALL`/`EBREAK`/`MRET`/`WFI` with `rd /= x0` or `rs1 /= x0`), illegal CSR access (`i_csr_illegal = '1'`), or any encoding that RV32IM does not define (`i_illegal = '1'`: a reserved opcode, an invalid `funct3` or `funct7`, all zeros, all ones, a compressed encoding, or `FENCE.I` when `HAS_ZIFENCEI = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
-| `4` | Misaligned Load effective address that the hardware does not run: outside the main memory (flash and peripherals), with the two words in different regions (internal RAM and SDRAM), or any misaligned load with `has_zicclsm = false` | Effective address (`i_ea`) |
+| `4` | Misaligned Load effective address that the hardware does not run: outside the main memory (flash and peripherals), with the two words in different regions (internal RAM and SDRAM), or any misaligned load with `HAS_ZICCLSM = false` | Effective address (`i_ea`) |
 | `6` | Misaligned Store effective address that the hardware does not run, under the same conditions as cause 4 | Effective address (`i_ea`) |
 | `11` | Machine-mode environment call (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
@@ -90,10 +90,10 @@ Machine-mode CSRs implemented:
 | Address | Name | Access | Reset Value | Mask / Implemented fields |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Read-write | `0x00001800` | `MPP` (bits `[12:11]`) hardwired to `"11"`; `MIE` (bit 3) and `MPIE` (bit 7) writable |
-| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `has_e` true the base is `E` and the value is `0x40001010` |
-| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `has_interrupts`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
-| `0x305` | `mtvec` | Read-write | `0x00000000` | `BASE` in bits `[31:2]` and `MODE` in bit 0, which only writes with `has_interrupts` (vectored); bit 1 is hardwired to `0`. In vectored mode bits `[5:2]` of `BASE` read zero |
-| `0x723` to `0x73F` | `mhpmevent3h` to `mhpmevent31h` | Read and write | `0x00000000` | Only with `has_sscofpmf`: `OF` (bit 31) and `MINH` (bit 30) of the counter with the same index; without the generic the address is nonexistent. Bit 13 of `mie` and `mip` is `LCOFIE` and `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
+| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `IS_BASE_E` true the base is `E` and the value is `0x40001010` |
+| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `HAS_INTERRUPTS`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
+| `0x305` | `mtvec` | Read-write | `0x00000000` | `BASE` in bits `[31:2]` and `MODE` in bit 0, which only writes with `HAS_INTERRUPTS` (vectored); bit 1 is hardwired to `0`. In vectored mode bits `[5:2]` of `BASE` read zero |
+| `0x723` to `0x73F` | `mhpmevent3h` to `mhpmevent31h` | Read and write | `0x00000000` | Only with `HAS_SSCOFPMF`: `OF` (bit 31) and `MINH` (bit 30) of the counter with the same index; without the constant the address is nonexistent. Bit 13 of `mie` and `mip` is `LCOFIE` and `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
 | `0x310` | `mstatush` | Read-write | `0x00000000` | All bits hardwired to zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Read-write | `0x00000000` | Full 32 bits |
 | `0x341` | `mepc` | Read-write | `0x00000000` | Bits `[1:0]` hardwired to `"00"` |
@@ -101,13 +101,13 @@ Machine-mode CSRs implemented:
 
 ### 3.3. Zifencei Extension (`src/Zifencei/fencei_unit.vhd`)
 
-The `rv32im_zicsr_zifencei` profile enables `has_zifencei = true`:
+The `rv32im_zicsr_zifencei` profile enables `HAS_ZIFENCEI = true`:
 
 | Aspect | Behavior |
 | :--- | :--- |
 | Instruction fetch from SDRAM (`>= 0x40000000`) | The IF stage asserts `o_ic_sel = '1'` and reads `i_ic_data`. While `i_ic_ready = '0'`, the PC stays frozen and `o_instr_valid = '0'` injects bubbles into `reg_if_id`, while EX, MEM, and WB continue advancing |
-| `FENCE.I` execution without D-cache (`has_dcache = false`) | When `FENCE.I` is valid in EX and `i_base_run = '1'`, `o_take` pulses for 1 cycle, asserting `o_ic_inval = '1'`, flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$ |
-| `FENCE.I` execution with write-back D-cache (`has_dcache = true`) | The unit holds the instruction in EX for one cycle, so that the older stores leave MEM and reach the cache, emits a pulse on `o_dc_flush` (`o_flush_req`) and holds `o_busy = '1'` (freezing PC, `IF/ID`, and `ID/EX` and injecting bubbles into `EX/MEM`) until `i_dc_done = '1'` is received, which the cache may raise in the very cycle of the pulse on `o_dc_flush` or in any later cycle, at which point it pulses `o_take = '1'` and invalidates the I-cache |
+| `FENCE.I` execution without D-cache (`HAS_DCACHE = false`) | When `FENCE.I` is valid in EX and `i_base_run = '1'`, `o_take` pulses for 1 cycle, asserting `o_ic_inval = '1'`, flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$ |
+| `FENCE.I` execution with write-back D-cache (`HAS_DCACHE = true`) | The unit holds the instruction in EX for one cycle, so that the older stores leave MEM and reach the cache, emits a pulse on `o_dc_flush` (`o_flush_req`) and holds `o_busy = '1'` (freezing PC, `IF/ID`, and `ID/EX` and injecting bubbles into `EX/MEM`) until `i_dc_done = '1'` is received, which the cache may raise in the very cycle of the pulse on `o_dc_flush` or in any later cycle, at which point it pulses `o_take = '1'` and invalidates the I-cache |
 
 ---
 

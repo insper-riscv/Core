@@ -12,3 +12,69 @@ ext_rom: ROM_EXTERNAL=true ROM_END=0x00040000 EXT_BASE=0x44000000 PERIPH_BASE=0x
 rom_after_boot: ROM_EXTERNAL=true ROM_END=0x00008000 RAM_BASE=0x00008000 RAM_END=0x40000000 EXT_BASE=0x40000000
 # Mapa pequeno das falhas de acesso: ROM de 4 KiB, RAM de 8 a 16 KiB e a janela externa vazia.
 faults_map: ROM_END=0x00001000 RAM_BASE=0x00002000 RAM_END=0x00004000 EXT_BASE=0x80000000 PERIPH_BASE=0x80000000
+
+# Variantes dos testes por entidade: as extensões que diferem do config_pkg padrão (RV32IM com Zicclsm), uma por combinação.
+# Sem m.
+no_m: HAS_M=false
+# Mapa da plataforma com FLASH externa em 0x20000000 que o check_isa aceita (a RAM interna vai até a janela externa), sem M.
+ext_flash_core_no_m: ROM_EXTERNAL=true ROM_END=0x00000000 RAM_BASE=0x00008000 RAM_END=0x20000000 EXT_BASE=0x20000000 PERIPH_BASE=0x60000000 HAS_M=false
+# Sem m sobre rom_after_boot.
+rom_after_boot_no_m: ROM_EXTERNAL=true ROM_END=0x00008000 RAM_BASE=0x00008000 RAM_END=0x40000000 EXT_BASE=0x40000000 HAS_M=false
+# Com interrupts.
+interrupts: HAS_INTERRUPTS=true
+# Com zicntr.
+zicntr: HAS_ZICNTR=true
+# Com zicntr, com zihpm.
+zicntr_zihpm: HAS_ZICNTR=true HAS_ZIHPM=true
+# Com access_faults.
+access_faults: HAS_ACCESS_FAULTS=true
+# Sem zicclsm.
+no_zicclsm: HAS_ZICCLSM=false
+# Sem m, com zifencei.
+no_m_zifencei: HAS_M=false HAS_ZIFENCEI=true
+# Com dcache, sem m, com zifencei.
+dcache_no_m_zifencei: HAS_DCACHE=true HAS_M=false HAS_ZIFENCEI=true
+# Sem m, com zicntr, com zicsr, com zihpm.
+no_m_zicntr_zicsr_zihpm: HAS_M=false HAS_ZICNTR=true HAS_ZICSR=true HAS_ZIHPM=true
+# Com a base E, sem m.
+e_no_m: IS_BASE_E=true HAS_M=false
+# Com zicsr.
+zicsr: HAS_ZICSR=true
+# Com a base E, com zicsr.
+e_zicsr: IS_BASE_E=true HAS_ZICSR=true
+# Com zicntr, com zicsr, com zihpm.
+zicntr_zicsr_zihpm: HAS_ZICNTR=true HAS_ZICSR=true HAS_ZIHPM=true
+# Sem m, com zicsr, com zmmul.
+no_m_zicsr_zmmul: HAS_M=false HAS_ZICSR=true HAS_ZMMUL=true
+# Sem m, com zicsr, com zimop.
+no_m_zicsr_zimop: HAS_M=false HAS_ZICSR=true HAS_ZIMOP=true
+# Sem m, com zicsr, com zihintntl, com zihintpause.
+no_m_zicsr_zihintntl_zihintpause: HAS_M=false HAS_ZICSR=true HAS_ZIHINTNTL=true HAS_ZIHINTPAUSE=true
+# Sem m, com zicsr.
+no_m_zicsr: HAS_M=false HAS_ZICSR=true
+# Com zicsr, com zifencei.
+zicsr_zifencei: HAS_ZICSR=true HAS_ZIFENCEI=true
+# Sem m, sem zicclsm.
+no_m_no_zicclsm: HAS_M=false HAS_ZICCLSM=false
+# Com zihpm.
+zihpm: HAS_ZIHPM=true
+# Com interrupts, com sscofpmf, com zihpm.
+interrupts_sscofpmf_zihpm: HAS_INTERRUPTS=true HAS_SSCOFPMF=true HAS_ZIHPM=true
+# Com interrupts, com zihpm.
+interrupts_zihpm: HAS_INTERRUPTS=true HAS_ZIHPM=true
+# Sem m, com zicond.
+no_m_zicond: HAS_M=false HAS_ZICOND=true
+# Com access_faults sobre faults_map.
+faults_map_access_faults: ROM_END=0x00001000 RAM_BASE=0x00002000 RAM_END=0x00004000 EXT_BASE=0x80000000 PERIPH_BASE=0x80000000 HAS_ACCESS_FAULTS=true
+# Com dcache.
+dcache: HAS_DCACHE=true
+# Com interrupts, com zicsr.
+interrupts_zicsr: HAS_INTERRUPTS=true HAS_ZICSR=true
+# Com interrupts, com zicsr, com zifencei.
+interrupts_zicsr_zifencei: HAS_INTERRUPTS=true HAS_ZICSR=true HAS_ZIFENCEI=true
+
+# Mapa pequeno das falhas de acesso com os periféricos não estritos (todo slot da janela aceita acesso).
+faults_map_access_faults_loose: ROM_END=0x00001000 RAM_BASE=0x00002000 RAM_END=0x00004000 EXT_BASE=0x80000000 PERIPH_BASE=0x80000000 HAS_ACCESS_FAULTS=true STRICT_PERIPH=false
+
+# RV64 com endereço físico de 40 bits: o Core ainda não executa RV64, mas todas as fontes analisam com esta variante (make check-rv64).
+rv64: IS_64=true ADDR_BITS=40

@@ -15,30 +15,30 @@
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
---   - O misa anuncia RV32I (RV32E quando base_e = true) e, quando has_m = true, a
+--   - O misa anuncia RV32I (RV32E quando IS_BASE_E = true) e, quando HAS_M = true, a
 --     extensão M.
---   - Com has_interrupts = true, mip e mie funcionam: mip (0x344) é somente leitura e
+--   - Com HAS_INTERRUPTS = true, mip e mie funcionam: mip (0x344) é somente leitura e
 --     espelha as portas i_irq_software (bit 3, MSIP), i_irq_timer (bit 7, MTIP) e
 --     i_irq_external (bit 11, MEIP), e mie (0x304) guarda os bits 3, 7 e 11 (MSIE, MTIE e
 --     MEIE); os demais bits dos dois leem zero e ignoram a escrita, e a escrita em mip não
 --     gera exceção. o_irq_pending vale '1' quando algum bit de mip e o de mie estão
---     ambos em '1', sem considerar mstatus.MIE. Sem has_interrupts as portas são
+--     ambos em '1', sem considerar mstatus.MIE. Sem HAS_INTERRUPTS as portas são
 --     ignoradas e mie e mip leem zero e ignoram a escrita.
 --   - A condição de tomada de interrupção é o_irq_take = mstatus.MIE e o_irq_pending. Com
 --     mais de uma pendente, o_irq_cause escolhe a de maior prioridade: externa (causa 11),
 --     software (causa 3) e timer (causa 7), no formato de mcause (bit 31 em '1').
 --   - mtvec (0x305) tem BASE nos bits 31 a 2 e MODE no bit 0: '0' é o modo direto e '1' o
---     vetorado, que só existe com has_interrupts (sem ele o bit 0 lê zero). O bit 1 lê
+--     vetorado, que só existe com HAS_INTERRUPTS (sem ele o bit 0 lê zero). O bit 1 lê
 --     zero (os modos 2 e 3 são reservados). No modo vetorado a BASE tem alinhamento de 64
 --     bytes (os bits 5 a 2 leem zero), para que BASE + 4 x causa seja um OR de bits.
 --     o_mtvec entrega a BASE (bits 1 e 0 em zero) e o_mtvec_vectored o MODE.
---   - Com has_zicntr = true, os contadores mcycle, minstret e time de 64 bits
+--   - Com HAS_ZICNTR = true, os contadores mcycle, minstret e time de 64 bits
 --     (metades baixa e alta) respondem em 0xB00 a 0xB82 e 0xC00 a 0xC82. mcycle
 --     soma 1 a cada ciclo, minstret soma 1 a cada pulso de i_retire e time soma 1
 --     a cada tick_cycles ciclos. mcycle e minstret aceitam escrita; cycle, time e
---     instret (0xC00 a 0xC82) são somente leitura. Sem has_zicntr esses endereços
+--     instret (0xC00 a 0xC82) são somente leitura. Sem HAS_ZICNTR esses endereços
 --     são inexistentes.
---   - Com has_zihpm = true, a extensão Zihpm define os 29 contadores de eventos de
+--   - Com HAS_ZIHPM = true, a extensão Zihpm define os 29 contadores de eventos de
 --     índice 3 a 31: mhpmcounterK em 0xB00 + K, a metade alta em 0xB80 + K, os
 --     espelhos somente leitura em 0xC00 + K e 0xC80 + K e o seletor de evento
 --     mhpmeventK em 0x320 + K (4 bits; o código escolhe um bit de i_events, e o
@@ -46,15 +46,15 @@
 --     (índices 3 a 2 + hpm_counters) têm contador de hpm_width bits, que soma 1 a cada
 --     ciclo em que o evento escolhido vale '1' em i_events, e os demais leem zero e
 --     ignoram a escrita, sem exceção. Os endereços do banco são decodificados pelos
---     7 bits altos (a faixa) e pelos 5 bits baixos (o índice). Sem has_zihpm esses
+--     7 bits altos (a faixa) e pelos 5 bits baixos (o índice). Sem HAS_ZIHPM esses
 --     endereços são inexistentes.
---   - Com has_sscofpmf = true (e has_zihpm e has_interrupts), a extensão Sscofpmf acrescenta os seletores
+--   - Com HAS_SSCOFPMF = true (e HAS_ZIHPM e HAS_INTERRUPTS), a extensão Sscofpmf acrescenta os seletores
 --     mhpmeventNh (0x720 + N) com os bits OF (31) e MINH (30) de cada contador de eventos, a interrupção de
 --     estouro de contador (LCOFI, causa 13) e os bits 13 de mip (LCOFIP, de leitura e escrita) e de mie (LCOFIE).
 --     Um contador que estoura com OF em '0' põe OF em '1' e LCOFIP em '1'; o programa limpa os dois por escrita.
 --     LCOFI tem a menor prioridade, depois de externa, software e timer, e o modo vetorado a leva a BASE + 52.
 --     Sem a extensão os endereços de mhpmeventNh são inexistentes e o bit 13 de mip e de mie lê zero.
---   - O registrador mcountinhibit (0x320) existe com has_zicntr ou has_zihpm: o bit 0
+--   - O registrador mcountinhibit (0x320) existe com HAS_ZICNTR ou HAS_ZIHPM: o bit 0
 --     inibe mcycle, o bit 2 inibe minstret e os bits de 3 a 2 + hpm_counters inibem os
 --     contadores de eventos; os demais bits leem zero e ignoram a escrita (o time não
 --     é inibível). Um contador inibido mantém o valor e continua legível e gravável.
@@ -78,24 +78,12 @@ use work.word_consts.all;
 
 entity csr_file is
 	generic (
-		-- Faz o misa anunciar a extensão M (bit 12), para o perfil que a inclui.
-		has_m : boolean := true;
-		-- Faz o misa anunciar a base E (bit 4) no lugar da I (bit 8), para o perfil de 16 registradores.
-		base_e : boolean := false;
-		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time e seus espelhos).
-		has_zicntr : boolean := false;
 		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
 		tick_cycles : positive := 50;
-		-- Habilita a extensão Zihpm: os 29 endereços de contador, evento e espelho de índices 3 a 31 e os bits de mcountinhibit.
-		has_zihpm : boolean := false;
 		-- Quantidade de contadores de eventos reais da extensão Zihpm, de índices 3 a 2 + hpm_counters; os outros leem zero.
 		hpm_counters : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
 		-- Largura em bits de cada contador de eventos real (0 a 64).
 		hpm_width : natural range 0 to 64 := 64;
-		-- Habilita as interrupções de máquina: mip espelha as portas i_irq_* e mie guarda as máscaras.
-		has_interrupts : boolean := false;
-		-- Habilita a extensão Sscofpmf (estouro de contador, LCOFI); só vale com has_zihpm e has_interrupts.
-		has_sscofpmf : boolean := false;
 		-- O CSR time espelha o mtime que a plataforma entrega em i_mtime (o CLINT), no lugar do contador próprio.
 		time_external : boolean := false;
 		-- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor lido só vale um ciclo depois de o endereço aparecer.
@@ -150,9 +138,9 @@ entity csr_file is
 		i_irq_timer    : in  std_logic := '0';
 		-- Interrupção externa de máquina (MEIP), de nível, no domínio de clock do core.
 		i_irq_external : in  std_logic := '0';
-		-- Há interrupção pendente e habilitada em mie, sem considerar mstatus.MIE ('0' sem has_interrupts).
+		-- Há interrupção pendente e habilitada em mie, sem considerar mstatus.MIE ('0' sem HAS_INTERRUPTS).
 		o_irq_pending  : out std_logic;
-		-- Há interrupção a tomar: pendente, habilitada em mie e com mstatus.MIE em '1' ('0' sem has_interrupts).
+		-- Há interrupção a tomar: pendente, habilitada em mie e com mstatus.MIE em '1' ('0' sem HAS_INTERRUPTS).
 		o_irq_take     : out std_logic;
 		-- Código de mcause da interrupção de maior prioridade pendente (externa, software e timer).
 		o_irq_cause    : out word_t;
@@ -163,16 +151,13 @@ end entity csr_file;
 
 architecture rtl of csr_file is
 
-	-- A Sscofpmf só existe com o Zihpm (as fontes de estouro) e com as interrupções (o destino).
-	constant SSCOF           : boolean := has_sscofpmf and has_zihpm and has_interrupts;
-
 	-- Bit MIE (bit 3) armazenado no registrador mstatus.
 	signal mstatus_mie       : std_logic;
 	-- Bit MPIE (bit 7) armazenado no registrador mstatus.
 	signal mstatus_mpie      : std_logic;
 	-- Valor registrado de BASE no CSR mtvec (bits 31 a 2; os dois bits baixos são sempre zero).
 	signal mtvec_reg         : word_t;
-	-- Modo registrado de mtvec ('1' é o vetorado; sempre '0' sem has_interrupts).
+	-- Modo registrado de mtvec ('1' é o vetorado; sempre '0' sem HAS_INTERRUPTS).
 	signal mtvec_mode        : std_logic;
 	-- Palavra de mtvec como o programa a lê: BASE e o modo no bit 0.
 	signal mtvec_value       : word_t;
@@ -239,12 +224,10 @@ architecture rtl of csr_file is
 	-- Escrita na metade alta de minstret.
 	signal minstret_we_hi    : std_logic;
 
-	-- O perfil tem o registrador mcountinhibit (Zicntr ou Zihpm).
-	constant HAS_INHIBIT     : boolean := has_zicntr or has_zihpm;
 	-- Bits de mcountinhibit de mcycle (0) e minstret (2) que aceitam escrita, quando há Zicntr.
 	function inhibit_mask return std_logic_vector is
 	begin
-		if has_zicntr then
+		if HAS_ZICNTR then
 			return "101";
 		end if;
 		return "000";
@@ -297,7 +280,7 @@ architecture rtl of csr_file is
 	-- Bits 2 a 0 de mcountinhibit como o programa os lê (zero fora do endereço).
 	signal inhibit_word      : word_t;
 
-	-- Valor das três portas de interrupção na ordem software, timer e externa (zero sem has_interrupts).
+	-- Valor das três portas de interrupção na ordem software, timer e externa (zero sem HAS_INTERRUPTS).
 	signal irq_in            : std_logic_vector(IRQ_COUNT - 1 downto 0);
 	-- Valor registrado das máscaras MSIE, MTIE e MEIE na mesma ordem.
 	signal irq_en_reg        : std_logic_vector(IRQ_COUNT - 1 downto 0);
@@ -323,7 +306,7 @@ architecture rtl of csr_file is
 	signal mtvec_we          : std_logic;
 	-- Próximo valor alinhado para escrita em mtvec.
 	signal mtvec_nxt         : word_t;
-	-- Modo vetorado pedido pela escrita em mtvec (bit 0 do valor escrito, só com has_interrupts).
+	-- Modo vetorado pedido pela escrita em mtvec (bit 0 do valor escrito, só com HAS_INTERRUPTS).
 	signal mtvec_mode_nxt    : std_logic;
 	-- Bits 5 a 2 de BASE como serão gravados: zero no modo vetorado (alinhamento de 64 bytes).
 	signal mtvec_base_low    : std_logic_vector(3 downto 0);
@@ -347,9 +330,9 @@ architecture rtl of csr_file is
 begin
 
 	-- Montagem da palavra mstatus: MPP (bits [12:11]) fixo em "11" (Machine Mode).
-	misa_value    <= MISA_E_WITH_M when (base_e and has_m) else
-	                 MISA_E_BASE   when base_e else
-	                 MISA_WITH_M   when has_m else
+	misa_value    <= MISA_E_WITH_M when (IS_BASE_E and HAS_M) else
+	                 MISA_E_BASE   when IS_BASE_E else
+	                 MISA_WITH_M   when HAS_M else
 	                 MISA_BASE;
 
 	mstatus_value <= (12 => '1', 11 => '1', 7 => mstatus_mpie, 3 => mstatus_mie, others => '0');
@@ -406,7 +389,7 @@ begin
 
 	-- Controle de atualização dos CSRs de 32 bits.
 	mtvec_we    <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and i_mret_take = '0') else '0';
-	mtvec_mode_nxt <= new_value(0) when has_interrupts else '0';
+	mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';
 	mtvec_base_low <= (others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2);
 	mtvec_nxt      <= new_value(31 downto 6) & mtvec_base_low & BYTE_OFFSET_0;
 	mtvec_value    <= mtvec_reg(31 downto 2) & '0' & mtvec_mode;
@@ -424,7 +407,7 @@ begin
 	mtval_nxt   <= i_trap_tval  when i_trap_take = '1' else new_value;
 
 	-- Interrupções de máquina: mip espelha as portas, mie guarda as máscaras.
-	irq_in <= (i_irq_external & i_irq_timer & i_irq_software) when has_interrupts else (others => '0');
+	irq_in <= (i_irq_external & i_irq_timer & i_irq_software) when HAS_INTERRUPTS else (others => '0');
 
 	mip_value <= (IRQ_BIT_LCOFI    => lcofip,
 	              IRQ_BIT_EXTERNAL => irq_in(IRQ_IDX_EXTERNAL),
@@ -451,7 +434,7 @@ begin
 	                 CAUSE_IRQ_LCOFI    when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else
 	                 CAUSE_IRQ_TIMER;
 
-	gen_irq : if has_interrupts generate
+	gen_irq : if HAS_INTERRUPTS generate
 		irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and i_mret_take = '0') else '0';
 
 		u_irq_en_reg : entity work.generic_register
@@ -467,14 +450,14 @@ begin
 			);
 	end generate gen_irq;
 
-	gen_no_irq : if not has_interrupts generate
+	gen_no_irq : if not HAS_INTERRUPTS generate
 		irq_en_we  <= '0';
 		irq_en_reg <= (others => '0');
 	end generate gen_no_irq;
 
 	-- Interrupção de estouro de contador (Sscofpmf): LCOFIP pega com o pedido do banco de contadores e a escrita em mip
 	-- o altera quando não há pedido no mesmo ciclo; LCOFIE guarda o bit 13 escrito em mie.
-	gen_lcofi : if SSCOF generate
+	gen_lcofi : if HAS_SSCOF generate
 		lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
 		lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
 
@@ -499,7 +482,7 @@ begin
 		lcofi_pend <= lcofip and lcofie;
 	end generate gen_lcofi;
 
-	gen_no_lcofi : if not SSCOF generate
+	gen_no_lcofi : if not HAS_SSCOF generate
 		lcofip_we  <= '0';
 		lcofip_nxt <= '0';
 		lcofip     <= '0';
@@ -508,7 +491,7 @@ begin
 	end generate gen_no_lcofi;
 
 	-- O modo de mtvec só existe com interrupções: sem elas MODE lê sempre zero.
-	gen_mtvec_mode : if has_interrupts generate
+	gen_mtvec_mode : if HAS_INTERRUPTS generate
 		u_mtvec_mode_ff : entity work.flip_flop
 			port map (
 				i_d      => mtvec_mode_nxt,
@@ -519,7 +502,7 @@ begin
 			);
 	end generate gen_mtvec_mode;
 
-	gen_no_mtvec_mode : if not has_interrupts generate
+	gen_no_mtvec_mode : if not HAS_INTERRUPTS generate
 		mtvec_mode <= '0';
 	end generate gen_no_mtvec_mode;
 
@@ -532,7 +515,7 @@ begin
 	minstret_we_lo <= cntr_write and to_sl(i_addr = ADDR_MINSTRET);
 	minstret_we_hi <= cntr_write and to_sl(i_addr = ADDR_MINSTRETH);
 
-	gen_zicntr : if has_zicntr generate
+	gen_zicntr : if HAS_ZICNTR generate
 
 		is_cntr_addr <= '1' when (i_addr = ADDR_MCYCLE or i_addr = ADDR_MCYCLEH or
 		                          i_addr = ADDR_MINSTRET or i_addr = ADDR_MINSTRETH or
@@ -629,7 +612,7 @@ begin
 
 	end generate gen_zicntr;
 
-	gen_no_zicntr : if not has_zicntr generate
+	gen_no_zicntr : if not HAS_ZICNTR generate
 		is_cntr_addr <= '0';
 		cntr_value   <= (others => '0');
 		mcycle_lo    <= (others => '0');
@@ -652,7 +635,7 @@ begin
 	is_inhibit_addr  <= in_event_range and to_sl(unsigned(addr_idx) = 0);
 
 	-- Bits de mcountinhibit de mcycle e minstret.
-	gen_inhibit : if has_zicntr generate
+	gen_inhibit : if HAS_ZICNTR generate
 		inhibit_we  <= cntr_write and is_inhibit_addr;
 		inhibit_nxt <= new_value(2 downto 0) and inhibit_mask;
 
@@ -669,20 +652,19 @@ begin
 			);
 	end generate gen_inhibit;
 
-	gen_no_inhibit : if not has_zicntr generate
+	gen_no_inhibit : if not HAS_ZICNTR generate
 		inhibit_we  <= '0';
 		inhibit_nxt <= (others => '0');
 		inhibit_reg <= (others => '0');
 	end generate gen_no_inhibit;
 
 	-- Banco de contadores de eventos da extensão Zihpm.
-	gen_zihpm : if has_zihpm generate
+	gen_zihpm : if HAS_ZIHPM generate
 		u_hpm_bank : entity work.hpm_counter_bank
 			generic map (
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_sscofpmf => SSCOF,
-				registered_read => hpm_registered_read
+								registered_read => hpm_registered_read
 			)
 			port map (
 				i_clk         => i_clk,
@@ -701,15 +683,15 @@ begin
 			);
 
 		is_ext_addr <= is_inhibit_addr or
-		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(SSCOF) and in_eventh_range)));
+		               (idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(HAS_SSCOF) and in_eventh_range)));
 		o_bank_read <= is_ext_addr when hpm_registered_read else '0';
 	end generate gen_zihpm;
 
-	gen_no_zihpm : if not has_zihpm generate
+	gen_no_zihpm : if not HAS_ZIHPM generate
 		ovf_irq     <= '0';
 		bank_rdata  <= (others => '0');
 		o_bank_read <= '0';
-		is_ext_addr <= is_inhibit_addr and to_sl(has_zicntr);
+		is_ext_addr <= is_inhibit_addr and to_sl(HAS_ZICNTR);
 	end generate gen_no_zihpm;
 
 	-- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.

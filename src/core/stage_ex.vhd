@@ -6,10 +6,10 @@
 -- unidades de extensão do estágio EX:
 --   1. Unidade de adiantamento (forwarding_unit) e muxes de operandos rs1/rs2.
 --   2. ULA principal (alu) e somadores de endereço-alvo de branch/JAL e JALR.
---   3. Unidade de multiplicação e divisão inteira (multdiv, quando has_m = true; só a multiplicação quando has_zmmul = true).
---   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando has_zicsr = true).
---   5. Unidade de sincronização FENCE.I (fencei_unit, quando has_zifencei = true).
---   6. Unidade de condicionais zero (zicond_unit, quando has_zicond = true).
+--   3. Unidade de multiplicação e divisão inteira (multdiv, quando HAS_M = true; só a multiplicação quando HAS_ZMMUL = true).
+--   4. Banco de CSRs e detector de exceções (csr_file e trap_unit, quando HAS_ZICSR = true).
+--   5. Unidade de sincronização FENCE.I (fencei_unit, quando HAS_ZIFENCEI = true).
+--   6. Unidade de condicionais zero (zicond_unit, quando HAS_ZICOND = true).
 --   7. Gerenciador de alinhamento de escrita em memória (store_manager).
 -- =============================================================================
 
@@ -25,40 +25,14 @@ use work.mem_map_consts.all;
 
 entity stage_ex is
 	generic (
-		-- Habilita a unidade de multiplicação e divisão (multdiv) completa.
-		has_m           : boolean := false;
-		-- Habilita a multiplicação sem o divisor (extensão Zmmul); has_m já a inclui.
-		has_zmmul       : boolean := false;
-		-- Faz o misa anunciar a base E (16 registradores) no lugar da I.
-		base_e          : boolean := false;
-		-- Habilita o banco de registradores CSR e a unidade de traps (csr_file, trap_unit).
-		has_zicsr       : boolean := false;
-		-- Habilita os contadores da extensão Zicntr no banco de CSRs; exige has_zicsr.
-		has_zicntr      : boolean := false;
 		-- Ciclos de clock do core por tick do contador time.
 		tick_cycles     : positive := 50;
-		-- Habilita a unidade de sincronização de cache de instruções (fencei_unit).
-		has_zifencei    : boolean := false;
-		-- Habilita a unidade de execução da extensão Zicond (zicond_unit).
-		has_zicond      : boolean := false;
-		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
-		has_zicclsm     : boolean := true;
-		-- Habilita o handshake de flush com a cache de dados write-back em FENCE.I.
-		has_dcache      : boolean := false;
-		-- Habilita a extensão Zihpm no banco de CSRs; exige has_zicsr.
-		has_zihpm       : boolean := false;
 		-- Quantidade de contadores de eventos reais da extensão Zihpm (índices 3 a 2 + hpm_counters).
 		hpm_counters    : natural range 0 to 29 := 29;
 		-- Largura em bits de cada contador de eventos real.
 		hpm_width       : natural range 0 to 64 := 64;
-		-- Habilita as interrupções de máquina (mip e mie) no banco de CSRs; exige has_zicsr.
-		has_interrupts  : boolean := false;
-		-- Habilita a extensão Sscofpmf (interrupção de estouro de contador); exige has_zihpm e has_interrupts.
-		has_sscofpmf    : boolean := false;
 		-- O CSR time espelha o mtime da plataforma (porta i_mtime) no lugar do contador próprio.
-		time_external   : boolean := false;
-		-- Gera a falha de acesso de instrução (causa 1) quando o PC da instrução em EX está fora das regiões executáveis; exige Zicsr.
-		has_access_faults : boolean := false
+		time_external   : boolean := false
 	);
 	port (
 		-- Vetor de eventos do SoC: o bit K vale '1' nos ciclos do evento de código K (contadores do Zihpm).
@@ -88,9 +62,9 @@ entity stage_ex is
 		-- Valor PC + 4 da instrução no estágio EX.
 		i_pc4             : in  word_t;
 		-- Índice do registrador fonte rs1 no estágio EX.
-		i_rs1_idx         : in  reg_t;
+		i_rs1_idx         : in  reg_field_t;
 		-- Índice do registrador destino rd no estágio EX.
-		i_rd_idx          : in  reg_t;
+		i_rd_idx          : in  reg_field_t;
 		-- Valor original de rs1 vindo do registrador ID/EX.
 		i_rs1_val         : in  word_t;
 		-- Valor original de rs2 vindo do registrador ID/EX.
@@ -111,7 +85,7 @@ entity stage_ex is
 		i_is_muldiv       : in  std_logic;
 		-- Indica que a instrução em EX pertence à extensão Zicsr (decodificado no ID).
 		i_is_csr          : in  std_logic;
-		-- Indica instrução inexistente em EX ('1' = ilegal; só gera exceção com has_zicsr).
+		-- Indica instrução inexistente em EX ('1' = ilegal; só gera exceção com HAS_ZICSR).
 		i_illegal         : in  std_logic;
 		-- Campo opcode da instrução no estágio EX.
 		i_opcode          : in  opcode_t;
@@ -301,41 +275,6 @@ architecture rtl of stage_ex is
 
 begin
 
-	-- ---------------------------------------------------------------------------
-	-- Checagem de configuração dos generics: falha na elaboração, com o nome do
-	-- generic e a causa. Uma linha por dependência.
-	-- ---------------------------------------------------------------------------
-
-	-- Os contadores do Zicntr são CSRs do csr_file, que só existe com Zicsr.
-	assert has_zicsr or (not has_zicntr)
-		report "has_zicntr exige has_zicsr: os contadores são CSRs"
-		severity failure;
-
-	-- Os contadores de eventos do Zihpm são CSRs do csr_file.
-	assert has_zicsr or (not has_zihpm)
-		report "has_zihpm exige has_zicsr: os contadores de eventos são CSRs"
-		severity failure;
-
-	-- mip e mie são CSRs do csr_file.
-	assert has_zicsr or (not has_interrupts)
-		report "has_interrupts exige has_zicsr: mip e mie são CSRs"
-		severity failure;
-
-	-- A Sscofpmf tem as fontes de estouro no Zihpm.
-	assert has_zihpm or (not has_sscofpmf)
-		report "has_sscofpmf exige has_zihpm: as fontes de estouro são os contadores de eventos"
-		severity failure;
-
-	-- A Sscofpmf entrega a interrupção de estouro pelo mip e pelo mie.
-	assert has_interrupts or (not has_sscofpmf)
-		report "has_sscofpmf exige has_interrupts: a interrupção LCOFI sai pelo mip e pelo mie"
-		severity failure;
-
-	-- A falha de acesso de instrução é um trap da unidade de traps, que só existe com Zicsr.
-	assert has_zicsr or (not has_access_faults)
-		report "has_access_faults exige has_zicsr: as falhas de acesso são traps"
-		severity failure;
-
 	-- =========================================================================
 	-- Unidade de Forwarding e Muxes de Operandos
 	-- =========================================================================
@@ -414,11 +353,8 @@ begin
 	-- =========================================================================
 	-- Extensão M: Multiplicação e Divisão Inteira (multdiv)
 	-- =========================================================================
-	gen_m : if (has_m or has_zmmul) generate
+	gen_m : if HAS_MULDIV generate
 		u_muldiv : entity work.multdiv
-			generic map (
-				has_div => has_m
-			)
 			port map (
 				i_clk       => i_clk,
 				i_rst       => i_rst,
@@ -442,7 +378,7 @@ begin
 	-- =========================================================================
 	-- Extensão Zicond: Condicionais Zero (czero.eqz e czero.nez)
 	-- =========================================================================
-	gen_zicond : if has_zicond generate
+	gen_zicond : if HAS_ZICOND generate
 		u_zicond : entity work.zicond_unit
 			port map (
 				i_op     => i_alu_op,
@@ -459,11 +395,8 @@ begin
 	-- =========================================================================
 	-- Extensão Zifencei: Sincronização de Memória de Instruções (FENCE.I)
 	-- =========================================================================
-	gen_fencei : if has_zifencei generate
+	gen_fencei : if HAS_ZIFENCEI generate
 		u_fencei : entity work.fencei_unit
-			generic map (
-				has_dcache => has_dcache
-			)
 			port map (
 				i_clk       => i_clk,
 				i_rst       => i_rst,
@@ -485,7 +418,7 @@ begin
 	-- Sem cache de dados a unidade de FENCE.I é puramente combinacional, então ela pode enxergar a instrução antes
 	-- do descarte por uma exceção de MEM mais antiga. Com cache de dados ela guarda estado (flush pedido), e uma
 	-- instrução descartada não pode armá-lo; por isso ali ela só enxerga a instrução válida de fato.
-	fencei_valid <= i_valid when has_dcache else i_valid_raw;
+	fencei_valid <= i_valid when HAS_DCACHE else i_valid_raw;
 
 	-- Um FENCE.I descartado por uma exceção de MEM não redireciona o pipeline, mas ainda pode invalidar a cache de
 	-- instruções: uma invalidação a mais só custa misses, e assim a invalidação não espera a conferência de
@@ -497,7 +430,7 @@ begin
 	-- =========================================================================
 	-- Extensão Zicsr e Detecção de Traps do Modo Máquina
 	-- =========================================================================
-	gen_csr : if has_zicsr generate
+	gen_csr : if HAS_ZICSR generate
 		-- A exceção do estágio MEM é de uma instrução mais antiga: vale no lugar da deste estágio.
 		csr_trap_take  <= trap_take_int or i_mem_trap_take;
 		csr_trap_cause <= i_mem_trap_cause when i_mem_trap_take = '1' else trap_cause;
@@ -523,15 +456,9 @@ begin
 
 		u_csr_file : entity work.csr_file
 			generic map (
-				has_m        => has_m,
-				base_e       => base_e,
-				has_zicntr   => has_zicntr,
 				tick_cycles  => tick_cycles,
-				has_zihpm    => has_zihpm,
 				hpm_counters => hpm_counters,
 				hpm_width    => hpm_width,
-				has_interrupts => has_interrupts,
-				has_sscofpmf => has_sscofpmf,
 				time_external => time_external,
 				hpm_registered_read => true
 			)
@@ -582,13 +509,11 @@ begin
 		sig_mret  <= '0';
 
 		-- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho da ULA.
-		fetch_ok <= '1' when (not has_access_faults) or addr_executable(unsigned(i_pc)) else '0';
+		fetch_ok <= '1' when (not HAS_ACCESS_FAULTS) or addr_executable(unsigned(i_pc)) else '0';
 
 		u_trap_unit : entity work.trap_unit
 			generic map (
-				has_zicclsm => has_zicclsm,
-				check_ea    => false,
-				has_access_faults => has_access_faults
+				check_ea    => false
 			)
 			port map (
 				i_fetch_ok    => fetch_ok,
@@ -617,7 +542,6 @@ begin
 		-- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
 		u_trap_detect : entity work.trap_unit
 			generic map (
-				has_zicclsm     => has_zicclsm,
 				check_ea        => true
 			)
 			port map (

@@ -50,8 +50,8 @@ Instruction fetch address (`if_pc`) decoding uses the bounds from `src/shared/me
 The ID stage comprises seven sub-blocks:
 
 1. **Base control unit (`control_unit`):** decodes `i_inst` to produce `o_sel_pc4_alu`, `o_ext_imm_op`, `o_wb_sel`, `o_we_reg`, `o_ext_ram_op`, `o_sel_rs2_imm`, `o_sel_pc_rs1`, `o_alu_op`, `o_we_ram`, `o_re_ram`, `o_en_ram`, `o_opcode`, and `o_funct3`.
-2. **RV32M decoder (`m_decode`, when `has_m = true`):** asserts `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'` when `opcode = OPCODE_OP` and `funct7 = FUNCT7_MULDIV`.
-3. **Zicsr decoder (`csr_decode`, when `has_zicsr = true`):** asserts `o_use_imm_i = '1'` for the entire `OPCODE_SYSTEM` class and asserts `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"`.
+2. **RV32M decoder (`m_decode`, when `HAS_M = true`):** asserts `o_is_muldiv = '1'`, `o_we_reg = '1'`, and `o_sel_pc_rs1 = '1'` when `opcode = OPCODE_OP` and `funct7 = FUNCT7_MULDIV`.
+3. **Zicsr decoder (`csr_decode`, when `HAS_ZICSR = true`):** asserts `o_use_imm_i = '1'` for the entire `OPCODE_SYSTEM` class and asserts `o_is_csr = '1'` and `o_we_reg = '1'` when `funct3` is neither `"000"` nor `"100"`.
 4. **Immediate extender (`extender_imm`):** reconstructs the 32-bit immediate according to `src/shared/ext_imm_consts.vhd`:
 
 | Constant | Code | Format and extension operation |

@@ -16,7 +16,7 @@ All hardware code in the project is written and validated under the **IEEE 1076-
 | Module instantiation | Use direct entity instantiation (`u_name : entity work.entity_name`), without redundant `component` declarations |
 | Port mapping (`port map`) | Always associate by name (`i_port => signal`) and use intermediate signals for logical expressions or dynamic slices, because GHDL requires globally static expressions in port map actuals |
 | Latch prevention | Every signal assigned in a combinational process or conditional assignment must receive an explicit default value across all branches (`else` / `when others =>`) |
-| Configuration asserts | Every dependency between generics (for example, "requires" in the comment) and every generic range has an `assert ... severity failure` at the top of the entity, and the message always carries the generic name and the cause (`has_zicntr requires has_zicsr: the counters are CSRs`) |
+| Configuration asserts | Every dependency between the extension and memory map constants lives in the `check_isa` function of the `config_pkg`, called once in the `generate` of the `core` (`if check_isa generate`), and every entity generic range has an `assert ... severity failure` at the top of the entity; the message always carries the constant or generic name and the cause (`Zicntr and Zihpm require Zicsr`) |
 
 The reference standard is [IEEE Std 1076-2008, IEEE Standard VHDL Language Reference Manual](https://standards.ieee.org/ieee/1076/3666/). In academic work, cite it with the BibTeX entry below:
 
@@ -86,7 +86,7 @@ All code identifiers must be written in **English**, whereas all comments and fi
 | Entities, architectures, and packages | `snake_case` (except the structural top level `core`) | `stage_ex`, `control_unit`, `alu_consts`, `rtl` |
 | Input ports (`in`) | Mandatory `i_` prefix + `snake_case` | `i_clk`, `i_rst`, `i_rs1_val`, `i_pipe_run` |
 | Output ports (`out`) | Mandatory `o_` prefix + `snake_case` | `o_alu_out`, `o_we_reg`, `o_stall`, `o_wb_data` |
-| Generics | Descriptive `snake_case` | `data_width`, `addr_width`, `has_m`, `has_zicsr` |
+| Generics | Descriptive `snake_case` | `data_width`, `addr_width`, `tick_cycles`, `hpm_width` |
 | Constants (`constant`) | `UPPER_SNAKE_CASE` | `WORD_WIDTH`, `ALU_ADD`, `OPCODE_JALR`, `REG_ZERO` |
 | Types and subtypes (`type`, `subtype`) | `snake_case` with `_t` suffix | `word_t`, `reg_idx_t`, `alu_op_t`, `ctrl_bus_t` |
 | Internal signals and variables | `snake_case` (prefixed by the stage name where applicable) | `ex_alu_result`, `id_imm`, `wb_ram_raw` |
@@ -146,7 +146,7 @@ The project follows the *Design for Reuse* practice described in the *Reuse Meth
 | 4 | **Lean ports:** the entity exposes only the ports and generics it uses | Signals or generics "for future use" do not belong in an entity |
 | 5 | **Dependence on ports only:** the upper level knows the entity declaration, never the internals of its architecture | The top level never carries fine-grained implementation logic |
 | 6 | **Composition with already verified leaf blocks:** reuse existing primitives | Do not reimplement with ad-hoc processes or operators what a primitive or an already computed signal provides |
-| 7 | **Extensions as optional blocks:** each extension lives in its own directory, enabled by a boolean generic on the `core` top level, and behaves as `NOP` when disabled | Contract in [docs/en/contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md); the top level `src/core/core.vhd` only connects the five stages and the four barrier registers |
+| 7 | **Extensions as optional blocks:** each extension lives in its own directory, enabled by a boolean constant of the `config_pkg` on the `core` top level, and behaves as `NOP` when disabled | Contract in [docs/en/contracts/01-contrato-de-extensao.md](docs/en/contracts/01-contrato-de-extensao.md); the top level `src/core/core.vhd` only connects the five stages and the four barrier registers |
 
 ## 6. Python Standards
 

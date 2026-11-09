@@ -13,17 +13,17 @@ Este documento confronta cada exigência do Zihpm, em [instructions.md](instruct
 
 | ID | Exigência | Situação | Como o Core cumpre | Evidência |
 | :--- | :--- | :--- | :--- | :--- |
-| K5 | `hpmcounter3` a `hpmcounter31` e suas metades altas existem como CSRs somente leitura | Conforme | Com `has_zihpm` os 29 índices existem nas faixas `0xC00` e `0xC80`, com `hpm_counters` contadores reais | Teste `CsrFileZihpmFull`, prova `csrh29_safety`, programa `hpm-sweep` |
+| K5 | `hpmcounter3` a `hpmcounter31` e suas metades altas existem como CSRs somente leitura | Conforme | Com `HAS_ZIHPM` os 29 índices existem nas faixas `0xC00` e `0xC80`, com `hpm_counters` contadores reais | Teste `CsrFileZihpmFull`, prova `csrh29_safety`, programa `hpm-sweep` |
 | K6 | Contador não implementado pode gerar instrução ilegal ou ler constante | Escolha do EEI | O índice sem contador lê zero e ignora a escrita, sem exceção | Teste `CsrFileZihpmReduced`, prova `csrh_safety`, programa `hpm-sweep`, modelo Sail e ACT4 com o contador fora da máscara |
 | K7 | O que cada contador conta é definido pela plataforma e escolhido por um registrador | Conforme | `mhpmeventK` guarda um código de 4 bits, o código 0 não conta e a tabela de eventos está documentada | Teste `HpmCounterBankAll64`, programas `hpm-inhibit-select` e `hpm-fused-high` |
-| K8 | O Zihpm depende do Zicsr | Conforme | A matriz de perfis implica `has_zicsr` e a elaboração do `core` falha sem ele | `make profiles` e a asserção do `core` |
+| K8 | O Zihpm depende do Zicsr | Conforme | A matriz de perfis implica `HAS_ZICSR` e a elaboração do `core` falha sem ele | `make profiles` e a asserção do `core` |
 | K9 | `mcountinhibit` inibe `cycle`, `instret` e os contadores de eventos | Conforme | Os bits 0 e 2 inibem `mcycle` e `minstret`, os bits de 3 a $2+$`hpm_counters` inibem os contadores de eventos e os demais leem zero | Testes `CsrFileZihpmFull` e `CsrFileZihpm`, prova `csrh2_safety`, programa `hpm-sweep` |
 
 ## 3. Exigências do volume privilegiado
 
 | Exigência | Situação | Como o Core cumpre | Evidência |
 | :--- | :--- | :--- | :--- |
-| `mhpmcounter3` a `mhpmcounter31` (`0xB03` a `0xB1F`) são 29 contadores de 64 bits WARL, e o endereço existe ainda que o contador seja fixo em zero | Conforme | 29 endereços sempre presentes com `has_zihpm`; os `hpm_counters` primeiros contam e os demais leem zero | Prova `csrh29_safety`, teste `CsrFileZihpmFull` |
+| `mhpmcounter3` a `mhpmcounter31` (`0xB03` a `0xB1F`) são 29 contadores de 64 bits WARL, e o endereço existe ainda que o contador seja fixo em zero | Conforme | 29 endereços sempre presentes com `HAS_ZIHPM`; os `hpm_counters` primeiros contam e os demais leem zero | Prova `csrh29_safety`, teste `CsrFileZihpmFull` |
 | `mhpmcounter3h` a `mhpmcounter31h` (`0xB83` a `0xB9F`) são as metades altas no RV32 | Conforme | Os mesmos 29 índices e os mesmos contadores reais | Prova `csrh29_safety` |
 | `mhpmevent3` a `mhpmevent31` (`0x323` a `0x33F`) são seletores WARL, e o evento 0 significa nenhum | Conforme | Código de 4 bits, os bits superiores leem zero e o índice sem contador lê zero | Teste `HpmCounterBankAll64`, prova `csrh_safety` |
 | `hpmcounterN` e `hpmcounterNh` espelham os contadores de máquina em leitura | Conforme | A faixa de espelho usa a mesma seleção de leitura, e a escrita é ilegal em qualquer índice | Teste `CsrFileZihpmFull`, mutante `hpm_mirror_writable` |

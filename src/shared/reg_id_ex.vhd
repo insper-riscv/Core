@@ -37,9 +37,9 @@ entity reg_id_ex is
 		-- Valor de PC + 4 da instrução no estágio ID.
 		i_pc4         : in  word_t;
 		-- Endereço do registrador fonte rs1.
-		i_rs1         : in  reg_t;
+		i_rs1         : in  reg_field_t;
 		-- Endereço do registrador destino rd.
-		i_rd          : in  reg_t;
+		i_rd          : in  reg_field_t;
 		-- Valor lido da porta rs1 do banco de registradores.
 		i_rs1_val     : in  word_t;
 		-- Valor lido da porta rs2 do banco de registradores.
@@ -89,9 +89,9 @@ entity reg_id_ex is
 		-- Valor de PC + 4 registrado para o estágio EX.
 		o_pc4         : out word_t;
 		-- Endereço de rs1 registrado para o estágio EX (usado pela Forwarding Unit).
-		o_rs1         : out reg_t;
+		o_rs1         : out reg_field_t;
 		-- Endereço de rd registrado para o estágio EX (usado pela HDU e estágios seguintes).
-		o_rd          : out reg_t;
+		o_rd          : out reg_field_t;
 		-- Valor de rs1 registrado para o estágio EX.
 		o_rs1_val     : out word_t;
 		-- Valor de rs2 registrado para o estágio EX.
@@ -147,9 +147,9 @@ architecture rtl of reg_id_ex is
 	-- Valor de PC + 4 armazenado.
 	signal r_pc4         : word_t       := (others => '0');
 	-- Endereço de rs1 armazenado.
-	signal r_rs1         : reg_t        := (others => '0');
+	signal r_rs1         : reg_field_t        := (others => '0');
 	-- Endereço de rd armazenado.
-	signal r_rd          : reg_t        := (others => '0');
+	signal r_rd          : reg_field_t        := (others => '0');
 	-- Valor de rs1 armazenado.
 	signal r_rs1_val     : word_t       := (others => '0');
 	-- Valor de rs2 armazenado.

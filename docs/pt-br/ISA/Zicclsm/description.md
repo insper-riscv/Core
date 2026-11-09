@@ -1,6 +1,6 @@
 # Zicclsm: Implementação no Core
 
-A Zicclsm é a extensão, definida na especificação de perfis do RISC-V, que exige loads e stores desalinhados executados sem exceção na memória principal. Este documento descreve como o Core executa esses acessos e qual é o caminho de uma instrução desalinhada pelo pipeline. O que a especificação exige, com as fontes, está em [instructions.md](instructions.md). O genérico `has_zicclsm` (padrão `true`) liga e desliga a extensão.
+A Zicclsm é a extensão, definida na especificação de perfis do RISC-V, que exige loads e stores desalinhados executados sem exceção na memória principal. Este documento descreve como o Core executa esses acessos e qual é o caminho de uma instrução desalinhada pelo pipeline. O que a especificação exige, com as fontes, está em [instructions.md](instructions.md). O constante `HAS_ZICCLSM` (padrão `true`) liga e desliga a extensão.
 
 ## 1. Classificação dos Acessos
 
@@ -44,7 +44,7 @@ Um acesso desalinhado que cabe numa palavra (`LH`, `LHU` e `SH` com $o = 1$) é 
 1. O endereço está na memória principal do mapa em uso.
 2. O endereço não pertence à última palavra de uma região. As duas palavras do acesso precisam ficar na mesma região, e a palavra seguinte à última de cada região pertence à região vizinha, mesmo quando os endereços são contíguos (por exemplo, `0x3FFFFFFC` no mapa padrão).
 
-Quando alguma condição falha, ou quando `has_zicclsm` é falso, o acesso gera exceção de endereço desalinhado. A instrução é anulada antes de acessar a memória, o que ocorre no estágio MEM quando o Core tem Zicsr e no estágio EX quando não tem. Com Zicsr ativo, a exceção usa `mcause = 4` para load e `mcause = 6` para store, e `mtval` recebe o endereço efetivo. Sem Zicsr, a exceção é só sinalizada nas saídas do Core, como descrito em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). A combinação sem Zicsr e sem Zicclsm é uma configuração válida.
+Quando alguma condição falha, ou quando `HAS_ZICCLSM` é falso, o acesso gera exceção de endereço desalinhado. A instrução é anulada antes de acessar a memória, o que ocorre no estágio MEM quando o Core tem Zicsr e no estágio EX quando não tem. Com Zicsr ativo, a exceção usa `mcause = 4` para load e `mcause = 6` para store, e `mtval` recebe o endereço efetivo. Sem Zicsr, a exceção é só sinalizada nas saídas do Core, como descrito em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). A combinação sem Zicsr e sem Zicclsm é uma configuração válida.
 
 ## 3. Acesso Que Cruza a Palavra
 

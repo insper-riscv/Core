@@ -14,7 +14,7 @@ Este documento confronta cada exigência da extensão Sscofpmf (capítulo 14 e s
 
 | ID | Exigência | Situação | Como o Core cumpre | Evidência |
 | :--- | :--- | :--- | :--- | :--- |
-| O1 | `mhpmeventnh` existe para os 29 contadores, com `OF` no bit 31 | Conforme | `0x720 + K` com `K` de 3 a 31, com `has_sscofpmf` | Teste `CsrFileSscofpmf`, prova `csrof_safety` |
+| O1 | `mhpmeventnh` existe para os 29 contadores, com `OF` no bit 31 | Conforme | `0x720 + K` com `K` de 3 a 31, com `HAS_SSCOFPMF` | Teste `CsrFileSscofpmf`, prova `csrof_safety` |
 | O2 | `OF` é pego quando o contador estoura e só a escrita do programa o limpa | Conforme | O pulso `o_wrap` põe `OF`, e o estouro vence uma escrita simultânea | Prova `csrof_safety`, mutantes `ofp_of_not_sticky` e `ofp_overflow_loses_to_write` |
 | O3 | O estouro é o estouro sem sinal dos bits implementados, e a escrita não estoura | Conforme | `o_wrap` marca a soma de todos os bits em `1` para zero, para toda largura | Prova `counter64_props`, testes `CsrFileSscofpmf` e `CsrFileSscofpmfWide`, programa `irq-lcofi` |
 | O4 | Com `OF` em `1` o estouro não pede interrupção, e `OF` desabilita a interrupção | Conforme | O pedido é `o_wrap` e não `OF` | Mutante `ofp_request_ignores_of`, programa `irq-lcofi` |
@@ -26,7 +26,7 @@ Este documento confronta cada exigência da extensão Sscofpmf (capítulo 14 e s
 | O10 | `SINH`, `UINH`, `VSINH` e `VUINH` são somente leitura zero sem o modo correspondente | Conforme | Os bits 29 a 26 leem zero | Teste `CsrFileSscofpmf` |
 | O11 | `scountovf` reflete os `OF` para o modo S | Não aplicável | O Core não tem o modo S, e `0xDA0` é um endereço inexistente | Teste `CoreTrapPriority` |
 | O12 | A delegação por `mideleg` do bit 13 | Não aplicável | O Core não tem o modo S nem `mideleg` | Teste `CoreTrapPriority` |
-| O13 | Sem a extensão, `LCOFIP` e `LCOFIE` são somente leitura zero e `mhpmeventnh` não existe | Conforme | Constantes zero e endereços inexistentes sem `has_sscofpmf` | Teste `CsrFileSscofpmfOff`, provas `csri_safety` e `csrh_safety` |
+| O13 | Sem a extensão, `LCOFIP` e `LCOFIE` são somente leitura zero e `mhpmeventnh` não existe | Conforme | Constantes zero e endereços inexistentes sem `HAS_SSCOFPMF` | Teste `CsrFileSscofpmfOff`, provas `csri_safety` e `csrh_safety` |
 
 ---
 

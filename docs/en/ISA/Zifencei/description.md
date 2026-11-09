@@ -41,10 +41,10 @@ Two Core parameters decide the behaviour.
 
 | Parameter | Meaning |
 | :--- | :--- |
-| `has_zifencei` | Enables the extension. It is enabled by the profiles whose name includes `zifencei` |
-| `has_dcache` | Indicates a write-back data cache, which requires a flush before the invalidation |
+| `HAS_ZIFENCEI` | Enables the extension. It is enabled by the profiles whose name includes `zifencei` |
+| `HAS_DCACHE` | Indicates a write-back data cache, which requires a flush before the invalidation |
 
-| `has_zifencei` | Behaviour of `FENCE.I` |
+| `HAS_ZIFENCEI` | Behaviour of `FENCE.I` |
 | :--- | :--- |
 | False | Illegal instruction, with an exception of cause 2 when there is Zicsr |
 | True | Executes as in sections 4 and 5 |
@@ -85,7 +85,7 @@ The acknowledgement may arrive in the cycle of the flush pulse, for a cache that
 | EX/MEM | Receives a bubble while the unit holds the instruction, so the instruction does not advance twice |
 | Earlier stages | Frozen while the unit is busy |
 | Output to the instruction cache | One-cycle invalidation pulse, in the cycle of the completion pulse |
-| Output to the data cache | One-cycle flush pulse, only with `has_dcache` |
+| Output to the data cache | One-cycle flush pulse, only with `HAS_DCACHE` |
 
 The two discarded instructions are fetched again from $\text{PC} + 4$, with the instruction cache already empty.
 

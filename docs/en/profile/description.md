@@ -1,34 +1,34 @@
 # Core Profiles
 
-A profile is a combination of RISC-V extensions that the `core` implements, selected by its input generics. This document describes the files that define the profiles, the rules that generate the full matrix, and the reference profiles kept in `profiles/`.
+A profile is a combination of RISC-V extensions that the `core` implements, selected by the constants of the `config_pkg`. This document describes the files that define the profiles, the rules that generate the full matrix, and the reference profiles kept in `profiles/`.
 
 ## 1. Files
 
 | File | Content |
 | :--- | :--- |
-| `profiles/matrix.yaml` | The bases (RV32I and RV32E), the extensions with the generic that turns each one on, and the rules between them |
-| `profiles/<profile>.yaml` | One reference profile, with `extensions`, `top`, `generics` and the `sources` list in GHDL dependency order |
+| `profiles/matrix.yaml` | The bases (RV32I and RV32E), the extensions with the `config_pkg` constant that turns each one on, and the rules between them |
+| `profiles/<profile>.yaml` | One reference profile, with `extensions`, `top`, `config` (the `config_pkg` constants that differ from the default package), `generics` (what is still a generic of the `core`, `hpm_counters` and `hpm_width`) and the `sources` list in GHDL dependency order |
 | `paths.yaml` | A `provides` section with the sources of each component of `src/` and the dependencies between components |
 
 ## 2. Matrix
 
-The matrix is the single source of the valid profiles. The command `riscv-tools profiles --spec profiles/matrix.yaml` expands it into 480 profiles, and the `profile-matrix` target of the `Makefile` elaborates each one with its generics.
+The matrix is the single source of the valid profiles. The command `riscv-tools profiles --spec profiles/matrix.yaml` expands it into 480 profiles, and the `profile-matrix` target of the `Makefile` writes the `config_pkg` of each one (`formal/build_profile.sh`, which swaps the default package of `src/common` for a variant of `formal/config_variant.sh`), analyzes the sources with it and elaborates the `core`, in parallel.
 
 ### 2.1. Bases and extensions
 
-| Item | Generic | Note |
+| Item | Constant | Note |
 | :--- | :--- | :--- |
-| RV32I | `has_e => false` | Base with 32 registers |
-| RV32E | `has_e => true` | Base with 16 registers |
-| Zicclsm | `has_zicclsm` | Misaligned accesses handled in hardware |
-| Zicsr | `has_zicsr` | CSR bank and traps |
-| Zicntr | `has_zicntr` | Implies Zicsr |
-| Zihpm | `has_zihpm` | Implies Zicsr; parameterized by `hpm_counters` and `hpm_width` |
-| Zifencei | `has_zifencei` | `FENCE.I` instruction |
-| Zimop | `has_zimop` | The 40 `mop.r.n` and `mop.rr.n` encodings |
-| Zicond | `has_zicond` | `czero.eqz` and `czero.nez` |
-| Zmmul | `has_zmmul` | Multiplication without division |
-| M | `has_m` | Multiplication and division; implies Zmmul |
+| RV32I | `IS_BASE_E = false` | Base with 32 registers |
+| RV32E | `IS_BASE_E = true` | Base with 16 registers |
+| Zicclsm | `HAS_ZICCLSM` | Misaligned accesses handled in hardware |
+| Zicsr | `HAS_ZICSR` | CSR bank and traps |
+| Zicntr | `HAS_ZICNTR` | Implies Zicsr |
+| Zihpm | `HAS_ZIHPM` | Implies Zicsr; parameterized by `hpm_counters` and `hpm_width` |
+| Zifencei | `HAS_ZIFENCEI` | `FENCE.I` instruction |
+| Zimop | `HAS_ZIMOP` | The 40 `mop.r.n` and `mop.rr.n` encodings |
+| Zicond | `HAS_ZICOND` | `czero.eqz` and `czero.nez` |
+| Zmmul | `HAS_ZMMUL` | Multiplication without division |
+| M | `HAS_M` | Multiplication and division; implies Zmmul |
 
 ### 2.2. Rules between extensions
 
@@ -44,9 +44,9 @@ The name starts with the base (`rv32i` or `rv32e`), with `m` appended directly w
 
 ## 3. Reference profiles
 
-| Profile | Extensions | Generics besides the extension ones |
+| Profile | Extensions | Constants and generics besides the extension ones |
 | :--- | :--- | :--- |
-| `rv32i` | I | `has_m => false` |
+| `rv32i` | I | `HAS_M = false` |
 | `rv32i_zmmul` | I, Zmmul | |
 | `rv32im` | I, M | |
 | `rv32im_zicsr` | I, M, Zicsr | |
@@ -57,7 +57,7 @@ The name starts with the base (`rv32i` or `rv32e`), with `m` appended directly w
 | `rv32im_zimop` | I, M, Zimop | |
 | `rv32im_zicond` | I, M, Zicond | |
 
-Every reference profile has `top: core` and analyzes the same extension units that the `core` instantiates directly. Units disabled by a generic leave the elaboration when the `generate` statements are evaluated, so the `sources` list does not change with the generic.
+Every reference profile has `top: core` and analyzes the same extension units that the `core` instantiates directly. Units disabled by the constant leave the elaboration when the `generate` statements are evaluated, so the `sources` list does not change with the constant.
 
 ## 4. Components of `src/`
 

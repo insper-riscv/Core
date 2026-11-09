@@ -12,9 +12,9 @@ Este documento descreve como o Core executa as quatro dicas da `Zihintntl`. As c
 
 ## 2. Configuração
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_zihintntl` | `false` | Instancia no estágio ID o decodificador que reconhece as quatro dicas |
+| `HAS_ZIHINTNTL` | `false` | Instancia no estágio ID o decodificador que reconhece as quatro dicas |
 
 Uma dica é um `ADD` válido em `x0`, então o núcleo a executa como `nop` com o genérico ligado ou desligado. A diferença é que, ligado, o estágio ID identifica a palavra como dica e desabilita a escrita em `rd`, de modo que nenhum registrador de destino chega aos estágios seguintes.
 

@@ -14,7 +14,7 @@ This document checks each requirement of the Sscofpmf extension (chapter 14 and 
 
 | ID | Requirement | Status | How the Core meets it | Evidence |
 | :--- | :--- | :--- | :--- | :--- |
-| O1 | `mhpmeventnh` exists for the 29 counters, with `OF` at bit 31 | Conforming | `0x720 + K` with `K` from 3 to 31, with `has_sscofpmf` | Test `CsrFileSscofpmf`, proof `csrof_safety` |
+| O1 | `mhpmeventnh` exists for the 29 counters, with `OF` at bit 31 | Conforming | `0x720 + K` with `K` from 3 to 31, with `HAS_SSCOFPMF` | Test `CsrFileSscofpmf`, proof `csrof_safety` |
 | O2 | `OF` is set when the counter overflows and only a program write clears it | Conforming | The `o_wrap` pulse sets `OF`, and the overflow wins over a simultaneous write | Proof `csrof_safety`, mutants `ofp_of_not_sticky` and `ofp_overflow_loses_to_write` |
 | O3 | The overflow is the unsigned overflow of the implemented bits, and a write does not overflow | Conforming | `o_wrap` marks the increment from all ones to zero, for every width | Proof `counter64_props`, tests `CsrFileSscofpmf` and `CsrFileSscofpmfWide`, program `irq-lcofi` |
 | O4 | With `OF` at `1` the overflow asks for no interrupt, and `OF` disables the interrupt | Conforming | The request is `o_wrap` and not `OF` | Mutant `ofp_request_ignores_of`, program `irq-lcofi` |
@@ -26,7 +26,7 @@ This document checks each requirement of the Sscofpmf extension (chapter 14 and 
 | O10 | `SINH`, `UINH`, `VSINH` and `VUINH` are read-only zero without the matching mode | Conforming | Bits 29 to 26 read zero | Test `CsrFileSscofpmf` |
 | O11 | `scountovf` reflects the `OF` bits for S-mode | Not applicable | The Core has no S-mode, and `0xDA0` is a nonexistent address | Test `CoreTrapPriority` |
 | O12 | Delegation of bit 13 by `mideleg` | Not applicable | The Core has neither S-mode nor `mideleg` | Test `CoreTrapPriority` |
-| O13 | Without the extension, `LCOFIP` and `LCOFIE` are read-only zero and `mhpmeventnh` does not exist | Conforming | Zero constants and nonexistent addresses without `has_sscofpmf` | Test `CsrFileSscofpmfOff`, proofs `csri_safety` and `csrh_safety` |
+| O13 | Without the extension, `LCOFIP` and `LCOFIE` are read-only zero and `mhpmeventnh` does not exist | Conforming | Zero constants and nonexistent addresses without `HAS_SSCOFPMF` | Test `CsrFileSscofpmfOff`, proofs `csri_safety` and `csrh_safety` |
 
 ---
 

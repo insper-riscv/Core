@@ -12,9 +12,9 @@ Este documento descreve como o Core executa a dica `pause`. A codificação est�
 
 ## 2. Configuração
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_zihintpause` | `false` | Instancia no estágio ID o decodificador que reconhece `pause` |
+| `HAS_ZIHINTPAUSE` | `false` | Instancia no estágio ID o decodificador que reconhece `pause` |
 
 A palavra de `pause` é um `FENCE` válido, então o núcleo a executa como `nop` com o genérico ligado ou desligado. Ligado, o estágio ID a identifica como dica e desabilita a escrita em `rd`.
 

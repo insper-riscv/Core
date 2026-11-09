@@ -12,11 +12,11 @@ Este documento descreve como o Core executa as 40 instruções da `Zimop`. O que
 
 ## 2. Configuração
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_zimop` | `false` | Instancia o decodificador no estágio ID e passa a executar `mop.r.n` e `mop.rr.n` |
+| `HAS_ZIMOP` | `false` | Instancia o decodificador no estágio ID e passa a executar `mop.r.n` e `mop.rr.n` |
 
-Com `has_zimop = false`, o decodificador não existe na elaboração e as 40 codificações seguem o caminho de qualquer instrução `SYSTEM` não suportada. Com `has_zicsr = true`, isso gera exceção de instrução ilegal (causa 2), e sem `has_zicsr` o sinal de exceção do núcleo sobe. O restante do núcleo não muda com a extensão ligada ou desligada.
+Com `HAS_ZIMOP = false`, o decodificador não existe na elaboração e as 40 codificações seguem o caminho de qualquer instrução `SYSTEM` não suportada. Com `HAS_ZICSR = true`, isso gera exceção de instrução ilegal (causa 2), e sem `HAS_ZICSR` o sinal de exceção do núcleo sobe. O restante do núcleo não muda com a extensão ligada ou desligada.
 
 ## 3. Decodificação no Estágio ID
 

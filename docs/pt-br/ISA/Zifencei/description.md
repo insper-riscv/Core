@@ -41,10 +41,10 @@ Dois parâmetros do Core decidem o comportamento.
 
 | Parâmetro | Significado |
 | :--- | :--- |
-| `has_zifencei` | Liga a extensão. É ligado pelos perfis cujo nome inclui `zifencei` |
-| `has_dcache` | Indica uma cache de dados write-back, que exige descarga antes da invalidação |
+| `HAS_ZIFENCEI` | Liga a extensão. É ligado pelos perfis cujo nome inclui `zifencei` |
+| `HAS_DCACHE` | Indica uma cache de dados write-back, que exige descarga antes da invalidação |
 
-| `has_zifencei` | Comportamento do `FENCE.I` |
+| `HAS_ZIFENCEI` | Comportamento do `FENCE.I` |
 | :--- | :--- |
 | Falso | Instrução ilegal, com exceção de causa 2 quando há Zicsr |
 | Verdadeiro | Executa conforme as seções 4 e 5 |
@@ -85,7 +85,7 @@ A confirmação pode chegar no ciclo do pulso de descarga, para uma cache que re
 | EX/MEM | Recebe bolha enquanto a unidade segura a instrução, para a instrução não avançar duas vezes |
 | Estágios anteriores | Congelados enquanto a unidade está ocupada |
 | Saída para a cache de instruções | Pulso de invalidação de um ciclo, no ciclo do pulso de conclusão |
-| Saída para a cache de dados | Pulso de descarga de um ciclo, só com `has_dcache` |
+| Saída para a cache de dados | Pulso de descarga de um ciclo, só com `HAS_DCACHE` |
 
 As duas instruções descartadas são buscadas de novo a partir de $\text{PC} + 4$, já com a cache de instruções vazia.
 

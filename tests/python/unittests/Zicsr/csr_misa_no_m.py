@@ -1,4 +1,4 @@
-"""csr_file with has_m = false: misa announces RV32I only."""
+"""csr_file with HAS_M = false: misa announces RV32I only."""
 
 import cocotb
 

@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-csr_file without has_interrupts (the default): the interrupt lines
+csr_file without HAS_INTERRUPTS (the default): the interrupt lines
 are ignored, mip and mie read zero and ignore writes, and nothing is
 pending.
 """

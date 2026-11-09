@@ -92,9 +92,9 @@ $$
 
 Instruções, semântica e detalhes de implementação da `M`: [ISA/M/instructions.md](../ISA/M/instructions.md) e [ISA/M/description.md](../ISA/M/description.md). A multiplicação sozinha (`Zmmul`) está em [ISA/Zmmul/instructions.md](../ISA/Zmmul/instructions.md) e [ISA/Zmmul/description.md](../ISA/Zmmul/description.md).
 
-Quando `has_m = true`, o decodificador `m_decode` no estágio ID reconhece instruções R-type com `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`), ativando `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'`.
+Quando `HAS_M = true`, o decodificador `m_decode` no estágio ID reconhece instruções R-type com `opcode = OPCODE_OP` (`"0110011"`) e `funct7 = FUNCT7_MULDIV` (`"0000001"`), ativando `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'`.
 
-Com `has_zmmul = true` e `has_m = false` (extensão Zmmul), o `m_decode` reconhece só as quatro multiplicações (`funct3(2) = '0'`) e a `multdiv` não instancia o divisor. `DIV`, `DIVU`, `REM` e `REMU` ficam sem dono, e a unidade de controle as trata como instruções ilegais.
+Com `HAS_ZMMUL = true` e `HAS_M = false` (extensão Zmmul), o `m_decode` reconhece só as quatro multiplicações (`funct3(2) = '0'`) e a `multdiv` não instancia o divisor. `DIV`, `DIVU`, `REM` e `REMU` ficam sem dono, e a unidade de controle as trata como instruções ilegais.
 
 No estágio EX, a unidade `multdiv` gera internamente um pulso único de início (`start_pulse`) no primeiro ciclo em que a instrução válida entra em EX, preserva `i_funct3` em um registrador próprio durante toda a operação e aciona o operador correspondente:
 
@@ -122,7 +122,7 @@ O capítulo da extensão M recomenda executar uma só vez `MULH[[S]U]` seguido d
 
 A especificação das instruções e a descrição completa da implementação estão em [instructions.md](../ISA/Zicsr/instructions.md) e [description.md](../ISA/Zicsr/description.md).
 
-Quando `has_zicsr = true`, o decodificador `csr_decode` no estágio ID identifica a classe `OPCODE_SYSTEM` (`"1110011"`), força a extração do imediato I-type (`instr[31:20]`) para transportar o endereço de 12 bits do CSR até EX e ativa `o_is_csr = '1'` e `o_we_reg = '1'` para as seis instruções de acesso a CSR (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
+Quando `HAS_ZICSR = true`, o decodificador `csr_decode` no estágio ID identifica a classe `OPCODE_SYSTEM` (`"1110011"`), força a extração do imediato I-type (`instr[31:20]`) para transportar o endereço de 12 bits do CSR até EX e ativa `o_is_csr = '1'` e `o_we_reg = '1'` para as seis instruções de acesso a CSR (`CSRRW`, `CSRRS`, `CSRRC`, `CSRRWI`, `CSRRSI`, `CSRRCI`).
 
 No estágio EX:
 
@@ -134,13 +134,13 @@ A exceção de endereço de load ou store é tomada no estágio MEM, no primeiro
 
 ### 3.3. Extensão Zifencei
 
-Quando `has_zifencei = true`, a unidade `fencei_unit` no estágio EX detecta a instrução `FENCE.I` (`opcode = OPCODE_MISC_MEM` e `funct3 = FUNCT3_FENCE_I`). Sem cache de dados write-back (`has_dcache = false`), ela pulsa `o_take = '1'` imediatamente quando `i_run = '1'`. Com cache de dados (`has_dcache = true`), ela retém a instrução por um ciclo para que os stores anteriores cheguem à cache, requisita o flush (`o_flush_req = '1'`), mantém `o_busy = '1'` até receber `i_dc_done = '1'` e então pulsa `o_take = '1'`, invalidando a cache de instruções externa (`o_ic_inval = '1'`), descartando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$.
+Quando `HAS_ZIFENCEI = true`, a unidade `fencei_unit` no estágio EX detecta a instrução `FENCE.I` (`opcode = OPCODE_MISC_MEM` e `funct3 = FUNCT3_FENCE_I`). Sem cache de dados write-back (`HAS_DCACHE = false`), ela pulsa `o_take = '1'` imediatamente quando `i_run = '1'`. Com cache de dados (`HAS_DCACHE = true`), ela retém a instrução por um ciclo para que os stores anteriores cheguem à cache, requisita o flush (`o_flush_req = '1'`), mantém `o_busy = '1'` até receber `i_dc_done = '1'` e então pulsa `o_take = '1'`, invalidando a cache de instruções externa (`o_ic_inval = '1'`), descartando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$.
 
 ### 3.4. Extensão Zicntr
 
 A descrição completa dos contadores está em [ISA/Zicntr](../ISA/Zicntr/description.md) e, para o Zihpm, em [ISA/Zihpm](../ISA/Zihpm/description.md).
 
-Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia três contadores de 64 bits, cada um com duas metades de 32 bits e carry registrado entre elas. A leitura soma o carry pendente à metade alta, de modo que `csrr` de `cycleh` logo depois de um estouro da metade baixa já vê o valor correto.
+Quando `HAS_ZICNTR = true` (que implica `HAS_ZICSR`), o `csr_file` instancia três contadores de 64 bits, cada um com duas metades de 32 bits e carry registrado entre elas. A leitura soma o carry pendente à metade alta, de modo que `csrr` de `cycleh` logo depois de um estouro da metade baixa já vê o valor correto.
 
 | Contador | Incrementa | Endereços (baixa/alta) | Espelho somente leitura |
 | :--- | :--- | :--- | :--- |
@@ -148,7 +148,7 @@ Quando `has_zicntr = true` (que implica `has_zicsr`), o `csr_file` instancia tr�
 | `minstret` | A cada pulso `i_retire`: instrução válida em EX, pipeline andando, sem exceção | `0xB02` / `0xB82` | `instret`: `0xC02` / `0xC82` |
 | `time` | A cada `tick_cycles` ciclos (50 dá 1 MHz a 50 MHz), por um divisor de tick | somente leitura | `time`: `0xC01` / `0xC81` |
 
-`mcycle` e `minstret` aceitam escrita em cada metade; uma escrita vence o incremento do próprio ciclo. Escrever em `cycle`, `time` ou `instret` é acesso ilegal (`mcause = 2`). Sem `has_zicntr` todos esses endereços são desconhecidos e acessá-los é ilegal.
+`mcycle` e `minstret` aceitam escrita em cada metade; uma escrita vence o incremento do próprio ciclo. Escrever em `cycle`, `time` ou `instret` é acesso ilegal (`mcause = 2`). Sem `HAS_ZICNTR` todos esses endereços são desconhecidos e acessá-los é ilegal.
 
 ---
 

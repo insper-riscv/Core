@@ -1,4 +1,4 @@
-"""csr_file with base_e and no M: misa announces RV32E only."""
+"""csr_file with IS_BASE_E and no M: misa announces RV32E only."""
 
 import cocotb
 

@@ -12,19 +12,19 @@ Este documento descreve como o Core implementa os contadores de eventos do Zihpm
 
 ## 2. Generics
 
-| Generic | Entidade | Padrão | Efeito |
+| Parâmetro | Entidade | Padrão | Efeito |
 | :--- | :--- | :--- | :--- |
-| `has_zihpm` | `core` | `false` | Liga a extensão: os 29 endereços de cada faixa passam a existir; exige `has_zicsr` |
+| `HAS_ZIHPM` | `core` | `false` | Liga a extensão: os 29 endereços de cada faixa passam a existir; exige `HAS_ZICSR` |
 | `hpm_counters` | `core` | 29 | Quantidade de contadores reais, de 0 a 29, nos índices de 3 a $2+$`hpm_counters` |
 | `hpm_width` | `core` | 64 | Largura em bits de cada contador real, de 0 a 64 |
 
-A elaboração falha se `has_zihpm` for ligado sem `has_zicsr`. O Zihpm independe do Zicntr e funciona sem ele. Os dois parâmetros de quantidade e de largura pertencem ao manifesto do perfil, e o valor de `hpm_counters` e de `hpm_width` de cada perfil sai de lá.
+A elaboração falha se `HAS_ZIHPM` for ligado sem `HAS_ZICSR`. O Zihpm independe do Zicntr e funciona sem ele. Os dois parâmetros de quantidade e de largura pertencem ao manifesto do perfil, e o valor de `hpm_counters` e de `hpm_width` de cada perfil sai de lá.
 
 Com `hpm_width` igual a 0 nenhum índice tem contador real, como se `hpm_counters` fosse 0.
 
 ## 3. Organização
 
-Com `has_zihpm`, o Core define os 29 índices de 3 a 31 em cinco faixas de 32 endereços. O índice $K$ é o endereço de base da faixa mais $K$.
+Com `HAS_ZIHPM`, o Core define os 29 índices de 3 a 31 em cinco faixas de 32 endereços. O índice $K$ é o endereço de base da faixa mais $K$.
 
 | CSR | Faixa | Escrita |
 | :--- | :--- | :--- |
@@ -79,7 +79,7 @@ O evento 9 conta a fusão de pares de multiplicação ou divisão (por exemplo `
 
 ## 7. `mcountinhibit`
 
-O registrador `mcountinhibit` fica em `0x320`, e os bits de `mcycle` e `minstret` estão em [Zicntr](../Zicntr/description.md). O registrador existe com `has_zicntr` ou `has_zihpm`.
+O registrador `mcountinhibit` fica em `0x320`, e os bits de `mcycle` e `minstret` estão em [Zicntr](../Zicntr/description.md). O registrador existe com `HAS_ZICNTR` ou `HAS_ZIHPM`.
 
 | Bit | Inibe | Existe quando |
 | :--- | :--- | :--- |

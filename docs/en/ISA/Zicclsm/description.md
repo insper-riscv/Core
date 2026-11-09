@@ -1,6 +1,6 @@
 # Zicclsm: Core Implementation
 
-Zicclsm is the extension, defined in the RISC-V profiles specification, that requires misaligned loads and stores to run without an exception in main memory. This document describes how the Core executes those accesses and the path a misaligned instruction takes through the pipeline. What the specification requires, with its sources, is in [instructions.md](instructions.md). The `has_zicclsm` generic (default `true`) turns the extension on and off.
+Zicclsm is the extension, defined in the RISC-V profiles specification, that requires misaligned loads and stores to run without an exception in main memory. This document describes how the Core executes those accesses and the path a misaligned instruction takes through the pipeline. What the specification requires, with its sources, is in [instructions.md](instructions.md). The `HAS_ZICCLSM` constant (default `true`) turns the extension on and off.
 
 ## 1. Access Classification
 
@@ -44,7 +44,7 @@ A misaligned access that fits in one word (`LH`, `LHU` and `SH` with $o = 1$) is
 1. The address is in the main memory of the map in use.
 2. The address does not belong to the last word of a region. Both words of the access must be in the same region, and the word after the last one of each region belongs to the neighbouring region, even when the addresses are contiguous (for example, `0x3FFFFFFC` in the default map).
 
-When a condition fails, or when `has_zicclsm` is false, the access raises a misaligned address exception. The instruction is cancelled before it reaches the memory, which happens in the MEM stage when the Core has Zicsr and in the EX stage when it does not. With Zicsr enabled, the exception uses `mcause = 4` for a load and `mcause = 6` for a store, and `mtval` receives the effective address. Without Zicsr, the exception is only signalled on the Core outputs, as described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). The combination without Zicsr and without Zicclsm is a valid configuration.
+When a condition fails, or when `HAS_ZICCLSM` is false, the access raises a misaligned address exception. The instruction is cancelled before it reaches the memory, which happens in the MEM stage when the Core has Zicsr and in the EX stage when it does not. With Zicsr enabled, the exception uses `mcause = 4` for a load and `mcause = 6` for a store, and `mtval` receives the effective address. Without Zicsr, the exception is only signalled on the Core outputs, as described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). The combination without Zicsr and without Zicclsm is a valid configuration.
 
 ## 3. Access That Crosses the Word
 

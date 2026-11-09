@@ -18,44 +18,9 @@ use work.mem_map_consts.all;
 entity core is
 	generic (
 		-- ---------------------------------------------------------------------------
-		-- Seção ISA: extensões e base do conjunto de instruções que o núcleo implementa.
+		-- Seção implementação: como o núcleo é construído, sem mudar a ISA visível ao software. A ISA e o
+		-- mapa de memória vêm do config_pkg.
 		-- ---------------------------------------------------------------------------
-		-- Habilita a extensão M de multiplicação e divisão inteira.
-		has_m           : boolean := false;
-		-- Habilita só a multiplicação (extensão Zmmul), sem divisão; has_m já a inclui.
-		has_zmmul       : boolean := false;
-		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15) e instrução ilegal para x16 a x31; falso é o RV32I, de 32 registradores.
-		has_e           : boolean := false;
-		-- Habilita a extensão Zicsr e o tratamento de exceções do modo máquina.
-		has_zicsr       : boolean := false;
-		-- Habilita os contadores da extensão Zicntr (mcycle, minstret, time); exige has_zicsr.
-		has_zicntr      : boolean := false;
-		-- Habilita a extensão Zihpm com os 29 endereços de contador de eventos (índices 3 a 31); é o token da matriz de perfis. Exige has_zicsr.
-		has_zihpm       : boolean := false;
-		-- Habilita as interrupções de máquina: mip espelha as três portas i_irq_* e mie as mascara; exige has_zicsr.
-		has_interrupts  : boolean := false;
-		-- Habilita a extensão Sscofpmf: a interrupção de estouro de contador (LCOFI, causa 13) e os bits OF e MINH dos seletores de evento; exige has_zihpm e has_interrupts.
-		has_sscofpmf    : boolean := false;
-		-- Habilita a extensão Zifencei para sincronização da cache de instruções.
-		has_zifencei    : boolean := false;
-		-- Habilita a extensão Zicond (czero.eqz e czero.nez).
-		has_zicond      : boolean := false;
-		-- Habilita a extensão Zimop: mop.r.n e mop.rr.n escrevem zero em rd e não geram exceção.
-		has_zimop       : boolean := false;
-		-- Habilita o decodificador das dicas ntl.* (Zihintntl), que executam como nop.
-		has_zihintntl   : boolean := false;
-		-- Habilita o decodificador da dica pause (Zihintpause), que executa como nop.
-		has_zihintpause : boolean := false;
-		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm).
-		has_zicclsm     : boolean := true;
-
-		-- ---------------------------------------------------------------------------
-		-- Seção implementação: como o núcleo é construído, sem mudar a ISA visível ao software.
-		-- ---------------------------------------------------------------------------
-		-- Habilita o handshake de flush da cache de dados write-back durante FENCE.I.
-		has_dcache      : boolean := false;
-		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa (BOOT_MEMORY, FLASH, RAM, janela externa e slots de periférico); exige Zicsr.
-		has_access_faults : boolean := false;
 		-- O CSR time espelha o mtime da plataforma (porta i_mtime, o CLINT) no lugar do contador próprio; sem CLINT fica falso.
 		time_external   : boolean := false;
 		-- Ciclos de clock do core por tick do contador time (50 dá 1 MHz a 50 MHz).
@@ -258,11 +223,11 @@ architecture rtl of core is
 	-- Bit de validade de entrada do registrador ID/EX após filtragem de bolha.
 	signal id_valid_out      : std_logic;
 	-- Índice do registrador fonte rs1 decodificado no estágio ID.
-	signal id_rs1_idx        : reg_t;
+	signal id_rs1_idx        : reg_field_t;
 	-- Índice do registrador fonte rs2 decodificado no estágio ID.
-	signal id_rs2_idx        : reg_t;
+	signal id_rs2_idx        : reg_field_t;
 	-- Índice do registrador destino rd decodificado no estágio ID.
-	signal id_rd_idx         : reg_t;
+	signal id_rd_idx         : reg_field_t;
 	-- Valor de 32 bits lido de rs1 no estágio ID.
 	signal id_rs1_val        : word_t;
 	-- Valor de 32 bits lido de rs2 no estágio ID.
@@ -316,9 +281,9 @@ architecture rtl of core is
 	-- Endereço PC + 4 registrado em ID/EX.
 	signal ex_pc4            : word_t;
 	-- Índice do registrador fonte rs1 registrado em ID/EX.
-	signal ex_rs1_idx        : reg_t;
+	signal ex_rs1_idx        : reg_field_t;
 	-- Índice do registrador destino rd registrado em ID/EX.
-	signal ex_rd_idx         : reg_t;
+	signal ex_rd_idx         : reg_field_t;
 	-- Valor de rs1 registrado em ID/EX.
 	signal ex_rs1_val        : word_t;
 	-- Valor de rs2 registrado em ID/EX.
@@ -434,7 +399,7 @@ architecture rtl of core is
 	-- Máscara de habilitação de bytes registrada em EX/MEM.
 	signal exmem_byteena     : byte_mask_t;
 	-- Índice do registrador destino rd registrado em EX/MEM.
-	signal exmem_rd_idx      : reg_t;
+	signal exmem_rd_idx      : reg_field_t;
 	-- Habilitação de escrita em registrador registrada em EX/MEM.
 	signal exmem_we_reg      : std_logic;
 	-- A instrução em EX/MEM é válida e escreve em registrador.
@@ -458,7 +423,7 @@ architecture rtl of core is
 	-- Resultado da ULA/execução registrado em MEM/WB.
 	signal memwb_alu_out     : word_t;
 	-- Índice do registrador destino rd registrado em MEM/WB.
-	signal memwb_rd_idx      : reg_t;
+	signal memwb_rd_idx      : reg_field_t;
 	-- Habilitação de escrita em registrador registrada em MEM/WB.
 	signal memwb_we_reg      : std_logic;
 	-- A instrução em MEM/WB é válida e escreve em registrador.
@@ -474,7 +439,7 @@ architecture rtl of core is
 	-- Habilitação final de escrita no banco de registradores.
 	signal wb_we             : std_logic;
 	-- Índice final do registrador destino rd para escrita no RegFile.
-	signal wb_rd             : reg_t;
+	signal wb_rd             : reg_field_t;
 	-- Dado de 32 bits selecionado no estágio WB, como a memória o entrega neste ciclo.
 	signal wb_data_raw       : word_t;
 	-- Próximo valor de wb_repeat: o ciclo atual é um stall de EX/MEM (base_run = '0').
@@ -488,7 +453,7 @@ architecture rtl of core is
 	-- Escrita no banco de registradores da instrução que saiu de WB no ciclo anterior (registrador WB2).
 	signal wb2_we            : std_logic;
 	-- Registrador destino rd da instrução em WB2.
-	signal wb2_rd            : reg_t;
+	signal wb2_rd            : reg_field_t;
 	-- Dado final de write-back da instrução em WB2.
 	signal wb2_data          : word_t;
 
@@ -534,60 +499,15 @@ begin
 	o_retire      <= retire_pulse;
 
 	-- ---------------------------------------------------------------------------
-	-- Checagem de configuração dos generics: falha na elaboração, antes de
-	-- gerar hardware, com o nome do generic e a causa. Uma linha por dependência.
+	-- Checagem da configuração: o check_isa do config_pkg falha na elaboração, antes de gerar hardware,
+	-- quando as dependências entre as extensões ou o mapa de memória são inválidos, e a nota informa a ISA.
 	-- ---------------------------------------------------------------------------
-
-	-- Os contadores do Zicntr são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not has_zicntr)
-		report "has_zicntr exige has_zicsr: os contadores são CSRs"
-		severity failure;
-
-	-- Os contadores de eventos do Zihpm são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not has_zihpm)
-		report "has_zihpm exige has_zicsr: os contadores de eventos são CSRs"
-		severity failure;
-
-	-- mip e mie são CSRs: sem Zicsr não há onde lê-los.
-	assert has_zicsr or (not has_interrupts)
-		report "has_interrupts exige has_zicsr: mip e mie são CSRs"
-		severity failure;
-
-	-- As falhas de acesso entram pela unidade de traps, que só existe com Zicsr.
-	assert has_zicsr or (not has_access_faults)
-		report "has_access_faults exige has_zicsr: as falhas de acesso são traps"
-		severity failure;
-
-	-- A Sscofpmf tem as fontes de estouro no Zihpm.
-	assert has_zihpm or (not has_sscofpmf)
-		report "has_sscofpmf exige has_zihpm: as fontes de estouro são os contadores de eventos"
-		severity failure;
-
-	-- A Sscofpmf entrega a interrupção de estouro pelo mip e pelo mie.
-	assert has_interrupts or (not has_sscofpmf)
-		report "has_sscofpmf exige has_interrupts: a interrupção LCOFI sai pelo mip e pelo mie"
-		severity failure;
-
-	-- Faixa do mapa: a BOOT_MEMORY de 2**BOOT_MEMORY_BITS bytes cabe no espaço de endereços.
-	assert BOOT_MEMORY_BITS < ADDR_BITS
-		report "BOOT_MEMORY_BITS não menor que ADDR_BITS: 2**BOOT_MEMORY_BITS não cabe no endereço"
-		severity failure;
-
-	-- Faixa do mapa: a RAM não termina antes de começar.
-	assert RAM_BASE <= RAM_END
-		report "RAM_BASE maior que RAM_END: a RAM teria tamanho negativo"
-		severity failure;
-
-	-- Faixa do mapa: a BOOT_MEMORY ocupa [0, 2**BOOT_MEMORY_BITS) e a RAM não pode começar dentro dela.
-	assert boot_memory_end <= RAM_BASE
-		report "RAM_BASE menor que o fim da BOOT_MEMORY (2**BOOT_MEMORY_BITS bytes): a RAM sobreporia a BOOT_MEMORY"
-		severity failure;
-
-	-- Faixa do mapa: as bases da janela externa e da janela de periféricos cabem no espaço de endereços.
-	assert EXT_BASE(ADDR_BITS) = '0' and PERIPH_BASE(ADDR_BITS) = '0'
-		report "EXT_BASE e PERIPH_BASE devem ser menores que 2**ADDR_BITS bytes"
-		severity failure;
-
+	gen_report : if check_isa generate
+	begin
+		assert false
+			report "ISA configurada: " & isa_string
+			severity note;
+	end generate gen_report;
 
 	flush_if_id   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take or if_replay;
 	flush_id_ex   <= ((ex_branch_taken or ex_jalr_taken) and pipe_run) or trap_take or mem_trap_take or mret_take or fencei_take;
@@ -649,17 +569,6 @@ begin
 	-- 2. Estágio ID (Instruction Decode) + Registrador ID/EX
 	-- =========================================================================
 	u_stage_id : entity work.stage_id
-		generic map (
-			has_m        => has_m,
-			has_zmmul    => has_zmmul,
-			has_zicsr    => has_zicsr,
-			has_zifencei => has_zifencei,
-			has_zicond   => has_zicond,
-			has_zimop    => has_zimop,
-			has_zihintntl   => has_zihintntl,
-			has_zihintpause => has_zihintpause,
-			has_e        => has_e
-		)
 		port map (
 			i_clk         => i_clk,
 			i_rst         => i_rst,
@@ -771,23 +680,10 @@ begin
 	-- =========================================================================
 	u_stage_ex : entity work.stage_ex
 		generic map (
-			has_m           => has_m,
-			has_zmmul       => has_zmmul,
-			base_e          => has_e,
-			has_zicsr       => has_zicsr,
-			has_zicntr      => has_zicntr,
 			tick_cycles     => tick_cycles,
-			has_zifencei    => has_zifencei,
-			has_zicond      => has_zicond,
-			has_zicclsm     => has_zicclsm,
-			has_dcache      => has_dcache,
-			has_zihpm       => has_zihpm,
 			hpm_counters    => hpm_counters,
 			hpm_width       => hpm_width,
-			has_interrupts  => has_interrupts,
-			has_sscofpmf    => has_sscofpmf,
-			time_external   => time_external,
-			has_access_faults => has_access_faults
+			time_external   => time_external
 		)
 		port map (
 			i_hpm_events      => hpm_events,
@@ -857,7 +753,6 @@ begin
 
 	u_reg_ex_mem : entity work.reg_ex_mem
 		generic map (
-			has_access_faults => has_access_faults,
 			periph_slots    => periph_slots
 		)
 		port map (
@@ -906,7 +801,6 @@ begin
 	-- =========================================================================
 	u_misaligned_unit : entity work.misaligned_unit
 		generic map (
-			has_zicclsm  => has_zicclsm,
 			flags_registered => true
 		)
 		port map (
@@ -940,10 +834,8 @@ begin
 
 	u_stage_mem : entity work.stage_mem
 		generic map (
-			has_zicclsm     => has_zicclsm,
-			check_ea        => has_zicsr,
-			flags_registered => true,
-			has_access_faults => has_access_faults
+			check_ea        => HAS_ZICSR,
+			flags_registered => true
 		)
 		port map (
 			i_flag_ok_rd    => exmem_ok_rd,
@@ -1070,7 +962,7 @@ begin
 
 	u_wb2_rd_reg : entity work.generic_register
 		generic map (
-			data_width => reg_t'length
+			data_width => reg_field_t'length
 		)
 		port map (
 			i_clk    => i_clk,

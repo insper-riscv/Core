@@ -12,15 +12,15 @@ Este documento descreve como o Core executa as instruções da `Zmmul`. O que o 
 
 ## 2. Configuração
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_zmmul` | `false` | Instancia o decodificador e o multiplicador, sem o divisor (4 instruções) |
+| `HAS_ZMMUL` | `false` | Instancia o decodificador e o multiplicador, sem o divisor (4 instruções) |
 
-O divisor só é instanciado com `has_m`, de modo que `has_zmmul = true` com `has_m = false` dá o perfil sem divisão. Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
+O divisor só é instanciado com `HAS_M`, de modo que `HAS_ZMMUL = true` com `HAS_M = false` dá o perfil sem divisão. Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
 
 ## 3. Decodificação sem Divisão
 
-O parâmetro de divisão do decodificador recebe o valor de `has_m`. Sem divisão, só os `funct3` com o bit 2 em zero são reivindicados, ou seja, as quatro multiplicações. Uma instrução com `funct7 = 0000001` e `funct3` de divisão não é reivindicada, e a unidade de controle a marca como ilegal. O restante da decodificação está em [M](../M/description.md).
+O parâmetro de divisão do decodificador recebe o valor de `HAS_M`. Sem divisão, só os `funct3` com o bit 2 em zero são reivindicados, ou seja, as quatro multiplicações. Uma instrução com `funct7 = 0000001` e `funct3` de divisão não é reivindicada, e a unidade de controle a marca como ilegal. O restante da decodificação está em [M](../M/description.md).
 
 ## 4. Multiplicador de Booth Radix-2
 

@@ -23,26 +23,6 @@ use work.alu_consts.all;
 use work.fwd_consts.all;
 
 entity stage_id is
-	generic (
-		-- Habilita o decodificador da extensão M completa (m_decode, multiplicação e divisão).
-		has_m     : boolean := false;
-		-- Habilita o decodificador só da multiplicação (extensão Zmmul); has_m já a inclui.
-		has_zmmul : boolean := false;
-		-- Habilita o decodificador da extensão Zicsr (csr_decode).
-		has_zicsr : boolean := false;
-		-- Declara o FENCE.I legal; sem a extensão Zifencei ele é uma instrução ilegal.
-		has_zifencei : boolean := false;
-		-- Habilita o decodificador da extensão Zicond (zicond_decode).
-		has_zicond   : boolean := false;
-		-- Habilita o decodificador da extensão Zimop (zimop_decode): mop.r.n e mop.rr.n escrevem zero em rd.
-		has_zimop : boolean := false;
-		-- Habilita o decodificador das dicas ntl.* da extensão Zihintntl (executam como nop).
-		has_zihintntl : boolean := false;
-		-- Habilita o decodificador da dica pause da extensão Zihintpause (executa como nop).
-		has_zihintpause : boolean := false;
-		-- Seleciona a base RV32E: banco de 16 registradores (x0 a x15); falso é o RV32I, de 32.
-		has_e     : boolean := false
-	);
 	port (
 		-- Sinal de clock principal do processador.
 		i_clk         : in  std_logic;
@@ -55,21 +35,21 @@ entity stage_id is
 		-- Habilitação de escrita no banco de registradores vinda do estágio WB.
 		i_wb_we       : in  std_logic;
 		-- Endereço do registrador destino rd vindo do estágio WB.
-		i_wb_rd       : in  reg_t;
+		i_wb_rd       : in  reg_field_t;
 		-- Dado de 32 bits a ser escrito no banco de registradores vindo do estágio WB.
 		i_wb_data     : in  word_t;
 		-- Endereço do registrador destino rd da instrução no estágio MEM (para detecção load-use).
-		i_mem_rd      : in  reg_t;
+		i_mem_rd      : in  reg_field_t;
 		-- Habilitação de escrita em registrador da instrução no estágio MEM (para o adiantamento).
 		i_mem_we_reg  : in  std_logic;
 		-- Registrador destino rd da instrução no estágio WB (para o adiantamento).
-		i_memwb_rd    : in  reg_t;
+		i_memwb_rd    : in  reg_field_t;
 		-- Habilitação de escrita em registrador da instrução no estágio WB (para o adiantamento).
 		i_memwb_we_reg : in std_logic;
 		-- Indica se a instrução no estágio MEM é uma leitura de memória (load).
 		i_mem_re_ram  : in  std_logic;
 		-- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
-		i_ex_rd       : in  reg_t;
+		i_ex_rd       : in  reg_field_t;
 		-- Habilitação de escrita em registrador da instrução no estágio EX (para o adiantamento).
 		i_ex_we_reg   : in  std_logic;
 		-- Indica se a instrução no estágio EX é uma leitura de memória (load).
@@ -83,11 +63,11 @@ entity stage_id is
 		-- Bit de validade filtrado (anulado em caso de bolha) para o registrador ID/EX.
 		o_idex_valid  : out std_logic;
 		-- Índice do registrador fonte rs1 extraído da instrução.
-		o_rs1_idx     : out reg_t;
+		o_rs1_idx     : out reg_field_t;
 		-- Índice do registrador fonte rs2 extraído da instrução.
-		o_rs2_idx     : out reg_t;
+		o_rs2_idx     : out reg_field_t;
 		-- Índice do registrador destino rd extraído da instrução.
-		o_rd_idx      : out reg_t;
+		o_rd_idx      : out reg_field_t;
 		-- Valor de 32 bits lido da porta rs1 do banco de registradores.
 		o_rs1_val     : out word_t;
 		-- Valor de 32 bits lido da porta rs2 do banco de registradores.
@@ -138,11 +118,11 @@ architecture rtl of stage_id is
 	-- Alias para o campo opcode (bits [6:0]) da instrução em IF/ID.
 	alias id_opcode        : opcode_t is i_instr(6 downto 0);
 	-- Alias para o índice do registrador destino rd (bits [11:7]).
-	alias id_rd_idx        : reg_t    is i_instr(11 downto 7);
+	alias id_rd_idx        : reg_field_t is i_instr(11 downto 7);
 	-- Alias para o índice do registrador fonte rs1 (bits [19:15]).
-	alias id_rs1_idx       : reg_t    is i_instr(19 downto 15);
+	alias id_rs1_idx       : reg_field_t is i_instr(19 downto 15);
 	-- Alias para o índice do registrador fonte rs2 (bits [24:20]).
-	alias id_rs2_idx       : reg_t    is i_instr(24 downto 20);
+	alias id_rs2_idx       : reg_field_t is i_instr(24 downto 20);
 
 	-- Operação do extensor de imediato gerada pela unidade de controle base.
 	signal cu_ext_imm_op   : ext_imm_op_t;
@@ -194,17 +174,8 @@ architecture rtl of stage_id is
 	signal cu_we_ram       : std_logic;
 	-- Habilitação de leitura na RAM antes do bubble_mux.
 	signal cu_re_ram       : std_logic;
-	-- Largura do endereço do banco de registradores: 5 bits para 32 registradores (RV32I), 4 bits para 16 (RV32E).
-	function addr_bits_for(e : boolean) return natural is
-	begin
-		if e then
-			return 4;
-		end if;
-		return 5;
-	end function addr_bits_for;
-
-	-- Largura do endereço do banco de registradores desta instância.
-	constant REG_ADDR_WIDTH : natural := addr_bits_for(has_e);
+	-- Largura do endereço do banco de registradores desta instância: 5 bits para 32 registradores (base I), 4 para 16 (base E).
+	constant REG_ADDR_WIDTH : natural := REG_BITS;
 
 	-- Habilitação geral da RAM antes do bubble_mux.
 	signal cu_en_ram       : std_logic;
@@ -250,11 +221,8 @@ begin
 			o_illegal     => cu_illegal
 		);
 
-	gen_m_decode : if (has_m or has_zmmul) generate
+	gen_m_decode : if HAS_MULDIV generate
 		u_m_decode : entity work.m_decode
-			generic map (
-				has_div => has_m
-			)
 			port map (
 				i_instr      => i_instr,
 				o_is_muldiv  => id_is_muldiv,
@@ -267,7 +235,7 @@ begin
 		m_sel_pc_rs1 <= '0';
 	end generate gen_m_decode;
 
-	gen_zicond_decode : if has_zicond generate
+	gen_zicond_decode : if HAS_ZICOND generate
 		u_zicond_decode : entity work.zicond_decode
 			port map (
 				i_instr      => i_instr,
@@ -283,7 +251,7 @@ begin
 		zc_sel_pc_rs1 <= '0';
 	end generate gen_zicond_decode;
 
-	gen_zimop_decode : if has_zimop generate
+	gen_zimop_decode : if HAS_ZIMOP generate
 		u_zimop_decode : entity work.zimop_decode
 			port map (
 				i_instr    => i_instr,
@@ -299,7 +267,7 @@ begin
 		zimop_opcode  <= OPCODE_OP_IMM;
 	end generate gen_zimop_decode;
 
-	gen_zihintntl_decode : if has_zihintntl generate
+	gen_zihintntl_decode : if HAS_ZIHINTNTL generate
 		u_zihintntl_decode : entity work.zihintntl_decode
 			port map (
 				i_instr   => i_instr,
@@ -309,7 +277,7 @@ begin
 		id_is_ntl <= '0';
 	end generate gen_zihintntl_decode;
 
-	gen_zihintpause_decode : if has_zihintpause generate
+	gen_zihintpause_decode : if HAS_ZIHINTPAUSE generate
 		u_zihintpause_decode : entity work.zihintpause_decode
 			port map (
 				i_instr   => i_instr,
@@ -321,7 +289,7 @@ begin
 
 	id_is_hint <= id_is_ntl or id_is_pause;
 
-	gen_csr_decode : if has_zicsr generate
+	gen_csr_decode : if HAS_ZICSR generate
 		u_csr_decode : entity work.csr_decode
 			port map (
 				i_instr     => i_instr,
@@ -337,7 +305,7 @@ begin
 	end generate gen_csr_decode;
 
 	o_is_muldiv   <= id_is_muldiv;
-	id_is_fencei  <= '1' when (has_zifencei and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
+	id_is_fencei  <= '1' when (HAS_ZIFENCEI and id_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
 	-- No RV32E o bit mais alto de cada campo de registrador usado precisa ser zero.
 	id_uses_rd  <= '1' when (id_opcode = OPCODE_LUI or id_opcode = OPCODE_AUIPC or id_opcode = OPCODE_JAL or
 	                         id_opcode = OPCODE_JALR or id_opcode = OPCODE_LOAD or id_opcode = OPCODE_OP_IMM or
@@ -349,7 +317,7 @@ begin
 	               else '0';
 	id_uses_rs2 <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP)
 	               else '0';
-	id_bad_reg  <= '1' when (has_e and
+	id_bad_reg  <= '1' when (IS_BASE_E and
 	                         ((id_uses_rd = '1' and id_rd_idx(4) = '1') or
 	                          (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
 	                          (id_uses_rs2 = '1' and id_rs2_idx(4) = '1')))

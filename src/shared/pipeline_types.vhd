@@ -3,8 +3,7 @@
 --
 -- Centraliza as larguras de campos da instrução, códigos de operação da
 -- ULA/extensores, seletores de write-back e máscaras de bytes utilizadas entre
--- os estágios do pipeline. A palavra de dados (word_t) e o índice de
--- registrador (reg_t) vêm do config_pkg.
+-- os estágios do pipeline. A palavra de dados (word_t) vem do config_pkg.
 -- =============================================================================
 
 library ieee;
@@ -20,8 +19,12 @@ package pipeline_types is
   -- Campo funct7 da instrução RISC-V (bits [31:25], 7 bits).
   subtype funct7_t  is std_logic_vector(6 downto 0);
 
+  -- Campo de registrador da instrução (rd, rs1 e rs2, bits [11:7], [19:15] e [24:20], sempre 5 bits). Na base E
+  -- o banco usa só os REG_BITS baixos e o bit 4 serve para detectar a instrução ilegal.
+  subtype reg_field_t is std_logic_vector(4 downto 0);
+
   -- Índice do registrador arquitetural x0 (sempre zero).
-  constant REG_ZERO : reg_t := (others => '0');
+  constant REG_ZERO : reg_field_t := (others => '0');
   
   -- Código de operação da ULA (5 bits).
   subtype alu_op_t  is std_logic_vector(4 downto 0);

@@ -24,7 +24,7 @@ entity stage_wb is
 		-- Resultado da ULA/execução (e bits [1:0] do endereço de load) no estágio WB.
 		i_alu_out      : in  word_t;
 		-- Índice do registrador destino rd no estágio WB.
-		i_rd_idx       : in  reg_t;
+		i_rd_idx       : in  reg_field_t;
 		-- Habilitação de escrita no banco de registradores vinda do registrador MEM/WB.
 		i_we_reg       : in  std_logic;
 		-- Modo de extensão de leitura da memória de dados vindo do registrador MEM/WB.
@@ -48,7 +48,7 @@ entity stage_wb is
 		-- Habilitação final de escrita enviada ao banco de registradores (reg_file).
 		o_wb_we        : out std_logic;
 		-- Endereço final do registrador destino rd enviado ao banco de registradores.
-		o_wb_rd        : out reg_t;
+		o_wb_rd        : out reg_field_t;
 		-- Dado final de 32 bits enviado ao banco de registradores e à malha de forwarding.
 		o_wb_data      : out word_t
 	);

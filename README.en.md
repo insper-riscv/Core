@@ -20,7 +20,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [contracts/03-relogios-e-reset.md](docs/en/contracts/03-relogios-e-reset.md): contract K7, the clock roles (`core`, `fetch`, `mem`, `mem_pin`, `rst`), where the value of each one comes from and the reset latency.
 - [ISA/Zicclsm/instructions.md](docs/en/ISA/Zicclsm/instructions.md) and [ISA/Zicclsm/description.md](docs/en/ISA/Zicclsm/description.md): what the profiles specification requires of Zicclsm and the hardware execution of misaligned loads and stores, access classification, regions covered in each memory map, and the two-step access that crosses a word.
 - [FORMAL.md](docs/en/formal/FORMAL.md): formal proofs, solver engines, the result file of each engine and the rule of the aggregator that decides the `formal` CI check.
-- [ISA/E/description.md](docs/en/ISA/E/description.md): the `has_e` generic that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
+- [ISA/E/description.md](docs/en/ISA/E/description.md): the `IS_BASE_E` constant that chooses the 32-register file (RV32I) or the 16-register file (RV32E), the illegal instruction with `x16` to `x31`, and the `ilp32e` ABI.
 - [ISA/Zicsr/instructions.md](docs/en/ISA/Zicsr/instructions.md) and [ISA/Zicsr/description.md](docs/en/ISA/Zicsr/description.md): the Zicsr extension, with the instructions, encoding and read/write rules required by the manual, and the Core implementation (CSR file, synchronous exceptions, `MRET`, redirection and behavior without Zicsr).
 - [ISA/Zicntr](docs/en/ISA/Zicntr/description.md): the base counters `cycle`, `time` and `instret` (Zicntr), with what the manual requires, the 64-bit counter block, instruction retirement, the tick divider and `mcountinhibit`.
 - [ISA/Zihpm](docs/en/ISA/Zihpm/description.md): the `hpmcounter` performance counters (Zihpm), with what the manual requires, the organization of the event counters, the counting rule and the event table.
@@ -65,31 +65,31 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 
 ## 3. ISA Profiles
 
-The structural top level `core` takes one boolean generic per extension, which enables or disables the extension at elaboration time:
+The structural top level `core` reads one boolean constant per extension from the `config_pkg` (Common-Components), which enables or disables the extension at elaboration time. The top level of a platform compiles the `config_pkg` generated from `platform.yaml` in the place of the default package (RV32IM with Zicclsm), and the tests and the formal proofs swap the file for a variant of `formal/configs.yaml`:
 
-| Extension | Generic | Default | With the generic off |
+| Extension | Constant | Default | With the constant false |
 | :--- | :--- | :--- | :--- |
-| M | `has_m` | `false` | M instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
-| Zmmul | `has_zmmul` | `false` | Multiplication instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
-| Zicsr | `has_zicsr` | `false` | No CSRs and no traps; the core signals the exception on `o_trap` |
-| Zicntr | `has_zicntr` | `false` | No `cycle`, `time` and `instret` counters; requires Zicsr |
-| Zihpm | `has_zihpm` | `false` | No `hpmcounter3` to `hpmcounter31` event counters; requires Zicsr, and `hpm_counters` and `hpm_width` size the bank |
-| Zifencei | `has_zifencei` | `false` | `FENCE.I` is illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
-| Zimop | `has_zimop` | `false` | The 40 encodings of `mop.r.n` and `mop.rr.n` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
-| Zihintntl | `has_zihintntl` | `false` | The four `ntl.*` hints remain an `ADD` to `x0`, which is also a `nop` |
-| Zihintpause | `has_zihintpause` | `false` | `pause` remains a `FENCE`, which is also a `nop` |
-| Zicclsm | `has_zicclsm` | `true` | Every misaligned access traps |
-| Zicond | `has_zicond` | `false` | `czero.eqz` and `czero.nez` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| M | `HAS_M` | `true` | M instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| Zmmul | `HAS_ZMMUL` | `false` | Multiplication instructions are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| Zicsr | `HAS_ZICSR` | `false` | No CSRs and no traps; the core signals the exception on `o_trap` |
+| Zicntr | `HAS_ZICNTR` | `false` | No `cycle`, `time` and `instret` counters; requires Zicsr |
+| Zihpm | `HAS_ZIHPM` | `false` | No `hpmcounter3` to `hpmcounter31` event counters; requires Zicsr, and `hpm_counters` and `hpm_width` size the bank |
+| Zifencei | `HAS_ZIFENCEI` | `false` | `FENCE.I` is illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| Zimop | `HAS_ZIMOP` | `false` | The 40 encodings of `mop.r.n` and `mop.rr.n` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
+| Zihintntl | `HAS_ZIHINTNTL` | `false` | The four `ntl.*` hints remain an `ADD` to `x0`, which is also a `nop` |
+| Zihintpause | `HAS_ZIHINTPAUSE` | `false` | `pause` remains a `FENCE`, which is also a `nop` |
+| Zicclsm | `HAS_ZICCLSM` | `true` | Every misaligned access traps |
+| Zicond | `HAS_ZICOND` | `false` | `czero.eqz` and `czero.nez` are illegal (cause 2 with Zicsr, `o_trap` without Zicsr) |
 
-A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`has_e` false) or RV32E (`has_e` true, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 240 combinations of extensions, which gives 480 profiles. The list of profiles comes from `profiles/matrix.yaml`, which expands Zimop and Zicond like the others; the `rv32im_zicond` and `rv32im_zimop` reference profiles turn each one on alone in the GHDL build:
+A profile is a combination of those extensions, and two rules define the valid combinations: M and Zmmul never coexist, because M already includes the multiplication of Zmmul, and Zicntr and Zihpm imply Zicsr, because the counters are CSRs. A core with neither Zicsr nor Zicclsm is also valid: the misaligned access is only signalled on `o_trap`. The base is RV32I (`IS_BASE_E` false) or RV32E (`IS_BASE_E` true, see [ISA/E/description.md](docs/en/ISA/E/description.md)), and each base accepts all 240 combinations of extensions, which gives 480 profiles. The list of profiles comes from `profiles/matrix.yaml`, which expands Zimop and Zicond like the others; the `rv32im_zicond` and `rv32im_zimop` reference profiles turn each one on alone in the GHDL build:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # one name per line
-riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and GHDL -g flags
-make profile-matrix                                                        # elaborate each profile with its generics
+riscv-tools profiles --spec profiles/matrix.yaml --format generics  # name and constants (-ghas_x=value, which the Makefile turns into HAS_X)
+make profile-matrix                                                        # elaborate each profile with its config_pkg
 ```
 
-When an extension is disabled by its generic, the corresponding instructions are illegal: with Zicsr they raise cause 2 of `mcause`, and without Zicsr they pulse `o_trap`, and in both cases they write no register and access no memory.
+When an extension is disabled by its constant, the corresponding instructions are illegal: with Zicsr they raise cause 2 of `mcause`, and without Zicsr they pulse `o_trap`, and in both cases they write no register and access no memory.
 
 ## 4. Verification and Execution
 

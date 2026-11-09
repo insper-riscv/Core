@@ -5,7 +5,8 @@
 profile: rv32im_zicsr_irq
 extensions: [I, M, Zicsr]
 top: core
-generics: {has_m: true, has_zicsr: true, has_zicclsm: false, has_interrupts: true}
+config: {HAS_ZICSR: true, HAS_ZICCLSM: false, HAS_INTERRUPTS: true}
+generics: {}
 sources:
   - src/common/src/utils_pkg.vhd
   - src/common/src/config_pkg.vhd
