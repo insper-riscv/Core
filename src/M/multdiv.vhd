@@ -35,6 +35,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.funct3_consts.all;
 use work.muldiv_consts.all;

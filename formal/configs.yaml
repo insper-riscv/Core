@@ -1,0 +1,14 @@
+# Variantes do config_pkg das provas formais e dos testes por entidade. Cada chave é o nome da variante e o valor
+# lista as constantes que mudam em relação ao config_pkg padrão do Common-Components, no formato CONSTANTE=valor
+# separados por espaço: booleanos como true e false, bases e fins do mapa em bytes (hexadecimal) e
+# BOOT_MEMORY_BITS em decimal. formal/config_variant.sh <nome> <arquivo> escreve o pacote da variante, que ocupa o
+# lugar de src/common/src/config_pkg.vhd na lista de fontes (CONFIG_FILE no formal/run.sh).
+
+# ROM e janela externa abaixo da RAM, com a ROM alcançada pela porta do núcleo (a FLASH externa de cima da BOOT_MEMORY).
+ext_flash: ROM_EXTERNAL=true ROM_END=0x00000000 EXT_BASE=0x20000000 PERIPH_BASE=0x60000000 RAM_BASE=0x40000000 RAM_END=0x60000000
+# ROM externa de 256 KiB, RAM de 64 MiB logo acima de 1 GiB e janela externa colada nela.
+ext_rom: ROM_EXTERNAL=true ROM_END=0x00040000 EXT_BASE=0x44000000 PERIPH_BASE=0x60000000 RAM_BASE=0x40000000 RAM_END=0x44000000
+# ROM externa de 32 KiB logo depois da BOOT_MEMORY e RAM até a janela externa de 1 GiB.
+rom_after_boot: ROM_EXTERNAL=true ROM_END=0x00008000 RAM_BASE=0x00008000 RAM_END=0x40000000 EXT_BASE=0x40000000
+# Mapa pequeno das falhas de acesso: ROM de 4 KiB, RAM de 8 a 16 KiB e a janela externa vazia.
+faults_map: ROM_END=0x00001000 RAM_BASE=0x00002000 RAM_END=0x00004000 EXT_BASE=0x80000000 PERIPH_BASE=0x80000000

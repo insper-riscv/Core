@@ -7,6 +7,10 @@
 # of the smtbmc engine; abc-bmc3 is the bounded model checker of ABC, which has no induction and no cover, so it
 # skips those proofs. FORMAL_TIMEOUT (seconds, 900 by default) bounds each proof.
 #
+# CONFIG_FILE, when set, is a config_pkg that takes the place of src/common/src/config_pkg.vhd in the source list of
+# the proof that follows it (the variants of formal/configs.yaml, written by formal/config_variant.sh). The units
+# that the proofs share with the other repositories (counter64, for one) are proven in their own repository.
+#
 # Besides the report, the run writes build/formal/result-<engine>.tsv, one line per proof with the columns
 # id, wanted (pass or fail), verdict (pass, fail, error or skip), sby exit code, milliseconds and the label, which
 # formal/aggregate.sh joins across engines.
@@ -58,6 +62,8 @@ netlist() {
   local work="$out/work_$3" replaces="${REPLACES:-}" log="$out/$3.ghdl.log" file replaced=0 files=()
   mkdir -p "$work"; : > "$log"
   for file in \
+    "$root/src/common/src/utils_pkg.vhd" \
+    "${CONFIG_FILE:-$root/src/common/src/config_pkg.vhd}" \
     "$root/src/shared/pipeline_types.vhd" \
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
@@ -77,9 +83,8 @@ netlist() {
     "$root/src/Zicsr/csr_event_consts.vhd" \
     "$root/src/Zicsr/csr_value_consts.vhd" \
     "$root/src/Zicsr/irq_consts.vhd" \
-    "$root/src/common/src/utils_pkg.vhd" \
     "$root/src/common/src/mux_tree.vhd" \
-    "$root/src/Zicntr/counter64.vhd" \
+    "$root/src/common/src/counter64.vhd" \
     "$root/src/Zicntr/tick_divider.vhd" \
     "${BANK_FILE:-$root/src/Zihpm/hpm_counter_bank.vhd}"; do
     if [ -n "$replaces" ] && [ "$file" = "$replaces" ]; then file="$1"; replaced=1; fi
@@ -93,6 +98,13 @@ netlist() {
   scan_warnings "$log"
 }
 
+# config_variant <name>: the config_pkg of the variant <name> of formal/configs.yaml (the default package of
+# src/common with the constants of the variant), written in the output folder; the path is the CONFIG_FILE that
+# puts it in the place of the default one in the source list of netlist and netlist_tree.
+config_variant() {
+  bash "$root/formal/config_variant.sh" "$1" "$out/config_$1.vhd" >&2 && echo "$out/config_$1.vhd"
+}
+
 # netlist_tree <entity> <name> [ghdl generics]: the Verilog netlist of an entity that needs the whole source tree
 # (stage_ex), with every source of the repository analyzed in the order riscv-tools vhdl-sort gives. A mutant
 # takes the place of the original file: TREE_REPLACES names the file and TREE_COPY is the mutant.
@@ -101,6 +113,7 @@ netlist_tree() {
   mkdir -p "$work"; : > "$log"
   while read -r file; do
     if [ -n "${TREE_REPLACES:-}" ] && [ "$file" = "$TREE_REPLACES" ]; then file="$TREE_COPY"; else file="$root/$file"; fi
+    if [ -n "${CONFIG_FILE:-}" ] && [ "$file" = "$root/src/common/src/config_pkg.vhd" ]; then file="$CONFIG_FILE"; fi
     ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
   done < <(cd "$root" && riscv-tools vhdl-sort $(find src -name '*.vhd' -not -path 'src/common/*' | sort) $(ls src/common/src/*.vhd | sort) | tr ' ' '\n')
   ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:3} "$1" > "$2.v" 2>> "$log" || { cat "$log" >&2; return 1; }
@@ -194,7 +207,7 @@ netlist "$trap" trap_unit trap_noea -gcheck_ea=false
 expect "no address check: causes 4 and 6 never occur (induction)"             PASS "$(prove trap_noea.v "$trap_props" prove 2 '-DCHECK_EA_OFF' trap_noea_safety)"
 netlist "$trap" trap_unit trap_off -gHAS_ZICCLSM=false
 expect "no Zicclsm: every misaligned access traps (induction)"                PASS "$(prove trap_off.v "$trap_props" prove 2 '-DZICCLSM_OFF' trap_zicclsm_off)"
-netlist "$trap" trap_unit trap_ext -grom_external=true -grom_end_kib=0 -gext_base_kib=524288 -gperiph_base_kib=1572864 -gram_base_kib=1048576 -gram_end_kib=1572864
+CONFIG_FILE="$(config_variant ext_flash)" netlist "$trap" trap_unit trap_ext
 expect "sdram map: misaligned in the flash and the SDRAM runs, elsewhere traps (induction)" PASS "$(prove trap_ext.v "$trap_props" prove 2 '-DZICCLSM_ON -DEXT_FLASH' trap_zicclsm_ext)"
 
 echo "trap_unit with an interrupt to take"
@@ -207,17 +220,6 @@ trap_af_gens="-ghas_access_faults=true"
 netlist "$trap" trap_unit trap_af "$trap_af_gens"
 expect "fetch fault is cause 1 with the PC and beats everything, a load or store the map refuses is cause 5 or 7 with the address, nothing else raises them (induction)" PASS "$(prove trap_af.v "$trap_af_props" prove 2 '' trap_af_safety)"
 expect "cover: causes 1, 5 and 7, a fetch fault over an illegal instruction and a misaligned load fault are reachable" PASS "$(prove trap_af.v "$trap_af_props" cover 2 '-DCOVER' trap_af_cover)"
-
-echo "counter64"
-cnt="$root/src/Zicntr/counter64.vhd"; cnt_props="$root/formal/counter64_props.sv"
-netlist "$cnt" counter64 cnt
-expect "the value shown is the ideal 64-bit counter, carry and writes (induction)" PASS "$(prove cnt.v "$cnt_props" prove 4 ''           cnt_safety)"
-expect "monotonic without a write (induction)"                                   PASS "$(prove cnt.v "$cnt_props" prove 4 '-DMONOTONIC' cnt_monotonic)"
-expect "cover: the carry between the halves is reachable"                        PASS "$(prove cnt.v "$cnt_props" cover 12 '-DCOVER'    cnt_cover)"
-for w in 1 20 32 33 63; do
-  netlist "$cnt" counter64 "cnt$w" "-gwidth=$w"
-  expect "width $w: the value shown is the ideal counter of that width, writes truncated (induction)" PASS "$(prove "cnt$w.v" "$cnt_props" prove 4 "-DWIDTH=$w" "cnt${w}_safety")"
-done
 
 echo "muldiv_fusion"
 fus="$root/src/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
@@ -444,7 +446,7 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inh
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (bool_to_sl(SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
@@ -455,7 +457,7 @@ mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d 
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_of_not_sticky "s/of_en     <= wrap or eventh_we;/of_en     <= eventh_we;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI    when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost "s/lcofip_we  <= ovf_irq or (csr_write_valid and bool_to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost "s/lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofie_ignored "s/lcofi_pend <= lcofip and lcofie;/lcofi_pend <= lcofip;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range  <= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
 
@@ -476,12 +478,6 @@ mutant "$fus" "$fus_props" muldiv_fusion '' fusion_same_op        "s/i_funct3 \/
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_no_check_cycle "s/hit   <= check_q and rec_valid/hit   <= rec_valid/" "" 10
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_record_on_start "0,/i_enable => i_done/s//i_enable => i_start/" "" 10
 
-mutant "$cnt" "$cnt_props" counter64 '' carry_lost        "s/lo = LO_ALL_ONES/lo(lo'high) = '1'/"
-mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=33' width_one_bit_wider "s/HI_WIDTH : natural := width - LO_WIDTH;/HI_WIDTH : natural := width - LO_WIDTH + 1;/" "-gwidth=33"
-mutant "$cnt" "$cnt_props" counter64 '' write_adds_one    "s/lo_nxt <= i_wdata(LO_WIDTH - 1 downto 0) when/lo_nxt <= std_logic_vector(unsigned(i_wdata(LO_WIDTH - 1 downto 0)) + 1) when/"
-mutant "$cnt" "$cnt_props" counter64 '' no_increment_idle "s/lo_en  <= i_we_lo or i_inc;/lo_en  <= i_we_lo;/"
-mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=33' wrap_without_hi "s/o_wrap      <= carry and hi_all_ones;/o_wrap      <= carry;/" "-gwidth=33"
-mutant "$cnt" "$cnt_props" counter64 '-DWIDTH=20' wrap_on_lo_write "s/lo_wrap_nxt <= '1' when (i_inc = '1' and i_we_lo = '0' and/lo_wrap_nxt <= '1' when (i_inc = '1' and/" "-gwidth=20"
 
 mutant "$zc" "$zc_props" zicond_unit '' zc_eqz_inverted   "s/(is_eqz and rs2_zero)/(is_eqz and not rs2_zero)/" "" 2
 mutant "$zc" "$zc_props" zicond_unit '' zc_nez_inverted   "s/(is_nez and not rs2_zero)/(is_nez and rs2_zero)/" "" 2

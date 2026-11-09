@@ -7,6 +7,8 @@ extensions: [I, M, Zicclsm, Zicsr, Zicntr, Zifencei]
 top: core
 generics: {has_m: true, has_zicclsm: true, has_zicsr: true, has_zicntr: true, has_zifencei: true}
 sources:
+  - src/common/src/utils_pkg.vhd
+  - src/common/src/config_pkg.vhd
   - src/shared/pipeline_types.vhd
   - src/shared/byte_mask_consts.vhd
   - src/shared/opcode_consts.vhd
@@ -35,7 +37,6 @@ sources:
   - src/common/src/mux_2x1.vhd
   - src/common/src/mux_4x1.vhd
   - src/common/src/flip_flop.vhd
-  - src/common/src/utils_pkg.vhd
   - src/I-E/alu.vhd
   - src/common/src/onehot_decoder.vhd
   - src/common/src/mux_tree.vhd
@@ -60,7 +61,7 @@ sources:
   - src/Zimop/zimop_decode.vhd
   - src/Zihintntl/zihintntl_decode.vhd
   - src/Zihintpause/zihintpause_decode.vhd
-  - src/Zicntr/counter64.vhd
+  - src/common/src/counter64.vhd
   - src/Zicntr/tick_divider.vhd
   - src/Zihpm/hpm_counter_bank.vhd
   - src/Zicsr/csr_file.vhd

@@ -91,6 +91,8 @@ Todos os identificadores de código devem ser escritos em **inglês**, enquanto 
 | Tipos e subtipos (`type`, `subtype`) | `snake_case` com sufixo `_t` | `word_t`, `reg_idx_t`, `alu_op_t`, `ctrl_bus_t` |
 | Sinais e variáveis internas | `snake_case` (prefixado pelo estágio quando aplicável) | `ex_alu_result`, `id_imm`, `wb_ram_raw` |
 | Rótulos de instância | Prefixo `u_` + `snake_case` | `u_alu`, `u_reg_file`, `u_pc_reg` |
+| Rótulos de generate | Prefixo `gen_` + `snake_case` | `gen_has_m`, `gen_lanes` |
+| Rótulos de processo | Prefixo `p_` + `snake_case`, obrigatório em todo processo e repetido em `end process` | `p_regs`, `p_next_state`, `p_sync_done` |
 
 ## 4. Cabeçalhos (Headers) e Docstrings em VHDL
 

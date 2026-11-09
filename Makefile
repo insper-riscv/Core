@@ -5,7 +5,7 @@ WDIR  := build/ghdl
 
 VHDL := $(shell find src -name '*.vhd' -not -path 'src/common/*' | sort) $(sort $(wildcard src/common/src/*.vhd))
 
-.PHONY: check profiles profile-matrix test formal paths clean
+.PHONY: check profiles profile-matrix configs test formal paths clean
 
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
@@ -43,12 +43,18 @@ FORMAL_ENGINE ?= bitwuzla
 formal:
 	FORMAL_ENGINE=$(FORMAL_ENGINE) bash formal/run.sh
 
+# One config_pkg for each variant of formal/configs.yaml, in build/configs/<variant>/config_pkg.vhd, which the
+# entries of tests/python/tests.json list in the place of the default package of src/common.
+CONFIGS := $(shell sed -n 's/^\([a-z_0-9]*\):.*/\1/p' formal/configs.yaml)
+configs:
+	@for c in $(CONFIGS); do bash formal/config_variant.sh $$c build/configs/$$c/config_pkg.vhd || exit 1; done
+
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
-test:
+test: configs
 	uv run python tests/python/runner.py $(TEST)
 
 # Every path the configuration lists exists, and the tree has the shape the Capstone defines (riscv-tools check-tree).
-paths:
+paths: configs
 	riscv-tools --root . check-paths --manifest paths.yaml
 	riscv-tools --root . check-tree --kind core
 

@@ -34,6 +34,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.byte_mask_consts.all;
 use work.opcode_consts.all;
@@ -47,27 +48,6 @@ entity trap_unit is
 		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
 		check_ea        : boolean := true;
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external    : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib    : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external    : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib    : natural := 1048576;
-		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		periph_base_kib : natural := 2097152;
 		-- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
 		ea_flags_external : boolean := false;
 		-- Gera as falhas de acesso 1 (busca), 5 (load) e 7 (store) a partir de i_fetch_ok, i_ea_rd_ok e i_ea_wr_ok; a de dados exige check_ea.
@@ -213,8 +193,8 @@ begin
 	-- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
 	-- constantes de potência de 2 viram testes de bits na síntese.
 	in_main_mem <= i_ea_main when ea_flags_external else
-	               '1' when (unsigned(i_ea) >= main_mem_base(rom_end_kib, ext_base_kib, rom_external, boot_memory_bits) and
-	                         unsigned(i_ea) < kib_to_addr(periph_base_kib))
+	               '1' when (unsigned(i_ea) >= main_mem_base and
+	                         unsigned(i_ea) < PERIPH_BASE)
 	               else '0';
 
 	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
@@ -225,7 +205,7 @@ begin
 	                         ((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH) and i_ea(1 downto 0) = BYTE_OFFSET_3)
 	                else '0';
 
-	last_word <= '1' when is_last_word(unsigned(i_ea), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib)
+	last_word <= '1' when is_last_word(unsigned(i_ea))
 	             else '0';
 
 	-- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal

@@ -89,7 +89,7 @@ Without `has_zicntr` the addresses of `mcycle`, `minstret`, `time`, their mirror
 
 | Proof | File | What it guarantees |
 | :--- | :--- | :--- |
-| `counter64` | `formal/counter64_props.sv` | The pair of halves is always the ideal 64-bit value, a write wins over the increment, the carry is never lost and the value does not decrease without a write (induction, cover) |
+| `counter64` | `formal/counter64_props.sv` of the Common-Components | The pair of halves is always the ideal 64-bit value, a write wins over the increment, the carry is never lost and the value does not decrease without a write (induction, cover) |
 | `csr_file` with Zicntr | `formal/csr_cntr_props.sv` | Values read from `mcycle`, `minstret` and mirrors, write per half, read-only mirrors and `time`, bits 0 and 2 of `mcountinhibit` and retirement cancellation (6-cycle BMC, cover) |
 
 The proof procedure is in [FORMAL.md](../../formal/FORMAL.md).

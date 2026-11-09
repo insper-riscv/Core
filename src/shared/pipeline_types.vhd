@@ -1,18 +1,17 @@
 -- =============================================================================
 -- Subtipos comuns de barramentos do pipeline RV32IM
 --
--- Centraliza as larguras padrão de palavras de dados, endereços de
--- registradores, códigos de operação da ULA/extensores, seletores de
--- write-back e máscaras de bytes utilizadas entre os estágios do pipeline.
+-- Centraliza as larguras de campos da instrução, códigos de operação da
+-- ULA/extensores, seletores de write-back e máscaras de bytes utilizadas entre
+-- os estágios do pipeline. A palavra de dados (word_t) e o índice de
+-- registrador (reg_t) vêm do config_pkg.
 -- =============================================================================
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.config_pkg.all;
 
 package pipeline_types is
-
-  -- Palavra de dados/instrução/endereço de 32 bits.
-  subtype word_t    is std_logic_vector(31 downto 0);
 
   -- Campo opcode da instrução RISC-V (bits [6:0], 7 bits).
   subtype opcode_t  is std_logic_vector(6 downto 0);
@@ -21,10 +20,8 @@ package pipeline_types is
   -- Campo funct7 da instrução RISC-V (bits [31:25], 7 bits).
   subtype funct7_t  is std_logic_vector(6 downto 0);
 
-  -- Índice de registrador de uso geral (x0 a x31, 5 bits).
-  subtype reg_t     is std_logic_vector(4 downto 0);
   -- Índice do registrador arquitetural x0 (sempre zero).
-  constant REG_ZERO : reg_t := "00000";
+  constant REG_ZERO : reg_t := (others => '0');
   
   -- Código de operação da ULA (5 bits).
   subtype alu_op_t  is std_logic_vector(4 downto 0);

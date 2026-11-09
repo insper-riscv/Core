@@ -7,7 +7,6 @@ tree:
     formal:
       core: [formal/core_trap_take_props.sv]
       alu: [formal/alu_props.sv]
-      counter64: []
       csr_file: [formal/csr_file_props.sv, formal/csr_cntr_props.sv, formal/csr_hpm_props.sv, formal/csr_irq_props.sv]
       muldiv_fusion: []
       trap_unit: []
@@ -42,7 +41,7 @@ provides:
   # component groups the packages of every folder, because the decoders and units of one folder read the constants of the others.
   # A component is a folder of src/, so the name of an extension keeps its capitals.
   constants:
-    requires: []
+    requires: [Common-Components/config]
     sources:
       - src/shared/pipeline_types.vhd
       - src/shared/byte_mask_consts.vhd
@@ -101,16 +100,15 @@ provides:
     sources:
       - src/Zicclsm/misaligned_unit.vhd
   Zicntr:
-    requires: [constants, Common-Components/registers]
+    requires: [constants, Common-Components/registers, Common-Components/counter64]
     sources:
-      - src/Zicntr/counter64.vhd
       - src/Zicntr/tick_divider.vhd
   Zihpm:
-    requires: [constants, Zicntr, Common-Components/registers, Common-Components/mux]
+    requires: [constants, Zicntr, Common-Components/registers, Common-Components/mux, Common-Components/counter64]
     sources:
       - src/Zihpm/hpm_counter_bank.vhd
   Zicsr:
-    requires: [constants, Zicntr, Zihpm, Common-Components/registers]
+    requires: [constants, Zicntr, Zihpm, Common-Components/registers, Common-Components/utils, Common-Components/counter64]
     sources:
       - src/Zicsr/csr_decode.vhd
       - src/Zicsr/csr_file.vhd

@@ -15,6 +15,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.fwd_consts.all;
@@ -57,28 +58,7 @@ entity stage_ex is
 		-- O CSR time espelha o mtime da plataforma (porta i_mtime) no lugar do contador próprio.
 		time_external   : boolean := false;
 		-- Gera a falha de acesso de instrução (causa 1) quando o PC da instrução em EX está fora das regiões executáveis; exige Zicsr.
-		has_access_faults : boolean := false;
-		-- Expoente do tamanho da BOOT_MEMORY: ela ocupa os endereços [0, 2**boot_memory_bits).
-		boot_memory_bits   : natural := 12;
-		-- Fim exclusivo, em KiB, da ROM, que começa logo depois da BOOT_MEMORY.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		rom_end_kib     : natural := 32;
-		-- A ROM é externa quando é alcançada pela porta do núcleo (o_ext_* ou a porta de instruções): a instrução sai pela porta de instruções e o dado pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		rom_external    : boolean := false;
-		-- Base, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_base_kib    : natural := 32;
-		-- Fim exclusivo, em KiB, da RAM.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ram_end_kib     : natural := 1048576;
-		-- A RAM é externa quando é alcançada pela porta do núcleo (o_ext_*): o dado sai pela porta externa, e a memória por trás pode ser externa ao chip ou uma memória interna atrás de cache.
-		ram_external    : boolean := false;
-		-- Base, em KiB, da janela externa: todo endereço a partir dela sai pela porta externa.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		ext_base_kib    : natural := 1048576;
-		-- Base, em KiB, da janela de periféricos: o fim da memória principal que o desalinhamento em hardware atende.
-		-- Endereço no mapa do Core (platform.yaml); as caches do Memory usam o da região da FLASH.
-		periph_base_kib : natural := 2097152
+		has_access_faults : boolean := false
 	);
 	port (
 		-- Vetor de eventos do SoC: o bit K vale '1' nos ciclos do evento de código K (contadores do Zihpm).
@@ -602,7 +582,7 @@ begin
 		sig_mret  <= '0';
 
 		-- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho da ULA.
-		fetch_ok <= '1' when (not has_access_faults) or addr_executable(unsigned(i_pc), rom_end_kib, ram_base_kib, ram_end_kib, ext_base_kib, periph_base_kib) else '0';
+		fetch_ok <= '1' when (not has_access_faults) or addr_executable(unsigned(i_pc)) else '0';
 
 		u_trap_unit : entity work.trap_unit
 			generic map (
@@ -638,15 +618,7 @@ begin
 		u_trap_detect : entity work.trap_unit
 			generic map (
 				has_zicclsm     => has_zicclsm,
-				check_ea        => true,
-				boot_memory_bits   => boot_memory_bits,
-				rom_end_kib     => rom_end_kib,
-				rom_external    => rom_external,
-				ram_base_kib    => ram_base_kib,
-				ram_end_kib     => ram_end_kib,
-				ram_external    => ram_external,
-				ext_base_kib    => ext_base_kib,
-				periph_base_kib => periph_base_kib
+				check_ea        => true
 			)
 			port map (
 				i_ex_valid    => i_valid,

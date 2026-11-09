@@ -23,17 +23,17 @@ Typical cases are a loader that copies a program into memory, code generation at
 
 ## 3. Where the Instruction Has Effect
 
-Only code fetched through the instruction cache is affected. The BOOT_MEMORY is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_MEMORY is external: it belongs to the external window from `ext_base_kib`, to a ROM flagged `rom_external`, or to a RAM flagged `ram_external`. The limits come from the generics described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+Only code fetched through the instruction cache is affected. The BOOT_MEMORY is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_MEMORY is external: it belongs to the external window from `EXT_BASE`, to a ROM flagged `ROM_EXTERNAL`, or to a RAM flagged `RAM_EXTERNAL`. The limits come from the constants described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
 | Fetch region | Goes through the instruction cache |
 | :--- | :--- |
 | BOOT_MEMORY | No |
-| ROM with `rom_external` false | No |
-| ROM with `rom_external` true | Yes |
-| RAM with `ram_external` true | Yes |
-| External window from `ext_base_kib` | Yes |
+| ROM with `ROM_EXTERNAL` false | No |
+| ROM with `ROM_EXTERNAL` true | Yes |
+| RAM with `RAM_EXTERNAL` true | Yes |
+| External window from `EXT_BASE` | Yes |
 
-In the default map (`rom_external` false) the ROM is internal and read directly, so only code written to the external window (from `0x40000000`) changes its result with `FENCE.I`. With an external ROM, `FENCE.I` also applies to code written to it.
+In the default map (`ROM_EXTERNAL` false) the ROM is internal and read directly, so only code written to the external window (from `0x40000000`) changes its result with `FENCE.I`. With an external ROM, `FENCE.I` also applies to code written to it.
 
 ## 4. Configuration
 

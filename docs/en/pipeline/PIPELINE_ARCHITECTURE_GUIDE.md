@@ -39,9 +39,9 @@ Instruction fetch address (`if_pc`) decoding uses the bounds from `src/shared/me
 
 | Address range (`if_pc`) | Selected region | Word delivered on `o_instr` |
 | :--- | :--- | :--- |
-| `< 0x00001000` (`boot_memory_bits`) | Boot memory | `i_boot_memory_data` |
+| `< 0x00001000` (`BOOT_MEMORY_BITS`) | Boot memory | `i_boot_memory_data` |
 | `0x00001000 .. 0x3FFFFFFF` | Flash memory (port 1) | `i_flash_data` |
-| `>= 0x40000000` (`ext_base_kib`) | External instruction cache (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (freezes the PC and clears `o_instr_valid` while `i_ic_ready = '0'`) |
+| `>= 0x40000000` (`EXT_BASE`) | External instruction cache (SDRAM, `o_ic_sel = '1'`) | `i_ic_data` (freezes the PC and clears `o_instr_valid` while `i_ic_ready = '0'`) |
 
 ### 2.2. Stage 2: Instruction Decode and Register Read (`stage_id`)
 
@@ -113,9 +113,9 @@ The MEM stage decodes the effective address `i_alu_out` using the bounds in `src
 
 | Address range (`i_alu_out`) | Triggered memory subsystem | Active signals |
 | :--- | :--- | :--- |
-| `< 0x00008000` (`rom_end_kib`) | Flash memory (port 2, read-only) | `o_flash_addr2`, `o_flash_rden2 = i_re_ram and i_valid` |
+| `< 0x00008000` (`ROM_END`) | Flash memory (port 2, read-only) | `o_flash_addr2`, `o_flash_rden2 = i_re_ram and i_valid` |
 | `0x00008000 .. 0x3FFFFFFF` | Internal RAM (1-cycle latency) | `o_ram_addr`, `o_ram_wdata`, `o_ram_byteena`, `o_ram_en`, `o_ram_wren`, `o_ram_rden` |
-| `>= 0x40000000` (`ext_base_kib`) | External SDRAM and peripheral bus | `o_ext_addr`, `o_ext_wdata`, `o_ext_byteena`, `o_ext_rden`, `o_ext_wren`, `o_ext_wait = sdram_access and (not i_ext_ready)` |
+| `>= 0x40000000` (`EXT_BASE`) | External SDRAM and peripheral bus | `o_ext_addr`, `o_ext_wdata`, `o_ext_byteena`, `o_ext_rden`, `o_ext_wren`, `o_ext_wait = sdram_access and (not i_ext_ready)` |
 
 ### 2.5. Stage 5: Write-Back (`stage_wb`)
 

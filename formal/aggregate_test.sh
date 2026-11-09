@@ -72,7 +72,7 @@ guard_case() {  # <wanted: warn|clean> <log line> <what the line shows> [engine]
     echo "WRONG guard: $3 (wanted $1, found '$found')"; failures=$((failures + 1))
   fi
 }
-guard_case warn  '/w/src/Zicntr/counter64.vhd:3:8:warning: entity "counter64" was also defined in file [-Wlibrary]' "a warning of GHDL" bitwuzla guard.ghdl.log
+guard_case warn  '/w/src/common/src/counter64.vhd:3:8:warning: entity "counter64" was also defined in file [-Wlibrary]' "a warning of GHDL" bitwuzla guard.ghdl.log
 guard_case warn  'src/common/src/mux_tree.vhd:9:9:warning: no assignment for offsets 0:0 of signal "mux_levels"' "an injected warning of GHDL"
 guard_case warn  'SBY 12:00:01 [mut_x] base: Warning: Wire props.\x is used but has no driver.' "a warning of Yosys in the log of SymbiYosys"
 guard_case warn  'WARNING: something' "the word in capitals"
