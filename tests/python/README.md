@@ -39,7 +39,7 @@ Cada chave de `tests/python/tests.json` define um alvo de teste com os seguintes
 | `toplevel` | Nome da entidade VHDL sob teste (por exemplo, `alu`, `reg_file`, `core`) |
 | `sources` | Lista de arquivos VHDL necessários, relativos à raiz do repositório e em ordem de dependência de compilação |
 | `test_module` | Módulo Python contendo os testes `@cocotb.test()` |
-| `parameters` | Dicionário opcional de generics passados ao simulador na elaboração (por exemplo, `{"has_m": false, "has_zifencei": true}`) |
+| `parameters` | Dicionário opcional de generics passados ao simulador na elaboração (por exemplo, `{"tick_cycles": 4, "hpm_counters": 4}`); as extensões não são generics, e a entrada escolhe o `config_pkg` na lista `sources` (`build/configs/<variante>/config_pkg.vhd`, variantes de `formal/configs.yaml`) |
 | `build_args` / `test_args` | Argumentos adicionais repassados ao GHDL (por exemplo, `["--std=08"]`) |
 | `skip` | Booleano opcional; quando `true`, omite o alvo na execução completa sem filtro |
 

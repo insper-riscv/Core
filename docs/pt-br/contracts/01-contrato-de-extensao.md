@@ -4,9 +4,9 @@
 
 A especificação RISC-V define a semântica arquitetural de cada instrução (opcodes, campos `funct3`/`funct7` e efeito nos registradores). O contrato de extensão define como o hardware de uma extensão (`M/`, `Zicsr/`, `Zifencei/`) se conecta aos estágios do pipeline (`core/`) sem acoplar a lógica base (`common/` e `I/`) aos detalhes internos de cada extensão.
 
-Cada extensão reside em sua própria pasta e é habilitada no topo `src/core/core.vhd` por um generic booleano (`has_m`, `has_zmmul`, `has_zicsr`, `has_zifencei`, `has_zicond`, `has_dcache`). Quando o generic correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
+Cada extensão reside em sua própria pasta e é habilitada no topo `src/core/core.vhd` por uma constante booleana do `config_pkg` (`HAS_M`, `HAS_ZMMUL`, `HAS_ZICSR`, `HAS_ZIFENCEI`, `HAS_ZICOND`, `HAS_DCACHE`). Quando a constante correspondente vale `false`, as instruções daquela extensão comportam-se como `NOP` (sem escrita em registrador, sem acesso à memória e sem parada do pipeline).
 
-Os estágios instanciam as unidades de cada extensão diretamente por `entity work`, sem declaração `component`. Por isso todo perfil analisa os arquivos de todas as extensões, e o generic em `false` retira a unidade da elaboração.
+Os estágios instanciam as unidades de cada extensão diretamente por `entity work`, sem declaração `component`. Por isso todo perfil analisa os arquivos de todas as extensões, e a constante em `false` retira a unidade da elaboração.
 
 ## 2. Regras de Integração no Pipeline
 
@@ -57,7 +57,7 @@ A unidade `multdiv` encapsula o multiplicador de Booth radix-2 (`booth_multiplie
 
 ### 3.2. Extensão Zicsr e Exceções (`src/Zicsr/csr_file.vhd` e `src/Zicsr/trap_unit.vhd`)
 
-O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade de traps operam no estágio EX:
+O perfil `rv32im_zicsr` habilita `HAS_ZICSR = true`. O banco de CSRs e a unidade de traps operam no estágio EX:
 
 | Aspecto | Especificação |
 | :--- | :--- |
@@ -66,18 +66,18 @@ O perfil `rv32im_zicsr` habilita `has_zicsr = true`. O banco de CSRs e a unidade
 | Operando de escrita | `ex_fwd_rs1_val` para instruções por registrador (`i_funct3(2) = '0'`) ou o índice `i_rs1_idx` estendido com zero para 32 bits nas formas imediatas (`i_funct3(2) = '1'`) |
 | Hazard load-use | A `hazard_detection_unit` inclui `OPCODE_SYSTEM` entre os leitores de `rs1`, inserindo 1 ciclo de stall quando precedido por um load para o mesmo registrador |
 | Acesso ilegal | `csr_file` asserta `o_illegal = '1'` para endereços CSR não implementados ou tentativas de escrita efetiva em CSRs somente leitura (`i_addr[11:10] = "11"`) |
-| `misa` | Lê RV32I, mais a extensão M (bit 12) quando `has_m = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
-| Interrupções | Com `has_interrupts = true`, `mip` espelha as portas `i_irq_software`, `i_irq_timer` e `i_irq_external`, `mie` guarda os bits 3, 7 e 11 e a `trap_unit` toma a interrupção de maior prioridade (externa, software, timer) sobre a instrução em EX quando `mstatus.MIE`, o bit de `mie` e o de `mip` valem `1` (ver [Zicsr](../ISA/Zicsr/description.md)); sem o generic, `mie` e `mip` leem zero e ignoram escritas |
-| Não implementados | Os contadores `cycle`, `time` e `instret` existem só com `has_zicntr = true`, e sem ele o acesso é um acesso CSR ilegal |
+| `misa` | Lê RV32I, mais a extensão M (bit 12) quando `HAS_M = true`; a Zmmul não tem bit próprio; escritas são ignoradas |
+| Interrupções | Com `HAS_INTERRUPTS = true`, `mip` espelha as portas `i_irq_software`, `i_irq_timer` e `i_irq_external`, `mie` guarda os bits 3, 7 e 11 e a `trap_unit` toma a interrupção de maior prioridade (externa, software, timer) sobre a instrução em EX quando `mstatus.MIE`, o bit de `mie` e o de `mip` valem `1` (ver [Zicsr](../ISA/Zicsr/description.md)); sem a constante, `mie` e `mip` leem zero e ignoram escritas |
+| Não implementados | Os contadores `cycle`, `time` e `instret` existem só com `HAS_ZICNTR = true`, e sem ele o acesso é um acesso CSR ilegal |
 
-Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `has_zicsr = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `has_zicsr` não há unidade de traps, e um encoding indefinido executa como `NOP`:
+Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução, com prioridade de cima para baixo). As causas 4 e 6 saem da instância do estágio MEM quando `HAS_ZICSR = true`, um ciclo depois das demais, e valem sobre a instrução que está em EX. A `control_unit` sinaliza um encoding indefinido no estágio ID, o `m_decode` retira o sinal das instruções M, e o sinal chega a EX pelo `reg_id_ex`. Sem `HAS_ZICSR` não há unidade de traps, e um encoding indefinido executa como `NOP`:
 
 | Código (`o_cause`) | Exceção | Valor gravado em `mtval` (`o_tval`) |
 | ---: | :--- | :--- |
 | `0` | Endereço-alvo de branch ou salto tomado com bits `[1:0] /= "00"` | Endereço-alvo desalinhado (`i_cf_target`) |
-| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um, encoding comprimido ou `FENCE.I` com `has_zifencei = false`) | `0x00000000` |
+| `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um, encoding comprimido ou `FENCE.I` com `HAS_ZIFENCEI = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
-| `4` | Endereço efetivo de Load desalinhado que o hardware não executa: fora da memória principal (flash e periféricos), com as duas palavras em regiões diferentes (RAM interna e SDRAM), ou qualquer load desalinhado com `has_zicclsm = false` | Endereço efetivo (`i_ea`) |
+| `4` | Endereço efetivo de Load desalinhado que o hardware não executa: fora da memória principal (flash e periféricos), com as duas palavras em regiões diferentes (RAM interna e SDRAM), ou qualquer load desalinhado com `HAS_ZICCLSM = false` | Endereço efetivo (`i_ea`) |
 | `6` | Endereço efetivo de Store desalinhado que o hardware não executa, nas mesmas condições da causa 4 | Endereço efetivo (`i_ea`) |
 | `11` | Chamada de ambiente do modo máquina (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
@@ -90,10 +90,10 @@ Registradores CSR implementados no modo máquina:
 | Endereço | Nome | Acesso | Valor de Reset | Máscara / Campos implementados |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Leitura e escrita | `0x00001800` | `MPP` (bits `[12:11]`) fixo em `"11"`; bits `MIE` (bit 3) e `MPIE` (bit 7) graváveis |
-| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `has_e` verdadeiro a base é a `E` e o valor é `0x40001010` |
-| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `has_interrupts`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem o generic, todos fixos em zero |
-| `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | `BASE` nos bits `[31:2]` e `MODE` no bit 0, que só grava com `has_interrupts` (vetorado); o bit 1 é fixo em `0`. No modo vetorado os bits `[5:2]` de `BASE` leem zero |
-| `0x723` a `0x73F` | `mhpmevent3h` a `mhpmevent31h` | Leitura e escrita | `0x00000000` | Só com `has_sscofpmf`: `OF` (bit 31) e `MINH` (bit 30) do contador de mesmo índice; sem o generic o endereço é inexistente. O bit 13 de `mie` e de `mip` é `LCOFIE` e `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
+| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `IS_BASE_E` verdadeiro a base é a `E` e o valor é `0x40001010` |
+| `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `HAS_INTERRUPTS`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem a constante, todos fixos em zero |
+| `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | `BASE` nos bits `[31:2]` e `MODE` no bit 0, que só grava com `HAS_INTERRUPTS` (vetorado); o bit 1 é fixo em `0`. No modo vetorado os bits `[5:2]` de `BASE` leem zero |
+| `0x723` a `0x73F` | `mhpmevent3h` a `mhpmevent31h` | Leitura e escrita | `0x00000000` | Só com `HAS_SSCOFPMF`: `OF` (bit 31) e `MINH` (bit 30) do contador de mesmo índice; sem a constante o endereço é inexistente. O bit 13 de `mie` e de `mip` é `LCOFIE` e `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
 | `0x310` | `mstatush` | Leitura e escrita | `0x00000000` | Todos os bits fixos em zero |
 | `0x340`, `0x342`, `0x343` | `mscratch`, `mcause`, `mtval` | Leitura e escrita | `0x00000000` | 32 bits completos |
 | `0x341` | `mepc` | Leitura e escrita | `0x00000000` | Bits `[1:0]` fixos em `"00"` |
@@ -101,13 +101,13 @@ Registradores CSR implementados no modo máquina:
 
 ### 3.3. Extensão Zifencei (`src/Zifencei/fencei_unit.vhd`)
 
-O perfil `rv32im_zicsr_zifencei` habilita `has_zifencei = true`:
+O perfil `rv32im_zicsr_zifencei` habilita `HAS_ZIFENCEI = true`:
 
 | Aspecto | Comportamento |
 | :--- | :--- |
 | Busca de instruções em SDRAM (`>= 0x40000000`) | O estágio IF asserta `o_ic_sel = '1'` e lê `i_ic_data`. Enquanto `i_ic_ready = '0'`, o PC permanece congelado e `o_instr_valid = '0'` injeta bolhas em `reg_if_id`, enquanto EX, MEM e WB continuam avançando |
-| Execução de `FENCE.I` sem D-cache (`has_dcache = false`) | Quando `FENCE.I` está válida em EX e `i_base_run = '1'`, `o_take` pulsa por 1 ciclo, acionando `o_ic_inval = '1'`, limpando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$ |
-| Execução de `FENCE.I` com D-cache write-back (`has_dcache = true`) | A unidade retém a instrução em EX por um ciclo, para que os stores anteriores deixem MEM e cheguem à cache, emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que a cache pode levantar no próprio ciclo do pulso em `o_dc_flush` ou em qualquer ciclo depois, momento em que pulsa `o_take = '1'` e invalida a I-cache |
+| Execução de `FENCE.I` sem D-cache (`HAS_DCACHE = false`) | Quando `FENCE.I` está válida em EX e `i_base_run = '1'`, `o_take` pulsa por 1 ciclo, acionando `o_ic_inval = '1'`, limpando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$ |
+| Execução de `FENCE.I` com D-cache write-back (`HAS_DCACHE = true`) | A unidade retém a instrução em EX por um ciclo, para que os stores anteriores deixem MEM e cheguem à cache, emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que a cache pode levantar no próprio ciclo do pulso em `o_dc_flush` ou em qualquer ciclo depois, momento em que pulsa `o_take = '1'` e invalida a I-cache |
 
 ---
 

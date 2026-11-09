@@ -23,9 +23,9 @@
 --                    | hardware não executa                    |
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
 --          1         | Falha de acesso de instrução (busca fora   | i_pc
---                    | de região executável, com has_access_faults)|
+--                    | de região executável, com HAS_ACCESS_FAULTS)|
 --          5         | Falha de acesso de load (endereço fora do  | i_ea
---                    | mapa válido, com has_access_faults)        |
+--                    | mapa válido, com HAS_ACCESS_FAULTS)        |
 --          7         | Falha de acesso de store (fora do mapa ou  | i_ea
 --                    | em região só de leitura)                   |
 --   0x80000003, 7, B | Interrupção de software, timer, externa | 0x00000000
@@ -44,14 +44,10 @@ use work.trap_consts.all;
 
 entity trap_unit is
 	generic (
-		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' faz todo desalinhado gerar trap.
-		has_zicclsm     : boolean := true;
 		-- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o conhece.
 		check_ea        : boolean := true;
 		-- A classificação do endereço efetivo (memória principal e mesma região das duas palavras) vem registrada pelas portas i_ea_main e i_ea_same_region, em vez de ser decodificada de i_ea.
-		ea_flags_external : boolean := false;
-		-- Gera as falhas de acesso 1 (busca), 5 (load) e 7 (store) a partir de i_fetch_ok, i_ea_rd_ok e i_ea_wr_ok; a de dados exige check_ea.
-		has_access_faults : boolean := false
+		ea_flags_external : boolean := false
 	);
 	port (
 		-- Indica que há uma instrução válida no estágio EX.
@@ -63,9 +59,9 @@ entity trap_unit is
 		-- Campo funct3 (bits [14:12]) da instrução no estágio EX.
 		i_funct3      : in  funct3_t;
 		-- Endereço do registrador destino rd (bits [11:7]) no estágio EX.
-		i_rd_idx      : in  reg_t;
+		i_rd_idx      : in  reg_field_t;
 		-- Endereço do registrador fonte rs1 (bits [19:15]) no estágio EX.
-		i_rs1_idx     : in  reg_t;
+		i_rs1_idx     : in  reg_field_t;
 		-- Campo imediato de 12 bits (bits [31:20] da instrução) no estágio EX.
 		i_imm12       : in  std_logic_vector(11 downto 0);
 		-- Endereço efetivo de memória calculado pela ULA no estágio EX.
@@ -74,13 +70,13 @@ entity trap_unit is
 		i_ea_main        : in  std_logic := '0';
 		-- As duas palavras de um acesso que cruza estão na mesma região da memória principal (com ea_flags_external).
 		i_ea_same_region : in  std_logic := '0';
-		-- A busca da instrução em EX veio de região executável do mapa ('0' gera a causa 1 com has_access_faults).
+		-- A busca da instrução em EX veio de região executável do mapa ('0' gera a causa 1 com HAS_ACCESS_FAULTS).
 		i_fetch_ok    : in  std_logic := '1';
 		-- PC da instrução em EX (mtval da falha de acesso de instrução).
 		i_pc          : in  word_t    := (others => '0');
-		-- O endereço efetivo aceita leitura no mapa (um load com '0' gera a causa 5 com has_access_faults).
+		-- O endereço efetivo aceita leitura no mapa (um load com '0' gera a causa 5 com HAS_ACCESS_FAULTS).
 		i_ea_rd_ok    : in  std_logic := '1';
-		-- O endereço efetivo aceita escrita no mapa (um store com '0' gera a causa 7 com has_access_faults).
+		-- O endereço efetivo aceita escrita no mapa (um store com '0' gera a causa 7 com HAS_ACCESS_FAULTS).
 		i_ea_wr_ok    : in  std_logic := '1';
 		-- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
 		i_cf_taken    : in  std_logic;
@@ -197,7 +193,7 @@ begin
 	                         unsigned(i_ea) < PERIPH_BASE)
 	               else '0';
 
-	misal_in_word <= '1' when (has_zicclsm and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
+	misal_in_word <= '1' when (HAS_ZICCLSM and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
 	                           (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU or i_funct3 = FUNCT3_SH))
 	                 else '0';
 
@@ -213,7 +209,7 @@ begin
 	same_region <= i_ea_same_region when ea_flags_external else (in_main_mem and (not last_word));
 
 	misal_exec <= '1' when (misal_in_word = '1' or
-	                        (has_zicclsm and crosses_word = '1' and same_region = '1' and
+	                        (HAS_ZICCLSM and crosses_word = '1' and same_region = '1' and
 	                         (i_opcode = OPCODE_LOAD or i_opcode = OPCODE_STORE)))
 	              else '0';
 
@@ -223,9 +219,9 @@ begin
 	-- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do manual,
 	-- que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele executa
 	-- só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
-	ld_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and ld_misal = '0') else '0';
-	st_fault <= '1' when (has_access_faults and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and st_misal = '0') else '0';
-	fetch_fault <= '1' when (has_access_faults and i_fetch_ok = '0') else '0';
+	ld_fault <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and ld_misal = '0') else '0';
+	st_fault <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and st_misal = '0') else '0';
+	fetch_fault <= '1' when (HAS_ACCESS_FAULTS and i_fetch_ok = '0') else '0';
 
 	any_illegal <= i_illegal or sys_illegal or (is_csr and i_csr_illegal);
 

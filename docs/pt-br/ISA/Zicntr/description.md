@@ -12,13 +12,13 @@ Este documento descreve como o Core implementa os contadores básicos `cycle`, `
 
 ## 2. Generics
 
-| Generic | Entidade | Padrão | Efeito |
+| Parâmetro | Entidade | Padrão | Efeito |
 | :--- | :--- | :--- | :--- |
-| `has_zicntr` | `core` | `false` | Instancia `mcycle`, `minstret` e `time` com seus espelhos, e o registrador `mcountinhibit`; exige `has_zicsr` |
+| `HAS_ZICNTR` | `core` | `false` | Instancia `mcycle`, `minstret` e `time` com seus espelhos, e o registrador `mcountinhibit`; exige `HAS_ZICSR` |
 | `tick_cycles` | `core` | 50 | Ciclos de clock por tick do `time` (50 dá 1 MHz a 50 MHz) |
 | `time_external` | `core` | `false` | O `time` espelha o `mtime` da porta `i_mtime` (o CLINT) no lugar do contador próprio |
 
-A elaboração falha se `has_zicntr` for ligado sem `has_zicsr`. O Zicntr independe do Zihpm.
+A elaboração falha se `HAS_ZICNTR` for ligado sem `HAS_ZICSR`. O Zicntr independe do Zihpm.
 
 ## 3. Bloco contador de 64 bits
 
@@ -48,7 +48,7 @@ Há 3 contadores de 64 bits. O Core não implementa `mcounteren`, e o acesso a e
 | `minstret` | `0xB02` | `0xB82` | `instret` em `0xC02` e `0xC82` | A cada instrução retirada, um ciclo depois da retirada, salvo inibição ou cancelamento | Sim, em cada metade |
 | `time` | `0xC01` | `0xC81` | Só existe a forma de leitura | A cada tick do divisor, sem inibição | Não |
 
-Os endereços `0xB01` e `0xB81` não existem, e o `time` não tem forma de máquina. Escrever efetivamente em `cycle`, `instret` ou `time` é acesso ilegal (`mcause = 2`). Sem `has_zicntr` os endereços de contador são inexistentes e o acesso é ilegal.
+Os endereços `0xB01` e `0xB81` não existem, e o `time` não tem forma de máquina. Escrever efetivamente em `cycle`, `instret` ou `time` é acesso ilegal (`mcause = 2`). Sem `HAS_ZICNTR` os endereços de contador são inexistentes e o acesso é ilegal.
 
 ### 4.2. Retirada de instruções
 
@@ -71,19 +71,19 @@ Sem `time_external`, o `time` deriva do clock do próprio Core, e a resolução 
 
 ## 5. `mcountinhibit`
 
-O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita. O registrador existe quando há `has_zicntr` ou `has_zihpm`, e os bits de contadores de eventos estão em [Zihpm](../Zihpm/description.md).
+O registrador `mcountinhibit` fica em `0x320`. Seus bits que aceitam escrita dependem do que o perfil inclui, e os demais leem zero e ignoram escrita. O registrador existe quando há `HAS_ZICNTR` ou `HAS_ZIHPM`, e os bits de contadores de eventos estão em [Zihpm](../Zihpm/description.md).
 
 | Bit | Inibe | Existe quando |
 | :--- | :--- | :--- |
-| 0 | `mcycle` | `has_zicntr` |
+| 0 | `mcycle` | `HAS_ZICNTR` |
 | 1 | Nada (o `time` não é inibível) | Nunca |
-| 2 | `minstret` | `has_zicntr` |
+| 2 | `minstret` | `HAS_ZICNTR` |
 
 Um contador inibido mantém o valor e continua legível e gravável. A inibição de `minstret` também suspende a soma da retirada pendente que a leitura mostra.
 
 ## 6. Endereço inexistente
 
-Sem `has_zicntr` os endereços de `mcycle`, `minstret`, `time`, seus espelhos e `mcountinhibit` (quando não há contador de eventos) são inexistentes. Ler ou escrever neles sinaliza acesso CSR ilegal, que o Core trata como exceção de instrução ilegal (`mcause = 2`). Não há valor constante de retorno. O mesmo vale para a escrita efetiva em `cycle`, `instret` e `time`.
+Sem `HAS_ZICNTR` os endereços de `mcycle`, `minstret`, `time`, seus espelhos e `mcountinhibit` (quando não há contador de eventos) são inexistentes. Ler ou escrever neles sinaliza acesso CSR ilegal, que o Core trata como exceção de instrução ilegal (`mcause = 2`). Não há valor constante de retorno. O mesmo vale para a escrita efetiva em `cycle`, `instret` e `time`.
 
 ## 7. Verificação formal
 

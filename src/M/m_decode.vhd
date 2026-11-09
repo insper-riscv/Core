@@ -3,7 +3,7 @@
 --
 -- Identifica no estágio ID as instruções R-type pertencentes à extensão M
 -- (opcode = OPCODE_OP e funct7 = FUNCT7_MULDIV: MUL, MULH, MULHSU, MULHU,
--- DIV, DIVU, REM, REMU). Com has_div = false (extensão Zmmul) só as quatro
+-- DIV, DIVU, REM, REMU). Com HAS_M falso (extensão Zmmul) só as quatro
 -- multiplicações (funct3(2) = '0') são reivindicadas; DIV, DIVU, REM e REMU
 -- ficam sem dono e a unidade de controle as trata como ilegais. Ativa os sinais de controle necessários:
 --   - o_is_muldiv  = '1' (seleciona o resultado da unidade multdiv no estágio EX)
@@ -19,10 +19,6 @@ use work.opcode_consts.all;
 use work.funct7_consts.all;
 
 entity m_decode is
-	generic (
-		-- Reivindica também as divisões e restos (extensão M completa); '0' deixa só a Zmmul.
-		has_div : boolean := true
-	);
 	port (
 		-- Instrução de 32 bits presente no estágio ID.
 		i_instr      : in  word_t;
@@ -45,11 +41,11 @@ architecture rtl of m_decode is
 
 	-- Sinal interno que indica reivindicação da instrução pela extensão M.
 	signal is_m_instr : std_logic;
-	-- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com has_div).
+	-- Indica que o funct3 está entre os que esta configuração implementa (multiplicações sempre; divisões só com HAS_M).
 	signal is_claimed_funct3 : std_logic;
 begin
 
-	is_claimed_funct3 <= '1' when (has_div or funct3(2) = '0') else '0';
+	is_claimed_funct3 <= '1' when (HAS_M or funct3(2) = '0') else '0';
 
 	is_m_instr <= '1' when (opcode = OPCODE_OP and funct7 = FUNCT7_MULDIV and is_claimed_funct3 = '1') else '0';
 

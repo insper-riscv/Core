@@ -3,14 +3,14 @@
 --
 -- Executa a instrução FENCE.I (opcode OPCODE_MISC_MEM, funct3 FUNCT3_FENCE_I)
 -- no estágio EX do pipeline:
---   1. Com cache de dados (has_dcache = true): retém a instrução em EX por um
+--   1. Com cache de dados (HAS_DCACHE = true): retém a instrução em EX por um
 --      ciclo, para que os stores anteriores deixem o estágio MEM e cheguem ao
 --      cache, e então solicita o flush da cache de dados (o_flush_req = '1' por
 --      um ciclo). A instrução fica retida (o_busy = '1') até receber a
 --      confirmação de conclusão (i_dc_done = '1'), que pode vir no ciclo do
 --      pulso (cache que responde combinacionalmente) ou em qualquer ciclo
 --      depois dele.
---   2. Ao concluir (ou imediatamente quando has_dcache = false), garante
+--   2. Ao concluir (ou imediatamente quando HAS_DCACHE = false), garante
 --      o_take = '1' por um ciclo para que o core invalide a cache de instruções,
 --      esvazie os estágios IF/ID e ID/EX e redirecione o PC para PC + 4.
 --
@@ -21,15 +21,12 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
 
 entity fencei_unit is
-	generic (
-		-- Indica a presença de cache de dados write-back que exige flush antes de invalidar I-cache.
-		has_dcache : boolean := false
-	);
 	port (
 		-- Sinal de clock do sistema.
 		i_clk       : in  std_logic;
@@ -73,7 +70,7 @@ begin
 
 	is_fencei <= '1' when (i_ex_valid = '1' and i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
 
-	gen_dc : if has_dcache generate
+	gen_dc : if HAS_DCACHE generate
 
 		-- Ciclo de chegada: o FENCE.I está em EX com o pipeline avançando e nada pedido ainda. O store
 		-- logo atrás dele ainda está em MEM neste ciclo e só chega à cache na borda seguinte.

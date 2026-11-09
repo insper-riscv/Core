@@ -16,6 +16,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
+use work.utils_pkg.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
@@ -23,8 +24,6 @@ use work.mem_map_consts.all;
 entity reg_ex_mem is
 
 	generic (
-		-- Gera as falhas de acesso (causas 1, 5 e 7) fora das regiões válidas do mapa; exige Zicsr.
-		has_access_faults : boolean := false;
 		-- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
 		periph_slots    : std_logic_vector(7 downto 0) := (others => '1')
 	);
@@ -53,7 +52,7 @@ entity reg_ex_mem is
 		-- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
 		i_byte_mask  : in  byte_mask_t;
 		-- Endereço do registrador destino rd.
-		i_rd         : in  reg_t;
+		i_rd         : in  reg_field_t;
 		-- Habilita escrita no banco de registradores no estágio WB.
 		i_we_reg     : in  std_logic;
 		-- Habilita escrita na memória de dados no estágio MEM.
@@ -75,7 +74,7 @@ entity reg_ex_mem is
 		-- Máscara de bytes registrada para o estágio MEM.
 		o_byte_mask  : out byte_mask_t;
 		-- Endereço de rd registrado para o estágio MEM (e Forwarding Unit).
-		o_rd         : out reg_t;
+		o_rd         : out reg_field_t;
 		-- Habilitação de escrita em registrador registrada para o estágio MEM.
 		o_we_reg     : out std_logic;
 		-- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
@@ -102,9 +101,9 @@ entity reg_ex_mem is
 		o_in_main    : out std_logic;
 		-- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
 		o_same_region : out std_logic;
-		-- O endereço registrado aceita leitura no mapa (sempre '1' sem has_access_faults).
+		-- O endereço registrado aceita leitura no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
 		o_ok_rd       : out std_logic;
-		-- O endereço registrado aceita escrita no mapa (sempre '1' sem has_access_faults).
+		-- O endereço registrado aceita escrita no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
 		o_ok_wr       : out std_logic
 	);
 
@@ -125,7 +124,7 @@ architecture rtl of reg_ex_mem is
 	-- Máscara de bytes armazenada.
 	signal r_byte_mask  : byte_mask_t  := (others => '0');
 	-- Endereço de rd armazenado.
-	signal r_rd         : reg_t        := (others => '0');
+	signal r_rd         : reg_field_t        := (others => '0');
 	-- Habilitação de escrita em registrador armazenada.
 	signal r_we_reg     : std_logic    := '0';
 	-- Validade e escrita em registrador armazenadas juntas.
@@ -166,6 +165,10 @@ architecture rtl of reg_ex_mem is
 	-- Entrada de r_ok_wr, decodificada do resultado da ULA.
 	signal in_ok_wr     : std_logic;
 
+	-- Slots do barramento de periféricos que aceitam acesso: os ocupados (periph_slots) com os periféricos estritos
+	-- (STRICT_PERIPH), todos sem eles, e então um slot sem periférico responde como os demais e não gera falha.
+	constant ACCEPTED_SLOTS : std_logic_vector(7 downto 0) := periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH));
+
 begin
 
 	-- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o endereço.
@@ -176,12 +179,12 @@ begin
 	in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
 	-- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir o bit.
-	gen_faults : if has_access_faults generate
-		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), periph_slots) else '0';
-		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), periph_slots) else '0';
+	gen_faults : if HAS_ACCESS_FAULTS generate
+		in_ok_rd <= '1' when addr_readable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
+		in_ok_wr <= '1' when addr_writable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
 	end generate gen_faults;
 
-	gen_no_faults : if not has_access_faults generate
+	gen_no_faults : if not HAS_ACCESS_FAULTS generate
 		in_ok_rd <= '1';
 		in_ok_wr <= '1';
 	end generate gen_no_faults;

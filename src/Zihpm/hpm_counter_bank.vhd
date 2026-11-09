@@ -18,7 +18,7 @@
 -- escrita, e hpm_width igual a 0 deixa o banco sem nenhum contador real. Os bits
 -- de um contador acima de hpm_width leem zero.
 --
--- Com has_sscofpmf = true (extensão Sscofpmf) cada contador ganha também a metade alta do seletor (mhpmeventNh) com
+-- Com HAS_SSCOFPMF = true (extensão Sscofpmf) cada contador ganha também a metade alta do seletor (mhpmeventNh) com
 -- dois bits: OF (bit 31, estouro, que pega quando o contador estoura e só a escrita do programa limpa) e MINH (bit 30,
 -- inibe a contagem no modo máquina, o único que o núcleo tem). Quando um contador estoura com OF em '0' o banco
 -- pulsa o_ovf_irq (o pedido de interrupção de estouro) e o OF passa a '1'; com OF em '1' o estouro não pede nada, de
@@ -41,8 +41,6 @@ entity hpm_counter_bank is
 		hpm_counters : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
 		-- Largura em bits de cada contador (0 deixa o banco sem contadores reais).
 		hpm_width    : natural range 0 to 64 := 64;
-		-- Habilita a extensão Sscofpmf: os bits OF e MINH de cada seletor (mhpmeventNh) e o pedido de interrupção de estouro.
-		has_sscofpmf : boolean := false;
 		-- A leitura sai de um registrador: o_rdata mostra, um ciclo depois, o valor do endereço dado em i_idx e nos seletores (a leitura dos 29 contadores sai do caminho combinacional do núcleo).
 		registered_read : boolean := false
 	);
@@ -59,7 +57,7 @@ entity hpm_counter_bank is
 		i_sel_inhibit : in  std_logic;
 		-- O acesso é à faixa dos seletores de evento mhpmeventN.
 		i_sel_event   : in  std_logic;
-		-- O acesso é à faixa das metades altas dos seletores de evento (mhpmeventNh), só com has_sscofpmf.
+		-- O acesso é à faixa das metades altas dos seletores de evento (mhpmeventNh), só com HAS_SSCOFPMF.
 		i_sel_eventh  : in  std_logic := '0';
 		-- O acesso é à faixa das metades baixas (mhpmcounterN ou hpmcounterN).
 		i_sel_lo      : in  std_logic;
@@ -71,7 +69,7 @@ entity hpm_counter_bank is
 		i_wdata       : in  word_t;
 		-- Valor lido do registrador selecionado (zero se não for do banco).
 		o_rdata       : out word_t;
-		-- Pedido de interrupção de estouro: algum contador estourou com o bit OF em '0' (sempre '0' sem has_sscofpmf).
+		-- Pedido de interrupção de estouro: algum contador estourou com o bit OF em '0' (sempre '0' sem HAS_SSCOFPMF).
 		o_ovf_irq     : out std_logic
 	);
 end entity hpm_counter_bank;
@@ -229,7 +227,7 @@ begin
 					o_wrap  => wrap
 				);
 
-			gen_sscofpmf : if has_sscofpmf generate
+			gen_sscofpmf : if HAS_SSCOF generate
 				eventh_we <= i_we and i_sel_eventh and hit;
 				of_d      <= wrap or i_wdata(31);
 				of_en     <= wrap or eventh_we;
@@ -257,7 +255,7 @@ begin
 				eventh_rows(n) <= (31 => of_q, 30 => minh_q, others => '0');
 			end generate gen_sscofpmf;
 
-			gen_no_sscofpmf : if not has_sscofpmf generate
+			gen_no_sscofpmf : if not HAS_SSCOF generate
 				eventh_we      <= '0';
 				of_d           <= '0';
 				of_en          <= '0';

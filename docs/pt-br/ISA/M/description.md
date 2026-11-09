@@ -12,13 +12,13 @@ Este documento descreve como o Core executa as instruções da `M`. O que o manu
 
 ## 2. Configuração
 
-O genérico `has_m` do `core` escolhe o que é instanciado.
+O constante `HAS_M` do `core` escolhe o que é instanciado.
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_m` | `false` | Instancia o decodificador, o multiplicador e o divisor (8 instruções) |
+| `HAS_M` | `false` | Instancia o decodificador, o multiplicador e o divisor (8 instruções) |
 
-O decodificador e a unidade de execução são gerados quando `has_m` ou `has_zmmul` vale `true`, e o divisor só quando `has_m` vale `true`. Assim, `has_m` já inclui a multiplicação, e o perfil sem divisão usa só o genérico `has_zmmul`, descrito em [Zmmul](../Zmmul/description.md). Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
+O decodificador e a unidade de execução são gerados quando `HAS_M` ou `HAS_ZMMUL` vale `true`, e o divisor só quando `HAS_M` vale `true`. Assim, `HAS_M` já inclui a multiplicação, e o perfil sem divisão usa só a constante `HAS_ZMMUL`, descrito em [Zmmul](../Zmmul/description.md). Os perfis válidos nunca combinam as duas extensões (ver o [README](../../../../README.md)).
 
 ## 3. Estrutura
 
@@ -40,7 +40,7 @@ O decodificador reivindica a instrução quando o `opcode` é o de operações e
 | Escrita em `rd` | `1` | O resultado é gravado no banco de registradores |
 | Operando A | `rs1` | O primeiro operando vem de `rs1` |
 
-O parâmetro de divisão do decodificador recebe o valor de `has_m`. Sem divisão (perfil `Zmmul`), só os `funct3` com o bit 2 em zero são reivindicados, ou seja, as quatro multiplicações.
+O parâmetro de divisão do decodificador recebe o valor de `HAS_M`. Sem divisão (perfil `Zmmul`), só os `funct3` com o bit 2 em zero são reivindicados, ou seja, as quatro multiplicações.
 
 ### 4.1. Instruções Desligadas
 

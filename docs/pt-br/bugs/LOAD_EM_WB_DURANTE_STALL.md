@@ -9,7 +9,7 @@ Enquanto a unidade de multiplicação e divisão (M) calcula, o pipeline inteiro
 | Sintoma | O destino de um load guarda a palavra do load seguinte depois de um `mul`, `div` ou `rem` |
 | Condição | Dois loads seguidos da RAM interna ou da porta 2 da flash, seguidos de uma instrução M que não depende do segundo load |
 | Correção | WB repete o dado do seu primeiro ciclo enquanto é segurado |
-| Teste | `CoreLoadStall`, um teste de núcleo com `has_m = true` e modelos síncronos de RAM e flash |
+| Teste | `CoreLoadStall`, um teste de núcleo com `HAS_M = true` e modelos síncronos de RAM e flash |
 
 ## 2. Como o Dado de um Load Chega a WB
 

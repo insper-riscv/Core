@@ -109,7 +109,7 @@ A property that keeps a model of a register of the unit outside it cannot be pro
 | Proof | Registers connected | Property by induction |
 | :--- | :--- | :--- |
 | `csri_safety` | mask bits of `mie`, `mstatus.MIE` and `MPIE`, BASE and MODE of `mtvec` | `mip` reads the three lines at positions 3, 7 and 11, `mie` keeps only those bits, a write to `mip` changes nothing, `o_irq_pending` is lines and mask, `o_irq_take` needs `mstatus.MIE`, the cause has the priority external, software, timer, and `mtvec` keeps BASE and MODE |
-| `csrio_safety` | the same | without `has_interrupts` the lines are ignored and `mip` and `mie` read zero |
+| `csrio_safety` | the same | without `HAS_INTERRUPTS` the lines are ignored and `mip` and `mie` read zero |
 
 The entry itself is proven by `stage_ex_irq_props.sv` and `trap_unit_props.sv` (both by induction): `mepc` is the address of the aborted instruction, `mcause` carries the cause and the line, `MIE` goes to 0 and `MPIE` to 1, the next PC is BASE or the vector, and the interrupt wins over every exception and `MRET`. The restore of `MIE` by `MRET` is proven by induction in `csr_mstatus`. The proofs of the counters (`csr_cntr_props.sv`, `csr_hpm_props.sv`) and of the fusion stay bounded, and the reason is in the comments of each file.
 

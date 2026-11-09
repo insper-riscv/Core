@@ -12,11 +12,11 @@ This document describes how the Core executes the 40 `Zimop` instructions. What 
 
 ## 2. Configuration
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_zimop` | `false` | Instantiates the decoder in the ID stage and executes `mop.r.n` and `mop.rr.n` |
+| `HAS_ZIMOP` | `false` | Instantiates the decoder in the ID stage and executes `mop.r.n` and `mop.rr.n` |
 
-With `has_zimop = false` the decoder is absent from the elaboration and the 40 encodings follow the path of any unsupported `SYSTEM` instruction. With `has_zicsr = true` this raises an illegal-instruction exception (cause 2), and without `has_zicsr` the exception signal of the core goes high. The rest of the core does not change with the extension on or off.
+With `HAS_ZIMOP = false` the decoder is absent from the elaboration and the 40 encodings follow the path of any unsupported `SYSTEM` instruction. With `HAS_ZICSR = true` this raises an illegal-instruction exception (cause 2), and without `HAS_ZICSR` the exception signal of the core goes high. The rest of the core does not change with the extension on or off.
 
 ## 3. Decoding in the ID Stage
 

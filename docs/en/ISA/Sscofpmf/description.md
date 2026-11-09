@@ -10,13 +10,13 @@ This document describes how the Core implements the Sscofpmf extension (count ov
 | Source | Volume II of the RISC-V manual (privileged ISA, version 20260120), sections 3.1.9, 3.1.10 and 14.1 |
 | Conformance of the Core with the privileged volume | `docs/conformance/riscv-privilegiado.md` of Insper-RISC-V |
 
-## 2. Generic
+## 2. Parameters
 
-| Generic | Entity | Default | Effect |
+| Parameter | Entity | Default | Effect |
 | :--- | :--- | :--- | :--- |
-| `has_sscofpmf` | `core` | `false` | Turns the extension on; needs `has_zihpm` and `has_interrupts` |
+| `HAS_SSCOFPMF` | `core` | `false` | Turns the extension on; needs `HAS_ZIHPM` and `HAS_INTERRUPTS` |
 
-Elaboration fails if `has_sscofpmf` is on without the other two. The platform profile turns the extension on with `extras: [Sscofpmf]` in `platform.yaml`, which `riscv-tools` turns into `HAS_SSCOFPMF` in the VHDL package of the memory map. The extension is not part of the profile matrix of the Core, like the machine interrupts.
+Elaboration fails if `HAS_SSCOFPMF` is on without the other two. The platform profile turns the extension on with `extras: [Sscofpmf]` in `platform.yaml`, which `riscv-tools` turns into `HAS_SSCOFPMF` in the VHDL package of the memory map. The extension is not part of the profile matrix of the Core, like the machine interrupts.
 
 ## 3. What the extension adds
 
@@ -58,7 +58,7 @@ The counter overflows only through an increment: `mcountinhibit` and `MINH` stop
 | `hpm_counter_bank` | Keeps `OF` and `MINH` per counter, applies `MINH` to the counting and gathers the request in `o_ovf_irq` |
 | `csr_file` | Decodes `mhpmeventKh`, keeps `LCOFIP` and `LCOFIE`, and joins the request to `o_irq_pending`, `o_irq_take` and `o_irq_cause` |
 
-With `has_sscofpmf = false` the `csr_file` fixes `LCOFIP` and `LCOFIE` at zero, the `0x720` range is nonexistent and the bank does not instantiate `OF` or `MINH`.
+With `HAS_SSCOFPMF = false` the `csr_file` fixes `LCOFIP` and `LCOFIE` at zero, the `0x720` range is nonexistent and the bank does not instantiate `OF` or `MINH`.
 
 ## 7. Verification
 

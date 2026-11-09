@@ -12,9 +12,9 @@ This document describes how the Core executes the `pause` hint. The encoding is 
 
 ## 2. Configuration
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_zihintpause` | `false` | Instantiates in the ID stage the decoder that recognizes `pause` |
+| `HAS_ZIHINTPAUSE` | `false` | Instantiates in the ID stage the decoder that recognizes `pause` |
 
 The `pause` word is a valid `FENCE`, so the core executes it as a `nop` with the generic on or off. When on, the ID stage identifies it as a hint and disables the write to `rd`.
 

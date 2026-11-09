@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-With has_e = true the core is an RV32E: x0 to x15 work, and an
+With IS_BASE_E = true the core is an RV32E: x0 to x15 work, and an
 instruction that uses x16 to x31 as rd, rs1 or rs2 traps with mcause 2
 and has no effect. The misa register announces the E base (bit 4) in
 place of the I base (bit 8).

@@ -12,11 +12,11 @@ Este documento descreve como o Core executa as instruções da `Zicond`. O que o
 
 ## 2. Configuração
 
-| Genérico | Padrão | Efeito |
+| Constante | Padrão | Efeito |
 | :--- | :--- | :--- |
-| `has_zicond` | `false` | Instancia o decodificador no estágio ID e a unidade de execução no estágio EX |
+| `HAS_ZICOND` | `false` | Instancia o decodificador no estágio ID e a unidade de execução no estágio EX |
 
-Com `has_zicond = false`, as duas codificações não são reivindicadas por nenhum decodificador, e a unidade de controle as marca como instruções ilegais, como qualquer codificação fora do RV32I. O perfil `rv32im_zicond` liga o genérico para a compilação no GHDL.
+Com `HAS_ZICOND = false`, as duas codificações não são reivindicadas por nenhum decodificador, e a unidade de controle as marca como instruções ilegais, como qualquer codificação fora do RV32I. O perfil `rv32im_zicond` liga a constante para a compilação no GHDL.
 
 ## 3. Decodificação no Estágio ID
 
@@ -56,8 +56,8 @@ O resultado entra no multiplexador de resultado do estágio EX, que o escolhe qu
 | :--- | :--- |
 | Teste de entidade do decodificador | As duas codificações, a independência dos campos de registrador e as codificações vizinhas que não são reivindicadas |
 | Teste de entidade da unidade de execução | A tabela de verdade, cada um dos 32 bits de `rs1` e de `rs2`, operandos pseudoaleatórios e os códigos de operação da ULA que não são reivindicados |
-| Teste do núcleo com `has_zicond` | `rs2` igual e diferente de zero, `rd` igual a `rs1`, `rd` igual a `x0`, `rs1` igual a `x0`, `rs1` e `rs2` no mesmo registrador e o adiantamento do operando e do resultado |
-| Teste do núcleo sem `has_zicond` | As duas instruções geram a exceção de instrução ilegal (causa 2) |
+| Teste do núcleo com `HAS_ZICOND` | `rs2` igual e diferente de zero, `rd` igual a `rs1`, `rd` igual a `x0`, `rs1` igual a `x0`, `rs1` e `rs2` no mesmo registrador e o adiantamento do operando e do resultado |
+| Teste do núcleo sem `HAS_ZICOND` | As duas instruções geram a exceção de instrução ilegal (causa 2) |
 | Provas formais | A semântica da tabela da seção 2 de [instructions.md](instructions.md) e a exatidão da codificação reivindicada, cada propriedade com mutantes do VHDL que precisam ser pegos |
 
 ---

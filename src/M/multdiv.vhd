@@ -2,7 +2,7 @@
 -- Unidade integrada de multiplicação e divisão inteira (Extensão RV32M)
 --
 -- Coordena a execução das 8 instruções da extensão M no estágio EX (com
--- has_div = false, só as 4 multiplicações da extensão Zmmul, sem o divisor):
+-- HAS_M falso, só as 4 multiplicações da extensão Zmmul, sem o divisor):
 --   - Multiplicação (33 ciclos via booth_multiplier_rv32):
 --     MUL (32 bits baixos), MULH (32 bits altos signed x signed),
 --     MULHSU (32 bits altos signed x unsigned) e MULHU (32 bits altos unsigned x unsigned).
@@ -41,10 +41,6 @@ use work.funct3_consts.all;
 use work.muldiv_consts.all;
 
 entity multdiv is
-	generic (
-		-- Instancia o divisor (extensão M completa); '0' deixa só a multiplicação (Zmmul).
-		has_div     : boolean := true
-	);
 	port (
 		-- Sinal de clock do sistema.
 		i_clk       : in  std_logic;
@@ -258,7 +254,7 @@ begin
 		);
 
 	-- Instância única do divisor não-restaurador de 32 bits (atende signed e unsigned).
-	gen_divider : if has_div generate
+	gen_divider : if HAS_M generate
 		u_divider : entity work.non_restoring_divider_rv32
 			port map (
 				i_clk         => i_clk,

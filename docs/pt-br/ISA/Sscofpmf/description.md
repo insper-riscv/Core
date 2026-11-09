@@ -10,13 +10,13 @@ Este documento descreve como o Core implementa a extensão Sscofpmf (estouro de 
 | Fonte | Volume II do manual do RISC-V (ISA privilegiada, versão 20260120), seções 3.1.9, 3.1.10 e 14.1 |
 | Conformidade do Core com o volume privilegiado | `docs/conformance/riscv-privilegiado.md` do Insper-RISC-V |
 
-## 2. Generic
+## 2. Parameters
 
-| Generic | Entidade | Padrão | Efeito |
+| Parâmetro | Entidade | Padrão | Efeito |
 | :--- | :--- | :--- | :--- |
-| `has_sscofpmf` | `core` | `false` | Liga a extensão; exige `has_zihpm` e `has_interrupts` |
+| `HAS_SSCOFPMF` | `core` | `false` | Liga a extensão; exige `HAS_ZIHPM` e `HAS_INTERRUPTS` |
 
-A elaboração falha se `has_sscofpmf` for ligado sem os outros dois. O perfil da plataforma liga a extensão pelo `extras: [Sscofpmf]` do `platform.yaml`, que o `riscv-tools` traduz em `HAS_SSCOFPMF` no pacote VHDL do mapa de memória. A extensão não faz parte da matriz de perfis do Core, como as interrupções de máquina.
+A elaboração falha se `HAS_SSCOFPMF` for ligado sem os outros dois. O perfil da plataforma liga a extensão pelo `extras: [Sscofpmf]` do `platform.yaml`, que o `riscv-tools` traduz em `HAS_SSCOFPMF` no pacote VHDL do mapa de memória. A extensão não faz parte da matriz de perfis do Core, como as interrupções de máquina.
 
 ## 3. O que a extensão acrescenta
 
@@ -58,7 +58,7 @@ O contador estoura de verdade só por uma soma: `mcountinhibit` e `MINH` impedem
 | `hpm_counter_bank` | Guarda `OF` e `MINH` por contador, aplica `MINH` à contagem e agrega o pedido em `o_ovf_irq` |
 | `csr_file` | Decodifica `mhpmeventKh`, guarda `LCOFIP` e `LCOFIE`, e junta o pedido ao `o_irq_pending`, ao `o_irq_take` e ao `o_irq_cause` |
 
-Com `has_sscofpmf = false` o `csr_file` fixa `LCOFIP` e `LCOFIE` em zero, a faixa `0x720` é inexistente e o banco não instancia `OF` nem `MINH`.
+Com `HAS_SSCOFPMF = false` o `csr_file` fixa `LCOFIP` e `LCOFIE` em zero, a faixa `0x720` é inexistente e o banco não instancia `OF` nem `MINH`.
 
 ## 7. Verificação
 

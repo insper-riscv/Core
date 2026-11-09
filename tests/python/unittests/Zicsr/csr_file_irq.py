@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-csr_file with has_interrupts: mip mirrors the three interrupt lines
+csr_file with HAS_INTERRUPTS: mip mirrors the three interrupt lines
 and is read-only, mie keeps the bits 3, 7 and 11, and the pending
 output is the lines under the mask. The generic comes from the entry
 of tests.json.

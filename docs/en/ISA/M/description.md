@@ -12,13 +12,13 @@ This document describes how the Core executes the `M` instructions. What the man
 
 ## 2. Configuration
 
-The `has_m` generic of `core` chooses what is instantiated.
+The `HAS_M` constant of the `config_pkg` chooses what is instantiated.
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_m` | `false` | Instantiates the decoder, the multiplier and the divider (8 instructions) |
+| `HAS_M` | `false` | Instantiates the decoder, the multiplier and the divider (8 instructions) |
 
-The decoder and the execution unit are generated when `has_m` or `has_zmmul` is `true`, and the divider only when `has_m` is `true`. So `has_m` already includes multiplication, and the profile without division uses only the `has_zmmul` generic, described in [Zmmul](../Zmmul/description.md). Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
+The decoder and the execution unit are generated when `HAS_M` or `HAS_ZMMUL` is `true`, and the divider only when `HAS_M` is `true`. So `HAS_M` already includes multiplication, and the profile without division uses only the `HAS_ZMMUL` constant, described in [Zmmul](../Zmmul/description.md). Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
 
 ## 3. Structure
 
@@ -40,7 +40,7 @@ The decoder claims the instruction when the `opcode` is the register-register on
 | Write to `rd` | `1` | The result is written to the register file |
 | Operand A | `rs1` | The first operand comes from `rs1` |
 
-The decoder division parameter takes the value of `has_m`. Without division (`Zmmul` profile), only the `funct3` values with bit 2 at zero are claimed, that is, the four multiplications.
+The decoder division parameter takes the value of `HAS_M`. Without division (`Zmmul` profile), only the `funct3` values with bit 2 at zero are claimed, that is, the four multiplications.
 
 ### 4.1. Disabled Instructions
 

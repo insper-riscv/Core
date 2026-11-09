@@ -54,6 +54,29 @@ expect() {
   esac
 }
 
+# resolve_gens <name> [ghdl generics]: separates the constants of the config_pkg (-ghas_*, -gstrict_periph and -gbase_e, the names the
+# core had as generics) from the generics that remain. CFG_FILE gets the config_pkg of the
+# unit (CONFIG_FILE, or the default one, with those constants set, written in the output folder) and GEN_FLAGS the flags
+# for GHDL.
+resolve_gens() {
+  local name="$1" flag key sets=""
+  shift
+  GEN_FLAGS=""
+  for flag in "$@"; do
+    key="${flag#-g}"; key="${key%%=*}"
+    case "${key,,}" in
+      has_e|base_e) sets="$sets IS_BASE_E=${flag#*=}" ;;
+      has_*|strict_periph) sets="$sets ${key^^}=${flag#*=}" ;;
+      *) GEN_FLAGS="$GEN_FLAGS $flag" ;;
+    esac
+  done
+  CFG_FILE="${CONFIG_FILE:-$root/src/common/src/config_pkg.vhd}"
+  if [ -n "$sets" ]; then
+    CONFIG_BASE="$CFG_FILE" bash "$root/formal/config_variant.sh" --set "$sets" "$out/cfg_$name.vhd" >&2
+    CFG_FILE="$out/cfg_$name.vhd"
+  fi
+}
+
 # netlist <vhdl> <entity> <name> [ghdl generics]: the Verilog netlist GHDL synthesizes for the entity, with the
 # bank of event counters of BANK_FILE (the real one by default). The mutant takes the place of the original unit in
 # the analysis order: REPLACES names the file the mutant stands for, and the file under proof ($1) is analyzed in
@@ -61,9 +84,10 @@ expect() {
 netlist() {
   local work="$out/work_$3" replaces="${REPLACES:-}" log="$out/$3.ghdl.log" file replaced=0 files=()
   mkdir -p "$work"; : > "$log"
+  resolve_gens "$3" ${@:4}
   for file in \
     "$root/src/common/src/utils_pkg.vhd" \
-    "${CONFIG_FILE:-$root/src/common/src/config_pkg.vhd}" \
+    "$CFG_FILE" \
     "$root/src/shared/pipeline_types.vhd" \
     "$root/src/shared/byte_mask_consts.vhd" \
     "$root/src/shared/opcode_consts.vhd" \
@@ -94,7 +118,7 @@ netlist() {
   for file in "${files[@]}"; do
     ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
   done
-  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:4} "$2" > "$3.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  ghdl --synth --std=08 --workdir="$work" --out=verilog $GEN_FLAGS "$2" > "$3.v" 2>> "$log" || { cat "$log" >&2; return 1; }
   scan_warnings "$log"
 }
 
@@ -111,12 +135,13 @@ config_variant() {
 netlist_tree() {
   local work="$out/work_$2" log="$out/$2.ghdl.log" file
   mkdir -p "$work"; : > "$log"
+  resolve_gens "$2" ${@:3}
   while read -r file; do
     if [ -n "${TREE_REPLACES:-}" ] && [ "$file" = "$TREE_REPLACES" ]; then file="$TREE_COPY"; else file="$root/$file"; fi
-    if [ -n "${CONFIG_FILE:-}" ] && [ "$file" = "$root/src/common/src/config_pkg.vhd" ]; then file="$CONFIG_FILE"; fi
+    if [ "$file" = "$root/src/common/src/config_pkg.vhd" ]; then file="$CFG_FILE"; fi
     ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
   done < <(cd "$root" && riscv-tools vhdl-sort $(find src -name '*.vhd' -not -path 'src/common/*' | sort) $(ls src/common/src/*.vhd | sort) | tr ' ' '\n')
-  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:3} "$1" > "$2.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  ghdl --synth --std=08 --workdir="$work" --out=verilog $GEN_FLAGS "$1" > "$2.v" 2>> "$log" || { cat "$log" >&2; return 1; }
   scan_warnings "$log"
 }
 
@@ -221,6 +246,16 @@ netlist "$trap" trap_unit trap_af "$trap_af_gens"
 expect "fetch fault is cause 1 with the PC and beats everything, a load or store the map refuses is cause 5 or 7 with the address, nothing else raises them (induction)" PASS "$(prove trap_af.v "$trap_af_props" prove 2 '' trap_af_safety)"
 expect "cover: causes 1, 5 and 7, a fetch fault over an illegal instruction and a misaligned load fault are reachable" PASS "$(prove trap_af.v "$trap_af_props" cover 2 '-DCOVER' trap_af_cover)"
 
+echo "reg_ex_mem validity flags on the window of the peripherals"
+exmem="$root/src/shared/reg_ex_mem.vhd"; exmem_props="$root/formal/exmem_periph_props.sv"
+exmem_gens="-ghas_access_faults=true -gperiph_slots=00001001"
+CONFIG_FILE="$(config_variant faults_map)" netlist "$exmem" reg_ex_mem exmem "$exmem_gens"
+expect "strict peripherals: a slot without a peripheral refuses read and write, the occupied slots, the RAM and the ROM follow the map, a bubble refuses nothing (bounded, 6 cycles)" PASS "$(prove exmem.v "$exmem_props" bmc 6 '' exmem_safety)"
+expect "cover: an occupied slot, a refused slot, the RAM, a hole and a bubble are reachable" PASS "$(prove exmem.v "$exmem_props" cover 6 '-DCOVER' exmem_cover)"
+CONFIG_FILE="$(config_variant faults_map)" netlist "$exmem" reg_ex_mem exmem_loose "$exmem_gens -gstrict_periph=false"
+expect "STRICT_PERIPH false: every slot of the window accepts read and write (bounded, 6 cycles)" PASS "$(prove exmem_loose.v "$exmem_props" bmc 6 '-DLOOSE' exmem_loose_safety)"
+expect "cover: with STRICT_PERIPH false a slot without a peripheral is accepted" PASS "$(prove exmem_loose.v "$exmem_props" cover 6 '-DLOOSE -DCOVER' exmem_loose_cover)"
+
 echo "muldiv_fusion"
 fus="$root/src/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
 netlist "$fus" muldiv_fusion fus
@@ -323,11 +358,13 @@ core_file="$root/src/core/core.vhd"; core_props="$root/formal/core_trap_take_pro
 core_netlist() {
   local work="$out/work_$1" log="$out/$1.ghdl.log" file name="$1"
   mkdir -p "$work"; : > "$log"
+  resolve_gens "$1" ${@:2}
   while read -r file; do
     [ "$root/$file" = "$core_file" ] && [ -n "${CORE_FILE:-}" ] && file="$CORE_FILE" || file="$root/$file"
+    [ "$file" = "$root/src/common/src/config_pkg.vhd" ] && file="$CFG_FILE"
     ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
   done < <(sed -n 's/^  - //p' "$root/profiles/rv32im_zicsr.yaml" | grep '\.vhd$')
-  ghdl --synth --std=08 --workdir="$work" --out=verilog ${@:2} core > "$name.v" 2>> "$log" || { cat "$log" >&2; return 1; }
+  ghdl --synth --std=08 --workdir="$work" --out=verilog $GEN_FLAGS core > "$name.v" 2>> "$log" || { cat "$log" >&2; return 1; }
   scan_warnings "$log"
 }
 core_netlist core_take -ghas_zicsr=true
@@ -376,7 +413,7 @@ PROBES="$irq_probes"
 mutant "$csr" "$csr_irq_props" csr_file '' irq_take_ignores_mie "s/o_irq_take    <= mstatus_mie when/o_irq_take    <= '1' when/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_software_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_SOFTWARE when irq_pend_vec(IRQ_IDX_SOFTWARE) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_timer_first "s/CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/CAUSE_IRQ_TIMER when irq_pend_vec(IRQ_IDX_TIMER) = '1' else CAUSE_IRQ_EXTERNAL when irq_pend_vec(IRQ_IDX_EXTERNAL) = '1' else/" "-ghas_interrupts=true" 6
-mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_mode_lost "s/mtvec_mode_nxt <= new_value(0) when has_interrupts else '0';/mtvec_mode_nxt <= '0';/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_mode_lost "s/mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';/mtvec_mode_nxt <= '0';/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_unaligned_vector "s/(others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2)/new_value(5 downto 2)/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_mtvec_mode_without_interrupts "s/mtvec_mode <= '0';/mtvec_mode <= i_wdata(0);/" "-ghas_interrupts=false" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_bit1_reads_mode "s/mtvec_reg(31 downto 2) \& '0' \& mtvec_mode;/mtvec_reg(31 downto 2) \& mtvec_mode \& mtvec_mode;/" "-ghas_interrupts=true" 6
@@ -446,7 +483,7 @@ mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inh
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(HAS_SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
@@ -468,7 +505,7 @@ mutant "$csr" "$csr_irq_props" csr_file '' irq_pending_unmasked "s/irq_pend_vec 
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_write_lost "s/i_enable => irq_en_we,/i_enable => '0',/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_bit_moved "s/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_TIMER);/irq_en_nxt(IRQ_IDX_TIMER)    <= new_value(IRQ_BIT_EXTERNAL);/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mie_read_wrong_bit "s/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_TIMER),/IRQ_BIT_TIMER    => irq_en_reg(IRQ_IDX_SOFTWARE),/" "-ghas_interrupts=true" 6
-mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_ports_not_gated "s/when has_interrupts else (others => '0');/when true else (others => '0');/" "-ghas_interrupts=false" 6
+mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_ports_not_gated "s/when HAS_INTERRUPTS else (others => '0');/when true else (others => '0');/" "-ghas_interrupts=false" 6
 PROBES=""
 
 mutant "$fus" "$fus_props" muldiv_fusion '' fusion_ignores_b      "s/(i_a = rec_a and i_b = rec_b)/(i_a = rec_a)/" "" 10
@@ -508,6 +545,8 @@ core_mutant() {  # <name> <sed expression> <mode: bmc|cover> <defines>
 core_mutant take_always "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
 core_mutant take_never  "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
 core_mutant take_with_retire "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
+CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_slots_ignored "s/periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH))/(others => '1')/" "$exmem_gens" 6
+CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_strict_inverted "s/to_sl(not STRICT_PERIPH)/to_sl(STRICT_PERIPH)/" "$exmem_gens" 6
 mutant "$alu" "$alu_props" alu '' alu_sra_fill_ignored   "s/shift_fill   <= op_inv and i_a(data_width-1);/shift_fill   <= '0';/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_slt_wrong_bit      "s/else sum_ext(data_width-1);/else sum_ext(data_width);/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_jalr_keeps_bit0    "s/(sum_ext(0) and not is_jalr)/sum_ext(0)/" "" 2

@@ -5,7 +5,8 @@
 profile: rv32im
 extensions: [I, M]
 top: core
-generics: {has_m: true, has_zicclsm: false}
+config: {HAS_ZICCLSM: false}
+generics: {}
 sources:
   - src/common/src/utils_pkg.vhd
   - src/common/src/config_pkg.vhd

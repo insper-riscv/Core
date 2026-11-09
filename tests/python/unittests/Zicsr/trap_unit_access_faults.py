@@ -1,6 +1,6 @@
 """Testes do modulo.
 
-trap_unit com has_access_faults: a busca fora de região executável gera
+trap_unit com HAS_ACCESS_FAULTS: a busca fora de região executável gera
 a causa 1 (mtval = PC), o load que o mapa não aceita ler gera a causa 5
 e o store que o mapa não aceita escrever gera a causa 7 (mtval =
 endereço efetivo). Prioridade da Tabela 17: a falha de busca vem antes

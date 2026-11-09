@@ -12,9 +12,9 @@ This document describes how the Core executes the four `Zihintntl` hints. The en
 
 ## 2. Configuration
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_zihintntl` | `false` | Instantiates in the ID stage the decoder that recognizes the four hints |
+| `HAS_ZIHINTNTL` | `false` | Instantiates in the ID stage the decoder that recognizes the four hints |
 
 A hint is a valid `ADD` to `x0`, so the core executes it as a `nop` with the generic on or off. The difference is that, when on, the ID stage identifies the word as a hint and disables the write to `rd`, so no destination register reaches the following stages.
 

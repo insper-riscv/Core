@@ -9,7 +9,7 @@ While the multiply and divide unit (M) computes, the whole pipeline stalls and t
 | Symptom | The destination of a load holds the word of the next load after an `mul`, `div` or `rem` |
 | Condition | Two loads in a row from the internal RAM or from flash port 2, followed by an M instruction that does not depend on the second load |
 | Fix | WB repeats the datum of its first cycle while it is held |
-| Test | `CoreLoadStall`, a core test with `has_m = true` and synchronous RAM and flash models |
+| Test | `CoreLoadStall`, a core test with `HAS_M = true` and synchronous RAM and flash models |
 
 ## 2. How the Data of a Load Reaches WB
 

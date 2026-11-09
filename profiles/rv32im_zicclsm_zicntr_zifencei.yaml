@@ -5,7 +5,8 @@
 profile: rv32im_zicclsm_zicntr_zifencei
 extensions: [I, M, Zicclsm, Zicsr, Zicntr, Zifencei]
 top: core
-generics: {has_m: true, has_zicclsm: true, has_zicsr: true, has_zicntr: true, has_zifencei: true}
+config: {HAS_ZICSR: true, HAS_ZICNTR: true, HAS_ZIFENCEI: true}
+generics: {}
 sources:
   - src/common/src/utils_pkg.vhd
   - src/common/src/config_pkg.vhd

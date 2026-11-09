@@ -12,19 +12,19 @@ This document describes how the Core implements the Zihpm event counters. What t
 
 ## 2. Generics
 
-| Generic | Entity | Default | Effect |
+| Parameter | Entity | Default | Effect |
 | :--- | :--- | :--- | :--- |
-| `has_zihpm` | `core` | `false` | Turns the extension on: the 29 addresses of each range exist; requires `has_zicsr` |
+| `HAS_ZIHPM` | `core` | `false` | Turns the extension on: the 29 addresses of each range exist; requires `HAS_ZICSR` |
 | `hpm_counters` | `core` | 29 | Number of real counters, from 0 to 29, at indices 3 to $2+$`hpm_counters` |
 | `hpm_width` | `core` | 64 | Width in bits of each real counter, from 0 to 64 |
 
-Elaboration fails if `has_zihpm` is on without `has_zicsr`. Zihpm is independent of Zicntr and works without it. The two parameters for count and width belong to the profile manifest, and the value of `hpm_counters` and `hpm_width` of each profile comes from there.
+Elaboration fails if `HAS_ZIHPM` is on without `HAS_ZICSR`. Zihpm is independent of Zicntr and works without it. The two parameters for count and width belong to the profile manifest, and the value of `hpm_counters` and `hpm_width` of each profile comes from there.
 
 With `hpm_width` equal to 0 no index has a real counter, as if `hpm_counters` were 0.
 
 ## 3. Organization
 
-With `has_zihpm`, the Core defines the 29 indices from 3 to 31 in five ranges of 32 addresses. Index $K$ is the base address of the range plus $K$.
+With `HAS_ZIHPM`, the Core defines the 29 indices from 3 to 31 in five ranges of 32 addresses. Index $K$ is the base address of the range plus $K$.
 
 | CSR | Range | Write |
 | :--- | :--- | :--- |
@@ -79,7 +79,7 @@ Event 9 counts the fusion of multiply or divide pairs (for example `MULH` follow
 
 ## 7. `mcountinhibit`
 
-The `mcountinhibit` register sits at `0x320`, and the bits of `mcycle` and `minstret` are in [Zicntr](../Zicntr/description.md). The register exists with `has_zicntr` or `has_zihpm`.
+The `mcountinhibit` register sits at `0x320`, and the bits of `mcycle` and `minstret` are in [Zicntr](../Zicntr/description.md). The register exists with `HAS_ZICNTR` or `HAS_ZIHPM`.
 
 | Bit | Inhibits | Exists when |
 | :--- | :--- | :--- |

@@ -12,15 +12,15 @@ This document describes how the Core executes the `Zmmul` instructions. What the
 
 ## 2. Configuration
 
-| Generic | Default | Effect |
+| Constant | Default | Effect |
 | :--- | :--- | :--- |
-| `has_zmmul` | `false` | Instantiates the decoder and the multiplier, without the divider (4 instructions) |
+| `HAS_ZMMUL` | `false` | Instantiates the decoder and the multiplier, without the divider (4 instructions) |
 
-The divider is instantiated only with `has_m`, so `has_zmmul = true` with `has_m = false` gives the profile without division. Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
+The divider is instantiated only with `HAS_M`, so `HAS_ZMMUL = true` with `HAS_M = false` gives the profile without division. Valid profiles never combine the two extensions (see the [README](../../../../README.en.md)).
 
 ## 3. Decoding without Division
 
-The division parameter of the decoder receives the value of `has_m`. Without division, only the `funct3` values with bit 2 at zero are claimed, that is, the four multiplications. An instruction with `funct7 = 0000001` and a division `funct3` is not claimed, and the control unit marks it illegal. The rest of the decoding is in [M](../M/description.md).
+The division parameter of the decoder receives the value of `HAS_M`. Without division, only the `funct3` values with bit 2 at zero are claimed, that is, the four multiplications. An instruction with `funct7 = 0000001` and a division `funct3` is not claimed, and the control unit marks it illegal. The rest of the decoding is in [M](../M/description.md).
 
 ## 4. Radix-2 Booth Multiplier
 

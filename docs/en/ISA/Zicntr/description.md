@@ -12,13 +12,13 @@ This document describes how the Core implements the base counters `cycle`, `time
 
 ## 2. Generics
 
-| Generic | Entity | Default | Effect |
+| Parameter | Entity | Default | Effect |
 | :--- | :--- | :--- | :--- |
-| `has_zicntr` | `core` | `false` | Instantiates `mcycle`, `minstret` and `time` with their mirrors, and the `mcountinhibit` register; requires `has_zicsr` |
+| `HAS_ZICNTR` | `core` | `false` | Instantiates `mcycle`, `minstret` and `time` with their mirrors, and the `mcountinhibit` register; requires `HAS_ZICSR` |
 | `tick_cycles` | `core` | 50 | Clock cycles per `time` tick (50 gives 1 MHz at 50 MHz) |
 | `time_external` | `core` | `false` | `time` mirrors the `mtime` of the `i_mtime` port (the CLINT) in place of the own counter |
 
-Elaboration fails if `has_zicntr` is on without `has_zicsr`. Zicntr is independent of Zihpm.
+Elaboration fails if `HAS_ZICNTR` is on without `HAS_ZICSR`. Zicntr is independent of Zihpm.
 
 ## 3. 64-bit counter block
 
@@ -48,7 +48,7 @@ There are 3 counters of 64 bits. The Core does not implement `mcounteren`, and a
 | `minstret` | `0xB02` | `0xB82` | `instret` at `0xC02` and `0xC82` | On every retired instruction, one cycle after the retirement, unless inhibited or canceled | Yes, in each half |
 | `time` | `0xC01` | `0xC81` | Only the read form exists | On every divider tick, never inhibited | No |
 
-Addresses `0xB01` and `0xB81` do not exist, and `time` has no machine form. An effective write to `cycle`, `instret` or `time` is an illegal access (`mcause = 2`). Without `has_zicntr` the counter addresses are nonexistent and access is illegal.
+Addresses `0xB01` and `0xB81` do not exist, and `time` has no machine form. An effective write to `cycle`, `instret` or `time` is an illegal access (`mcause = 2`). Without `HAS_ZICNTR` the counter addresses are nonexistent and access is illegal.
 
 ### 4.2. Instruction retirement
 
@@ -71,19 +71,19 @@ Without `time_external`, `time` derives from the Core's own clock, and the resol
 
 ## 5. `mcountinhibit`
 
-The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what the profile includes, and the other bits read zero and ignore writes. The register exists when there is `has_zicntr` or `has_zihpm`, and the event counter bits are in [Zihpm](../Zihpm/description.md).
+The `mcountinhibit` register sits at `0x320`. Its writable bits depend on what the profile includes, and the other bits read zero and ignore writes. The register exists when there is `HAS_ZICNTR` or `HAS_ZIHPM`, and the event counter bits are in [Zihpm](../Zihpm/description.md).
 
 | Bit | Inhibits | Exists when |
 | :--- | :--- | :--- |
-| 0 | `mcycle` | `has_zicntr` |
+| 0 | `mcycle` | `HAS_ZICNTR` |
 | 1 | Nothing (`time` cannot be inhibited) | Never |
-| 2 | `minstret` | `has_zicntr` |
+| 2 | `minstret` | `HAS_ZICNTR` |
 
 An inhibited counter keeps its value and stays readable and writable. Inhibiting `minstret` also suspends the sum of the pending retirement that the read shows.
 
 ## 6. Nonexistent address
 
-Without `has_zicntr` the addresses of `mcycle`, `minstret`, `time`, their mirrors and `mcountinhibit` (when there is no event counter) are nonexistent. Reading or writing them signals an illegal CSR access, which the Core handles as an illegal-instruction exception (`mcause = 2`). There is no constant return value. The same holds for an effective write to `cycle`, `instret` and `time`.
+Without `HAS_ZICNTR` the addresses of `mcycle`, `minstret`, `time`, their mirrors and `mcountinhibit` (when there is no event counter) are nonexistent. Reading or writing them signals an illegal CSR access, which the Core handles as an illegal-instruction exception (`mcause = 2`). There is no constant return value. The same holds for an effective write to `cycle`, `instret` and `time`.
 
 ## 7. Formal verification
 

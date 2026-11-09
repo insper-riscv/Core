@@ -20,7 +20,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [contracts/03-relogios-e-reset.md](docs/pt-br/contracts/03-relogios-e-reset.md): contrato K7, os papéis de relógio (`core`, `fetch`, `mem`, `mem_pin`, `rst`), a origem do valor de cada um e a latência do reset.
 - [ISA/Zicclsm/instructions.md](docs/pt-br/ISA/Zicclsm/instructions.md) e [ISA/Zicclsm/description.md](docs/pt-br/ISA/Zicclsm/description.md): o que a especificação de perfis exige da Zicclsm e a execução em hardware dos loads e stores desalinhados, classificação dos acessos, regiões cobertas em cada mapa de memória e o acesso em duas etapas que cruza a palavra.
 - [FORMAL.md](docs/pt-br/formal/FORMAL.md): provas formais, engines de solver, arquivo de resultado por engine e a regra do agregador que decide o check `formal` do CI.
-- [ISA/E/description.md](docs/pt-br/ISA/E/description.md): o genérico `has_e` que escolhe o banco de 32 registradores (RV32I) ou de 16 (RV32E), a instrução ilegal com `x16` a `x31` e a ABI `ilp32e`.
+- [ISA/E/description.md](docs/pt-br/ISA/E/description.md): a constante `IS_BASE_E` que escolhe o banco de 32 registradores (RV32I) ou de 16 (RV32E), a instrução ilegal com `x16` a `x31` e a ABI `ilp32e`.
 - [ISA/Zicsr/instructions.md](docs/pt-br/ISA/Zicsr/instructions.md) e [ISA/Zicsr/description.md](docs/pt-br/ISA/Zicsr/description.md): extensão Zicsr, com as instruções, a codificação e as regras de leitura e escrita exigidas pelo manual, e a implementação no Core (banco de CSRs, exceções síncronas, `MRET`, redirecionamento e comportamento sem Zicsr).
 - [ISA/Zicntr](docs/pt-br/ISA/Zicntr/description.md): contadores básicos `cycle`, `time` e `instret` (Zicntr), com o que o manual exige, o bloco contador de 64 bits, a retirada de instruções, o divisor de tick e o `mcountinhibit`.
 - [ISA/Zihpm](docs/pt-br/ISA/Zihpm/description.md): contadores de desempenho `hpmcounter` (Zihpm), com o que o manual exige, a organização dos contadores de eventos, a regra de contagem e a tabela de eventos.
@@ -65,31 +65,31 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 
 ## 3. Perfis da ISA
 
-O topo estrutural `core` recebe um generic booleano por extensão, que habilita ou desabilita a extensão em tempo de elaboração:
+O topo estrutural `core` lê uma constante booleana por extensão do `config_pkg` (Common-Components), que habilita ou desabilita a extensão em tempo de elaboração. O topo de uma plataforma compila o `config_pkg` gerado do `platform.yaml` no lugar do pacote padrão (RV32IM com Zicclsm), e os testes e as provas formais trocam o arquivo por uma variante de `formal/configs.yaml`:
 
-| Extensão | Generic | Padrão | Com o generic desligado |
+| Extensão | Constante | Padrão | Com a constante falsa |
 | :--- | :--- | :--- | :--- |
-| M | `has_m` | `false` | As instruções M são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
-| Zmmul | `has_zmmul` | `false` | As instruções de multiplicação são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
-| Zicsr | `has_zicsr` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
-| Zicntr | `has_zicntr` | `false` | Sem os contadores `cycle`, `time` e `instret`; exige Zicsr |
-| Zihpm | `has_zihpm` | `false` | Sem os contadores de eventos `hpmcounter3` a `hpmcounter31`; exige Zicsr, e `hpm_counters` e `hpm_width` dimensionam o banco |
-| Zifencei | `has_zifencei` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
-| Zimop | `has_zimop` | `false` | As 40 codificações de `mop.r.n` e `mop.rr.n` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
-| Zihintntl | `has_zihintntl` | `false` | As quatro dicas `ntl.*` seguem como `ADD` em `x0`, que também é um `nop` |
-| Zihintpause | `has_zihintpause` | `false` | `pause` segue como `FENCE`, que também é um `nop` |
-| Zicclsm | `has_zicclsm` | `true` | Todo acesso desalinhado gera trap |
-| Zicond | `has_zicond` | `false` | `czero.eqz` e `czero.nez` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| M | `HAS_M` | `true` | As instruções M são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zmmul | `HAS_ZMMUL` | `false` | As instruções de multiplicação são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zicsr | `HAS_ZICSR` | `false` | Sem CSRs nem traps; o core sinaliza a exceção em `o_trap` |
+| Zicntr | `HAS_ZICNTR` | `false` | Sem os contadores `cycle`, `time` e `instret`; exige Zicsr |
+| Zihpm | `HAS_ZIHPM` | `false` | Sem os contadores de eventos `hpmcounter3` a `hpmcounter31`; exige Zicsr, e `hpm_counters` e `hpm_width` dimensionam o banco |
+| Zifencei | `HAS_ZIFENCEI` | `false` | `FENCE.I` é ilegal (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zimop | `HAS_ZIMOP` | `false` | As 40 codificações de `mop.r.n` e `mop.rr.n` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
+| Zihintntl | `HAS_ZIHINTNTL` | `false` | As quatro dicas `ntl.*` seguem como `ADD` em `x0`, que também é um `nop` |
+| Zihintpause | `HAS_ZIHINTPAUSE` | `false` | `pause` segue como `FENCE`, que também é um `nop` |
+| Zicclsm | `HAS_ZICCLSM` | `true` | Todo acesso desalinhado gera trap |
+| Zicond | `HAS_ZICOND` | `false` | `czero.eqz` e `czero.nez` são ilegais (causa 2 com Zicsr, `o_trap` sem Zicsr) |
 
-Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`has_e` falso) ou o RV32E (`has_e` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 240 combinações de extensões, o que dá 480 perfis. A lista de perfis vem de `profiles/matrix.yaml`, que expande a Zimop e a Zicond como as demais; os perfis de referência `rv32im_zicond` e `rv32im_zimop` ligam cada uma sozinha na compilação do GHDL:
+Um perfil é uma combinação dessas extensões, e duas regras definem as combinações válidas: M e Zmmul nunca coexistem, porque M já inclui a multiplicação do Zmmul, e Zicntr e Zihpm implicam Zicsr, porque os contadores são CSRs. Um core sem Zicsr e sem Zicclsm também é válido: o acesso desalinhado só é sinalizado em `o_trap`. A base é o RV32I (`IS_BASE_E` falso) ou o RV32E (`IS_BASE_E` verdadeiro, ver [ISA/E/description.md](docs/pt-br/ISA/E/description.md)), e cada base aceita todas as 240 combinações de extensões, o que dá 480 perfis. A lista de perfis vem de `profiles/matrix.yaml`, que expande a Zimop e a Zicond como as demais; os perfis de referência `rv32im_zicond` e `rv32im_zimop` ligam cada uma sozinha na compilação do GHDL:
 
 ```bash
 riscv-tools profiles --spec profiles/matrix.yaml                    # um nome por linha
-riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e flags -g do GHDL
-make profile-matrix                                                        # elabora cada perfil com seus generics
+riscv-tools profiles --spec profiles/matrix.yaml --format generics  # nome e constantes (-ghas_x=valor, que o Makefile traduz em HAS_X)
+make profile-matrix                                                        # elabora cada perfil com o seu config_pkg
 ```
 
-Quando uma extensão está desabilitada pelo seu generic, as instruções correspondentes são ilegais: com Zicsr geram a causa 2 do `mcause`, e sem Zicsr geram um pulso em `o_trap`, e em qualquer dos dois casos não escrevem registrador nem acessam a memória.
+Quando uma extensão está desabilitada pela sua constante, as instruções correspondentes são ilegais: com Zicsr geram a causa 2 do `mcause`, e sem Zicsr geram um pulso em `o_trap`, e em qualquer dos dois casos não escrevem registrador nem acessam a memória.
 
 ## 4. Verificação e Execução
 

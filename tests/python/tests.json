@@ -241,7 +241,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -313,9 +313,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.sdram_stall",
-        "parameters": {
-            "has_m": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -327,7 +324,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "build/configs/ext_flash/config_pkg.vhd",
+            "build/configs/ext_flash_core_no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -399,9 +396,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.ext_flash",
-        "parameters": {
-            "has_m": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -413,7 +407,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "build/configs/rom_after_boot/config_pkg.vhd",
+            "build/configs/rom_after_boot_no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -485,9 +479,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.rom_after_boot",
-        "parameters": {
-            "has_m": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -620,7 +611,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -642,10 +633,7 @@
         ],
         "test_args": [
             "--std=08"
-        ],
-        "parameters": {
-            "has_interrupts": true
-        }
+        ]
     },
     "CsrFileNoIrq": {
         "toplevel": "csr_file",
@@ -679,7 +667,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicntr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -696,7 +684,6 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zicntr": true,
             "tick_cycles": 4
         },
         "test_module": "tests.python.unittests.Zicntr.csr_file_zicntr",
@@ -711,7 +698,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicntr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -728,7 +715,6 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zicntr": true,
             "tick_cycles": 4,
             "time_external": true
         },
@@ -744,7 +730,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicntr_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -761,9 +747,7 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zicntr": true,
             "tick_cycles": 4,
-            "has_zihpm": true,
             "hpm_counters": 4
         },
         "test_module": "tests.python.unittests.Zicntr.csr_file_zihpm",
@@ -827,7 +811,7 @@
         "toplevel": "trap_unit",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/access_faults/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -842,16 +826,13 @@
         ],
         "test_args": [
             "--std=08"
-        ],
-        "parameters": {
-            "has_access_faults": true
-        }
+        ]
     },
     "TrapUnitNoZicclsm": {
         "toplevel": "trap_unit",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_zicclsm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -861,9 +842,6 @@
             "src/Zicsr/trap_unit.vhd"
         ],
         "test_module": "tests.python.unittests.Zicsr.trap_unit_no_zicclsm",
-        "parameters": {
-            "has_zicclsm": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -917,7 +895,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -989,9 +967,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.fetch_stall",
-        "parameters": {
-            "has_m": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1003,7 +978,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zifencei/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1075,10 +1050,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.fence_i",
-        "parameters": {
-            "has_m": false,
-            "has_zifencei": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1090,7 +1061,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/dcache_no_m_zifencei/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1162,11 +1133,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.fence_i_dcache",
-        "parameters": {
-            "has_m": false,
-            "has_zifencei": true,
-            "has_dcache": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1250,9 +1216,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.load_stall",
-        "parameters": {
-            "has_m": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1264,7 +1227,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicntr_zicsr_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1337,9 +1300,6 @@
         ],
         "test_module": "tests.python.unittests.cores.load_use",
         "parameters": {
-            "has_zicsr": true,
-            "has_zicntr": true,
-            "has_zihpm": true,
             "hpm_counters": 4
         },
         "build_args": [
@@ -1425,9 +1385,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.mul_div",
-        "parameters": {
-            "has_m": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1483,7 +1440,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -1499,9 +1456,6 @@
             "src/Zihpm/hpm_counter_bank.vhd",
             "src/Zicsr/csr_file.vhd"
         ],
-        "parameters": {
-            "has_m": false
-        },
         "test_module": "tests.python.unittests.Zicsr.csr_misa_no_m",
         "build_args": [
             "--std=08"
@@ -1514,7 +1468,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/e_no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -1530,10 +1484,6 @@
             "src/Zihpm/hpm_counter_bank.vhd",
             "src/Zicsr/csr_file.vhd"
         ],
-        "parameters": {
-            "has_m": false,
-            "base_e": true
-        },
         "test_module": "tests.python.unittests.Zicsr.csr_misa_rve",
         "build_args": [
             "--std=08"
@@ -1546,7 +1496,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1618,10 +1568,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.misaligned_jump",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1633,7 +1579,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1705,10 +1651,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.illegal_instruction",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1720,7 +1662,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1792,10 +1734,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.trap_priority",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1807,7 +1745,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/e_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1879,11 +1817,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.rv32e",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_e": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -1895,7 +1828,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicntr_zicsr_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -1968,10 +1901,6 @@
         ],
         "test_module": "tests.python.unittests.cores.zihpm",
         "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_zicntr": true,
-            "has_zihpm": true,
             "hpm_counters": 4
         },
         "build_args": [
@@ -1985,7 +1914,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr_zmmul/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2057,10 +1986,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zmmul",
-        "parameters": {
-            "has_zmmul": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2072,7 +1997,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr_zimop/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2144,10 +2069,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zimop",
-        "parameters": {
-            "has_zimop": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2159,7 +2080,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr_zihintntl_zihintpause/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2230,11 +2151,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zihint",
-        "parameters": {
-            "has_zihintntl": true,
-            "has_zihintpause": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2246,7 +2162,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2318,9 +2234,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.misaligned_half",
-        "parameters": {
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2332,7 +2245,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicntr_zicsr_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2405,9 +2318,6 @@
         ],
         "test_module": "tests.python.unittests.cores.mem_trap_ex",
         "parameters": {
-            "has_zicsr": true,
-            "has_zicntr": true,
-            "has_zihpm": true,
             "hpm_counters": 4
         },
         "build_args": [
@@ -2421,7 +2331,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicsr_zifencei/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2493,11 +2403,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.fence_i_legal",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_zifencei": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2509,7 +2414,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2581,7 +2486,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.trap_signal",
-        "parameters": {},
         "build_args": [
             "--std=08"
         ],
@@ -2593,7 +2497,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_no_zicclsm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2665,9 +2569,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.trap_signal_no_zicclsm",
-        "parameters": {
-            "has_zicclsm": false
-        },
         "build_args": [
             "--std=08"
         ],
@@ -2679,7 +2580,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -2751,7 +2652,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.misaligned",
-        "parameters": {},
         "build_args": [
             "--std=08"
         ],
@@ -2998,7 +2898,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3015,7 +2915,6 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 29,
             "hpm_width": 64
         },
@@ -3031,7 +2930,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3048,7 +2947,6 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 2,
             "hpm_width": 40
         },
@@ -3064,7 +2962,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3081,7 +2979,6 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 5,
             "hpm_width": 20
         },
@@ -3097,7 +2994,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_sscofpmf_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3114,11 +3011,8 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 4,
-            "hpm_width": 8,
-            "has_interrupts": true,
-            "has_sscofpmf": true
+            "hpm_width": 8
         },
         "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
         "build_args": [
@@ -3132,7 +3026,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_sscofpmf_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3149,11 +3043,8 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 4,
-            "hpm_width": 40,
-            "has_interrupts": true,
-            "has_sscofpmf": true
+            "hpm_width": 40
         },
         "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
         "build_args": [
@@ -3167,7 +3058,7 @@
         "toplevel": "csr_file",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_zihpm/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/word_consts.vhd",
@@ -3184,10 +3075,8 @@
             "src/Zicsr/csr_file.vhd"
         ],
         "parameters": {
-            "has_zihpm": true,
             "hpm_counters": 4,
-            "hpm_width": 8,
-            "has_interrupts": true
+            "hpm_width": 8
         },
         "test_module": "tests.python.unittests.Zihpm.csr_file_sscofpmf",
         "build_args": [
@@ -3238,7 +3127,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicond/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3310,9 +3199,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zicond",
-        "parameters": {
-            "has_zicond": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -3324,7 +3210,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3396,9 +3282,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zicond_off",
-        "parameters": {
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -3460,14 +3343,33 @@
         "toplevel": "reg_ex_mem",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "build/configs/faults_map/config_pkg.vhd",
+            "build/configs/faults_map_access_faults/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/mem_map_consts.vhd",
             "src/shared/reg_ex_mem.vhd"
         ],
         "test_module": "tests.python.unittests.common.reg_ex_mem_faults",
         "parameters": {
-            "has_access_faults": true,
+            "periph_slots": "00001001"
+        },
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "RegExMemLoosePeriph": {
+        "toplevel": "reg_ex_mem",
+        "sources": [
+            "src/common/src/utils_pkg.vhd",
+            "build/configs/faults_map_access_faults_loose/config_pkg.vhd",
+            "src/shared/pipeline_types.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/reg_ex_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_ex_mem_loose_periph",
+        "parameters": {
             "periph_slots": "00001001"
         },
         "build_args": [
@@ -3541,7 +3443,7 @@
         "toplevel": "fencei_unit",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/dcache/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/opcode_consts.vhd",
             "src/shared/funct3_consts.vhd",
@@ -3549,9 +3451,6 @@
             "src/Zifencei/fencei_unit.vhd"
         ],
         "test_module": "tests.python.unittests.Zifencei.fencei_unit_dcache",
-        "parameters": {
-            "has_dcache": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -3626,7 +3525,7 @@
         "toplevel": "stage_id",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3681,7 +3580,7 @@
         "toplevel": "stage_ex",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3783,7 +3682,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3855,11 +3754,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.irq_sweep",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_interrupts": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -3871,7 +3765,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_zicsr_zifencei/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -3943,12 +3837,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.irq_fencei",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_interrupts": true,
-            "has_zifencei": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -3960,7 +3848,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -4032,11 +3920,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.irq_priority",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_interrupts": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -4048,7 +3931,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/interrupts_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -4120,11 +4003,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.irq_vectored",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true,
-            "has_interrupts": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -4157,7 +4035,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -4229,10 +4107,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.trap_take",
-        "parameters": {
-            "has_m": true,
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],
@@ -4244,7 +4118,7 @@
         "toplevel": "core",
         "sources": [
             "src/common/src/utils_pkg.vhd",
-            "src/common/src/config_pkg.vhd",
+            "build/configs/no_m_zicsr/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
             "src/shared/opcode_consts.vhd",
@@ -4316,9 +4190,6 @@
             "src/core/core.vhd"
         ],
         "test_module": "tests.python.unittests.cores.zimop_off",
-        "parameters": {
-            "has_zicsr": true
-        },
         "build_args": [
             "--std=08"
         ],

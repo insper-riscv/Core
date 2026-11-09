@@ -50,8 +50,8 @@ A decodificação do endereço de busca (`if_pc`) utiliza os limites de `src/sha
 O estágio ID reúne sete subblocos:
 
 1. **Unidade de controle base (`control_unit`):** decodifica `i_inst` gerando `o_sel_pc4_alu`, `o_ext_imm_op`, `o_wb_sel`, `o_we_reg`, `o_ext_ram_op`, `o_sel_rs2_imm`, `o_sel_pc_rs1`, `o_alu_op`, `o_we_ram`, `o_re_ram`, `o_en_ram`, `o_opcode` e `o_funct3`.
-2. **Decodificador RV32M (`m_decode`, quando `has_m = true`):** ativa `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'` quando `opcode = OPCODE_OP` e `funct7 = FUNCT7_MULDIV`.
-3. **Decodificador Zicsr (`csr_decode`, quando `has_zicsr = true`):** ativa `o_use_imm_i = '1'` para toda a classe `OPCODE_SYSTEM` e ativa `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"`.
+2. **Decodificador RV32M (`m_decode`, quando `HAS_M = true`):** ativa `o_is_muldiv = '1'`, `o_we_reg = '1'` e `o_sel_pc_rs1 = '1'` quando `opcode = OPCODE_OP` e `funct7 = FUNCT7_MULDIV`.
+3. **Decodificador Zicsr (`csr_decode`, quando `HAS_ZICSR = true`):** ativa `o_use_imm_i = '1'` para toda a classe `OPCODE_SYSTEM` e ativa `o_is_csr = '1'` e `o_we_reg = '1'` quando `funct3` é diferente de `"000"` e `"100"`.
 4. **Extensor de imediatos (`extender_imm`):** reconstrói o imediato de 32 bits de acordo com `src/shared/ext_imm_consts.vhd`:
 
 | Constante | Código | Formato e operação de extensão |

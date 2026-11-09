@@ -109,7 +109,7 @@ Uma propriedade que guarda um modelo de um registrador da unidade fora dela não
 | Prova | Registradores ligados | Propriedade por indução |
 | :--- | :--- | :--- |
 | `csri_safety` | máscaras de `mie`, `mstatus.MIE` e `MPIE`, BASE e MODE de `mtvec` | `mip` lê as três linhas nas posições 3, 7 e 11, `mie` guarda só esses bits, escrever em `mip` não muda nada, `o_irq_pending` é linhas e máscara, `o_irq_take` exige `mstatus.MIE`, a causa tem prioridade externa, software, timer, e `mtvec` guarda BASE e MODE |
-| `csrio_safety` | os mesmos | sem `has_interrupts` as linhas são ignoradas e `mip` e `mie` leem zero |
+| `csrio_safety` | os mesmos | sem `HAS_INTERRUPTS` as linhas são ignoradas e `mip` e `mie` leem zero |
 
 A tomada em si é provada pelo `stage_ex_irq_props.sv` e pelo `trap_unit_props.sv` (ambos por indução): `mepc` é o endereço da instrução abortada, `mcause` leva a causa e a linha, `MIE` vai a 0 e `MPIE` a 1, o PC seguinte é BASE ou o vetor, e a interrupção vence toda exceção e o `MRET`. A restauração de `MIE` pelo `MRET` é provada por indução em `csr_mstatus`. As provas de contadores (`csr_cntr_props.sv`, `csr_hpm_props.sv`) e a fusão continuam limitadas, e o motivo está nos comentários de cada arquivo.
 

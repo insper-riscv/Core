@@ -35,8 +35,6 @@ use work.mem_map_consts.all;
 
 entity misaligned_unit is
 	generic (
-		-- Executa em hardware o acesso desalinhado à memória principal (extensão Zicclsm); '0' desliga a unidade.
-		has_zicclsm  : boolean := true;
 		-- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
 		flags_registered : boolean := false
 	);
@@ -137,7 +135,7 @@ begin
 	                          (i_byte_mask = BYTE_MASK_HALF_HIGH and offset = BYTE_OFFSET_3)))
 	               else '0';
 
-	cross <= (i_valid and i_en and (load_cross or store_cross)) when has_zicclsm else '0';
+	cross <= (i_valid and i_en and (load_cross or store_cross)) when HAS_ZICCLSM else '0';
 
 	is_sdram <= i_is_sdram when flags_registered else
 	            '1' when is_external_addr(unsigned(i_addr)) else '0';

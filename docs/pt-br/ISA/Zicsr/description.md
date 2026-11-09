@@ -14,7 +14,7 @@ Este documento descreve como o Core implementa a extensão `Zicsr` e o tratament
 
 ## 2. Visão Geral
 
-A extensão é ligada pelo generic `has_zicsr` da entidade `core` (padrão `false`) e reúne três blocos.
+A extensão é ligada pela constante `HAS_ZICSR` do `config_pkg` (padrão `false`) e reúne três blocos.
 
 | Bloco | Estágio | Função |
 | :--- | :--- | :--- |
@@ -82,26 +82,26 @@ Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus
 | Endereço | CSR | Acesso | Definição | Leitura | Escrita |
 | :---: | :--- | :---: | :---: | :--- | :--- |
 | `0x300` | `mstatus` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 e 11) fixo em `11`, `MPIE` (bit 7), `MIE` (bit 3); demais bits zero | Só `MIE` e `MPIE` são gravados; os demais bits são ignorados |
-| `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `has_m`, `0x40001100` (soma o bit 12, extensão `M`); com `has_e` verdadeiro (RV32E), o bit 4 (extensão `E`) substitui o bit 8, e o valor é `0x40000010` ou, com `has_m`, `0x40001010` | Ignorada |
-| `0x304` | `mie` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `has_interrupts`, as máscaras `MSIE`, `MTIE` e `MEIE` (bits 3, 7 e 11) | Com `has_interrupts`, grava os bits 3, 7 e 11; os demais são ignorados |
-| `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | `BASE` nos bits `[31:2]` e `MODE` no bit 0 (`0` direto, `1` vetorado); o bit 1 lê zero. Sem `has_interrupts`, `MODE` lê sempre zero | Grava `BASE` e, com `has_interrupts`, `MODE`; no modo vetorado os bits `[5:2]` de `BASE` são gravados em zero (alinhamento de 64 bytes) |
+| `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `HAS_M`, `0x40001100` (soma o bit 12, extensão `M`); com `IS_BASE_E` verdadeiro (RV32E), o bit 4 (extensão `E`) substitui o bit 8, e o valor é `0x40000010` ou, com `HAS_M`, `0x40001010` | Ignorada |
+| `0x304` | `mie` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `HAS_INTERRUPTS`, as máscaras `MSIE`, `MTIE` e `MEIE` (bits 3, 7 e 11) | Com `HAS_INTERRUPTS`, grava os bits 3, 7 e 11; os demais são ignorados |
+| `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | `BASE` nos bits `[31:2]` e `MODE` no bit 0 (`0` direto, `1` vetorado); o bit 1 lê zero. Sem `HAS_INTERRUPTS`, `MODE` lê sempre zero | Grava `BASE` e, com `HAS_INTERRUPTS`, `MODE`; no modo vetorado os bits `[5:2]` de `BASE` são gravados em zero (alinhamento de 64 bytes) |
 | `0x310` | `mstatush` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignorada |
 | `0x340` | `mscratch` | L/E | [2.1.1.13](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-13-machine-scratch-mscratch-register) | Valor gravado, 32 bits | Grava os 32 bits |
 | `0x341` | `mepc` | L/E | [2.1.1.14](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-14-machine-exception-program-counter-mepc-register) | PC salvo, com os bits `[1:0]` em zero | Grava os bits `[31:2]` |
 | `0x342` | `mcause` | L/E | [2.1.1.15](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#mcause) | Código da última exceção, 32 bits | Grava os 32 bits |
 | `0x343` | `mtval` | L/E | [2.1.1.16](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-16-machine-trap-value-mtval-register) | Valor associado à última exceção, 32 bits | Grava os 32 bits |
-| `0x344` | `mip` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `has_interrupts`, o nível das linhas `MSIP`, `MTIP` e `MEIP` (bits 3, 7 e 11) | Ignorada |
+| `0x344` | `mip` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `HAS_INTERRUPTS`, o nível das linhas `MSIP`, `MTIP` e `MEIP` (bits 3, 7 e 11) | Ignorada |
 | `0xF11` | `mvendorid` | L | [2.1.1.2](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-2-machine-vendor-id-mvendorid-register) | Zero | Escrita efetiva é ilegal |
 | `0xF12` | `marchid` | L | [2.1.1.3](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-3-machine-architecture-id-marchid-register) | Zero | Escrita efetiva é ilegal |
 | `0xF13` | `mimpid` | L | [2.1.1.4](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-4-machine-implementation-id-mimpid-register) | Zero | Escrita efetiva é ilegal |
 | `0xF14` | `mhartid` | L | [2.1.1.5](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-5-hart-id-mhartid-register) | Zero | Escrita efetiva é ilegal |
 | `0xF15` | `mconfigptr` | L | [2.1.1.17](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-17-machine-configuration-pointer-mconfigptr-register) | Zero | Escrita efetiva é ilegal |
 
-Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` e as metades altas) também vêm da tabela do manual privilegiado, e só existem quando o perfil inclui `Zicntr` ou `Zihpm`, descritos em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md). Sem eles, esses endereços não são conhecidos e o acesso é ilegal. Qualquer outro endereço também não é conhecido. Sem `has_interrupts`, `mie` e `mip` leem zero e ignoram escritas.
+Os endereços dos contadores (`mcountinhibit`, `mhpmeventN`, `mcycle`, `minstret`, `mhpmcounterN`, `cycle`, `time`, `instret` e as metades altas) também vêm da tabela do manual privilegiado, e só existem quando o perfil inclui `Zicntr` ou `Zihpm`, descritos em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md). Sem eles, esses endereços não são conhecidos e o acesso é ilegal. Qualquer outro endereço também não é conhecido. Sem `HAS_INTERRUPTS`, `mie` e `mip` leem zero e ignoram escritas.
 
 ### 5.1. Interrupções de Máquina
 
-O generic `has_interrupts` (padrão `false`, exige `has_zicsr`) liga as três linhas de interrupção de máquina do `core` e faz `mip` e `mie` funcionarem. As linhas são de nível e pertencem ao domínio de clock do núcleo; uma fonte em outro domínio passa antes por um `synchronizer` do `Common-Components`.
+A constante `HAS_INTERRUPTS` (padrão `false`, exige `HAS_ZICSR`) liga as três linhas de interrupção de máquina do `core` e faz `mip` e `mie` funcionarem. As linhas são de nível e pertencem ao domínio de clock do núcleo; uma fonte em outro domínio passa antes por um `synchronizer` do `Common-Components`.
 
 | Porta | Interrupção | Bit em `mip` e `mie` |
 | :--- | :--- | :---: |
@@ -123,7 +123,7 @@ $$\text{o\_irq\_pending} = \left(\text{mip} \land \text{mie}\right) \ne 0 \qquad
 | Estouro de contador (`LCOFIP` e `LCOFIE`, só com Sscofpmf), sem as três anteriores | `0x8000000D` |
 
 A interrupção de estouro de contador pertence à extensão [Sscofpmf](../Sscofpmf/description.md), que acrescenta o bit 13 a `mip` e a `mie`.
-Com `has_interrupts = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, `o_irq_pending` e `o_irq_take` valem `0` e `MODE` de `mtvec` lê zero. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`.
+Com `HAS_INTERRUPTS = false`, as portas são ignoradas, `mie` e `mip` leem zero e ignoram escritas, `o_irq_pending` e `o_irq_take` valem `0` e `MODE` de `mtvec` lê zero. As posições dos bits e os códigos de `mcause` de cada interrupção ficam no pacote `irq_consts`.
 
 ## 6. Exceções Síncronas
 
@@ -136,16 +136,16 @@ A `trap_unit` avalia a instrução no estágio EX e sinaliza no máximo uma exce
 | 0 | Endereço de instrução desalinhado | Desvio, `JAL` ou `JALR` tomado com alvo de bits `[1:0]` diferentes de `00` | Endereço alvo |
 | 2 | Instrução ilegal | Encoding indefinido apontado pelo decodificador do estágio ID, instrução `SYSTEM` não suportada, ou acesso a CSR ilegal (seção 4.3) | Zero |
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
-| 1 | Falha de acesso de instrução | Busca de instrução fora das regiões executáveis do mapa, com `has_access_faults` (seção 6.7) | PC da instrução |
+| 1 | Falha de acesso de instrução | Busca de instrução fora das regiões executáveis do mapa, com `HAS_ACCESS_FAULTS` (seção 6.7) | PC da instrução |
 | 4 | Endereço de load desalinhado | Load desalinhado que o hardware não executa | Endereço efetivo |
-| 5 | Falha de acesso de load | Load para endereço que o mapa não aceita ler, com `has_access_faults` (seção 6.7) | Endereço efetivo |
+| 5 | Falha de acesso de load | Load para endereço que o mapa não aceita ler, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
 | 6 | Endereço de store desalinhado | Store desalinhado que o hardware não executa | Endereço efetivo |
-| 7 | Falha de acesso de store | Store para endereço que o mapa não aceita escrever, com `has_access_faults` (seção 6.7) | Endereço efetivo |
+| 7 | Falha de acesso de store | Store para endereço que o mapa não aceita escrever, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
 | 11 | Chamada de ambiente do modo máquina | `ECALL` (`funct12 = 0x000`) | Zero |
 
 As instruções `ECALL`, `EBREAK`, `MRET` e `WFI` só são reconhecidas com `funct3 = 000`, `rd = x0` e `rs1 = x0`. Qualquer outra instrução `SYSTEM` que não seja de acesso a CSR, inclusive `funct3 = 100`, `SRET` e `SFENCE.VMA`, é ilegal. O decodificador do estágio ID também marca como ilegal um registrador com índice acima de 15 quando o perfil é RV32E.
 
-Um desalinhamento de load ou store é definido pelas regras da extensão `Zicclsm`: o hardware executa o acesso desalinhado dentro da memória principal (RAM interna e SDRAM) quando `has_zicclsm = true`, e qualquer outro desalinhamento gera as causas 4 e 6. Com `has_zicsr = true`, essas duas causas são verificadas no estágio MEM por uma segunda instância da `trap_unit`, que lê o endereço efetivo já registrado em `EX/MEM`, e a instância do estágio EX não confere o endereço efetivo.
+Um desalinhamento de load ou store é definido pelas regras da extensão `Zicclsm`: o hardware executa o acesso desalinhado dentro da memória principal (RAM interna e SDRAM) quando `HAS_ZICCLSM = true`, e qualquer outro desalinhamento gera as causas 4 e 6. Com `HAS_ZICSR = true`, essas duas causas são verificadas no estágio MEM por uma segunda instância da `trap_unit`, que lê o endereço efetivo já registrado em `EX/MEM`, e a instância do estágio EX não confere o endereço efetivo.
 
 ### 6.2. Prioridade
 
@@ -153,7 +153,7 @@ Para a instância do estágio EX, a prioridade é a da tabela, de cima para baix
 
 | Prioridade | `mcause` |
 | :---: | :---: |
-| 1 | 1 (falha de busca, com `has_access_faults`) |
+| 1 | 1 (falha de busca, com `HAS_ACCESS_FAULTS`) |
 | 2 | 2 |
 | 3 | 0 |
 | 4 | 3 |
@@ -196,7 +196,7 @@ A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma ex
 
 ### 6.7. Falhas de Acesso
 
-O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causas 1, 5 e 7. O mapa válido vem das constantes do mapa de memória do `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`) e do genérico `periph_slots`, a máscara das janelas de 256 MiB do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits 30:28 iguais a $n$), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
+A constante `HAS_ACCESS_FAULTS` (padrão `false`, exige `HAS_ZICSR`) liga as causas 1, 5 e 7. O mapa válido vem das constantes do mapa de memória do `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`) e do generic `periph_slots`, a máscara das janelas do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits `ADDR_BITS-2` a `ADDR_BITS-4` iguais a $n$; com `ADDR_BITS = 32`, os bits 30:28 e janelas de 256 MiB), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A janela de periféricos começa em `PERIPH_BASE`, `2**(ADDR_BITS - 1)` por padrão. A constante `STRICT_PERIPH` do `config_pkg` (padrão `true`, desligável por plataforma) decide se uma janela sem periférico é recusada: com ela verdadeira o acesso a uma janela vazia gera a falha 5 ou 7; com ela falsa toda janela aceita o acesso. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
 
 | Região | Leitura | Escrita | Busca |
 | :--- | :---: | :---: | :---: |
@@ -204,9 +204,11 @@ O generic `has_access_faults` (padrão `false`, exige `has_zicsr`) liga as causa
 | RAM, de `RAM_BASE` a `RAM_END` | Sim | Sim | Sim |
 | Janela externa, de `EXT_BASE` a `PERIPH_BASE` | Sim | Sim | Sim |
 | Janela de periféricos ocupada, a partir de `PERIPH_BASE` | Sim | Sim | Não |
-| O que sobra (buracos entre as regiões, janelas de periférico vazias) | Não | Não | Não |
+| Janela de periféricos vazia, com `STRICT_PERIPH` | Não | Não | Não |
+| Janela de periféricos vazia, sem `STRICT_PERIPH` | Sim | Sim | Não |
+| O que sobra (buracos entre as regiões) | Não | Não | Não |
 
-A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `has_access_faults = false` as validades valem sempre `1` e nada disso é sintetizado.
+A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `HAS_ACCESS_FAULTS = false` as validades valem sempre `1` e nada disso é sintetizado.
 
 A falha de busca vem antes da instrução ilegal, na ordem da Tabela 17 do volume privilegiado. O desalinhamento que o hardware não executa (fora da memória principal) mantém a causa 4 ou 6, a ordem opcional da tabela, e o acesso desalinhado que ele executa só passa se o endereço for válido. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
 
@@ -281,7 +283,7 @@ O `MRET` segue a seção 6.4. A `WFI` executa como `NOP`, como o manual privileg
 
 ## 8. Core sem Zicsr
 
-Com `has_zicsr = false`, o `csr_file` e o `csr_decode` não são instanciados e não há registradores de trap. O Core mantém um detector de causas que apenas sinaliza a exceção nas saídas e não redireciona o PC.
+Com `HAS_ZICSR = false`, o `csr_file` e o `csr_decode` não são instanciados e não há registradores de trap. O Core mantém um detector de causas que apenas sinaliza a exceção nas saídas e não redireciona o PC.
 
 | Saída | Valor |
 | :--- | :--- |

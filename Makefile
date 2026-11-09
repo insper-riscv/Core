@@ -5,7 +5,7 @@ WDIR  := build/ghdl
 
 VHDL := $(shell find src -name '*.vhd' -not -path 'src/common/*' | sort) $(sort $(wildcard src/common/src/*.vhd))
 
-.PHONY: check profiles profile-matrix configs test formal paths clean
+.PHONY: check check-rv64 profiles profile-matrix configs test formal paths clean
 
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
@@ -13,28 +13,41 @@ check:
 	@$(GHDL) -a $(STD) -Wno-library --work=work --workdir=$(WDIR) $$(riscv-tools vhdl-sort $(VHDL))
 	@echo "VHDL syntax check passed"
 
-# Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml,
-# a flat `- path` list) and elaborate the top with the profile's generic. rv32i has no extension
-# enabled and the last profile has every extension enabled. Every profile analyzes the same extension
-# units, because core instantiates them directly, and the disabled ones leave the elaboration.
-# GHDL 6 takes the generic at run time, so each profile is elaborated and run for 1 ns.
-profiles: profile-matrix
+# The same sources analyze with the rv64 variant of formal/configs.yaml (IS_64 true, 40-bit physical address): the
+# types and the constants of the config_pkg carry the wider XLEN. The core does not run RV64 yet, so this stops at
+# the analysis.
+check-rv64: check configs
+	@mkdir -p $(WDIR)/rv64
+	@riscv-tools vhdl-sort $(VHDL) | tr ' ' '\n' | sed 's#^src/common/src/config_pkg.vhd$$#build/configs/rv64/config_pkg.vhd#' > $(WDIR)/rv64.order
+	@$(GHDL) -a $(STD) -Wno-library --work=work --workdir=$(WDIR)/rv64 $$(cat $(WDIR)/rv64.order)
+	@echo "RV64 analysis passed"
+
+# Each profile builds on its own: analyze exactly its sources (profiles/<p>.yaml, a flat `- path` list), with the
+# config_pkg of the profile (its `config:` constants, written by formal/config_variant.sh in the place of the default
+# package of src/common), and elaborate the top with the generics the profile still has (`generics:`, the
+# implementation sizes of the Zihpm). rv32i has no extension enabled and the last profile has every extension
+# enabled. Every profile analyzes the same extension units, because core instantiates them directly, and the
+# disabled ones leave the elaboration. GHDL 6 takes the generic at run time, so each profile is elaborated and
+# run for 1 ns.
+profiles: profile-matrix check-rv64
 	@for p in rv32i rv32i_zmmul rv32im rv32im_zicsr rv32im_zicsr_irq rv32im_zicond rv32im_zicsr_zifencei rv32im_zicclsm_zicntr_zifencei rv32im_zicclsm_zicntr_zihpm_zifencei rv32im_zicclsm_zicntr_zihpm_zifencei_reduced rv32im_zimop; do \
-	  dir=$(WDIR)/$$p; rm -rf $$dir; mkdir -p $$dir; \
 	  srcs=$$(sed -n 's/^  - //p' profiles/$$p.yaml | grep '\.vhd$$'); \
+	  sets=$$(sed -n 's/^config: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([A-Za-z_0-9]*\): *\(.*\)/\1=\2/' | tr '\n' ' '); \
 	  gens=$$(sed -n 's/^generics: {\(.*\)}/\1/p' profiles/$$p.yaml | tr ',' '\n' | sed 's/ *\([a-zA-Z_]*\): *\(.*\)/-g\1=\2/' | tr '\n' ' '); \
-	  $(GHDL) -a $(STD) --workdir=$$dir $$srcs && \
-	  $(GHDL) --elab-run $(STD) --workdir=$$dir -o $$dir/core core $$gens --stop-time=1ns >/dev/null 2>&1 \
-	  && echo "profile $$p builds ($$gens)" || { echo "profile $$p FAILED"; exit 1; }; \
+	  bash formal/build_profile.sh $$p $(WDIR)/$$p "$$sets" "$$gens" $$srcs || exit 1; \
 	done
 
-# Every profile of profiles/matrix.yaml (riscv-tools profiles) elaborates with its generics, on the
-# sources `check` analyzed.
+# Profiles of profiles/matrix.yaml (riscv-tools profiles) build with their constants: each one analyzes the sources of
+# `check` (their order) with its own config_pkg, which GHDL cannot share between profiles because every unit depends on
+# it, and elaborates the core, in parallel. The CI job has 15 minutes, so by default one profile in MATRIX_STRIDE is
+# built (96 of the 480); `make profile-matrix MATRIX_STRIDE=1` builds all of them.
+MATRIX_STRIDE ?= 5
 profile-matrix: check
-	@riscv-tools profiles --spec profiles/matrix.yaml --format generics | while read -r name gens; do \
-	  $(GHDL) --elab-run $(STD) --workdir=$(WDIR) -o $(WDIR)/matrix core $$gens --stop-time=1ns >/dev/null 2>&1 \
-	  && echo "matrix $$name builds" || { echo "matrix $$name FAILED ($$gens)"; exit 1; }; \
-	done
+	@riscv-tools vhdl-sort $(VHDL) | tr ' ' '\n' > $(WDIR)/order.txt
+	@riscv-tools profiles --spec profiles/matrix.yaml --format generics | awk 'NR % $(MATRIX_STRIDE) == 1' | \
+	  sed -e 's/-ghas_e=/IS_BASE_E=/' -e 's/ -ghas_\([a-z0-9]*\)=/ HAS_\U\1=/g' | \
+	  QUIET=1 xargs -P $$(nproc) -L 1 bash -c 'bash formal/build_profile.sh matrix_$$0 $(WDIR)/matrix/$$0 "$$*" "" $$(cat $(WDIR)/order.txt) || exit 255'
+	@echo "matrix: $$(riscv-tools profiles --spec profiles/matrix.yaml --format names | awk 'NR % $(MATRIX_STRIDE) == 1' | wc -l) profiles build"
 
 # Formal proofs of the CSR bank, the trap unit, the counters and the fusion record, with their mutants
 # (SymbiYosys, Yosys and one engine of the CI image: FORMAL_ENGINE is yices, bitwuzla, boolector or abc-bmc3);

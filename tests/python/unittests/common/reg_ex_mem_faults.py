@@ -1,4 +1,4 @@
-"""Testes de reg_ex_mem com has_access_faults.
+"""Testes de reg_ex_mem com HAS_ACCESS_FAULTS.
 
 A validade do endereço no mapa é registrada junto com a classificação.
 
@@ -35,15 +35,14 @@ CASES = [
 ]
 
 
-@cocotb.test()
-async def test_validity_of_each_region(dut):
-    """Verifica leitura e escrita aceitas por região no EX/MEM."""
+async def check_cases(dut, cases):
+    """Confere (leitura, escrita) aceitas por endereço e a bolha."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     dut.i_rst.value = 0
     dut.i_en.value = 1
     dut.i_flush.value = 0
     await RisingEdge(dut.i_clk)
-    for address, rd, wr in CASES:
+    for address, rd, wr in cases:
         dut.i_ea.value = address
         await RisingEdge(dut.i_clk)
         await Timer(1, unit="ns")
@@ -57,3 +56,9 @@ async def test_validity_of_each_region(dut):
         (1, 1),
         "a bolha não pode gerar falha",
     )
+
+
+@cocotb.test()
+async def test_validity_of_each_region(dut):
+    """Verifica leitura e escrita aceitas por região no EX/MEM."""
+    await check_cases(dut, CASES)

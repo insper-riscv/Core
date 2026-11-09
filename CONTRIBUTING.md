@@ -16,7 +16,7 @@ Todo código de hardware do projeto é escrito e validado sob a norma **IEEE 107
 | Instanciação de módulos | Usar instanciação direta de entidade (`u_nome : entity work.nome_da_entidade`), sem declarações `component` redundantes |
 | Mapeamento de portas (`port map`) | Associar sempre por nome (`i_porta => sinal`) e utilizar sinais intermediários para expressões lógicas ou fatias dinâmicas, pois o GHDL exige expressões globalmente estáticas nos formais/atuais de porta |
 | Inferência de latches | Todo sinal atribuído em processo combinacional ou atribuição condicional deve receber valor padrão explícito em todos os ramos (`else` / `when others =>`) |
-| Asserts de configuração | Toda dependência entre generics (por exemplo, "exige" no comentário) e toda faixa de generic têm um `assert ... severity failure` no topo da entidade, e a mensagem sempre traz o nome do generic e a causa (`has_zicntr exige has_zicsr: os contadores são CSRs`) |
+| Asserts de configuração | Toda dependência entre as constantes de extensão e do mapa de memória fica na função `check_isa` do `config_pkg`, chamada uma vez no `generate` do `core` (`if check_isa generate`), e toda faixa de generic de entidade tem um `assert ... severity failure` no topo da entidade; a mensagem sempre traz o nome da constante ou do generic e a causa (`Zicntr e Zihpm exigem Zicsr`) |
 
 A norma de referência é a [IEEE Std 1076-2008, IEEE Standard VHDL Language Reference Manual](https://standards.ieee.org/ieee/1076/3666/). Em trabalhos acadêmicos, cite-a com a entrada BibTeX abaixo:
 
@@ -86,7 +86,7 @@ Todos os identificadores de código devem ser escritos em **inglês**, enquanto 
 | Entidades, arquiteturas e pacotes | `snake_case` (exceto o topo estrutural `core`) | `stage_ex`, `control_unit`, `alu_consts`, `rtl` |
 | Portas de entrada (`in`) | Prefixo obrigatório `i_` + `snake_case` | `i_clk`, `i_rst`, `i_rs1_val`, `i_pipe_run` |
 | Portas de saída (`out`) | Prefixo obrigatório `o_` + `snake_case` | `o_alu_out`, `o_we_reg`, `o_stall`, `o_wb_data` |
-| Generics | `snake_case` descritivo | `data_width`, `addr_width`, `has_m`, `has_zicsr` |
+| Generics | `snake_case` descritivo | `data_width`, `addr_width`, `tick_cycles`, `hpm_width` |
 | Constantes (`constant`) | `UPPER_SNAKE_CASE` | `WORD_WIDTH`, `ALU_ADD`, `OPCODE_JALR`, `REG_ZERO` |
 | Tipos e subtipos (`type`, `subtype`) | `snake_case` com sufixo `_t` | `word_t`, `reg_idx_t`, `alu_op_t`, `ctrl_bus_t` |
 | Sinais e variáveis internas | `snake_case` (prefixado pelo estágio quando aplicável) | `ex_alu_result`, `id_imm`, `wb_ram_raw` |
@@ -146,7 +146,7 @@ O projeto segue a prática de *Design for Reuse* descrita no *Reuse Methodology 
 | 4 | **Portas enxutas:** a entidade expõe somente as portas e os generics que usa | Sinais ou generics "para uso futuro" não entram em uma entidade |
 | 5 | **Dependência apenas das portas:** o nível superior conhece a declaração da entidade, nunca detalhes internos de sua arquitetura | O topo nunca carrega lógica fina de implementação |
 | 6 | **Composição com blocos-folha já verificados:** reaproveitar primitivos existentes | Não reimplementar com processos ou operadores redundantes o que um primitivo ou um sinal já calculado fornece |
-| 7 | **Extensões como blocos opcionais:** cada extensão reside em diretório próprio, habilitada por generic booleano no topo `core`, e se comporta como `NOP` quando desabilitada | Contrato em [docs/pt-br/contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md); o topo `src/core/core.vhd` apenas conecta os cinco estágios e os quatro registradores de barreira |
+| 7 | **Extensões como blocos opcionais:** cada extensão reside em diretório próprio, habilitada por uma constante booleana do `config_pkg` lida pelo `core`, e se comporta como `NOP` quando desabilitada | Contrato em [docs/pt-br/contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md); o topo `src/core/core.vhd` apenas conecta os cinco estágios e os quatro registradores de barreira |
 
 ## 6. Normas Python
 
