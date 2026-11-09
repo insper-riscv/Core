@@ -34,166 +34,168 @@ use work.ext_ram_consts.all;
 use work.mem_map_consts.all;
 
 entity misaligned_unit is
-	generic (
-		-- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
-		flags_registered : boolean := false
-	);
-	port (
-		-- Sinal de clock principal.
-		i_clk        : in  std_logic;
-		-- Reset assíncrono ativo em '1'.
-		i_rst        : in  std_logic;
-		-- Bit de validade da instrução no estágio MEM.
-		i_valid      : in  std_logic;
-		-- Habilitação geral de acesso à memória da instrução em MEM.
-		i_en         : in  std_logic;
-		-- A instrução em MEM é um load.
-		i_re         : in  std_logic;
-		-- A instrução em MEM é um store.
-		i_we         : in  std_logic;
-		-- Operação de extensão do load em MEM (EXT_RAM_LW, EXT_RAM_LH, EXT_RAM_LHU, EXT_RAM_LB, EXT_RAM_LBU).
-		i_ext_op     : in  ext_ram_op_t;
-		-- Máscara de bytes do store em MEM, como saiu do store_manager.
-		i_byte_mask  : in  byte_mask_t;
-		-- O endereço efetivo cai na janela externa, a SDRAM (com flags_registered).
-		i_is_sdram   : in  std_logic := '0';
-		-- Endereço efetivo do acesso em MEM.
-		i_addr       : in  word_t;
-		-- Dado do store em MEM, como saiu do store_manager.
-		i_store_data : in  word_t;
-		-- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
-		i_ready      : in  std_logic;
-		-- A memória avança neste ciclo (o pipeline não está parado por multdiv nem por espera da SDRAM).
-		i_advance    : in  std_logic;
-		-- O pipeline avança neste ciclo e a instrução deixa o estágio MEM.
-		i_base_run   : in  std_logic;
-		-- Palavra lida da RAM interna.
-		i_ram_rdata  : in  word_t;
-		-- Palavra lida da SDRAM.
-		i_ext_rdata : in word_t;
-		-- A instrução em MEM cruza a palavra e é executada por esta unidade.
-		o_cross      : out std_logic;
-		-- Estamos na etapa 1 de um acesso que cruza: o pipeline deve esperar.
-		o_stall      : out std_logic;
-		-- Endereço da etapa corrente (palavra da etapa 1 ou palavra seguinte na etapa 2).
-		o_addr       : out word_t;
-		-- Dado de escrita da etapa corrente.
-		o_data       : out word_t;
-		-- Máscara de bytes da etapa corrente (zero em loads).
-		o_mask       : out byte_mask_t;
-		-- Palavra lida na etapa 1, retida para o estágio WB.
-		o_first_word : out word_t
-	);
+    generic (
+        -- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
+        flags_registered : boolean := false
+    );
+    port (
+        -- Sinal de clock principal.
+        i_clk        : in    std_logic;
+        -- Reset assíncrono ativo em '1'.
+        i_rst        : in    std_logic;
+        -- Bit de validade da instrução no estágio MEM.
+        i_valid      : in    std_logic;
+        -- Habilitação geral de acesso à memória da instrução em MEM.
+        i_en         : in    std_logic;
+        -- A instrução em MEM é um load.
+        i_re         : in    std_logic;
+        -- A instrução em MEM é um store.
+        i_we         : in    std_logic;
+        -- Operação de extensão do load em MEM (EXT_RAM_LW, EXT_RAM_LH, EXT_RAM_LHU, EXT_RAM_LB, EXT_RAM_LBU).
+        i_ext_op     : in    ext_ram_op_t;
+        -- Máscara de bytes do store em MEM, como saiu do store_manager.
+        i_byte_mask  : in    byte_mask_t;
+        -- O endereço efetivo cai na janela externa, a SDRAM (com flags_registered).
+        i_is_sdram   : in    std_logic := '0';
+        -- Endereço efetivo do acesso em MEM.
+        i_addr       : in    word_t;
+        -- Dado do store em MEM, como saiu do store_manager.
+        i_store_data : in    word_t;
+        -- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
+        i_ready      : in    std_logic;
+        -- A memória avança neste ciclo (o pipeline não está parado por multdiv nem por espera da SDRAM).
+        i_advance    : in    std_logic;
+        -- O pipeline avança neste ciclo e a instrução deixa o estágio MEM.
+        i_base_run   : in    std_logic;
+        -- Palavra lida da RAM interna.
+        i_ram_rdata  : in    word_t;
+        -- Palavra lida da SDRAM.
+        i_ext_rdata  : in    word_t;
+        -- A instrução em MEM cruza a palavra e é executada por esta unidade.
+        o_cross      : out   std_logic;
+        -- Estamos na etapa 1 de um acesso que cruza: o pipeline deve esperar.
+        o_stall      : out   std_logic;
+        -- Endereço da etapa corrente (palavra da etapa 1 ou palavra seguinte na etapa 2).
+        o_addr       : out   word_t;
+        -- Dado de escrita da etapa corrente.
+        o_data       : out   word_t;
+        -- Máscara de bytes da etapa corrente (zero em loads).
+        o_mask       : out   byte_mask_t;
+        -- Palavra lida na etapa 1, retida para o estágio WB.
+        o_first_word : out   word_t
+    );
 end entity misaligned_unit;
 
 architecture rtl of misaligned_unit is
 
-	-- Dois bits menos significativos do endereço efetivo: posição do primeiro byte na palavra.
-	signal offset         : byte_offset_t;
-	-- Load que ocupa duas palavras (LW fora do offset 0, LH ou LHU no offset 3).
-	signal load_cross     : std_logic;
-	-- Store que ocupa duas palavras (SW fora do offset 0, SH no offset 3).
-	signal store_cross    : std_logic;
-	-- O acesso cruza a palavra e a unidade está ligada.
-	signal cross          : std_logic;
-	-- O endereço pertence à janela da SDRAM.
-	signal is_sdram       : std_logic;
-	-- A etapa corrente pode concluir: a RAM sempre, a SDRAM quando o escravo está pronto.
-	signal step_ok        : std_logic;
-	-- '1' durante a etapa 2.
-	signal second         : std_logic;
-	-- A etapa 1 conclui neste ciclo.
-	signal first_done     : std_logic;
-	-- Habilita a mudança de etapa.
-	signal second_enable  : std_logic;
-	-- Primeiro ciclo da etapa 2: o único em que a saída da memória ainda é a palavra da etapa 1.
-	signal second_start   : std_logic;
-	-- Dado do store ajustado para 32 bits, sem o deslocamento do store_manager.
-	signal raw_data       : word_t;
-	-- Máscara de bytes do store sem deslocamento (1111 para SW, 0011 para SH).
-	signal raw_mask       : byte_mask_t;
-	-- Dado do store posicionado no par de palavras (etapa 2 nos bits [63:32]).
-	signal data64         : std_logic_vector(63 downto 0);
-	-- Máscara do store posicionada no par de palavras (etapa 2 nos bits [7:4]).
-	signal mask8          : std_logic_vector(7 downto 0);
-	-- Palavra seguinte à do primeiro byte.
-	signal next_word      : unsigned(29 downto 0);
-	-- Palavra lida pela região do acesso, a ser guardada na etapa 2.
-	signal region_rdata   : word_t;
+    -- Dois bits menos significativos do endereço efetivo: posição do primeiro byte na palavra.
+    signal offset        : byte_offset_t;
+    -- Load que ocupa duas palavras (LW fora do offset 0, LH ou LHU no offset 3).
+    signal load_cross    : std_logic;
+    -- Store que ocupa duas palavras (SW fora do offset 0, SH no offset 3).
+    signal store_cross   : std_logic;
+    -- O acesso cruza a palavra e a unidade está ligada.
+    signal cross         : std_logic;
+    -- O endereço pertence à janela da SDRAM.
+    signal is_sdram      : std_logic;
+    -- A etapa corrente pode concluir: a RAM sempre, a SDRAM quando o escravo está pronto.
+    signal step_ok       : std_logic;
+    -- '1' durante a etapa 2.
+    signal second        : std_logic;
+    -- A etapa 1 conclui neste ciclo.
+    signal first_done    : std_logic;
+    -- Habilita a mudança de etapa.
+    signal second_enable : std_logic;
+    -- Primeiro ciclo da etapa 2: o único em que a saída da memória ainda é a palavra da etapa 1.
+    signal second_start  : std_logic;
+    -- Dado do store ajustado para 32 bits, sem o deslocamento do store_manager.
+    signal raw_data      : word_t;
+    -- Máscara de bytes do store sem deslocamento (1111 para SW, 0011 para SH).
+    signal raw_mask      : byte_mask_t;
+    -- Dado do store posicionado no par de palavras (etapa 2 nos bits [63:32]).
+    signal data64        : std_logic_vector(63 downto 0);
+    -- Máscara do store posicionada no par de palavras (etapa 2 nos bits [7:4]).
+    signal mask8         : std_logic_vector(7 downto 0);
+    -- Palavra seguinte à do primeiro byte.
+    signal next_word     : unsigned(29 downto 0);
+    -- Palavra lida pela região do acesso, a ser guardada na etapa 2.
+    signal region_rdata  : word_t;
 
 begin
 
-	offset <= i_addr(1 downto 0);
+    offset <= i_addr(1 downto 0);
 
-	load_cross <= '1' when (i_re = '1' and
-	                        ((i_ext_op = EXT_RAM_LW and offset /= BYTE_OFFSET_0) or
-	                         ((i_ext_op = EXT_RAM_LH or i_ext_op = EXT_RAM_LHU) and offset = BYTE_OFFSET_3)))
-	              else '0';
+    load_cross <= '1' when (i_re = '1' and
+                               ((i_ext_op = EXT_RAM_LW and offset /= BYTE_OFFSET_0) or
+                                   ((i_ext_op = EXT_RAM_LH or i_ext_op = EXT_RAM_LHU) and offset = BYTE_OFFSET_3))) else
+                  '0';
 
-	store_cross <= '1' when (i_we = '1' and
-	                         ((i_byte_mask = BYTE_MASK_WORD and offset /= BYTE_OFFSET_0) or
-	                          (i_byte_mask = BYTE_MASK_HALF_HIGH and offset = BYTE_OFFSET_3)))
-	               else '0';
+    store_cross <= '1' when (i_we = '1' and
+                                ((i_byte_mask = BYTE_MASK_WORD and offset /= BYTE_OFFSET_0) or
+                                    (i_byte_mask = BYTE_MASK_HALF_HIGH and offset = BYTE_OFFSET_3))) else
+                   '0';
 
-	cross <= (i_valid and i_en and (load_cross or store_cross)) when HAS_ZICCLSM else '0';
+    cross <= (i_valid and i_en and (load_cross or store_cross)) when HAS_ZICCLSM else '0';
 
-	is_sdram <= i_is_sdram when flags_registered else
-	            '1' when is_external_addr(unsigned(i_addr)) else '0';
-	step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
+    is_sdram <= i_is_sdram when flags_registered else
+                '1' when is_external_addr(unsigned(i_addr)) else
+                '0';
+    step_ok  <= '1' when (is_sdram = '0' or i_ready = '1') else '0';
 
-	first_done    <= cross and (not second) and step_ok and i_advance;
-	second_enable <= first_done or (second and i_base_run);
+    first_done    <= cross and (not second) and step_ok and i_advance;
+    second_enable <= first_done or (second and i_base_run);
 
-	u_second_ff : entity work.flip_flop
-		port map (
-			i_d      => first_done,
-			o_d      => second,
-			i_enable => second_enable,
-			i_clk    => i_clk,
-			i_rst    => i_rst
-		);
+    u_second_ff : entity work.flip_flop
+        port map (
+            i_d      => first_done,
+            o_d      => second,
+            i_enable => second_enable,
+            i_clk    => i_clk,
+            i_rst    => i_rst
+        );
 
-	-- A RAM interna responde ao endereço do ciclo anterior, então no primeiro ciclo da etapa 2 ela ainda entrega a
-	-- palavra da etapa 1 e nos seguintes a da etapa 2. Se a etapa 2 for segurada por um stall de EX, como uma
-	-- multiplicação, o registrador não pode continuar capturando, ou perde a primeira palavra.
-	u_second_start_ff : entity work.flip_flop
-		port map (
-			i_d      => first_done,
-			o_d      => second_start,
-			i_enable => '1',
-			i_clk    => i_clk,
-			i_rst    => i_rst
-		);
+    -- A RAM interna responde ao endereço do ciclo anterior, então no primeiro ciclo da etapa 2 ela ainda entrega a
+    -- palavra da etapa 1 e nos seguintes a da etapa 2. Se a etapa 2 for segurada por um stall de EX, como uma
+    -- multiplicação, o registrador não pode continuar capturando, ou perde a primeira palavra.
+    u_second_start_ff : entity work.flip_flop
+        port map (
+            i_d      => first_done,
+            o_d      => second_start,
+            i_enable => '1',
+            i_clk    => i_clk,
+            i_rst    => i_rst
+        );
 
-	raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else
-	            std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
-	raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
+    raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else
+                std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
+    raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
 
-	data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length), BYTE_WIDTH * to_integer(unsigned(offset))));
-	mask8  <= std_logic_vector(shift_left(resize(unsigned(raw_mask), mask8'length), to_integer(unsigned(offset))));
+    data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length),
+                                          BYTE_WIDTH * to_integer(unsigned(offset))));
+    mask8  <= std_logic_vector(shift_left(resize(unsigned(raw_mask), mask8'length), to_integer(unsigned(offset))));
 
-	next_word <= unsigned(i_addr(31 downto 2)) + 1;
+    next_word <= unsigned(i_addr(31 downto 2)) + 1;
 
-	o_cross <= cross;
-	o_stall <= cross and (not second);
-	o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & BYTE_OFFSET_0;
-	o_data  <= data64(31 downto 0) when second = '0' else data64(63 downto 32);
-	o_mask  <= BYTE_MASK_NONE when i_we = '0' else
-	           mask8(3 downto 0) when second = '0' else
-	           mask8(7 downto 4);
+    o_cross <= cross;
+    o_stall <= cross and (not second);
+    o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & BYTE_OFFSET_0;
+    o_data  <= data64(31 downto 0) when second = '0' else data64(63 downto 32);
+    o_mask  <= BYTE_MASK_NONE when i_we = '0' else
+               mask8(3 downto 0) when second = '0' else
+               mask8(7 downto 4);
 
-	region_rdata <= i_ext_rdata when is_sdram = '1' else i_ram_rdata;
+    region_rdata <= i_ext_rdata when is_sdram = '1' else i_ram_rdata;
 
-	u_first_word_reg : entity work.generic_register
-		generic map (
-			data_width => word_t'length
-		)
-		port map (
-			i_clk    => i_clk,
-			i_rst    => i_rst,
-			i_enable => second_start,
-			i_d      => region_rdata,
-			o_d      => o_first_word
-		);
+    u_first_word_reg : entity work.generic_register
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => second_start,
+            i_d      => region_rdata,
+            o_d      => o_first_word
+        );
 
 end architecture rtl;

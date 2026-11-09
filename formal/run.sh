@@ -384,10 +384,10 @@ mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl ge
   REPLACES="$1" netlist "$copy" "$3" "mut_$5" ${7:-}
   expect "mutant $5 is caught" FAIL "$(prove "mut_$5.v" "$2" bmc "${8:-8}" "$4" "mut_$5")"
 }
-mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0'          when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
-mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1'         when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
+mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0' \+when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
+mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1' \+when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
 mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_value(31 downto 2) \& BYTE_OFFSET_0;/new_value;/"
-mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt  <= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
+mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt \+<= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
@@ -395,16 +395,16 @@ mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' in_word_any_region  "s/in
 mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_exc <= fetch_fault or cf_misal or any_illegal or/has_exc <= fetch_fault or cf_misal or/"
 mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
 
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT   when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT \+when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned "s/ and st_misal = '0') else '0';/) else '0';/;s/CAUSE_MISALIGNED_ST when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc        when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT   when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned ":a;N;\$!ba;s/[[:space:]]\+and[[:space:]]\+st_misal[[:space:]]\+=[[:space:]]\+'0')[[:space:]]\+else[[:space:]]\+'0';/) else '0';/;s/CAUSE_MISALIGNED_ST[[:space:]]\+when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc \+when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
+mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT \+when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
 
 # Mutants of the interrupt entry in the trap unit and in the CSR bank, one defect each.
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_keeps_mret   "s/ and (not irq_go);/;/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_aborts_fencei "s/ and (not is_fencei);/;/"
-mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_dirty_tval   "s/o_tval  <= (others => '0') when irq_go = '1' else/o_tval  <= i_ea when irq_go = '1' else/"
+mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_dirty_tval   "s/o_tval \+<= (others => '0') when irq_go = '1' else/o_tval  <= i_ea when irq_go = '1' else/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_loses_to_exception "s/o_cause <= i_irq_cause when irq_go = '1' else/o_cause <= i_irq_cause when (irq_go = '1' and has_exc = '0') else/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_run  "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_ex_valid and/"
 mutant "$trap" "$trap_props" trap_unit  '-DIRQ'         irq_ignores_valid "s/i_irq_take and i_ex_valid and i_run and/i_irq_take and i_run and/"
@@ -428,8 +428,8 @@ mutant_tree() {  # <name> <sed expression>
   TREE_REPLACES="src/core/stage_ex.vhd" TREE_COPY="$copy" netlist_tree stage_ex "mut_$1" $ex_gens
   expect "mutant $1 is caught" FAIL "$(prove "mut_$1.v" "$stage_props" bmc 14 '' "mut_$1")"
 }
-mutant_tree stage_irq_mepc_next "s/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc;/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc4;/"
-mutant_tree stage_irq_vector_ignored "s/irq_vector_pc  when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/csr_mtvec when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/"
+mutant_tree stage_irq_mepc_next "s/i_mem_trap_pc \+when i_mem_trap_take = '1' else i_pc;/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc4;/"
+mutant_tree stage_irq_vector_ignored "s/irq_vector_pc \+when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/csr_mtvec when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/"
 mutant_tree stage_irq_vector_wrong_bits "s/csr_mtvec(31 downto 6) \& trap_cause(3 downto 0) \& BYTE_OFFSET_0;/csr_mtvec(31 downto 6) \& trap_cause(4 downto 1) \& BYTE_OFFSET_0;/"
 mutant_tree stage_irq_vector_for_exceptions "s/(trap_is_irq = '1' and csr_mtvec_vec = '1')/(trap_take_int = '1' and csr_mtvec_vec = '1')/"
 mutant_tree stage_irq_cause_lost "s/i_irq_cause   => irq_cause,/i_irq_cause   => (others => '0'),/"
@@ -477,14 +477,14 @@ hpm4="-ghas_zihpm=true -ghpm_counters=4 -ghpm_width=64"
 hpm2="-ghas_zihpm=true -ghpm_counters=2 -ghpm_width=40"
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_ignored "s/(not inhibit_q(n - HPM_FIRST_INDEX))/'1'/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_table_ignored "s/events_valid <= i_events and EVENT_TABLE_MASK;/events_valid <= i_events;/" "$hpm4" 6
-mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_absent_not_zero "s/lo_rows(n)    <= (others => '0');/lo_rows(n)    <= (others => '1');/" "$hpm4" 6
+mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_absent_not_zero "s/lo_rows(n) \+<= (others => '0');/lo_rows(n)    <= (others => '1');/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=2 -DWIDTH=40' hpm_width_ignored "s/width => hpm_width/width => 64/" "$hpm2" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_inhibit_reserved_bits "s/inhibit_q(HPM_MAX_COUNTERS - 1 downto REAL_COUNTERS) <= (others => '0');/inhibit_q(HPM_MAX_COUNTERS - 1 downto REAL_COUNTERS) <= (others => '1');/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_write_lost "s/i_we_lo => lo_we,/i_we_lo => '0',/" "$hpm4" 6
 mutant_bank "$bank" "$csr_hpm_props" '-DNHPM=4' hpm_event_write_lost "s/i_enable => event_we,/i_enable => '0',/" "$hpm4" 6
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_mirror_writable "s/is_read_only     <= '1' when i_addr(11 downto 10) = CSR_ADDR_READ_ONLY else '0';/is_read_only     <= '0';/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal "s/(idx_is_hpm and (in_event_range or in_lo_range or in_hi_range or (to_sl(HAS_SSCOF) and in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
-mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range   <= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal ":a;N;\$!ba;s/(idx_is_hpm[[:space:]]\+and[[:space:]]\+(in_event_range[[:space:]]\+or[[:space:]]\+in_lo_range[[:space:]]\+or[[:space:]]\+in_hi_range[[:space:]]\+or[[:space:]]\+(to_sl(HAS_SSCOF)[[:space:]]\+and[[:space:]]\+in_eventh_range)))/(in_event_range or in_lo_range or in_hi_range)/" "$hpm4" 6
+mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range \+<= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
 mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(31 downto 0);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
@@ -493,10 +493,10 @@ mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_request_ignores_of "s/ovf_req(n)
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d      <= wrap or i_wdata(31);/of_d      <= i_wdata(31);/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_of_not_sticky "s/of_en     <= wrap or eventh_we;/of_en     <= eventh_we;/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI    when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost "s/lcofip_we  <= ovf_irq or (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI \+when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost ":a;N;\$!ba;s/lcofip_we[[:space:]]\+<=[[:space:]]\+ovf_irq[[:space:]]\+or[[:space:]]\+(csr_write_valid[[:space:]]\+and[[:space:]]\+to_sl(i_addr[[:space:]]\+=[[:space:]]\+ADDR_MIP)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_trap_take)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofie_ignored "s/lcofi_pend <= lcofip and lcofie;/lcofi_pend <= lcofip;/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range  <= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range \+<= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
 
 # Mutants of the interrupts in csr_file, one defect each.
 PROBES="$irq_probes"
@@ -542,20 +542,20 @@ core_mutant() {  # <name> <sed expression> <mode: bmc|cover> <defines>
   CORE_FILE="$copy" core_netlist "mut_$1" -ghas_zicsr=true
   expect "mutant $1 is caught" FAIL "$(prove "mut_$1.v" "$core_props" "$3" 10 "$4" "mut_$1")"
 }
-core_mutant take_always "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
-core_mutant take_never  "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
-core_mutant take_with_retire "s/o_trap_take   <= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
+core_mutant take_always "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
+core_mutant take_never  "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
+core_mutant take_with_retire "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
 CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_slots_ignored "s/periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH))/(others => '1')/" "$exmem_gens" 6
 CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_strict_inverted "s/to_sl(not STRICT_PERIPH)/to_sl(STRICT_PERIPH)/" "$exmem_gens" 6
-mutant "$alu" "$alu_props" alu '' alu_sra_fill_ignored   "s/shift_fill   <= op_inv and i_a(data_width-1);/shift_fill   <= '0';/" "" 2
-mutant "$alu" "$alu_props" alu '' alu_slt_wrong_bit      "s/else sum_ext(data_width-1);/else sum_ext(data_width);/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_sra_fill_ignored   "s/shift_fill \+<= op_inv and i_a(data_width *- *1);/shift_fill   <= '0';/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_slt_wrong_bit      "s/\(else[[:space:]]\+\|^[[:space:]]*\)sum_ext(data_width *- *1);/\1sum_ext(data_width);/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_jalr_keeps_bit0    "s/(sum_ext(0) and not is_jalr)/sum_ext(0)/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_srl_digit_two      "s/shift_right_fill(shr_stage(p), 2 \* 4 \*\* p, shift_fill) when SHIFT_DIGIT_2/shift_right_fill(shr_stage(p), 3 * 4 ** p, shift_fill) when SHIFT_DIGIT_2/" "" 2
-mutant "$alu" "$alu_props" alu '' alu_sll_digit_one      "s/shift_left_zero(shl_stage(p), 1 \* 4 \*\* p)     when SHIFT_DIGIT_1/shift_left_zero(shl_stage(p), 2 * 4 ** p)     when SHIFT_DIGIT_1/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_sll_digit_one      "s/shift_left_zero(shl_stage(p), 1 \* 4 \*\* p) \+when SHIFT_DIGIT_1/shift_left_zero(shl_stage(p), 2 * 4 ** p)     when SHIFT_DIGIT_1/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_bgeu_inverted      "s/is_branch and not lt_unsigned  *when FUNCT3_BGEU/is_branch and lt_unsigned when FUNCT3_BGEU/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_equal_low_bit      "s/'1' when i_a = i_b else '0'/'1' when i_a(data_width-1 downto 1) = i_b(data_width-1 downto 1) else '0'/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_lui_adds_a         "s/(others => '0') when is_lui = '1' else i_a/i_a/" "" 2
-mutant "$alu" "$alu_props" alu '' alu_sub_no_carry       "s/carry_in  <= (0 => op_inv);/carry_in  <= (0 => '0');/" "" 2
+mutant "$alu" "$alu_props" alu '' alu_sub_no_carry       "s/carry_in \+<= (0 => op_inv);/carry_in  <= (0 => '0');/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_xor_selects_or     "s/and (i_a xor i_b)/and (i_a or i_b)/" "" 2
 
 [ -s "$warnings" ] && { echo "formal: $(wc -l < "$warnings") warning(s) found; a warning is an error (see above)"; fail=1; }

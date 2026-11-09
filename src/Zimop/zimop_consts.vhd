@@ -13,15 +13,15 @@ use ieee.std_logic_1164.all;
 
 package zimop_consts is
 
-	-- Valor fixo do bit 31 das 40 instruções.
-	constant ZIMOP_BIT31       : std_logic := '1';
-	-- Valor fixo dos bits [29:28] das 40 instruções.
-	constant ZIMOP_BITS_29_28  : std_logic_vector(1 downto 0) := "00";
-	-- Valor do bit 25 que distingue mop.r.n ('0') de mop.rr.n ('1').
-	constant ZIMOP_BIT25_R     : std_logic := '0';
-	-- Valor do bit 25 de mop.rr.n.
-	constant ZIMOP_BIT25_RR    : std_logic := '1';
-	-- Valor fixo dos bits [24:22] de mop.r.n.
-	constant ZIMOP_BITS_24_22  : std_logic_vector(2 downto 0) := "111";
+    -- Valor fixo do bit 31 das 40 instruções.
+    constant ZIMOP_BIT31      : std_logic                    := '1';
+    -- Valor fixo dos bits [29:28] das 40 instruções.
+    constant ZIMOP_BITS_29_28 : std_logic_vector(1 downto 0) := "00";
+    -- Valor do bit 25 que distingue mop.r.n ('0') de mop.rr.n ('1').
+    constant ZIMOP_BIT25_R    : std_logic                    := '0';
+    -- Valor do bit 25 de mop.rr.n.
+    constant ZIMOP_BIT25_RR   : std_logic                    := '1';
+    -- Valor fixo dos bits [24:22] de mop.r.n.
+    constant ZIMOP_BITS_24_22 : std_logic_vector(2 downto 0) := "111";
 
 end package zimop_consts;
