@@ -12,7 +12,7 @@ Um perfil é uma combinação de extensões do RISC-V que o `core` implementa, e
 
 ## 2. Matriz
 
-A matriz é a fonte única dos perfis válidos. O comando `riscv-tools profiles --spec profiles/matrix.yaml` a expande em 480 perfis, e o alvo `profile-matrix` do `Makefile` gera o `config_pkg` de cada um (`formal/build_profile.sh`, que troca o pacote padrão de `src/common` por uma variante de `formal/config_variant.sh`), analisa as fontes com ele e elabora o `core`, em paralelo.
+A matriz é a fonte única dos perfis válidos. O comando `riscv-tools profiles --spec profiles/matrix.yaml` a expande em 480 perfis, e o alvo `profile-matrix` do `Makefile`, que por padrão constrói um perfil a cada `MATRIX_STRIDE` (5, ou seja, 96 dos 480, por causa do limite de 15 minutos do job da CI; `MATRIX_STRIDE=1` constrói todos), gera o `config_pkg` de cada um (`formal/build_profile.sh`, que troca o pacote padrão de `src/common` por uma variante de `formal/config_variant.sh`), analisa as fontes com ele e elabora o `core`, em paralelo.
 
 ### 2.1. Bases e extensões
 
