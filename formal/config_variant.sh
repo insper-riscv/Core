@@ -30,8 +30,8 @@ for item in $line; do
     0x*) new="$(printf 'resize(unsigned'"'"'(x"%08X"), ADDR_BITS + 1)' "$val")" ;;
     *) new="$val" ;;
   esac
-  grep -qE "^$(printf '\t')constant $key +:" "$out" || { echo "constante '$key' ausente no config_pkg" >&2; exit 1; }
-  sed -i -E "s/^(\tconstant $key +: +[a-z_]+ +:= ).*;\$/\1${new//&/\\&};/" "$out"
+  grep -qE "^[[:space:]]+constant $key +:" "$out" || { echo "constante '$key' ausente no config_pkg" >&2; exit 1; }
+  sed -i -E "s/^([[:space:]]+constant $key +: +[a-z_]+ +:= ).*;\$/\1${new//&/\\&};/" "$out"
 done
 [ "$name" = "--set" ] || ! cmp -s "$default" "$out" || { echo "variante '$name': nenhuma constante mudou o pacote" >&2; exit 1; }
 exit 0
