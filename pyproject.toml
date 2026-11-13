@@ -1,6 +1,6 @@
 [project]
 name = "riscv-core"
-version = "0.8.0"
+version = "0.8.1"
 description = "RV32 pipeline core in VHDL, organized by ISA extension, with per-entity cocotb tests."
 license = "Apache-2.0"
 # Same Python as the ci-vhdl image of Infra, which also carries riscv-tools.

@@ -36,7 +36,7 @@ entity reg_mem_wb is
         -- Resultado calculado no estágio EX (palavra completa para WB e bits [1:0] para o ExtenderRAM).
         i_alu_out    : in    word_t;
         -- Endereço do registrador destino rd.
-        i_rd         : in    reg_field_t;
+        i_rd         : in    reg_t;
         -- Habilita escrita no banco de registradores no estágio WB.
         i_we_reg     : in    std_logic;
         -- Modo de extensão de leitura da memória de dados para o ExtenderRAM.
@@ -48,7 +48,7 @@ entity reg_mem_wb is
         -- Resultado do estágio EX registrado para o estágio WB.
         o_alu_out    : out   word_t;
         -- Endereço de rd registrado para o estágio WB (banco de registradores e Forwarding Unit).
-        o_rd         : out   reg_field_t;
+        o_rd         : out   reg_t;
         -- Habilitação de escrita no banco de registradores registrada para o estágio WB.
         o_we_reg     : out   std_logic;
         -- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
@@ -73,7 +73,7 @@ architecture rtl of reg_mem_wb is
     -- Resultado do estágio EX armazenado.
     signal r_alu_out    : word_t       := (others => '0');
     -- Endereço de rd armazenado.
-    signal r_rd         : reg_field_t  := (others => '0');
+    signal r_rd         : reg_t  := (others => '0');
     -- Habilitação de escrita em registrador armazenada.
     signal r_we_reg     : std_logic    := '0';
     -- Validade e escrita em registrador armazenadas juntas.

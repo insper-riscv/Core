@@ -15,7 +15,7 @@ A constante booleana `IS_E` do `config_pkg` escolhe quantos registradores de uso
 | Item | `IS_E = false` | `IS_E = true` |
 | :--- | :--- | :--- |
 | Registradores | `x0` a `x31` | `x0` a `x15` |
-| Endereço do `reg_file` | 5 bits | 4 bits |
+| Índice de registrador depois do estágio ID (`reg_t`) | 5 bits | 4 bits |
 | Instrução com `x16` a `x31` | Executa | Ilegal, causa 2 do `mcause` com `HAS_ZICSR` |
 | Bit de base do `misa` com `HAS_ZICSR` | `I` (bit 8) | `E` (bit 4), e o bit `I` fica em zero |
 
@@ -42,7 +42,7 @@ Uma instrução ilegal não escreve nenhum registrador e segue a mesma via de ex
 
 ## 4. Compatibilidade
 
-O banco menor não muda o pipeline nem o adiantamento, que seguem comparando índices de 5 bits. Como a verificação de ilegalidade só depende de `IS_E`, ela é independente das demais extensões, e as 60 combinações de extensões de `profiles/matrix.yaml` valem tanto para a base de 32 registradores quanto para a de 16, o que dá 120 perfis.
+O estágio ID converte o campo de 5 bits da instrução (`reg_field_t`) no índice `reg_t` de `REG_BITS` bits, junto da checagem que recusa `x16` a `x31`. O adiantamento, a dependência de load, os registradores EX/MEM e MEM/WB e o write-back carregam `reg_t`. O campo de 5 bits fica só onde é codificação: os campos `rs1` e `rd` que chegam ao estágio EX (o imediato de 5 bits das instruções CSR e a checagem de `ECALL`, `EBREAK`, `MRET` e `WFI`) e os decodificadores. Como a verificação de ilegalidade só depende de `IS_E`, ela é independente das demais extensões, e as 60 combinações de extensões de `profiles/matrix.yaml` valem tanto para a base de 32 registradores quanto para a de 16, o que dá 120 perfis.
 
 Os programas do RV32E usam a ABI `ilp32e`, definida na [psABI do RISC-V](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (fora do manual de ISA), que só aloca registradores até `x15`.
 

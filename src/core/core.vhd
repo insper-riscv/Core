@@ -408,7 +408,7 @@ architecture rtl of core is
     -- Máscara de habilitação de bytes registrada em EX/MEM.
     signal exmem_byteena    : byte_mask_t;
     -- Índice do registrador destino rd registrado em EX/MEM.
-    signal exmem_rd_idx     : reg_field_t;
+    signal exmem_rd_idx     : reg_t;
     -- Habilitação de escrita em registrador registrada em EX/MEM.
     signal exmem_we_reg     : std_logic;
     -- A instrução em EX/MEM é válida e escreve em registrador.
@@ -432,7 +432,7 @@ architecture rtl of core is
     -- Resultado da ULA/execução registrado em MEM/WB.
     signal memwb_alu_out    : word_t;
     -- Índice do registrador destino rd registrado em MEM/WB.
-    signal memwb_rd_idx     : reg_field_t;
+    signal memwb_rd_idx     : reg_t;
     -- Habilitação de escrita em registrador registrada em MEM/WB.
     signal memwb_we_reg     : std_logic;
     -- A instrução em MEM/WB é válida e escreve em registrador.
@@ -448,7 +448,7 @@ architecture rtl of core is
     -- Habilitação final de escrita no banco de registradores.
     signal wb_we         : std_logic;
     -- Índice final do registrador destino rd para escrita no RegFile.
-    signal wb_rd         : reg_field_t;
+    signal wb_rd         : reg_t;
     -- Dado de 32 bits selecionado no estágio WB, como a memória o entrega neste ciclo.
     signal wb_data_raw   : word_t;
     -- Próximo valor de wb_repeat: o ciclo atual é um stall de EX/MEM (base_run = '0').
@@ -462,7 +462,7 @@ architecture rtl of core is
     -- Escrita no banco de registradores da instrução que saiu de WB no ciclo anterior (registrador WB2).
     signal wb2_we        : std_logic;
     -- Registrador destino rd da instrução em WB2.
-    signal wb2_rd        : reg_field_t;
+    signal wb2_rd        : reg_t;
     -- Dado final de write-back da instrução em WB2.
     signal wb2_data      : word_t;
 
@@ -601,7 +601,7 @@ begin
             i_memwb_rd      => memwb_rd_idx,
             i_memwb_we_reg  => memwb_we_reg,
             i_mem_re_ram    => exmem_re_ram,
-            i_ex_rd         => ex_rd_idx,
+            i_ex_rd         => ex_rd_idx(reg_t'range),
             i_ex_we_reg     => ex_we_reg,
             i_ex_re_ram     => ex_re_ram,
             i_pipe_stall    => pipe_stall,
@@ -783,7 +783,7 @@ begin
             i_ea          => ex_alu_result,
             i_store_data  => ex_store_data,
             i_byte_mask   => ex_store_byteena,
-            i_rd          => ex_rd_idx,
+            i_rd          => ex_rd_idx(reg_t'range),
             i_we_reg      => ex_we_reg,
             i_we_ram      => ex_we_ram,
             i_re_ram      => ex_re_ram,
@@ -977,7 +977,7 @@ begin
 
     u_wb2_rd_reg : entity work.generic_register
         generic map (
-            data_width => reg_field_t'length
+            data_width => reg_t'length
         )
         port map (
             i_clk    => i_clk,

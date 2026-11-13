@@ -28,17 +28,17 @@ entity hazard_detection_unit is
         -- Indica que a instrução presente no registrador IF/ID é válida.
         i_ifid_valid   : in    std_logic;
         -- Endereço do registrador fonte rs1 da instrução no estágio ID.
-        i_ifid_rs1     : in    reg_field_t;
+        i_ifid_rs1     : in    reg_t;
         -- Endereço do registrador fonte rs2 da instrução no estágio ID.
-        i_ifid_rs2     : in    reg_field_t;
+        i_ifid_rs2     : in    reg_t;
         -- Campo opcode da instrução no estágio ID (usado para identificar se lê rs1/rs2).
         i_ifid_opcode  : in    opcode_t;
         -- Endereço do registrador destino rd da instrução no estágio EX.
-        i_idex_rd      : in    reg_field_t;
+        i_idex_rd      : in    reg_t;
         -- Indica que a instrução no estágio EX é uma leitura de memória (load).
         i_idex_re_ram  : in    std_logic;
         -- Endereço do registrador destino rd da instrução no estágio MEM.
-        i_exmem_rd     : in    reg_field_t := (others => '0');
+        i_exmem_rd     : in    reg_t := (others => '0');
         -- Indica que a instrução no estágio MEM é uma leitura de memória (load).
         i_exmem_re_ram : in    std_logic   := '0';
         -- Parada global do pipeline (MulDiv, espera da memória externa ou FENCE.I).
@@ -87,11 +87,11 @@ begin
     -- Um load só entrega o dado alinhado ao registrador WB2, dois estágios depois de MEM; o dependente espera
     -- enquanto o load está em EX ou em MEM.
     load_use_hazard <= '1' when ((i_idex_re_ram = '1' and
-                                     i_idex_rd /= REG_ZERO and
+                                     i_idex_rd /= REG_IDX_ZERO and
                                      ((ifid_uses_rs1 = '1' and i_idex_rd = i_ifid_rs1) or
                                          (ifid_uses_rs2 = '1' and i_idex_rd = i_ifid_rs2))) or
                                     (i_exmem_re_ram = '1' and
-                                        i_exmem_rd /= REG_ZERO and
+                                        i_exmem_rd /= REG_IDX_ZERO and
                                         ((ifid_uses_rs1 = '1' and i_exmem_rd = i_ifid_rs1) or
                                             (ifid_uses_rs2 = '1' and i_exmem_rd = i_ifid_rs2)))) else
                        '0';

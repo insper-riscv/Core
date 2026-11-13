@@ -46,7 +46,7 @@ entity reg_ex_mem is
         -- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
         i_byte_mask   : in    byte_mask_t;
         -- Endereço do registrador destino rd.
-        i_rd          : in    reg_field_t;
+        i_rd          : in    reg_t;
         -- Habilita escrita no banco de registradores no estágio WB.
         i_we_reg      : in    std_logic;
         -- Habilita escrita na memória de dados no estágio MEM.
@@ -68,7 +68,7 @@ entity reg_ex_mem is
         -- Máscara de bytes registrada para o estágio MEM.
         o_byte_mask   : out   byte_mask_t;
         -- Endereço de rd registrado para o estágio MEM (e Forwarding Unit).
-        o_rd          : out   reg_field_t;
+        o_rd          : out   reg_t;
         -- Habilitação de escrita em registrador registrada para o estágio MEM.
         o_we_reg      : out   std_logic;
         -- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
@@ -118,7 +118,7 @@ architecture rtl of reg_ex_mem is
     -- Máscara de bytes armazenada.
     signal r_byte_mask  : byte_mask_t  := (others => '0');
     -- Endereço de rd armazenado.
-    signal r_rd         : reg_field_t  := (others => '0');
+    signal r_rd         : reg_t  := (others => '0');
     -- Habilitação de escrita em registrador armazenada.
     signal r_we_reg     : std_logic    := '0';
     -- Validade e escrita em registrador armazenadas juntas.

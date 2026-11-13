@@ -15,7 +15,7 @@ The boolean `IS_E` constant of the `config_pkg` chooses how many general-purpose
 | Item | `IS_E = false` | `IS_E = true` |
 | :--- | :--- | :--- |
 | Registers | `x0` to `x31` | `x0` to `x15` |
-| `reg_file` address | 5 bits | 4 bits |
+| Register index after the ID stage (`reg_t`) | 5 bits | 4 bits |
 | Instruction using `x16` to `x31` | Runs | Illegal, `mcause` 2 with `HAS_ZICSR` |
 | Base bit of `misa` with `HAS_ZICSR` | `I` (bit 8) | `E` (bit 4), and the `I` bit is zero |
 
@@ -42,7 +42,7 @@ An illegal instruction writes no register and takes the same exception path as a
 
 ## 4. Compatibility
 
-The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `IS_E`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
+The ID stage converts the 5-bit instruction field (`reg_field_t`) into the register index `reg_t` of `REG_BITS` bits, next to the check that refuses `x16` to `x31`. The forwarding, the load-use hazard, the EX/MEM and MEM/WB registers and the write-back carry `reg_t`. The 5-bit field stays only where it is an encoding: the `rs1` and `rd` fields that reach the EX stage (the 5-bit immediate of the CSR instructions and the check of `ECALL`, `EBREAK`, `MRET` and `WFI`) and the decoders. Since the illegal-instruction check depends only on `IS_E`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
 
 RV32E programs use the `ilp32e` ABI, defined in the [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (outside the ISA manual), which allocates registers only up to `x15`.
 
