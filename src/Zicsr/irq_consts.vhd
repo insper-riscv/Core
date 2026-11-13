@@ -9,6 +9,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 
@@ -34,13 +35,15 @@ package irq_consts is
     -- Largura do vetor interno de interrupções (software, timer e externa).
     constant IRQ_COUNT : natural := 3;
 
-    -- Código mcause da interrupção de software de máquina (0x80000003).
-    constant CAUSE_IRQ_SOFTWARE : word_t := x"80000003";
-    -- Código mcause da interrupção de timer de máquina (0x80000007).
-    constant CAUSE_IRQ_TIMER    : word_t := x"80000007";
-    -- Código mcause da interrupção externa de máquina (0x8000000B).
-    constant CAUSE_IRQ_EXTERNAL : word_t := x"8000000B";
-    -- Código mcause da interrupção de estouro de contador, LCOFI da Sscofpmf (0x8000000D).
-    constant CAUSE_IRQ_LCOFI    : word_t := x"8000000D";
+    -- Bit de interrupção do mcause, o mais significativo da palavra.
+    constant CAUSE_IRQ_FLAG : word_t := std_logic_vector(shift_left(to_unsigned(1, XLEN), XLEN - 1));
+    -- Código mcause da interrupção de software de máquina (bit de interrupção e código 3).
+    constant CAUSE_IRQ_SOFTWARE : word_t := CAUSE_IRQ_FLAG or std_logic_vector(to_unsigned(3, XLEN));
+    -- Código mcause da interrupção de timer de máquina (bit de interrupção e código 7).
+    constant CAUSE_IRQ_TIMER    : word_t := CAUSE_IRQ_FLAG or std_logic_vector(to_unsigned(7, XLEN));
+    -- Código mcause da interrupção externa de máquina (bit de interrupção e código 11).
+    constant CAUSE_IRQ_EXTERNAL : word_t := CAUSE_IRQ_FLAG or std_logic_vector(to_unsigned(11, XLEN));
+    -- Código mcause da interrupção de estouro de contador, LCOFI da Sscofpmf (bit de interrupção e código 13).
+    constant CAUSE_IRQ_LCOFI    : word_t := CAUSE_IRQ_FLAG or std_logic_vector(to_unsigned(13, XLEN));
 
 end package irq_consts;

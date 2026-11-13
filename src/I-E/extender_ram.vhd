@@ -53,10 +53,10 @@ begin
     -- Extensão de sinal ou zero conforme o tipo de instrução de load.
     with i_op select o_data <=
         i_data when EXT_RAM_LW,
-        (31 downto 16 => selected_half(15)) & selected_half when EXT_RAM_LH,
-        (31 downto 16 => '0') & selected_half when EXT_RAM_LHU,
-        (31 downto 8  => selected_byte(7)) & selected_byte when EXT_RAM_LB,
-        (31 downto 8  => '0') & selected_byte when EXT_RAM_LBU,
+        (XLEN - 1 downto 16 => selected_half(15)) & selected_half when EXT_RAM_LH,
+        (XLEN - 1 downto 16 => '0') & selected_half when EXT_RAM_LHU,
+        (XLEN - 1 downto 8  => selected_byte(7)) & selected_byte when EXT_RAM_LB,
+        (XLEN - 1 downto 8  => '0') & selected_byte when EXT_RAM_LBU,
         (others => '0') when others;
 
 end architecture rtl;

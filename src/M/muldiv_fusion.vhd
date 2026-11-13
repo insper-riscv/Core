@@ -79,7 +79,7 @@ begin
 
     u_rec_a : entity work.generic_register
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_clk    => i_clk,
@@ -91,7 +91,7 @@ begin
 
     u_rec_b : entity work.generic_register
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_clk    => i_clk,
@@ -115,7 +115,7 @@ begin
 
     u_rec_lo : entity work.generic_register
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_clk    => i_clk,
@@ -127,7 +127,7 @@ begin
 
     u_rec_hi : entity work.generic_register
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_clk    => i_clk,

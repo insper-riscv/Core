@@ -4,7 +4,7 @@ Without Zicsr the core has no CSRs: a trap is signalled on o_trap and
 the instruction has no effect.
 
 ECALL, EBREAK, an undefined encoding and a misaligned load and store to
-the peripheral window each raise o_trap for one cycle each, with the
+the direct flash each raise o_trap for one cycle each, with the
 mcause code on o_trap_cause and the instruction's PC on o_trap_pc. The
 core does not redirect the PC, writes no register and starts no memory
 access.
@@ -28,7 +28,7 @@ ECALL = 0x00000073
 EBREAK = 0x00100073
 UNDEFINED = 0xFFFFFFFF
 SENTINEL = 0x55
-PERIPHERAL = 0x80000
+FLASH_PAGE = 0x2
 
 
 def build():
@@ -36,7 +36,7 @@ def build():
     return [
         NOP,
         addi(24, 0, SENTINEL),
-        lui(16, PERIPHERAL),
+        lui(16, FLASH_PAGE),
         lui(7, RAM_BASE >> 12),
         ECALL,
         EBREAK,

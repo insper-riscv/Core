@@ -133,7 +133,7 @@ begin
 
     -- mcountinhibit: os bits de 0 a 2 não pertencem ao banco e leem zero aqui.
     inhibit_word(2 downto 0)  <= (others => '0');
-    inhibit_word(31 downto 3) <= inhibit_q;
+    inhibit_word((XLEN - 1) downto 3) <= inhibit_q;
     inhibit_we                <= i_we and i_sel_inhibit;
 
     inhibit_q(HPM_MAX_COUNTERS - 1 downto REAL_COUNTERS) <= (others => '0');

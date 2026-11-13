@@ -17,10 +17,10 @@ The two data paths of the Core have different timing contracts, and that decides
 
 | Path | Range | Wait |
 | :--- | :--- | :--- |
-| Internal RAM | `0x00008000` to `0x3FFFFFFF` | None. The answer always arrives one cycle after the address |
-| External bus | `0x40000000` onwards | By the ready signal, of variable length |
+| Direct RAM | `0x00008000` to `0x3FFFFFFF` by default | None. The answer always arrives one cycle after the address |
+| External port | The FLASH and the RAM on the bus and what lies outside the three regions, from `0x40000000` by default | By the ready signal, of variable length |
 
-In the map with external FLASH, chosen by the `ROM_EXTERNAL` constant, there is no internal RAM, and the FLASH at `0x20000000` also answers through the external bus.
+With the FLASH on the bus, chosen by the `FLASH_ON_BUS` constant, the FLASH also answers through the external port.
 
 ## 2. Relation Between the Widths
 

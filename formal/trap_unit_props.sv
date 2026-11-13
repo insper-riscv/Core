@@ -90,25 +90,34 @@ module props (input clk);
   end
 
 `ifdef ZICCLSM_ON
-  // With Zicclsm the main memory (RAM and SDRAM, [0x8000, 0x80000000)) runs a misaligned access when its two words
-  // lie in the same region, and everything else traps with cause 4 or 6.
+  // With Zicclsm the main memory (everything above the BOOT_MEMORY and the direct FLASH) runs a misaligned access when
+  // its two words lie in the same region of its own path, and everything else traps with cause 4 or 6. The regions
+  // are the ones of the map: the BOOT_MEMORY and the direct FLASH are never main memory, and the main memory is cut
+  // at the edges of the FLASH, of the RAM and of the address space.
   wire is_load  = opcode == LOAD  && (funct3 == 3'b010 || funct3[1:0] == 2'b01 || funct3[1:0] == 2'b00 || funct3 == 3'b100);
   wire is_store = opcode == STORE && (funct3 == 3'b010 || funct3 == 3'b001 || funct3 == 3'b000);
   wire unaligned = ((funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[0]));
   wire [31:0] next_word = {ea[31:2] + 30'd1, 2'b00};
 `ifdef EXT_FLASH
-  // Memory map of the sdram platform: the flash is [0x20000000, 0x40000000) and the SDRAM [0x40000000, 0x60000000).
-  wire ram_pair  = ea >= 32'h20000000 && ea < 32'h40000000 && next_word >= 32'h20000000 && next_word < 32'h40000000;
-  wire sdram_pair = ea >= 32'h40000000 && ea < 32'h60000000 && next_word >= 32'h40000000 && next_word < 32'h60000000;
-  wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
-  wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && ea >= 32'h20000000 && ea < 32'h60000000;
+  // Memory map of the ext_flash variant: BOOT_MEMORY [0, 0x1000), FLASH on the bus [0x20000000, 0x40000000), RAM
+  // [0x40000000, 0x60000000), everything else external; the main memory starts at 0x1000.
+  wire hole_pair = ea >= 32'h1000 && ea < 32'h20000000 && next_word >= 32'h1000 && next_word < 32'h20000000;
+  wire flash_pair = ea >= 32'h20000000 && ea < 32'h40000000 && next_word >= 32'h20000000 && next_word < 32'h40000000;
+  wire ram_pair  = ea >= 32'h40000000 && ea < 32'h60000000 && next_word >= 32'h40000000 && next_word < 32'h60000000;
+  wire top_pair  = ea >= 32'h60000000 && next_word >= 32'h60000000;
+  wire in_word_ok = ea >= 32'h1000;
 `else
+  // Default map: BOOT_MEMORY [0, 0x1000) and FLASH [0x1000, 0x8000) on the direct port, RAM [0x8000, 0x40000000), the
+  // rest external; the main memory starts at 0x8000.
+  wire hole_pair = 1'b0;
+  wire flash_pair = 1'b0;
   wire ram_pair  = ea >= 32'h8000 && ea < 32'h40000000 && next_word >= 32'h8000 && next_word < 32'h40000000;
-  wire sdram_pair = ea >= 32'h40000000 && ea < 32'h80000000 && next_word >= 32'h40000000 && next_word < 32'h80000000;
-  wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
-  wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && ea >= 32'h8000 && ea < 32'h80000000;
+  wire top_pair  = ea >= 32'h40000000 && next_word >= 32'h40000000;
+  wire in_word_ok = ea >= 32'h8000;
 `endif
-  wire runs     = in_word || (crosses && (ram_pair || sdram_pair));
+  wire crosses  = (funct3 == 3'b010 && ea[1:0] != 0) || (funct3[1:0] == 2'b01 && ea[1:0] == 2'b11);
+  wire in_word  = funct3[1:0] == 2'b01 && ea[1:0] == 2'b01 && in_word_ok;
+  wire runs     = in_word || (crosses && (hole_pair || flash_pair || ram_pair || top_pair));
   always @(*) begin
     if (active && !cf_misal && !illegal && (is_load || is_store) && unaligned && runs) assert (!take);
     if (active && !cf_misal && !illegal && is_load  && unaligned && !runs) assert (take && cause == 4 && tval == ea);

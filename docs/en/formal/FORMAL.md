@@ -13,6 +13,7 @@ The formal proofs of the Core run in SymbiYosys over the Verilog netlist that GH
 | `stage_ex` with interrupts | `stage_ex_irq_props.sv` | induction, cover, with `mepc`, `mcause`, `MIE`, the next PC and the null effect of an aborted CSR access |
 | `alu` | `alu_props.sv` | combinational equivalence, cover |
 | `trap_unit` with access faults | `trap_af_props.sv` | induction, cover, with the order and `mtval` mutants |
+| `stage_mem` with an error of the external port | `ext_error_props.sv` | induction, cover, with and without `HAS_ACCESS_FAULTS`, with the mutants of the ignored error, without `ready`, off the external port, of the cause and of `mtval` |
 | `csr_file` with `time_external` | `csr_time_props.sv` | BMC, cover |
 | `muldiv_fusion` | `muldiv_fusion_props.sv` | BMC, cover |
 | `csr_file` with Zicntr | `csr_cntr_props.sv` | BMC, cover |

@@ -174,9 +174,12 @@ architecture rtl of stage_id is
     signal   cu_we_ram       : std_logic;
     -- Habilitação de leitura na RAM antes do bubble_mux.
     signal   cu_re_ram       : std_logic;
-    -- Largura do endereço do banco de registradores desta instância: 5 bits para 32 registradores (base I), 4 para 16
-    -- (base E).
-    constant REG_ADDR_WIDTH  : natural := REG_BITS;
+    -- Índice do registrador rs1 no banco de registradores: os reg_t'length bits baixos do campo da instrução.
+    signal   rf_rs1_idx      : reg_t;
+    -- Índice do registrador rs2 no banco de registradores.
+    signal   rf_rs2_idx      : reg_t;
+    -- Índice do registrador rd de escrita no banco de registradores.
+    signal   rf_rd_idx       : reg_t;
 
     -- Habilitação geral da RAM antes do bubble_mux.
     signal cu_en_ram     : std_logic;
@@ -222,7 +225,7 @@ begin
             o_illegal     => cu_illegal
         );
 
-    gen_m_decode : if HAS_MULDIV generate
+    gen_m_decode : if HAS_MULTIPLICATION generate
 
         u_m_decode : entity work.m_decode
             port map (
@@ -334,7 +337,7 @@ begin
                      '0';
     id_uses_rs2   <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP) else
                      '0';
-    id_bad_reg    <= '1' when (IS_BASE_E and
+    id_bad_reg    <= '1' when (IS_E and
                                   ((id_uses_rd = '1' and id_rd_idx(4) = '1') or
                                       (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
                                       (id_uses_rs2 = '1' and id_rs2_idx(4) = '1'))) else
@@ -370,17 +373,22 @@ begin
     o_alu_op  <= zc_alu_op when id_is_zicond = '1' else id_alu_op;
     o_alu_sel <= alu_result_select(id_alu_op);
 
+    rf_rs1_idx <= id_rs1_idx(reg_t'range);
+    rf_rs2_idx <= id_rs2_idx(reg_t'range);
+    rf_rd_idx  <= i_wb_rd(reg_t'range);
+
     u_regfile : entity work.reg_file
         generic map (
-            addr_width => REG_ADDR_WIDTH
+            data_width => word_t'length,
+            addr_width => reg_t'length
         )
         port map (
             i_clk    => i_clk,
             i_rst    => i_rst,
             i_enable => i_wb_we,
-            i_rs1    => id_rs1_idx(REG_ADDR_WIDTH - 1 downto 0),
-            i_rs2    => id_rs2_idx(REG_ADDR_WIDTH - 1 downto 0),
-            i_rd     => i_wb_rd(REG_ADDR_WIDTH - 1 downto 0),
+            i_rs1    => rf_rs1_idx,
+            i_rs2    => rf_rs2_idx,
+            i_rd     => rf_rd_idx,
             i_d      => i_wb_data,
             o_rs1    => o_rs1_val,
             o_rs2    => o_rs2_val

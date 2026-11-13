@@ -1,12 +1,13 @@
 // Properties of csr_file with Zicntr, checked on the Verilog netlist that GHDL synthesizes from the VHDL.
 // Two 64-bit models keep the ideal values of mcycle and minstret. A retirement is added to minstret one
-// cycle after it happens, unless the cancel input of that cycle removes it, and a read already shows it. Whatever the CSR instructions do,
+// cycle after it happens, or later while the hold input keeps it pending, unless the cancel input of that cycle
+// removes it, and a read already shows it. Whatever the CSR instructions do,
 // the value read at 0xB00/0xB80/0xC00/0xC80 (mcycle and cycle) and 0xB02/0xB82/0xC02/0xC82
 // (minstret and instret) is the model's value; a write lands in the half it addresses and wins over
 // the increment of its own cycle; the read-only mirrors and time reject every write. Bits 0 and 2 of
 // mcountinhibit (0x320) stop mcycle and minstret, and the register reads back what was written to them.
 module props (input clk);
-  (* anyseq *) wire reset, commit, src_zero, trap_take, mret_take, retire, retire_cancel;
+  (* anyseq *) wire reset, commit, src_zero, trap_take, mret_take, retire, retire_cancel, retire_hold;
   (* anyseq *) wire [11:0] addr;
   (* anyseq *) wire [2:0] op;
   (* anyseq *) wire [31:0] wdata;
@@ -15,7 +16,8 @@ module props (input clk);
 
   csr_file dut (.i_clk(clk), .i_rst(reset), .i_commit(commit), .i_addr(addr), .i_op(op), .i_wdata(wdata),
     .i_src_zero(src_zero), .o_rdata(rdata), .o_illegal(illegal), .i_trap_take(trap_take),
-    .i_mret_take(mret_take), .i_retire(retire), .i_retire_cancel(retire_cancel));
+    .i_mret_take(mret_take), .i_retire(retire), .i_retire_cancel(retire_cancel),
+    .i_retire_hold(retire_hold));
 
   // The registers have no initial value: the first clock is a reset, as on the board.
   initial assume (reset);
@@ -58,7 +60,7 @@ module props (input clk);
   wire        cy_carry = !m_inh0 && !we_cycle_lo && m_cycle[31:0] == 32'hFFFFFFFF;
   wire [31:0] cy_lo = we_cycle_lo ? new_value : (m_inh0 ? m_cycle[31:0] : m_cycle[31:0] + 32'd1);
   wire [31:0] cy_hi = (we_cycle_hi ? new_value : m_cycle[63:32]) + {31'b0, cy_carry};
-  wire        pinc = m_pending && !retire_cancel && !m_inh2;
+  wire        pinc = m_pending && !retire_cancel && !retire_hold && !m_inh2;
   wire        in_carry = pinc && !we_instret_lo && m_instret[31:0] == 32'hFFFFFFFF;
   wire [31:0] in_lo = we_instret_lo ? new_value : (pinc ? m_instret[31:0] + 32'd1 : m_instret[31:0]);
   wire [31:0] in_hi = (we_instret_hi ? new_value : m_instret[63:32]) + {31'b0, in_carry};
@@ -69,7 +71,7 @@ module props (input clk);
     m_instret <= reset ? 64'h0 : {in_hi, in_lo};
     m_inh0 <= reset ? 1'b0 : we_inhibit ? new_value[0] : m_inh0;
     m_inh2 <= reset ? 1'b0 : we_inhibit ? new_value[2] : m_inh2;
-    m_pending <= reset ? 1'b0 : (retire && !we_instret_lo && !we_instret_hi);
+    m_pending <= reset ? 1'b0 : retire_hold ? m_pending : (retire && !we_instret_lo && !we_instret_hi);
   end
 
   // While reset is high a read gives the reset value, so the properties apply to the clocks without reset.
@@ -91,6 +93,8 @@ module props (input clk);
     cover (m_pending && m_instret[31:0] == 32'hFFFFFFFF && !we_instret_lo);
     cover (we_instret_lo && retire);
     cover (m_pending && retire_cancel);
+    cover (m_pending && retire_hold && !retire_cancel);
+    cover (m_pending && retire_hold && retire_cancel);
   end
 `endif
 endmodule

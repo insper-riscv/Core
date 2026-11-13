@@ -30,9 +30,7 @@ entity core is
         -- zero.
         hpm_counters  : natural range 0 to 29        := 29;
         -- Largura em bits de cada contador de eventos real, de 0 a 64.
-        hpm_width     : natural range 0 to 64        := 64;
-        -- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
-        periph_slots  : std_logic_vector(7 downto 0) := (others => '1')
+        hpm_width     : natural range 0 to 64        := 64
     );
     port (
         -- Sinal de clock principal do processador.
@@ -41,7 +39,7 @@ entity core is
         i_rst : in    std_logic;
 
         -- Endereço de busca de instrução (PC atual no estágio IF).
-        o_if_addr          : out   word_t;
+        o_if_addr          : out   addr_t;
         -- Habilitação de leitura da memória de instruções no estágio IF.
         o_if_rden          : out   std_logic;
         -- Palavra de instrução retornada pela BOOT_MEMORY.
@@ -50,14 +48,14 @@ entity core is
         i_flash_data       : in    word_t;
 
         -- Endereço de leitura de dados na segunda porta da memória FLASH (estágio MEM).
-        o_flash_addr2 : out   word_t;
+        o_flash_addr2 : out   addr_t;
         -- Habilitação de leitura de dados na segunda porta da memória FLASH (estágio MEM).
         o_flash_rden2 : out   std_logic;
         -- Palavra de dados lida da segunda porta da memória FLASH (recebida no estágio WB).
         i_flash_data2 : in    word_t;
 
         -- Endereço de acesso à memória RAM interna de dados (estágio MEM).
-        o_ram_addr    : out   word_t;
+        o_ram_addr    : out   addr_t;
         -- Palavra de dados alinhada para escrita na RAM interna (estágio MEM).
         o_ram_wdata   : out   word_t;
         -- Palavra de dados lida da RAM interna (recebida no estágio WB).
@@ -71,28 +69,32 @@ entity core is
         -- Máscara de habilitação de escrita por byte na RAM interna (estágio MEM).
         o_ram_byteena : out   byte_mask_t;
 
-        -- Endereço de acesso ao barramento externo de dados SDRAM/periféricos (estágio MEM).
-        o_ext_addr    : out   word_t;
-        -- Palavra de dados alinhada para escrita no barramento externo SDRAM (estágio MEM).
+        -- Endereço de acesso à porta externa de dados (estágio MEM): a FLASH e a RAM no barramento e todo endereço fora
+        -- da BOOT_MEMORY, da FLASH e da RAM.
+        o_ext_addr    : out   addr_t;
+        -- Palavra de dados alinhada para escrita na porta externa (estágio MEM).
         o_ext_wdata   : out   word_t;
-        -- Máscara de habilitação de bytes no barramento externo SDRAM (estágio MEM).
+        -- Máscara de habilitação de bytes na porta externa (estágio MEM).
         o_ext_byteena : out   byte_mask_t;
-        -- Habilitação de leitura no barramento externo SDRAM (estágio MEM).
+        -- Habilitação de leitura na porta externa (estágio MEM).
         o_ext_rden    : out   std_logic;
-        -- Habilitação de escrita no barramento externo SDRAM (estágio MEM).
+        -- Habilitação de escrita na porta externa (estágio MEM).
         o_ext_wren    : out   std_logic;
-        -- Palavra de dados lida do barramento externo SDRAM.
+        -- Palavra de dados lida da porta externa.
         i_ext_rdata   : in    word_t    := (others => '0');
-        -- Sinaliza que o escravo externo SDRAM concluiu a transação atual.
+        -- Sinaliza que o escravo externo concluiu a transação atual.
         i_ext_ready   : in    std_logic := '1';
-        -- Indica ao escravo externo SDRAM que o estágio MEM avançou neste ciclo.
+        -- Sinaliza, junto de i_ext_ready, que a transação atual terminou em erro porque nenhum escravo atende o
+        -- endereço; o estágio MEM gera a falha de acesso de load ou store (causas 5 e 7) com o endereço em mtval.
+        i_ext_error   : in    std_logic := '0';
+        -- Indica ao escravo externo que o estágio MEM avançou neste ciclo.
         o_mem_advance : out   std_logic;
 
-        -- Palavra de instrução fornecida pela cache de instruções externa (região SDRAM).
+        -- Palavra de instrução fornecida pela cache de instruções externa (região atendida pelo barramento).
         i_ic_data  : in    word_t    := (others => '0');
         -- Indica que a cache de instruções externa possui a instrução válida para o PC atual.
         i_ic_ready : in    std_logic := '1';
-        -- Indica que o endereço de busca atual (o_if_addr) pertence à região de SDRAM.
+        -- Indica que o endereço de busca atual (o_if_addr) é atendido pelo barramento (cache de instruções).
         o_ic_sel   : out   std_logic;
         -- Pulso que comanda a invalidação da cache de instruções externa (instrução FENCE.I).
         o_ic_inval : out   std_logic;
@@ -138,7 +140,7 @@ architecture rtl of core is
     signal muldiv_stall   : std_logic;
     -- Pulso de término de uma operação M fundida com a anterior (evento 9 do Zihpm).
     signal muldiv_fused   : std_logic;
-    -- Indica que o barramento externo SDRAM está em espera no estágio MEM.
+    -- Indica que a porta externa está em espera no estágio MEM.
     signal sdram_wait     : std_logic;
     -- Indica que a unidade FENCE.I aguarda o flush da cache de dados no estágio EX.
     signal fencei_busy    : std_logic;
@@ -166,7 +168,7 @@ architecture rtl of core is
     signal flush_ex_mem   : std_logic;
     -- Pulso de exceção sinalizada sem Zicsr, que mata a instrução em EX sem redirecionar o PC.
     signal trap_sig       : std_logic;
-    -- A memória avança neste ciclo: sem parada de multdiv nem espera da SDRAM, mesmo com a etapa 1 de um acesso
+    -- A memória avança neste ciclo: sem parada de multdiv nem espera da porta externa, mesmo com a etapa 1 de um acesso
     -- desalinhado.
     signal mem_run        : std_logic;
     -- O acesso em MEM cruza a palavra e é executado em duas etapas.
@@ -183,7 +185,7 @@ architecture rtl of core is
     signal mis_first_word : word_t;
     -- Região FLASH do load em WB, decodificada na entrada do registrador MEM/WB.
     signal memwb_is_flash : std_logic;
-    -- Região SDRAM do load em WB, decodificada na entrada do registrador MEM/WB.
+    -- Região da porta externa do load em WB, decodificada na entrada do registrador MEM/WB.
     signal memwb_is_sdram : std_logic;
     -- Cruzamento de palavra do load em WB, decodificado na entrada do registrador MEM/WB.
     signal memwb_is_cross : std_logic;
@@ -355,7 +357,8 @@ architecture rtl of core is
     signal ex_redirect_pc    : word_t;
     -- Pulso de tomada de exceção síncrona gerado no estágio EX.
     signal trap_take         : std_logic;
-    -- Exceção de endereço do acesso à memória no estágio MEM (instrução mais antiga que a de EX).
+    -- Exceção do acesso à memória no estágio MEM, de endereço ou de falha de acesso por erro da porta externa
+    -- (instrução mais antiga que a de EX).
     signal mem_trap_take     : std_logic;
     -- Causa (mcause) da exceção de MEM.
     signal mem_trap_cause    : word_t;
@@ -371,19 +374,18 @@ architecture rtl of core is
     signal exmem_pc          : word_t;
     -- Campo funct3 da instrução em MEM trazido de EX/MEM.
     signal exmem_funct3      : funct3_t;
-    -- O endereço em MEM cai na FLASH de dados, classificado em EX e registrado em EX/MEM.
+    -- O endereço em MEM é atendido pela porta direta da BOOT_MEMORY e da FLASH, classificado em EX e registrado em
+    -- EX/MEM.
     signal exmem_is_flash    : std_logic;
     -- Resultado da ULA em EX (o endereço efetivo de um load ou store).
     signal ex_alu_result     : word_t;
-    -- O endereço em MEM cai na janela externa (SDRAM), registrado em EX/MEM.
+    -- O endereço em MEM sai pela porta externa, registrado em EX/MEM.
     signal exmem_is_sdram    : std_logic;
     -- O endereço em MEM está na memória principal, registrado em EX/MEM.
     signal exmem_in_main     : std_logic;
     -- As duas palavras de um acesso que cruza o endereço em MEM ficam na mesma região, registrado em EX/MEM.
     signal exmem_same_region : std_logic;
-    -- O endereço efetivo registrado em EX/MEM aceita leitura no mapa.
-    signal exmem_ok_rd       : std_logic;
-    -- O endereço efetivo registrado em EX/MEM aceita escrita no mapa.
+    -- O endereço efetivo registrado em EX/MEM aceita escrita no mapa do núcleo.
     signal exmem_ok_wr       : std_logic;
     -- Pulso de retirada de uma instrução em EX: válida, com o pipeline andando e sem exceção.
     signal retire_pulse      : std_logic;
@@ -769,9 +771,6 @@ begin
         );
 
     u_reg_ex_mem : entity work.reg_ex_mem
-        generic map (
-            periph_slots => periph_slots
-        )
         port map (
             i_clk         => i_clk,
             i_rst         => i_rst,
@@ -809,7 +808,6 @@ begin
             o_is_sdram    => exmem_is_sdram,
             o_in_main     => exmem_in_main,
             o_same_region => exmem_same_region,
-            o_ok_rd       => exmem_ok_rd,
             o_ok_wr       => exmem_ok_wr
         );
 
@@ -855,7 +853,6 @@ begin
             flags_registered => true
         )
         port map (
-            i_flag_ok_rd  => exmem_ok_rd,
             i_flag_ok_wr  => exmem_ok_wr,
             i_flag_flash  => exmem_is_flash,
             i_flag_sdram  => exmem_is_sdram,
@@ -871,6 +868,7 @@ begin
             i_re_ram      => exmem_re_ram,
             i_en_ram      => exmem_en_ram,
             i_ext_ready   => i_ext_ready,
+            i_ext_error   => i_ext_error,
             o_flash_addr2 => o_flash_addr2,
             o_flash_rden2 => o_flash_rden2,
             o_ram_addr    => o_ram_addr,

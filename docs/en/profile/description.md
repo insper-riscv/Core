@@ -18,8 +18,8 @@ The matrix is the single source of the valid profiles. The command `riscv-tools 
 
 | Item | Constant | Note |
 | :--- | :--- | :--- |
-| RV32I | `IS_BASE_E = false` | Base with 32 registers |
-| RV32E | `IS_BASE_E = true` | Base with 16 registers |
+| RV32I | `IS_E = false` | Base with 32 registers |
+| RV32E | `IS_E = true` | Base with 16 registers |
 | Zicclsm | `HAS_ZICCLSM` | Misaligned accesses handled in hardware |
 | Zicsr | `HAS_ZICSR` | CSR bank and traps |
 | Zicntr | `HAS_ZICNTR` | Implies Zicsr |

@@ -29,7 +29,7 @@ module props (input clk);
   wire illegal, pending, take, vec;
   wire [31:0] cause;
 
-  csr_file dut (.i_clk(clk), .i_rst(reset), .i_commit(commit), .i_addr(addr), .i_op(op), .i_wdata(wdata),
+  csr_file dut (.i_retire_hold(1'b0), .i_clk(clk), .i_rst(reset), .i_commit(commit), .i_addr(addr), .i_op(op), .i_wdata(wdata),
     .i_src_zero(src_zero), .o_rdata(rdata), .o_illegal(illegal), .i_trap_take(trap_take),
     .i_trap_cause(trap_cause), .i_trap_pc(trap_pc), .i_trap_tval(trap_tval), .i_mret_take(mret_take),
     .o_mtvec(mtvec_o), .o_mepc(mepc_o), .i_irq_software(irq_sw), .i_irq_timer(irq_tm),

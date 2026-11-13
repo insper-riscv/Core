@@ -23,13 +23,13 @@ O processador executa o conjunto de instruções RISC-V de 32 bits em um pipelin
 
 | Camada | Papel arquitetural |
 | :--- | :--- |
-| Estágio 1 (IF) | Mantém o Program Counter (PC), calcula $\text{PC} + 4$, seleciona a próxima fonte de PC e decodifica a região de busca entre Memória de boot, Flash e cache de instruções externa (SDRAM) |
+| Estágio 1 (IF) | Mantém o Program Counter (PC), calcula $\text{PC} + 4$, seleciona a próxima fonte de PC e decodifica a região de busca entre Memória de boot, Flash e cache de instruções do barramento |
 | Barreira IF/ID | Registra a validade (`o_valid`), o endereço `o_pc`, `o_pc4` e a instrução `o_inst`, respondendo a congelamento (`i_en = '0'`) e descarte (`i_flush = '1'`) |
 | Estágio 2 (ID) | Decodifica os sinais de controle da base RV32I e das extensões ativas (`M` e `Zicsr`), estende o imediato de 32 bits, lê os operandos `rs1` e `rs2` no banco de registradores com bypass interno de escrita e detecta conflitos load-use |
 | Barreira ID/EX | Registra os operandos lidos, o imediato estendido, os índices `rs1`, `rs2` e `rd` e todos os sinais de controle para execução, memória e write-back |
 | Estágio 3 (EX) | Aplica o adiantamento de operandos (forwarding), executa operações na ULA, coordena o multiplicador/divisor multiciclo (`M`), avalia desvios e saltos (`BRANCH`, `JAL`, `JALR`), formata escritas em memória e processa CSRs, exceções e `FENCE.I` |
 | Barreira EX/MEM | Registra o resultado final de execução, o dado e a máscara de bytes de store, o índice `rd` e os sinais de controle de memória e write-back |
-| Estágio 4 (MEM) | Decodifica o endereço efetivo entre Flash de dados, RAM interna e barramento externo SDRAM/periféricos, gerando o sinal de espera `o_ext_wait` quando o escravo externo ainda não respondeu |
+| Estágio 4 (MEM) | Decodifica o endereço efetivo entre Flash de dados, RAM direta e porta externa, gerando o sinal de espera `o_ext_wait` quando o escravo externo ainda não respondeu e a falha de acesso quando ele responde com `i_ext_error` |
 | Barreira MEM/WB | Registra o resultado de execução `o_alu_out`, o destino `o_rd` e os seletores de extensão de leitura e write-back |
 | Estágio 5 (WB) | Seleciona a palavra bruta retornada pela memória acessada, aplica o alinhamento e a extensão de sinal ou zero para bytes e meias-palavras e escolhe o dado final a gravar no banco de registradores |
 

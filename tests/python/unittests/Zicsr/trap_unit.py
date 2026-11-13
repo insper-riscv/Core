@@ -269,8 +269,8 @@ async def test_illegal_goes_before_misaligned_target(dut):
     check_equal((take, cause, tval), (1, CAUSE_MISALIGNED_TARGET, 0x102))
 
 
-MAIN_MEMORY = [0x8000, 0x3FFFFF00, 0x40000000, 0x7FFFFFF0]
-OUTSIDE_MAIN_MEMORY = [0x0, 0x1000, 0x7FF0, 0x80000000, 0xD0000000]
+MAIN_MEMORY = [0x8000, 0x3FFFFF00, 0x40000000, 0x7FFFFFF0, 0xD0000000]
+OUTSIDE_MAIN_MEMORY = [0x0, 0xFF0, 0x1000, 0x7FF0]
 IN_WORD = [
     (OP_LOAD, 0b001, CAUSE_LOAD_MISALIGNED),
     (OP_LOAD, 0b101, CAUSE_LOAD_MISALIGNED),
@@ -293,7 +293,8 @@ CROSSING = [
 async def test_halfword_inside_a_word_is_executed_in_main_memory(dut):
     """Verifica halfword inside a word is executed in main memory.
 
-    LH, LHU and SH at offset 1 do not trap in the RAM or the SDRAM.
+    LH, LHU and SH at offset 1 do not trap in the RAM or in the external
+    window.
     """
     for opcode, funct3, _ in IN_WORD:
         for base in MAIN_MEMORY:
@@ -312,7 +313,7 @@ async def test_halfword_inside_a_word_is_executed_in_main_memory(dut):
 async def test_halfword_inside_a_word_traps_outside_main_memory(dut):
     """Verifica halfword inside a word traps outside main memory.
 
-    The flash and the peripheral window do not run a misaligned access,
+    The boot memory and the direct flash do not run a misaligned access,
     even inside a word.
     """
     for opcode, funct3, cause in IN_WORD:
@@ -333,8 +334,8 @@ async def test_halfword_inside_a_word_traps_outside_main_memory(dut):
 async def test_access_crossing_a_word_is_executed_in_main_memory(dut):
     """Verifica access crossing a word is executed in main memory.
 
-    An access that spans two words of the RAM or of the SDRAM does not
-    trap.
+    An access that spans two words of the RAM or of the external window
+    does not trap.
     """
     for opcode, funct3, offset, _ in CROSSING:
         for base in MAIN_MEMORY:
@@ -349,7 +350,7 @@ async def test_access_crossing_a_word_is_executed_in_main_memory(dut):
 async def test_access_crossing_a_word_traps_outside_main_memory(dut):
     """Verifica access crossing a word traps outside main memory.
 
-    The flash and the peripheral window do not run an access that spans
+    The boot memory and the direct flash do not run an access that spans
     two words.
     """
     for opcode, funct3, offset, cause in CROSSING:
@@ -370,16 +371,17 @@ async def test_access_crossing_a_word_traps_outside_main_memory(dut):
 async def test_access_crossing_into_another_region_traps(dut):
     """Verifica access crossing into another region traps.
 
-    The two words must lie in the same region: the RAM into the SDRAM,
-    or the SDRAM into the peripherals, traps.
+    The two words must lie in the same region: the RAM into the
+    external window, or the end of the address space into its start,
+    traps.
     """
     for opcode, funct3, ea, cause in [
         (OP_LOAD, 0b010, 0x3FFFFFFD, CAUSE_LOAD_MISALIGNED),
         (OP_LOAD, 0b001, 0x3FFFFFFF, CAUSE_LOAD_MISALIGNED),
         (OP_STORE, 0b010, 0x3FFFFFFE, CAUSE_STORE_MISALIGNED),
         (OP_STORE, 0b001, 0x3FFFFFFF, CAUSE_STORE_MISALIGNED),
-        (OP_LOAD, 0b010, 0x7FFFFFFF, CAUSE_LOAD_MISALIGNED),
-        (OP_STORE, 0b001, 0x7FFFFFFF, CAUSE_STORE_MISALIGNED),
+        (OP_LOAD, 0b010, 0xFFFFFFFF, CAUSE_LOAD_MISALIGNED),
+        (OP_STORE, 0b001, 0xFFFFFFFF, CAUSE_STORE_MISALIGNED),
     ]:
         check_equal(
             await probe(dut, opcode, funct3, ea=ea),

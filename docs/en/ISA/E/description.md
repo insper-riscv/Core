@@ -1,6 +1,6 @@
 # 16-Register File (RV32E)
 
-The boolean `IS_BASE_E` constant of the `config_pkg` chooses how many general-purpose registers the processor has. False, the default, gives an RV32I with 32 registers. True gives an RV32E, which gives up registers `x16` to `x31` for less area. The manual requirements are in [instructions.md](instructions.md).
+The boolean `IS_E` constant of the `config_pkg` chooses how many general-purpose registers the processor has. False, the default, gives an RV32I with 32 registers. True gives an RV32E, which gives up registers `x16` to `x31` for less area. The manual requirements are in [instructions.md](instructions.md).
 
 ## 1. Reference
 
@@ -12,14 +12,14 @@ The boolean `IS_BASE_E` constant of the `config_pkg` chooses how many general-pu
 
 ## 2. What Changes
 
-| Item | `IS_BASE_E = false` | `IS_BASE_E = true` |
+| Item | `IS_E = false` | `IS_E = true` |
 | :--- | :--- | :--- |
 | Registers | `x0` to `x31` | `x0` to `x15` |
 | `reg_file` address | 5 bits | 4 bits |
 | Instruction using `x16` to `x31` | Runs | Illegal, `mcause` 2 with `HAS_ZICSR` |
 | Base bit of `misa` with `HAS_ZICSR` | `I` (bit 8) | `E` (bit 4), and the `I` bit is zero |
 
-The `misa` follows the privileged manual ([section 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), which sets the `E` bit in the RV32E and defines it as reading as the complement of the `I` bit. The ID stage computes the register file address width (5 bits with `IS_BASE_E` false, 4 bits with `IS_BASE_E` true) and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
+The `misa` follows the privileged manual ([section 2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa)), which sets the `E` bit in the RV32E and defines it as reading as the complement of the `I` bit. The ID stage computes the register file address width (5 bits with `IS_E` false, 4 bits with `IS_E` true) and wires only those low bits of the `rs1`, `rs2` and `rd` indices to the file.
 
 ## 3. Illegal Instruction
 
@@ -42,7 +42,7 @@ An illegal instruction writes no register and takes the same exception path as a
 
 ## 4. Compatibility
 
-The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `IS_BASE_E`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
+The smaller file changes neither the pipeline nor the forwarding, which keep comparing 5-bit indices. Since the illegal-instruction check depends only on `IS_E`, it is independent of the other extensions, and the 60 extension combinations of `profiles/matrix.yaml` hold for both the 32-register base and the 16-register one, which gives 120 profiles.
 
 RV32E programs use the `ilp32e` ABI, defined in the [RISC-V psABI](https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/v1.0/riscv-cc.adoc#ilp32e-calling-convention) (outside the ISA manual), which allocates registers only up to `x15`.
 

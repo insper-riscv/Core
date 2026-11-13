@@ -98,7 +98,7 @@ architecture rtl of reg_mem_wb is
 begin
 
     -- A região sai da comparação do endereço com os limites constantes do mapa.
-    in_is_flash <= '1' when unsigned(i_alu_out) < internal_rom_end else '0';
+    in_is_flash <= '1' when is_direct_rom_addr(unsigned(i_alu_out)) else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_alu_out)) else '0';
     in_is_cross <= '1' when ((i_ext_ram_op = EXT_RAM_LW and i_alu_out(1 downto 0) /= BYTE_OFFSET_0) or
                                 ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and

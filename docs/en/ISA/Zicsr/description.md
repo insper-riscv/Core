@@ -82,7 +82,7 @@ All CSRs are zero after reset, except `misa` and the fixed part of `mstatus`, wh
 | Address | CSR | Access | Definition | Read | Write |
 | :---: | :--- | :---: | :---: | :--- | :--- |
 | `0x300` | `mstatus` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 and 11) fixed at `11`, `MPIE` (bit 7), `MIE` (bit 3); other bits zero | Only `MIE` and `MPIE` are stored; other bits are ignored |
-| `0x301` | `misa` | R/W | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extension `I`); with `HAS_M`, `0x40001100` (adds bit 12, extension `M`); with `IS_BASE_E` true (RV32E), bit 4 (extension `E`) replaces bit 8, and the value is `0x40000010` or, with `HAS_M`, `0x40001010` | Ignored |
+| `0x301` | `misa` | R/W | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extension `I`); with `HAS_M`, `0x40001100` (adds bit 12, extension `M`); with `IS_E` true (RV32E), bit 4 (extension `E`) replaces bit 8, and the value is `0x40000010` or, with `HAS_M`, `0x40001010` | Ignored |
 | `0x304` | `mie` | R/W | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; with `HAS_INTERRUPTS`, the masks `MSIE`, `MTIE` and `MEIE` (bits 3, 7 and 11) | With `HAS_INTERRUPTS`, writes bits 3, 7 and 11; the other bits are ignored |
 | `0x305` | `mtvec` | R/W | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | `BASE` in bits `[31:2]` and `MODE` in bit 0 (`0` direct, `1` vectored); bit 1 reads zero. Without `HAS_INTERRUPTS`, `MODE` always reads zero | Stores `BASE` and, with `HAS_INTERRUPTS`, `MODE`; in vectored mode bits `[5:2]` of `BASE` are stored as zero (64-byte alignment) |
 | `0x310` | `mstatush` | R/W | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignored |
@@ -138,14 +138,14 @@ With `HAS_INTERRUPTS = false`, the ports are ignored, `mie` and `mip` read zero 
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
 | 1 | Instruction access fault | Instruction fetch outside the executable regions of the map, with `HAS_ACCESS_FAULTS` (section 6.7) | Instruction PC |
 | 4 | Load address misaligned | Misaligned load that the hardware does not execute | Effective address |
-| 5 | Load access fault | Load to an address the map does not accept for reading, with `HAS_ACCESS_FAULTS` (section 6.7) | Effective address |
+| 5 | Load access fault | Load whose access to the external port ends with an error, with `HAS_ACCESS_FAULTS` (section 6.7) | Effective address |
 | 6 | Store address misaligned | Misaligned store that the hardware does not execute | Effective address |
-| 7 | Store access fault | Store to an address the map does not accept for writing, with `HAS_ACCESS_FAULTS` (section 6.7) | Effective address |
+| 7 | Store access fault | Store to the Boot memory or the FLASH, or whose access to the external port ends with an error, with `HAS_ACCESS_FAULTS` (section 6.7) | Effective address |
 | 11 | Machine-mode environment call | `ECALL` (`funct12 = 0x000`) | Zero |
 
 The `ECALL`, `EBREAK`, `MRET` and `WFI` instructions are recognized only with `funct3 = 000`, `rd = x0` and `rs1 = x0`. Any other non-CSR `SYSTEM` instruction, including `funct3 = 100`, `SRET` and `SFENCE.VMA`, is illegal. The ID-stage decoder also flags as illegal a register index above 15 when the profile is RV32E.
 
-A load or store misalignment is defined by the rules of the `Zicclsm` extension: the hardware executes the misaligned access inside main memory (internal RAM and SDRAM) when `HAS_ZICCLSM = true`, and any other misalignment raises causes 4 and 6. With `HAS_ZICSR = true`, these two causes are checked in the MEM stage by a second `trap_unit` instance, which reads the effective address already registered in `EX/MEM`, and the EX-stage instance does not check the effective address.
+A load or store misalignment is defined by the rules of the `Zicclsm` extension: the hardware executes the misaligned access inside main memory (everything that is neither the Boot memory nor the direct FLASH) when `HAS_ZICCLSM = true`, and any other misalignment raises causes 4 and 6. With `HAS_ZICSR = true`, these two causes are checked in the MEM stage by a second `trap_unit` instance, which reads the effective address already registered in `EX/MEM`, and the EX-stage instance does not check the effective address.
 
 ### 6.2. Priority
 
@@ -192,25 +192,32 @@ The redirect PC is chosen among `mepc` (on `MRET`), `PC + 4` (on `FENCE.I`), the
 
 The EX exception is detected combinationally in the cycle in which the instruction is in EX and the pipeline advances. The CSRs and the PC are written at the clock edge that ends that cycle, so the first handler instruction is fetched in the following cycle. Two younger instructions (in the IF and ID stages) are discarded, besides the faulting instruction itself. The load or store exception is detected in the cycle in which the access reaches MEM, one cycle after the instruction passed through EX.
 
-The retirement of an instruction in EX adds to `minstret` one cycle later, and a MEM exception cancels that addition, so the failing access does not count as retired. Counter details are in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md).
+The retirement of an instruction in EX adds to `minstret` one cycle later, and a MEM exception cancels that addition, so the failing access does not count as retired. While the MEM stage is stalled, the addition stays pending and completes only in the cycle in which it advances, so that the error of the external port, which arrives after wait cycles, still cancels it. Counter details are in [Zicntr](../Zicntr/description.md) and [Zihpm](../Zihpm/description.md).
 
 ### 6.7. Access Faults
 
-The `HAS_ACCESS_FAULTS` constant (default `false`, needs `HAS_ZICSR`) turns on causes 1, 5 and 7. The valid map comes from the memory map constants of the `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` and `PERIPH_BASE`) and from the `periph_slots` generic, the mask of the windows of the peripheral bus that hold a peripheral (bit $n$ for the addresses whose bits `ADDR_BITS-2` to `ADDR_BITS-4` equal $n$; with `ADDR_BITS = 32`, bits 30:28 and 256 MiB windows), which `riscv-tools` writes to the map package as `PERIPH_SLOTS`. The peripheral window starts at `PERIPH_BASE`, `2**(ADDR_BITS - 1)` by default. The `STRICT_PERIPH` constant of the `config_pkg` (default `true`, switchable off per platform) decides whether a window without a peripheral is refused: when true, an access to an empty window raises fault 5 or 7; when false, every window accepts the access. The extension is turned on by `extras: [AccessFaults]` in `platform.yaml`.
+The `HAS_ACCESS_FAULTS` constant (default `false`, needs `HAS_ZICSR`) turns on causes 1, 5 and 7. The core knows only the Boot memory, the FLASH and the RAM (`BOOT_MEMORY_END`, `FLASH_BASE`, `FLASH_END`, `RAM_BASE`, `RAM_END` and `FLASH_ON_BUS`, `RAM_ON_BUS` of the `config_pkg`), and knows no peripherals. Every address outside the three regions leaves through the external port, and the load or store fault of those accesses comes from the error answer of the port (`i_ext_error`, raised together with `i_ext_ready`). The extension is turned on by `extras: [AccessFaults]` in the `platform.yaml`.
+
+| Cause | Origin of the fault | Who decides |
+| :---: | :--- | :--- |
+| 1 | Fetch outside the Boot memory, the FLASH and the RAM on the bus | The map of the core, from the PC of the instruction in EX |
+| 5 | Load whose access ends with `i_ext_error` | The external port, in the MEM stage |
+| 7 | Store to the Boot memory or to the FLASH | The map of the core, from the effective address |
+| 7 | Store whose access ends with `i_ext_error` | The external port, in the MEM stage |
 
 | Region | Read | Write | Fetch |
 | :--- | :---: | :---: | :---: |
-| ROM, from zero to `ROM_END` (BOOT_MEMORY and FLASH) | Yes | No | Yes |
-| RAM, from `RAM_BASE` to `RAM_END` | Yes | Yes | Yes |
-| External window, from `EXT_BASE` to `PERIPH_BASE` | Yes | Yes | Yes |
-| Occupied peripheral window, from `PERIPH_BASE` up | Yes | Yes | No |
-| Empty peripheral window, with `STRICT_PERIPH` | No | No | No |
-| Empty peripheral window, without `STRICT_PERIPH` | Yes | Yes | No |
-| The rest (gaps between regions) | No | No | No |
+| Boot memory | Yes | No | Yes |
+| FLASH, direct or on the bus | Yes | No | Yes |
+| Direct RAM | Yes | Yes | No |
+| RAM on the bus | Yes | Yes | Yes |
+| Outside the three regions | Through the external port | Through the external port | No |
 
-The read and write validity of the effective address is decided in the EX stage, from the ALU result, next to the address classification that `reg_ex_mem` already registers, and the MEM stage only checks the registered bit. The fetch validity comes from the PC of the instruction in EX, from a register, off the ALU path. With `HAS_ACCESS_FAULTS = false` the validities are always `1` and none of this is synthesized.
+The write validity of the effective address is decided in the EX stage, from the ALU result, next to the address classification that `reg_ex_mem` already registers, and the MEM stage only checks the registered bit. The fetch validity comes from the PC of the instruction in EX, from a register, off the ALU path. With `HAS_ACCESS_FAULTS = false` the validities are always `1`, the error answer is ignored and none of this is synthesized.
 
-The fetch fault goes before the illegal instruction, in the order of Table 17 of the privileged volume. The misalignment the hardware does not execute (outside main memory) keeps cause 4 or 6, the optional order of the table, and the misaligned access it does execute only passes if the address is valid. A load or store fault belongs to the address of the first word, and the access does not reach the memories, as with misalignment.
+The fault by external error leaves the MEM stage in the cycle in which the external port completes the access with `i_ext_error`. In that cycle the MEM stage raises cause 5 (load) or 7 (store) with the effective address in `mtval`, through the same path as the address exception: the EX instruction is discarded, the load writes no register, the store has no effect on the slave and the `minstret` retirement of the failing access is cancelled, even when it waited cycles for the port. In a misaligned access that spans two words, the error of either word raises the fault of the access.
+
+The fetch fault goes before the illegal instruction, in the order of Table 17 of the privileged volume. The misalignment the hardware does not execute (Boot memory and direct FLASH) keeps cause 4 or 6, the optional order of the table, and the misaligned access it does execute only passes if the address is valid. A load or store fault belongs to the address of the first word, and the access does not reach the memories, as with misalignment.
 
 ## 7. Interrupt Entry
 
@@ -255,7 +262,7 @@ The entry waits while the pipeline does not advance or there is no valid instruc
 | :--- | :--- |
 | Multiplication or division | The pipeline stays stopped until the end. In the cycle the result is ready the interrupt aborts the instruction, which redoes the computation after the return |
 | Misaligned access in two steps | Both steps finish before the entry |
-| SDRAM read or write wait | The access finishes before the entry |
+| External port read or write wait | The access finishes before the entry |
 | Fetch waiting for `i_ic_ready` | There is no valid instruction in EX; the interrupt is taken on the first valid instruction that arrives |
 | Bubble in EX (taken jump, load dependency) | The interrupt is taken on the first valid instruction that arrives |
 | `FENCE.I` in EX | The instruction redirects the pipeline to the next one and completes; the interrupt is taken on that next instruction |

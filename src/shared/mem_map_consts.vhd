@@ -1,11 +1,15 @@
 -- =============================================================================
 -- Funções do mapa de memória do processador
 --
--- O mapa vem em bytes do config_pkg (BOOT_MEMORY_BITS, ROM_END, RAM_BASE,
--- RAM_END, EXT_BASE, PERIPH_BASE, ROM_EXTERNAL e RAM_EXTERNAL), e este pacote
--- reúne as decisões de que os pontos de decodificação precisam (BOOT_MEMORY,
--- ROM interna, janela externa e janela de periféricos). Cada projeto fixa os
--- limites no `platform.yaml` da sua plataforma, de onde sai o config_pkg.
+-- O núcleo conhece só três regiões do config_pkg, a BOOT_MEMORY, a FLASH e a RAM
+-- (BOOT_MEMORY_END, FLASH_BASE, FLASH_END, RAM_BASE e RAM_END), e este pacote
+-- reúne as decisões de que os pontos de decodificação precisam. A BOOT_MEMORY é
+-- sempre alcançada pela porta direta; a FLASH e a RAM, pela porta direta ou pelo
+-- barramento, conforme FLASH_ON_BUS e RAM_ON_BUS; todo endereço fora das três
+-- regiões sai pela porta externa, que responde com erro quando nada o atende.
+-- A busca de instrução, o load e o store seguem a mesma regra de região.
+-- Cada projeto fixa os limites no `platform.yaml` da sua plataforma, de onde sai
+-- o config_pkg.
 -- =============================================================================
 
 library ieee;
@@ -15,37 +19,48 @@ use work.config_pkg.all;
 
 package mem_map_consts is
 
-    -- Endereço exclusivo do fim da BOOT_MEMORY, que ocupa [0, 2**BOOT_MEMORY_BITS).
+    -- O endereço pertence à BOOT_MEMORY, que ocupa [0, BOOT_MEMORY_END).
 
-    function boot_memory_end return map_addr_t;
+    function is_boot_addr (addr : unsigned) return boolean;
 
-    -- Endereço exclusivo do fim da ROM interna, ou zero quando a ROM é externa.
+    -- O endereço pertence à janela da FLASH, [FLASH_BASE, FLASH_END), qualquer que seja o caminho dela.
 
-    function internal_rom_end return map_addr_t;
+    function is_flash_addr (addr : unsigned) return boolean;
 
-    -- Início da memória principal: logo depois da ROM interna; com a ROM externa, a base externa quando a ROM é vazia
-    -- ou o fim da BOOT_MEMORY, pois a ROM externa, que começa ali, é lida e escrita pela porta externa como a RAM.
+    -- O endereço pertence à janela da RAM, [RAM_BASE, RAM_END), qualquer que seja o caminho dela.
 
-    function main_mem_base return map_addr_t;
+    function is_ram_addr (addr : unsigned) return boolean;
 
-    -- O endereço sai pela porta externa: a janela externa, a ROM quando é externa ou a RAM quando é externa.
+    -- O endereço é atendido pela porta direta de leitura de dados e de instruções: a BOOT_MEMORY, ou a FLASH quando
+    -- ela não está no barramento.
+
+    function is_direct_rom_addr (addr : unsigned) return boolean;
+
+    -- O endereço é atendido pela porta direta da RAM: a janela da RAM quando ela não está no barramento.
+
+    function is_direct_ram_addr (addr : unsigned) return boolean;
+
+    -- O endereço sai pela porta externa: tudo o que as portas diretas não atendem, isto é, a FLASH e a RAM no
+    -- barramento e todo endereço fora das três regiões.
 
     function is_external_addr (addr : unsigned) return boolean;
 
-    -- A palavra do endereço é a última de uma região: a seguinte pertenceria à região vizinha.
+    -- O endereço está na memória principal, a única em que o acesso desalinhado é executado em hardware (Zicclsm): tudo
+    -- o que não é a BOOT_MEMORY nem a FLASH direta, que não repartem um acesso em duas leituras.
+
+    function is_main_addr (addr : unsigned) return boolean;
+
+    -- A palavra do endereço é a última de uma região de caminho próprio: a seguinte pertenceria à região vizinha, que
+    -- o acesso desalinhado não alcança com a classificação do primeiro endereço.
 
     function is_last_word (addr : unsigned) return boolean;
 
-    -- O endereço está no intervalo de leitura válido do mapa: ROM, RAM, janela externa ou um slot de periférico
-    -- ocupado.
+    -- O endereço aceita escrita no mapa do núcleo: tudo menos a BOOT_MEMORY e a FLASH, que são só de leitura. Um
+    -- endereço fora das três regiões aceita escrita aqui, e a porta externa responde erro se nada o atende.
 
-    function addr_readable (addr : unsigned; periph_slots : std_logic_vector(7 downto 0)) return boolean;
+    function addr_writable (addr : unsigned) return boolean;
 
-    -- O endereço aceita escrita: o mapa válido sem a ROM (BOOT_MEMORY e FLASH são só de leitura).
-
-    function addr_writable (addr : unsigned; periph_slots : std_logic_vector(7 downto 0)) return boolean;
-
-    -- O endereço aceita busca de instrução: ROM, RAM e janela externa (nunca periférico).
+    -- O endereço aceita busca de instrução: a BOOT_MEMORY, a FLASH e a RAM no barramento (pela cache de instruções).
 
     function addr_executable (addr : unsigned) return boolean;
 
@@ -53,60 +68,61 @@ end package mem_map_consts;
 
 package body mem_map_consts is
 
-    function boot_memory_end return map_addr_t is
+    function is_boot_addr (addr : unsigned) return boolean is
     begin
 
-        return shift_left(to_unsigned(1, ADDR_BITS + 1), BOOT_MEMORY_BITS);
+        return addr < BOOT_MEMORY_END;
 
-    end function boot_memory_end;
+    end function is_boot_addr;
 
-    function internal_rom_end return map_addr_t is
+    function is_flash_addr (addr : unsigned) return boolean is
     begin
 
-        if ROM_EXTERNAL then
-            return to_unsigned(0, ADDR_BITS + 1);
-        end if;
+        return addr >= FLASH_BASE and addr < FLASH_END;
 
-        return ROM_END;
+    end function is_flash_addr;
 
-    end function internal_rom_end;
-
-    function main_mem_base return map_addr_t is
+    function is_ram_addr (addr : unsigned) return boolean is
     begin
 
-        if ROM_EXTERNAL and ROM_END = 0 then
-            return EXT_BASE;
-        end if;
+        return addr >= RAM_BASE and addr < RAM_END;
 
-        if ROM_EXTERNAL then
-            return boot_memory_end;
-        end if;
+    end function is_ram_addr;
 
-        return ROM_END;
+    function is_direct_rom_addr (addr : unsigned) return boolean is
+    begin
 
-    end function main_mem_base;
+        return is_boot_addr(addr) or ((not FLASH_ON_BUS) and is_flash_addr(addr));
+
+    end function is_direct_rom_addr;
+
+    function is_direct_ram_addr (addr : unsigned) return boolean is
+    begin
+
+        return (not RAM_ON_BUS) and is_ram_addr(addr);
+
+    end function is_direct_ram_addr;
 
     function is_external_addr (addr : unsigned) return boolean is
     begin
 
-        if addr >= EXT_BASE then
-            return true;
-        end if;
-
-        if ROM_EXTERNAL and addr < ROM_END then
-            return true;
-        end if;
-
-        return RAM_EXTERNAL and addr >= RAM_BASE and addr < RAM_END;
+        return not (is_direct_rom_addr(addr) or is_direct_ram_addr(addr));
 
     end function is_external_addr;
+
+    function is_main_addr (addr : unsigned) return boolean is
+    begin
+
+        return not is_direct_rom_addr(addr);
+
+    end function is_main_addr;
 
     function is_last_word (addr : unsigned) return boolean is
 
         -- O índice da palavra, sem os dois bits de byte.
         constant WORD : unsigned((ADDR_BITS - 3) downto 0) := addr((ADDR_BITS - 1) downto 2);
 
-        -- A palavra de índice anterior ao da fronteira dada, ou todos em 1 quando a fronteira é zero.
+        -- A palavra de índice anterior ao da fronteira dada, ou todos em 1 quando a fronteira é 2**ADDR_BITS.
 
         function before (bound : map_addr_t) return unsigned is
         begin
@@ -117,37 +133,23 @@ package body mem_map_consts is
 
     begin
 
-        return (ROM_END > 0 and WORD = before(ROM_END)) or
-		       (RAM_BASE > 0 and WORD = before(RAM_BASE)) or
-		       (RAM_END > 0 and WORD = before(RAM_END)) or
-		       (EXT_BASE > 0 and WORD = before(EXT_BASE)) or
-		       (PERIPH_BASE > 0 and WORD = before(PERIPH_BASE));
+        return WORD = before(FLASH_BASE) or WORD = before(FLASH_END) or WORD = before(RAM_BASE) or
+               WORD = before(RAM_END) or WORD = (WORD'range => '1');
 
     end function is_last_word;
 
     function addr_executable (addr : unsigned) return boolean is
     begin
 
-        return addr < ROM_END or
-		       (addr >= RAM_BASE and addr < RAM_END) or
-		       (addr >= EXT_BASE and addr < PERIPH_BASE);
+        return is_boot_addr(addr) or is_flash_addr(addr) or (RAM_ON_BUS and is_ram_addr(addr));
 
     end function addr_executable;
 
-    function addr_writable (addr : unsigned; periph_slots : std_logic_vector(7 downto 0)) return boolean is
+    function addr_writable (addr : unsigned) return boolean is
     begin
 
-        return (addr >= RAM_BASE and addr < RAM_END) or
-		       (addr >= EXT_BASE and addr < PERIPH_BASE) or
-		       (addr >= PERIPH_BASE and periph_slots(to_integer(addr((ADDR_BITS - 2) downto (ADDR_BITS - 4)))) = '1');
+        return not (is_boot_addr(addr) or is_flash_addr(addr));
 
     end function addr_writable;
-
-    function addr_readable (addr : unsigned; periph_slots : std_logic_vector(7 downto 0)) return boolean is
-    begin
-
-        return addr < ROM_END or addr_writable(addr, periph_slots);
-
-    end function addr_readable;
 
 end package body mem_map_consts;

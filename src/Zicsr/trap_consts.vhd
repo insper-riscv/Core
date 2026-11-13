@@ -10,6 +10,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 
@@ -25,22 +26,22 @@ package trap_consts is
     constant IMM12_MRET   : std_logic_vector(11 downto 0) := x"302";
 
     -- Código mcause para endereço de instrução desalinhado (0).
-    constant CAUSE_MISALIGNED_PC : word_t := x"00000000";
+    constant CAUSE_MISALIGNED_PC : word_t := std_logic_vector(to_unsigned(0, XLEN));
     -- Código mcause para falha de acesso de instrução (1).
-    constant CAUSE_FETCH_FAULT   : word_t := x"00000001";
+    constant CAUSE_FETCH_FAULT   : word_t := std_logic_vector(to_unsigned(1, XLEN));
     -- Código mcause para falha de acesso de load (5).
-    constant CAUSE_LOAD_FAULT    : word_t := x"00000005";
+    constant CAUSE_LOAD_FAULT    : word_t := std_logic_vector(to_unsigned(5, XLEN));
     -- Código mcause para falha de acesso de store ou AMO (7).
-    constant CAUSE_STORE_FAULT   : word_t := x"00000007";
+    constant CAUSE_STORE_FAULT   : word_t := std_logic_vector(to_unsigned(7, XLEN));
     -- Código mcause para instrução ilegal (2).
-    constant CAUSE_ILLEGAL_INSTR : word_t := x"00000002";
+    constant CAUSE_ILLEGAL_INSTR : word_t := std_logic_vector(to_unsigned(2, XLEN));
     -- Código mcause para breakpoint EBREAK (3).
-    constant CAUSE_BREAKPOINT    : word_t := x"00000003";
+    constant CAUSE_BREAKPOINT    : word_t := std_logic_vector(to_unsigned(3, XLEN));
     -- Código mcause para endereço de load desalinhado (4).
-    constant CAUSE_MISALIGNED_LD : word_t := x"00000004";
+    constant CAUSE_MISALIGNED_LD : word_t := std_logic_vector(to_unsigned(4, XLEN));
     -- Código mcause para endereço de store desalinhado (6).
-    constant CAUSE_MISALIGNED_ST : word_t := x"00000006";
+    constant CAUSE_MISALIGNED_ST : word_t := std_logic_vector(to_unsigned(6, XLEN));
     -- Código mcause para chamada de ambiente do modo M, ECALL (11).
-    constant CAUSE_MACHINE_ECALL : word_t := x"0000000B";
+    constant CAUSE_MACHINE_ECALL : word_t := std_logic_vector(to_unsigned(11, XLEN));
 
 end package trap_consts;

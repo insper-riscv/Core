@@ -23,7 +23,11 @@ from tests.python.unittests.cores.fetch_stall import (
     lui,
     sw,
 )
-from tests.python.unittests.cores.sdram_stall import RAM_BASE, _bytes_merge
+from tests.python.unittests.cores.sdram_stall import (
+    RAM_BASE,
+    SDRAM_BASE,
+    _bytes_merge,
+)
 
 FENCE_I = 0x0000100F
 NOP = 0x00000013
@@ -157,8 +161,16 @@ class _Model:
             self.inval_pulses += 1
         if int(dut.o_ext_wren.value) and int(dut.o_mem_advance.value):
             a = int(dut.o_ext_addr.value) & ~3
-            target = self.backing if self.flush_latency is None else self.dirty
-            base = target.get(a, self.backing.get(a, 0))
+            if a < SDRAM_BASE:
+                # the RAM on the bus (the data cache config): the
+                # results of the program stay in the RAM model
+                target = self.ram
+                base = self.ram.get(a, 0)
+            else:
+                target = (
+                    self.backing if self.flush_latency is None else self.dirty
+                )
+                base = target.get(a, self.backing.get(a, 0))
             target[a] = _bytes_merge(
                 base,
                 int(dut.o_ext_wdata.value),

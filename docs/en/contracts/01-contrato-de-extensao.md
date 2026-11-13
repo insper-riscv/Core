@@ -77,7 +77,7 @@ Synchronous exceptions detected by `trap_unit` (at most one per instruction, wit
 | `0` | Taken branch or jump target address with bits `[1:0] /= "00"` | Misaligned target address (`i_cf_target`) |
 | `2` | Unsupported `SYSTEM` instruction (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, or `ECALL`/`EBREAK`/`MRET`/`WFI` with `rd /= x0` or `rs1 /= x0`), illegal CSR access (`i_csr_illegal = '1'`), or any encoding that RV32IM does not define (`i_illegal = '1'`: a reserved opcode, an invalid `funct3` or `funct7`, all zeros, all ones, a compressed encoding, or `FENCE.I` when `HAS_ZIFENCEI = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
-| `4` | Misaligned Load effective address that the hardware does not run: outside the main memory (flash and peripherals), with the two words in different regions (internal RAM and SDRAM), or any misaligned load with `HAS_ZICCLSM = false` | Effective address (`i_ea`) |
+| `4` | Misaligned Load effective address that the hardware does not run: outside the main memory (Boot memory and direct FLASH), with the two words in different regions (for example, the end of the RAM and the range above it), or any misaligned load with `HAS_ZICCLSM = false` | Effective address (`i_ea`) |
 | `6` | Misaligned Store effective address that the hardware does not run, under the same conditions as cause 4 | Effective address (`i_ea`) |
 | `11` | Machine-mode environment call (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
@@ -90,7 +90,7 @@ Machine-mode CSRs implemented:
 | Address | Name | Access | Reset Value | Mask / Implemented fields |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Read-write | `0x00001800` | `MPP` (bits `[12:11]`) hardwired to `"11"`; `MIE` (bit 3) and `MPIE` (bit 7) writable |
-| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `IS_BASE_E` true the base is `E` and the value is `0x40001010` |
+| `0x301` | `misa` | Read-only | `0x40001100` | RV32 (`MXL = 1`) with `I` and `M` extensions; with `IS_E` true the base is `E` and the value is `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | With `HAS_INTERRUPTS`, bits 3, 7 and 11 (`mie` writes, `mip` mirrors the lines); the others hardwired to zero. Without the generic, all bits hardwired to zero |
 | `0x305` | `mtvec` | Read-write | `0x00000000` | `BASE` in bits `[31:2]` and `MODE` in bit 0, which only writes with `HAS_INTERRUPTS` (vectored); bit 1 is hardwired to `0`. In vectored mode bits `[5:2]` of `BASE` read zero |
 | `0x723` to `0x73F` | `mhpmevent3h` to `mhpmevent31h` | Read and write | `0x00000000` | Only with `HAS_SSCOFPMF`: `OF` (bit 31) and `MINH` (bit 30) of the counter with the same index; without the constant the address is nonexistent. Bit 13 of `mie` and `mip` is `LCOFIE` and `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
@@ -105,7 +105,7 @@ The `rv32im_zicsr_zifencei` profile enables `HAS_ZIFENCEI = true`:
 
 | Aspect | Behavior |
 | :--- | :--- |
-| Instruction fetch from SDRAM (`>= 0x40000000`) | The IF stage asserts `o_ic_sel = '1'` and reads `i_ic_data`. While `i_ic_ready = '0'`, the PC stays frozen and `o_instr_valid = '0'` injects bubbles into `reg_if_id`, while EX, MEM, and WB continue advancing |
+| Instruction fetch from a region served by the bus (FLASH with `FLASH_ON_BUS`, RAM with `RAM_ON_BUS`, or outside the three regions) | The IF stage asserts `o_ic_sel = '1'` and reads `i_ic_data`. While `i_ic_ready = '0'`, the PC stays frozen and `o_instr_valid = '0'` injects bubbles into `reg_if_id`, while EX, MEM, and WB continue advancing |
 | `FENCE.I` execution without D-cache (`HAS_DCACHE = false`) | When `FENCE.I` is valid in EX and `i_base_run = '1'`, `o_take` pulses for 1 cycle, asserting `o_ic_inval = '1'`, flushing `IF/ID` and `ID/EX`, and redirecting the PC to $\text{PC} + 4$ |
 | `FENCE.I` execution with write-back D-cache (`HAS_DCACHE = true`) | The unit holds the instruction in EX for one cycle, so that the older stores leave MEM and reach the cache, emits a pulse on `o_dc_flush` (`o_flush_req`) and holds `o_busy = '1'` (freezing PC, `IF/ID`, and `ID/EX` and injecting bubbles into `EX/MEM`) until `i_dc_done = '1'` is received, which the cache may raise in the very cycle of the pulse on `o_dc_flush` or in any later cycle, at which point it pulses `o_take = '1'` and invalidates the I-cache |
 

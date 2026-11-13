@@ -1,8 +1,8 @@
 """Testes do modulo.
 
-trap_unit with an external ROM that starts right after the BOOT_MEMORY
-(256 KiB) and an external RAM at 0x40000000: the ROM is main memory, as
-the instruction cache and the data cache serve it like the RAM.
+trap_unit with a flash on the bus that starts right after the
+BOOT_MEMORY (256 KiB) and a RAM at 0x40000000: the flash is main memory,
+as the instruction cache and the data cache serve it like the RAM.
 """
 
 import cocotb
@@ -16,8 +16,8 @@ from tests.python.unittests.Zicsr.trap_unit import (
     probe,
 )
 
-MAIN_MEMORY = [0x1000, 0x3FF00, 0x40000000, 0x43FFFFF0]
-OUTSIDE_MAIN_MEMORY = [0x0, 0xFFC, 0x60000000, 0x80000000]
+MAIN_MEMORY = [0x1000, 0x3FF00, 0x40000000, 0x43FFFFF0, 0x60000000]
+OUTSIDE_MAIN_MEMORY = [0x0, 0xFFC]
 
 
 @cocotb.test()
@@ -51,10 +51,10 @@ async def test_access_crossing_a_word_is_executed_in_the_rom(dut):
 
 
 @cocotb.test()
-async def test_boot_memory_and_peripherals_trap(dut):
-    """Verifica que a memória de boot e os periféricos não acessam.
+async def test_boot_memory_traps(dut):
+    """Verifica que a memória de boot não executa o desalinhado.
 
-    The BOOT_MEMORY and the addresses above the SDRAM take the trap.
+    The BOOT_MEMORY takes the trap.
     """
     for opcode, funct3, cause in IN_WORD:
         for base in OUTSIDE_MAIN_MEMORY:
@@ -66,10 +66,10 @@ async def test_boot_memory_and_peripherals_trap(dut):
 
 
 @cocotb.test()
-async def test_access_crossing_out_of_the_rom_end_traps(dut):
-    """Verifica que o acesso na ultima palavra da rom nao cruza.
+async def test_access_crossing_out_of_the_flash_end_traps(dut):
+    """Verifica que o acesso na ultima palavra da flash nao cruza.
 
-    The last word of the ROM is followed by the hole above it, so a
+    The last word of the flash is followed by the hole above it, so a
     load that crosses its end traps.
     """
     check_equal(

@@ -175,11 +175,18 @@ def _bytes_merge(old, new, byteena):
 class _SdramSlave:
     """Slave of the SDRAM window, as the bridge of the board answers."""
 
-    def __init__(self, dut, memory, stall_for):
-        """Serve the dict memory, stalling access n by stall_for(n)."""
+    def __init__(self, dut, memory, stall_for, error_for=None):
+        """Serve the dict memory, stalling access n by stall_for(n).
+
+        An access to an address for which error_for(address) is true
+        ends with ready and error together and leaves the memory alone,
+        the way the interconnect answers an address no slave takes.
+        """
         self.dut = dut
         self.memory = memory
         self.stall_for = stall_for
+        self.error_for = error_for
+        self.fails = False
         self.state = "idle"
         self.countdown = self.accesses = self.pending_read = 0
         self.held_addr = None
@@ -196,6 +203,9 @@ class _SdramSlave:
             "be": int(dut.o_ext_byteena.value),
         }
         self.held_addr = int(dut.o_ext_addr.value)
+        self.fails = bool(
+            self.error_for and self.error_for(int(dut.o_ext_addr.value))
+        )
         stall = self.stall_for(self.accesses) if self.stall_for else 0
         self.countdown = stall
         self.accesses += 1
@@ -221,7 +231,9 @@ class _SdramSlave:
         access = self.access
         if access is None:
             raise AssertionError("the wait began without an accepted access")
-        if access["we"]:
+        if self.fails:
+            dut.i_ext_error.value = 1
+        elif access["we"]:
             self.memory[access["addr"]] = _bytes_merge(
                 self.memory.get(access["addr"], 0),
                 access["wdata"],
@@ -237,6 +249,7 @@ class _SdramSlave:
         dut = self.dut
         if self.state == "done" and self.advance_seen:
             dut.i_ext_ready.value = 0
+            dut.i_ext_error.value = 0
             dut.i_ext_rdata.value = self.pending_read
             self.state, self.advance_seen = "idle", False
             self.held_addr = None

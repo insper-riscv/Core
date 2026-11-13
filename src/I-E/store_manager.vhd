@@ -39,9 +39,9 @@ architecture rtl of store_manager is
     -- Indica que a instrução atual corresponde a uma operação de escrita em memória (STORE).
     signal is_store : std_logic;
     -- Meia-palavra de rs2 estendida com zeros à esquerda, antes do deslocamento (SH).
-    signal sh_base  : unsigned(31 downto 0);
+    signal sh_base  : unsigned(word_t'range);
     -- Byte de rs2 estendido com zeros à esquerda, antes do deslocamento (SB).
-    signal sb_base  : unsigned(31 downto 0);
+    signal sb_base  : unsigned(word_t'range);
     -- Palavra alinhada para escrita de meia-palavra (SH).
     signal sh_data  : word_t;
     -- Máscara de bytes para escrita de meia-palavra (SH).

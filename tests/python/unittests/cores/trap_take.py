@@ -4,7 +4,7 @@ With Zicsr the core handles an exception at mtvec, so o_trap stays low.
 The pulse o_trap_take marks the cycle in which the core takes it.
 
 ECALL, EBREAK, an undefined encoding and a misaligned load to the
-peripheral window (taken in MEM) each raise o_trap_take for exactly one
+direct flash (taken in MEM) each raise o_trap_take for exactly one
 cycle, while the legal instructions between them raise none.
 """
 
@@ -32,7 +32,7 @@ from tests.python.unittests.cores.sdram_stall import addi, jal_self, lui, sw
 ECALL = 0x00000073
 EBREAK = 0x00100073
 UNDEFINED = 0xFFFFFFFF
-PERIPHERAL = 0x80000
+FLASH_PAGE = 0x2
 MIN_TRAP_CYCLE = 4
 TRAPPING = [ECALL, EBREAK, UNDEFINED, lw(24, 16, 2)]
 
@@ -43,7 +43,7 @@ def build():
         NOP,
         addi(5, 0, HANDLER_WORD * 4),
         csrrw(0, MTVEC, 5),
-        lui(16, PERIPHERAL),
+        lui(16, FLASH_PAGE),
         lui(7, RAM_BASE >> 12),
     ]
     for word in TRAPPING:

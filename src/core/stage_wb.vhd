@@ -61,7 +61,7 @@ architecture rtl of stage_wb is
     -- Palavra de 32 bits alinhada e estendida pelo módulo extender_ram.
     signal wb_ram_extended : word_t;
     -- Par de palavras do load que cruzou, deslocado até o primeiro byte do dado.
-    signal cross_pair      : std_logic_vector(63 downto 0);
+    signal cross_pair      : std_logic_vector((2 * XLEN) - 1 downto 0);
     -- Palavra baixa do par deslocado: o dado do load alinhado ao byte 0.
     signal cross_word      : word_t;
     -- Palavra entregue ao extensor: a juntada de duas palavras ou a lida da memória.
@@ -77,7 +77,7 @@ begin
 
     cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
                                                8 * to_integer(unsigned(i_alu_out(1 downto 0)))));
-    cross_word <= cross_pair(31 downto 0);
+    cross_word <= cross_pair(XLEN - 1 downto 0);
 
     ext_data   <= cross_word when i_is_cross = '1' else mem_read_data;
     ext_offset <= BYTE_OFFSET_0 when i_is_cross = '1' else i_alu_out(1 downto 0);

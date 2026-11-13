@@ -8,19 +8,24 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use work.utils_pkg.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 
 package csr_value_consts is
 
-    -- Valor do registrador misa com MXL = 1 (RV32) e a extensão I; a extensão M soma o bit 12.
-    constant MISA_BASE     : word_t := x"40000100";
-    -- Valor do registrador misa com MXL = 1 (RV32) e as extensões I e M.
-    constant MISA_WITH_M   : word_t := x"40001100";
-    -- Valor do registrador misa com MXL = 1 (RV32) e a base E (bit 4) no lugar da I; a extensão M soma o bit 12.
-    constant MISA_E_BASE   : word_t := x"40000010";
-    -- Valor do registrador misa com MXL = 1 (RV32), a base E (bit 4) e a extensão M.
-    constant MISA_E_WITH_M : word_t := x"40001010";
+    -- Campo MXL do misa, nos dois bits mais altos da palavra: 1 para XLEN 32 e 2 para XLEN 64.
+    constant MISA_MXL : word_t := std_logic_vector(shift_left(to_unsigned(pick(IS_64, 2, 1), XLEN), XLEN - 2));
+
+    -- Valor do registrador misa com o MXL de XLEN e a extensão I; a extensão M soma o bit 12.
+    constant MISA_BASE     : word_t := MISA_MXL or std_logic_vector(to_unsigned(256, XLEN));
+    -- Valor do registrador misa com o MXL de XLEN e as extensões I e M.
+    constant MISA_WITH_M   : word_t := MISA_MXL or std_logic_vector(to_unsigned(4352, XLEN));
+    -- Valor do registrador misa com o MXL de XLEN e a base E (bit 4) no lugar da I; a extensão M soma o bit 12.
+    constant MISA_E_BASE   : word_t := MISA_MXL or std_logic_vector(to_unsigned(16, XLEN));
+    -- Valor do registrador misa com o MXL de XLEN, a base E (bit 4) e a extensão M.
+    constant MISA_E_WITH_M : word_t := MISA_MXL or std_logic_vector(to_unsigned(4112, XLEN));
 
     -- Operação de um acesso a CSR, bits [1:0] do funct3 (2 bits).
     subtype csr_op_t is std_logic_vector(1 downto 0);

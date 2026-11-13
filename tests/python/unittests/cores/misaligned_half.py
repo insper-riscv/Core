@@ -4,10 +4,10 @@ A halfword access at offset 1 runs in the RAM; a misaligned access
 outside the main memory traps.
 
 LH, LHU and SH at offset 1 stay inside one word, so the core executes
-them. Any misaligned access outside the main memory (the flash and the
-peripheral window), even inside a word, traps with mcause 4 or 6 and has
-no effect. The accesses that cross a word run in the two-step unit,
-which the CoreMisaligned test covers.
+them. Any misaligned access outside the main memory (the boot
+memory and the direct flash), even inside a word, traps with mcause 4
+or 6 and has no effect. The accesses that cross a word run in the
+two-step unit, which the CoreMisaligned test covers.
 """
 
 import cocotb
@@ -104,7 +104,7 @@ def build():
         addi(24, 0, UNTOUCHED),
         addi(10, 0, 0),
         lui(15, 1),
-        lui(16, 0x80000),
+        lui(16, 2),
         *load_constant(12, WORD0),
         sw(12, 8, 0),
         *load_constant(12, WORD1),

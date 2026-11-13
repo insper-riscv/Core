@@ -117,7 +117,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 | `x0` | Constant zero, without a register; a write never enables it |
 | Reset | Asynchronous, on registers `x1` to `x31` |
 | Read in the write cycle | A multiplexer delivers the data being written when the register read is the same one, except `x0` |
-| Size | 32 registers; the `IS_BASE_E` constant set to true selects RV32E ([E/description.md](../E/description.md)) |
+| Size | 32 registers; the `IS_E` constant set to true selects RV32E ([E/description.md](../E/description.md)) |
 
 ## 9. Forwarding and Hazards
 
@@ -132,7 +132,7 @@ The final data of a load exists only at the end of WB. For this reason load forw
 
 | Generic | Effect on the RV32I base |
 | :--- | :--- |
-| `IS_BASE_E` | False, 32 registers; true, 16 registers and an instruction that uses `x16` to `x31` is illegal |
+| `IS_E` | False, 32 registers; true, 16 registers and an instruction that uses `x16` to `x31` is illegal |
 | `HAS_ZICSR` | Enables the synchronous exception (illegal, `ECALL`, `EBREAK`, misaligned target) with redirect to `mtvec`; disabled, the Core only flags `o_trap` |
 | `HAS_ZICCLSM` | Runs misaligned main-memory loads and stores in hardware; disabled, every misaligned access raises an exception |
 | `HAS_ZIFENCEI` | Makes `FENCE.I` legal; `FENCE` is always legal |
