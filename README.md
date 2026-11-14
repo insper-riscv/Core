@@ -18,6 +18,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [contracts/01-contrato-de-extensao.md](docs/pt-br/contracts/01-contrato-de-extensao.md): contrato de diretórios por extensão, manifestos de perfil (`profiles/*.yaml`) e ponto único de integração de novas extensões na entidade de topo.
 - [contracts/02-barramento-e-memoria.md](docs/pt-br/contracts/02-barramento-e-memoria.md): protocolo de barramento de instruções e de dados (mapa de memória por região, endereçamento em byte, habilitação por byte, handshake de espera por memória lenta, resposta de erro da porta externa e cache de instruções).
 - [contracts/03-relogios-e-reset.md](docs/pt-br/contracts/03-relogios-e-reset.md): contrato K7, os papéis de relógio (`core`, `fetch`, `mem`, `mem_pin`, `rst`), a origem do valor de cada um e a latência do reset.
+- [contracts/04-contrato-de-boot.md](docs/pt-br/contracts/04-contrato-de-boot.md): fragmentos de boot por extensão (`src/<Extensão>/boot.inc`), a ordem de inclusão, o estado que cada um deixa e a verificação em `tests/boot`.
 - [ISA/Zicclsm/instructions.md](docs/pt-br/ISA/Zicclsm/instructions.md) e [ISA/Zicclsm/description.md](docs/pt-br/ISA/Zicclsm/description.md): o que a especificação de perfis exige da Zicclsm e a execução em hardware dos loads e stores desalinhados, classificação dos acessos, regiões cobertas em cada mapa de memória e o acesso em duas etapas que cruza a palavra.
 - [FORMAL.md](docs/pt-br/formal/FORMAL.md): provas formais, engines de solver, arquivo de resultado por engine e a regra do agregador que decide o check `formal` do CI.
 - [ISA/E/description.md](docs/pt-br/ISA/E/description.md): a constante `IS_E` que escolhe o banco de 32 registradores (RV32I) ou de 16 (RV32E), a instrução ilegal com `x16` a `x31` e a ABI `ilp32e`.
@@ -62,6 +63,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 | `profiles/` | A especificação dos perfis (`matrix.yaml`) e os manifestos de fontes dos perfis que provam a compilação sem os diretórios opcionais (`rv32i.yaml`, `rv32i_zmmul.yaml`, `rv32im.yaml`, `rv32im_zicsr.yaml`, `rv32im_zicsr_irq.yaml`, `rv32im_zicond.yaml`, `rv32im_zicsr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei.yaml`, `rv32im_zicclsm_zicntr_zihpm_zifencei_reduced.yaml`) em ordem de dependência |
 | `formal/` | Propriedades em SystemVerilog (`csr_file_props.sv`, `trap_unit_props.sv`), configurações `.sby`, script de verificação formal via GHDL + Yosys + SymbiYosys e o agregador dos engines ([documentação](docs/pt-br/formal/FORMAL.md)) |
 | `tests/python/` | Testes unitários por entidade e de integração do topo em cocotb/GHDL ([documentação](tests/python/README.md)) |
+| `tests/boot/` | Verificação dos fragmentos de boot: montagem de todas as combinações de macros e execução no Spike ([contrato](docs/pt-br/contracts/04-contrato-de-boot.md)) |
 
 ## 3. Perfis da ISA
 

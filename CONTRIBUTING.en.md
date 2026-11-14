@@ -235,6 +235,7 @@ make check     # Check the VHDL-2008 syntax of all sources in topological order
 make profiles  # Compile and elaborate every profile in profiles/*.yaml under GHDL
 make test      # Run the per-entity tests (cocotb + GHDL)
 make paths     # Verify the paths of paths.yaml and the repository tree (riscv-tools check-tree)
+make test-boot # Assemble the boot fragments in every combination and run them on Spike (toolchain and Spike of the ci-elf image)
 make formal    # Run the formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
 

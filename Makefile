@@ -5,7 +5,7 @@ WDIR  := build/ghdl
 
 VHDL := $(shell find src -name '*.vhd' -not -path 'src/common/*' | sort) $(sort $(wildcard src/common/src/*.vhd))
 
-.PHONY: check check-rv64 profiles profile-matrix configs test formal paths clean
+.PHONY: check check-rv64 profiles profile-matrix configs test test-boot formal paths clean
 
 # GHDL syntax check of every source, in dependency order (riscv-tools vhdl-sort).
 check:
@@ -65,6 +65,13 @@ configs:
 # Per-entity cocotb tests; `make test TEST=ALU` for one entry of tests/python/tests.json.
 test: configs
 	uv run python tests/python/runner.py $(TEST)
+
+# Boot fragments (src/<Extension>/boot.inc): assembles every combination of the boot_config.h macros and runs the
+# fragments on Spike over a dirty state. Needs the riscv32-unknown-elf toolchain and Spike of the ci-elf image
+# (SPIKE=/opt/riscv-foundation/spike/bin/spike there), so it is not part of `make test`.
+test-boot:
+	bash tests/boot/assemble.sh
+	bash tests/boot/spike.sh
 
 # Every path the configuration lists exists, and the tree has the shape the Capstone defines (riscv-tools check-tree).
 paths: configs

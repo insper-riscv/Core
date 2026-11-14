@@ -34,6 +34,7 @@ references:
   - {name: per-entity tests.json, file: tests/python/tests.json, yaml: "*.sources", base: .}
   - {name: provides sources, file: paths.yaml, yaml: "provides.*.sources", base: .}
   - {name: entry points, paths: [src/core, src/shared, src/common, tests/python/runner.py, docs/pt-br/contracts, docs/en/contracts]}
+  - {name: boot fragment tests, paths: [tests/boot/lib.sh, tests/boot/assemble.sh, tests/boot/spike.sh, tests/boot/check.S, tests/boot/link.ld, docs/pt-br/contracts/04-contrato-de-boot.md, docs/en/contracts/04-contrato-de-boot.md]}
 
 provides:
   # Each component lists its sources in GHDL dependency order and the components it needs. A requires with
@@ -143,3 +144,13 @@ provides:
       - src/core/stage_mem.vhd
       - src/core/stage_wb.vhd
       - src/core/core.vhd
+  # The boot fragments (assembly, not VHDL) of the extensions that have state to initialize, in the order the boot
+  # memory of the platform includes them. No VHDL component requires it: the boot_core.S of Insper-RISC-V includes the files.
+  boot:
+    requires: []
+    sources:
+      - src/Zicsr/boot.inc
+      - src/Zicntr/boot.inc
+      - src/Zihpm/boot.inc
+      - src/Sscofpmf/boot.inc
+      - src/Zifencei/boot.inc
