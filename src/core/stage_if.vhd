@@ -6,7 +6,7 @@
 --      ou endereço de redirecionamento de trap/MRET/FENCE.I).
 --   2. Instanciação da unidade pc_fetch (registrador de PC e somador PC + 4).
 --   3. Decodificação combinacional do espaço de endereços de código entre
---      BOOT_MEMORY, FLASH e cache de instruções externa (SDRAM) usando as
+--      BOOT_MEMORY, FLASH direta e cache de instruções externa (barramento) usando as
 --      constantes centralizadas em mem_map_consts.
 --   4. Controle de espera da cache de instruções (if_wait) e invalidação por
 --      instrução FENCE.I (o_ic_inval).
@@ -58,8 +58,8 @@ entity stage_if is
         i_boot_memory_data : in    word_t;
         -- Palavra de instrução retornada pela memória FLASH (porta 1).
         i_flash_data       : in    word_t;
-        -- Palavra de instrução retornada pela cache de instruções externa (SDRAM).
-        i_ic_data          : in    word_t;
+        -- Palavra de instrução retornada pela cache de instruções externa (barramento).
+        i_ic_data         : in    word_t;
         -- Indica que a cache de instruções externa possui a palavra válida para o PC atual.
         i_ic_ready         : in    std_logic;
         -- Endereço atual do Program Counter (enviado ao registrador IF/ID).
@@ -71,10 +71,10 @@ entity stage_if is
         -- Indica que a instrução entregue em o_instr é válida (não está em espera de I-cache).
         o_instr_valid      : out   std_logic;
         -- Endereço de busca enviado às memórias de instrução externas.
-        o_if_addr          : out   word_t;
+        o_if_addr          : out   addr_t;
         -- Habilitação de leitura das memórias de instrução externas.
         o_if_rden          : out   std_logic;
-        -- Indica que o endereço de busca pertence à região atendida pela I-cache (SDRAM).
+        -- Indica que o endereço de busca pertence à região atendida pela I-cache (barramento).
         o_ic_sel           : out   std_logic;
         -- Pulso que comanda a invalidação da cache de instruções externa (FENCE.I).
         o_ic_inval         : out   std_logic;
@@ -93,9 +93,9 @@ architecture rtl of stage_if is
     signal pc_write_en       : std_logic;
     -- Indica que o endereço atual do PC aponta para a BOOT_MEMORY.
     signal is_boot_memory_if : std_logic;
-    -- Indica que o endereço atual do PC aponta para a região de SDRAM.
+    -- Indica que o endereço atual do PC aponta para uma região atendida pelo barramento.
     signal if_in_sdram       : std_logic;
-    -- Indica que a busca na região de SDRAM está aguardando resposta da I-cache.
+    -- Indica que a busca em região atendida pelo barramento está aguardando resposta da I-cache.
     signal if_wait           : std_logic;
     -- A instrução carregada em IF/ID veio sem resposta da I-cache e tem de ser buscada de novo.
     signal miss_q            : std_logic := '0';
@@ -149,18 +149,18 @@ begin
             o_pc4           => o_pc4
         );
 
-    is_boot_memory_if <= '1' when unsigned(if_pc) < boot_memory_end else '0';
+    is_boot_memory_if <= '1' when is_boot_addr(unsigned(if_pc)) else '0';
     if_in_sdram       <= '1' when (is_boot_memory_if = '0' and
                                       is_external_addr(unsigned(if_pc))) else
                          '0';
     if_wait           <= if_in_sdram and (not i_ic_ready);
 
     o_instr <= i_boot_memory_data when is_boot_memory_if = '1' else
-               i_ic_data when (if_in_sdram = '1' or ROM_EXTERNAL) else
+               i_ic_data when if_in_sdram = '1' else
                i_flash_data;
 
     o_pc          <= if_pc;
-    o_if_addr     <= if_pc;
+    o_if_addr     <= if_pc(addr_t'range);
     o_if_rden     <= '1';
     o_instr_valid <= not if_wait;
     o_ic_sel      <= if_in_sdram;

@@ -35,21 +35,21 @@ entity stage_id is
         -- Habilitação de escrita no banco de registradores vinda do estágio WB.
         i_wb_we         : in    std_logic;
         -- Endereço do registrador destino rd vindo do estágio WB.
-        i_wb_rd         : in    reg_field_t;
+        i_wb_rd         : in    reg_t;
         -- Dado de 32 bits a ser escrito no banco de registradores vindo do estágio WB.
         i_wb_data       : in    word_t;
         -- Endereço do registrador destino rd da instrução no estágio MEM (para detecção load-use).
-        i_mem_rd        : in    reg_field_t;
+        i_mem_rd        : in    reg_t;
         -- Habilitação de escrita em registrador da instrução no estágio MEM (para o adiantamento).
         i_mem_we_reg    : in    std_logic;
         -- Registrador destino rd da instrução no estágio WB (para o adiantamento).
-        i_memwb_rd      : in    reg_field_t;
+        i_memwb_rd      : in    reg_t;
         -- Habilitação de escrita em registrador da instrução no estágio WB (para o adiantamento).
         i_memwb_we_reg  : in    std_logic;
         -- Indica se a instrução no estágio MEM é uma leitura de memória (load).
         i_mem_re_ram    : in    std_logic;
         -- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
-        i_ex_rd         : in    reg_field_t;
+        i_ex_rd         : in    reg_t;
         -- Habilitação de escrita em registrador da instrução no estágio EX (para o adiantamento).
         i_ex_we_reg     : in    std_logic;
         -- Indica se a instrução no estágio EX é uma leitura de memória (load).
@@ -117,11 +117,11 @@ architecture rtl of stage_id is
 
     -- Alias para o campo opcode (bits [6:0]) da instrução em IF/ID.
     alias id_opcode  : opcode_t is i_instr(6 downto 0);
-    -- Alias para o índice do registrador destino rd (bits [11:7]).
+    -- Alias para o campo do registrador destino rd (bits [11:7]), de 5 bits.
     alias id_rd_idx  : reg_field_t is i_instr(11 downto 7);
-    -- Alias para o índice do registrador fonte rs1 (bits [19:15]).
+    -- Alias para o campo do registrador fonte rs1 (bits [19:15]), de 5 bits.
     alias id_rs1_idx : reg_field_t is i_instr(19 downto 15);
-    -- Alias para o índice do registrador fonte rs2 (bits [24:20]).
+    -- Alias para o campo do registrador fonte rs2 (bits [24:20]), de 5 bits.
     alias id_rs2_idx : reg_field_t is i_instr(24 downto 20);
 
     -- Operação do extensor de imediato gerada pela unidade de controle base.
@@ -174,9 +174,12 @@ architecture rtl of stage_id is
     signal   cu_we_ram       : std_logic;
     -- Habilitação de leitura na RAM antes do bubble_mux.
     signal   cu_re_ram       : std_logic;
-    -- Largura do endereço do banco de registradores desta instância: 5 bits para 32 registradores (base I), 4 para 16
-    -- (base E).
-    constant REG_ADDR_WIDTH  : natural := REG_BITS;
+    -- Índice do registrador rs1 no banco de registradores: os reg_t'length bits baixos do campo da instrução.
+    signal   rf_rs1_idx      : reg_t;
+    -- Índice do registrador rs2 no banco de registradores.
+    signal   rf_rs2_idx      : reg_t;
+    -- Índice do registrador rd de escrita no banco de registradores.
+    signal   rf_rd_idx       : reg_t;
 
     -- Habilitação geral da RAM antes do bubble_mux.
     signal cu_en_ram     : std_logic;
@@ -222,7 +225,7 @@ begin
             o_illegal     => cu_illegal
         );
 
-    gen_m_decode : if HAS_MULDIV generate
+    gen_m_decode : if HAS_MULTIPLICATION generate
 
         u_m_decode : entity work.m_decode
             port map (
@@ -334,7 +337,7 @@ begin
                      '0';
     id_uses_rs2   <= '1' when (id_opcode = OPCODE_BRANCH or id_opcode = OPCODE_STORE or id_opcode = OPCODE_OP) else
                      '0';
-    id_bad_reg    <= '1' when (IS_BASE_E and
+    id_bad_reg    <= '1' when (IS_E and
                                   ((id_uses_rd = '1' and id_rd_idx(4) = '1') or
                                       (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
                                       (id_uses_rs2 = '1' and id_rs2_idx(4) = '1'))) else
@@ -353,8 +356,8 @@ begin
 
     u_forwarding_match : entity work.forwarding_match
         port map (
-            i_rs1       => id_rs1_idx,
-            i_rs2       => id_rs2_idx,
+            i_rs1       => rf_rs1_idx,
+            i_rs2       => rf_rs2_idx,
             i_ex_rd     => i_ex_rd,
             i_ex_we     => i_ex_we_reg,
             i_mem_rd    => i_mem_rd,
@@ -370,17 +373,22 @@ begin
     o_alu_op  <= zc_alu_op when id_is_zicond = '1' else id_alu_op;
     o_alu_sel <= alu_result_select(id_alu_op);
 
+    rf_rs1_idx <= id_rs1_idx(reg_t'range);
+    rf_rs2_idx <= id_rs2_idx(reg_t'range);
+    rf_rd_idx  <= i_wb_rd;
+
     u_regfile : entity work.reg_file
         generic map (
-            addr_width => REG_ADDR_WIDTH
+            data_width => word_t'length,
+            addr_width => reg_t'length
         )
         port map (
             i_clk    => i_clk,
             i_rst    => i_rst,
             i_enable => i_wb_we,
-            i_rs1    => id_rs1_idx(REG_ADDR_WIDTH - 1 downto 0),
-            i_rs2    => id_rs2_idx(REG_ADDR_WIDTH - 1 downto 0),
-            i_rd     => i_wb_rd(REG_ADDR_WIDTH - 1 downto 0),
+            i_rs1    => rf_rs1_idx,
+            i_rs2    => rf_rs2_idx,
+            i_rd     => rf_rd_idx,
             i_d      => i_wb_data,
             o_rs1    => o_rs1_val,
             o_rs2    => o_rs2_val
@@ -389,8 +397,8 @@ begin
     u_hdu : entity work.hazard_detection_unit
         port map (
             i_ifid_valid   => i_ifid_valid,
-            i_ifid_rs1     => id_rs1_idx,
-            i_ifid_rs2     => id_rs2_idx,
+            i_ifid_rs1     => rf_rs1_idx,
+            i_ifid_rs2     => rf_rs2_idx,
             i_ifid_opcode  => id_opcode,
             i_idex_rd      => i_ex_rd,
             i_idex_re_ram  => i_ex_re_ram,

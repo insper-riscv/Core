@@ -117,7 +117,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 | `x0` | Constante zero, sem registrador; a escrita nunca o habilita |
 | Reset | Assíncrono, nos registradores `x1` a `x31` |
 | Leitura no ciclo da escrita | Um multiplexador entrega o dado que está sendo escrito quando o registrador lido é o mesmo, exceto `x0` |
-| Tamanho | 32 registradores; a constante `IS_BASE_E` verdadeiro seleciona o RV32E ([E/description.md](../E/description.md)) |
+| Tamanho | 32 registradores; a constante `IS_E` verdadeiro seleciona o RV32E ([E/description.md](../E/description.md)) |
 
 ## 9. Adiantamento e Hazards
 
@@ -132,7 +132,7 @@ O dado final de um load só existe ao fim de WB. Por isso o adiantamento de um l
 
 | Genérico | Efeito sobre a base RV32I |
 | :--- | :--- |
-| `IS_BASE_E` | Falso, 32 registradores; verdadeiro, 16 registradores e a instrução que usa `x16` a `x31` é ilegal |
+| `IS_E` | Falso, 32 registradores; verdadeiro, 16 registradores e a instrução que usa `x16` a `x31` é ilegal |
 | `HAS_ZICSR` | Ativa a exceção síncrona (ilegal, `ECALL`, `EBREAK`, alvo desalinhado) com redirecionamento para `mtvec`; desativado, o Core apenas sinaliza `o_trap` |
 | `HAS_ZICCLSM` | Executa em hardware os loads e stores desalinhados da memória principal; desativado, todo acesso desalinhado gera exceção |
 | `HAS_ZIFENCEI` | Torna `FENCE.I` legal; `FENCE` é sempre legal |

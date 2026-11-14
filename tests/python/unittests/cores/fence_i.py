@@ -23,7 +23,11 @@ from tests.python.unittests.cores.fetch_stall import (
     lui,
     sw,
 )
-from tests.python.unittests.cores.sdram_stall import RAM_BASE, _bytes_merge
+from tests.python.unittests.cores.sdram_stall import (
+    RAM_BASE,
+    SDRAM_BASE,
+    _bytes_merge,
+)
 
 FENCE_I = 0x0000100F
 NOP = 0x00000013
@@ -150,30 +154,45 @@ class _Model:
         elif self.flush_countdown is not None:
             self.flush_countdown -= 1
 
+    def _store_external(self, dut):
+        """Apply the store that the external port completes."""
+        a = int(dut.o_ext_addr.value) & ~3
+        if a < SDRAM_BASE:
+            # the RAM on the bus (the data cache config): the
+            # results of the program stay in the RAM model
+            target = self.ram
+            base = self.ram.get(a, 0)
+        else:
+            target = self.backing if self.flush_latency is None else self.dirty
+            base = target.get(a, self.backing.get(a, 0))
+        target[a] = _bytes_merge(
+            base,
+            int(dut.o_ext_wdata.value),
+            int(dut.o_ext_byteena.value),
+        )
+
+    def _access_ram(self, dut):
+        """Apply the read and the write of the internal RAM."""
+        if not int(dut.o_ram_en.value):
+            return
+        a = int(dut.o_ram_addr.value) & ~3
+        if int(dut.o_ram_rden.value):
+            self.read_pending = self.ram.get(a, 0)
+        if int(dut.o_ram_wren.value):
+            self.ram[a] = _bytes_merge(
+                self.ram.get(a, 0),
+                int(dut.o_ram_wdata.value),
+                int(dut.o_ram_byteena.value),
+            )
+
     def serve_memory(self, dut):
         """Apply the invalidate, SDRAM stores and RAM traffic."""
         if int(dut.o_ic_inval.value):
             self.lines.clear()
             self.inval_pulses += 1
         if int(dut.o_ext_wren.value) and int(dut.o_mem_advance.value):
-            a = int(dut.o_ext_addr.value) & ~3
-            target = self.backing if self.flush_latency is None else self.dirty
-            base = target.get(a, self.backing.get(a, 0))
-            target[a] = _bytes_merge(
-                base,
-                int(dut.o_ext_wdata.value),
-                int(dut.o_ext_byteena.value),
-            )
-        if int(dut.o_ram_en.value) and int(dut.o_ram_rden.value):
-            addr = int(dut.o_ram_addr.value) & ~3
-            self.read_pending = self.ram.get(addr, 0)
-        if int(dut.o_ram_en.value) and int(dut.o_ram_wren.value):
-            a = int(dut.o_ram_addr.value) & ~3
-            self.ram[a] = _bytes_merge(
-                self.ram.get(a, 0),
-                int(dut.o_ram_wdata.value),
-                int(dut.o_ram_byteena.value),
-            )
+            self._store_external(dut)
+        self._access_ram(dut)
 
 
 async def run(dut, fence, latency=2, flush_latency=None):

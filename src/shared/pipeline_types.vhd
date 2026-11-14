@@ -21,12 +21,16 @@ package pipeline_types is
     -- Campo funct7 da instrução RISC-V (bits [31:25], 7 bits).
     subtype funct7_t is std_logic_vector(6 downto 0);
 
-    -- Campo de registrador da instrução (rd, rs1 e rs2, bits [11:7], [19:15] e [24:20], sempre 5 bits). Na base E
-    -- o banco usa só os REG_BITS baixos e o bit 4 serve para detectar a instrução ilegal.
+    -- Campo de registrador da instrução (rd, rs1 e rs2, bits [11:7], [19:15] e [24:20], sempre 5 bits), que é
+    -- codificação e não índice: na base E o bit 4 serve para detectar a instrução ilegal, e o campo rs1 é também o
+    -- imediato de 5 bits dos CSRs. O índice no banco de registradores é reg_t, de REG_BITS bits.
     subtype reg_field_t is std_logic_vector(4 downto 0);
 
-    -- Índice do registrador arquitetural x0 (sempre zero).
+    -- Campo de registrador x0 da instrução (sempre zero).
     constant REG_ZERO : reg_field_t := (others => '0');
+
+    -- Índice do registrador arquitetural x0 no banco (sempre zero), de REG_BITS bits.
+    constant REG_IDX_ZERO : reg_t := (others => '0');
 
     -- Código de operação da ULA (5 bits).
     subtype alu_op_t is std_logic_vector(4 downto 0);

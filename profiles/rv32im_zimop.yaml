@@ -5,7 +5,7 @@
 profile: rv32im_zimop
 extensions: [I, M, Zimop]
 top: core
-config: {HAS_ZIMOP: true, HAS_ZICCLSM: false}
+config: {HAS_M: true, HAS_ZIMOP: true, HAS_ZICCLSM: false}
 generics: {}
 sources:
   - src/common/src/utils_pkg.vhd

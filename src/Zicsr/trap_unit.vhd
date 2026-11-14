@@ -24,10 +24,11 @@
 --         11         | Chamada de ambiente do modo M (ECALL)   | 0x00000000
 --          1         | Falha de acesso de instrução (busca fora   | i_pc
 --                    | de região executável, com HAS_ACCESS_FAULTS)|
---          5         | Falha de acesso de load (endereço fora do  | i_ea
---                    | mapa válido, com HAS_ACCESS_FAULTS)        |
---          7         | Falha de acesso de store (fora do mapa ou  | i_ea
---                    | em região só de leitura)                   |
+--          5         | Falha de acesso de load (resposta de erro  | i_ea
+--                    | da porta externa, gerada no estágio MEM)   |
+--          7         | Falha de acesso de store (região só de     | i_ea
+--                    | leitura, ou resposta de erro da porta      |
+--                    | externa, gerada no estágio MEM)            |
 --   0x80000003, 7, B | Interrupção de software, timer, externa | 0x00000000
 -- =============================================================================
 
@@ -76,9 +77,7 @@ entity trap_unit is
         i_fetch_ok       : in    std_logic := '1';
         -- PC da instrução em EX (mtval da falha de acesso de instrução).
         i_pc             : in    word_t    := (others => '0');
-        -- O endereço efetivo aceita leitura no mapa (um load com '0' gera a causa 5 com HAS_ACCESS_FAULTS).
-        i_ea_rd_ok       : in    std_logic := '1';
-        -- O endereço efetivo aceita escrita no mapa (um store com '0' gera a causa 7 com HAS_ACCESS_FAULTS).
+        -- O endereço efetivo aceita escrita no mapa do núcleo (um store com '0' gera a causa 7 com HAS_ACCESS_FAULTS).
         i_ea_wr_ok       : in    std_logic := '1';
         -- Indica que um desvio condicional, JAL ou JALR foi tomado no estágio EX.
         i_cf_taken       : in    std_logic;
@@ -134,18 +133,16 @@ architecture rtl of trap_unit is
     signal ld_unaligned  : std_logic;
     -- Indica STORE com endereço desalinhado, executado ou não pelo hardware.
     signal st_unaligned  : std_logic;
-    -- Indica que o endereço efetivo está na memória principal (RAM interna ou SDRAM): fora da flash e da janela de
-    -- periféricos.
+    -- Indica que o endereço efetivo está na memória principal: tudo o que não é a BOOT_MEMORY nem a FLASH direta.
     signal in_main_mem   : std_logic;
     -- Indica que o acesso desalinhado cabe numa única palavra (LH, LHU ou SH com offset 1) e o hardware o executa.
     signal misal_in_word : std_logic;
     -- Indica acesso que ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
     signal crosses_word  : std_logic;
-    -- Indica que o endereço efetivo está na última palavra de uma região de 1 GiB (bits [29:2] todos em '1'): a palavra
-    -- seguinte pertence à outra região.
+    -- Indica que o endereço efetivo está na última palavra de uma região da memória principal: a palavra seguinte
+    -- pertence à outra região.
     signal last_word     : std_logic;
-    -- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal (RAM interna ou
-    -- SDRAM).
+    -- Indica que as duas palavras de um acesso que cruza estão na mesma região da memória principal.
     signal same_region   : std_logic;
     -- Indica acesso desalinhado que o hardware executa (dentro da palavra ou cruzando, na memória principal).
     signal misal_exec    : std_logic;
@@ -153,9 +150,7 @@ architecture rtl of trap_unit is
     signal cf_misal      : std_logic;
     -- Indica busca de instrução fora de região executável.
     signal fetch_fault   : std_logic;
-    -- Indica load para endereço que o mapa não aceita ler.
-    signal ld_fault      : std_logic;
-    -- Indica store para endereço que o mapa não aceita escrever.
+    -- Indica store para endereço que o mapa do núcleo não aceita escrever (BOOT_MEMORY e FLASH).
     signal st_fault      : std_logic;
     -- Indica instrução ilegal por qualquer motivo (codificação inexistente, SYSTEM inválida ou CSR inválido), que tem
     -- prioridade sobre o alvo desalinhado.
@@ -194,11 +189,10 @@ begin
                                      (i_funct3 = FUNCT3_SH and i_ea(0) = '1'))) else
                     '0';
 
-    -- A memória principal vai do fim da ROM interna (ou da base externa) até a janela de periféricos; as bases
-    -- constantes de potência de 2 viram testes de bits na síntese.
+    -- A memória principal é tudo o que não é a BOOT_MEMORY nem a FLASH direta; as bases constantes de potência de 2
+    -- viram testes de bits na síntese.
     in_main_mem <= i_ea_main when ea_flags_external else
-                   '1' when (unsigned(i_ea) >= main_mem_base and
-                                unsigned(i_ea) < PERIPH_BASE) else
+                   '1' when is_main_addr(unsigned(i_ea)) else
                    '0';
 
     misal_in_word <= '1' when (HAS_ZICCLSM and in_main_mem = '1' and i_ea(1 downto 0) = BYTE_OFFSET_1 and
@@ -227,10 +221,8 @@ begin
 
     -- O desalinhamento que o hardware não executa vem antes da falha de acesso (a ordem opcional da Tabela 17 do
     -- manual, que mantém a causa 4 ou 6 do acesso desalinhado fora da memória principal); o desalinhamento que ele
-    -- executa só passa se o endereço for válido, e a falha é do endereço da primeira palavra.
-    ld_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0' and
-                                ld_misal = '0') else
-                   '0';
+    -- executa só passa se o endereço for válido, e a falha é do endereço da primeira palavra. A falha de load e a de
+    -- store por resposta de erro da porta externa saem do estágio MEM (stage_mem), depois do acesso.
     st_fault    <= '1' when (HAS_ACCESS_FAULTS and check_ea and i_opcode = OPCODE_STORE and i_ea_wr_ok = '0' and
                                 st_misal = '0') else
                    '0';
@@ -244,7 +236,7 @@ begin
     cf_misal <= '1' when (i_cf_taken = '1' and i_cf_target(1 downto 0) /= BYTE_OFFSET_0 and i_illegal = '0') else '0';
 
     has_exc <= fetch_fault or cf_misal or any_illegal or is_ebreak or
-               ld_misal or st_misal or ld_fault or st_fault or is_ecall;
+               ld_misal or st_misal or st_fault or is_ecall;
 
     is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
     irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
@@ -260,14 +252,13 @@ begin
                CAUSE_BREAKPOINT when is_ebreak = '1' else
                CAUSE_MISALIGNED_LD when ld_misal = '1' else
                CAUSE_MISALIGNED_ST when st_misal = '1' else
-               CAUSE_LOAD_FAULT when ld_fault = '1' else
                CAUSE_STORE_FAULT when st_fault = '1' else
                CAUSE_MACHINE_ECALL;
 
     o_tval <= (others => '0') when irq_go = '1' else
               i_pc when fetch_fault = '1' else
               i_cf_target when cf_misal = '1' else
-              i_ea when ((ld_misal = '1' or st_misal = '1' or ld_fault = '1' or st_fault = '1') and
+              i_ea when ((ld_misal = '1' or st_misal = '1' or st_fault = '1') and
                             i_illegal = '0') else
               (others => '0');
 

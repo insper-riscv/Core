@@ -15,7 +15,7 @@
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
 --     somente-leitura (bits [11:10] = "11") assertem o_illegal = '1'.
---   - O misa anuncia RV32I (RV32E quando IS_BASE_E = true) e, quando HAS_M = true, a
+--   - O misa anuncia RV32I (RV32E quando IS_E = true) e, quando HAS_M = true, a
 --     extensão M.
 --   - Com HAS_INTERRUPTS = true, mip e mie funcionam: mip (0x344) é somente leitura e
 --     espelha as portas i_irq_software (bit 3, MSIP), i_irq_timer (bit 7, MTIP) e
@@ -124,8 +124,11 @@ entity csr_file is
         i_mret_take      : in    std_logic                                         := '0';
         -- Pulso de um ciclo: uma instrução foi retirada em EX (incrementa minstret no ciclo seguinte).
         i_retire         : in    std_logic                                         := '0';
-        -- Cancela a retirada do ciclo anterior: a instrução gerou exceção no estágio MEM e não conta em minstret.
+        -- Cancela a retirada pendente: a instrução gerou exceção no estágio MEM e não conta em minstret.
         i_retire_cancel  : in    std_logic                                         := '0';
+        -- Segura a retirada pendente enquanto o estágio MEM está parado, até o ciclo em que ele avança, para que uma
+        -- exceção que chega depois de ciclos de espera (o erro da porta externa) ainda a cancele.
+        i_retire_hold    : in    std_logic                                         := '0';
         -- Vetor de eventos: o bit K vale '1' nos ciclos em que o evento de código K ocorre (o bit 0 é ignorado).
         i_events         : in    std_logic_vector(EVENT_VECTOR_WIDTH - 1 downto 0) := (others => '0');
         -- Endereço base do tratador de traps armazenado no registrador mtvec.
@@ -336,8 +339,8 @@ architecture rtl of csr_file is
 begin
 
     -- Montagem da palavra mstatus: MPP (bits [12:11]) fixo em "11" (Machine Mode).
-    misa_value <= MISA_E_WITH_M when (IS_BASE_E and HAS_M) else
-                  MISA_E_BASE when IS_BASE_E else
+    misa_value <= MISA_E_WITH_M when (IS_E and HAS_M) else
+                  MISA_E_BASE when IS_E else
                   MISA_WITH_M when HAS_M else
                   MISA_BASE;
 
@@ -363,7 +366,7 @@ begin
         is_cntr_addr or is_ext_addr when others;
 
     o_rdata          <= old_value;
-    o_mtvec          <= mtvec_reg(31 downto 2) & BYTE_OFFSET_0;
+    o_mtvec          <= mtvec_reg((XLEN - 1) downto 2) & BYTE_OFFSET_0;
     o_mtvec_vectored <= mtvec_mode;
     o_mepc           <= mepc_reg;
 
@@ -400,8 +403,8 @@ begin
                       '0';
     mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';
     mtvec_base_low <= (others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2);
-    mtvec_nxt      <= new_value(31 downto 6) & mtvec_base_low & BYTE_OFFSET_0;
-    mtvec_value    <= mtvec_reg(31 downto 2) & '0' & mtvec_mode;
+    mtvec_nxt      <= new_value((XLEN - 1) downto 6) & mtvec_base_low & BYTE_OFFSET_0;
+    mtvec_value    <= mtvec_reg((XLEN - 1) downto 2) & '0' & mtvec_mode;
 
     mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and
                                 i_mret_take = '0') else
@@ -410,8 +413,8 @@ begin
     mepc_we  <= '1' when (i_trap_take = '1' or
                              (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else
                 '0';
-    mepc_nxt <= i_trap_pc(31 downto 2) & BYTE_OFFSET_0 when i_trap_take = '1' else
-                new_value(31 downto 2) & BYTE_OFFSET_0;
+    mepc_nxt <= i_trap_pc((XLEN - 1) downto 2) & BYTE_OFFSET_0 when i_trap_take = '1' else
+                new_value((XLEN - 1) downto 2) & BYTE_OFFSET_0;
 
     mcause_we  <= '1' when (i_trap_take = '1' or
                                (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else
@@ -576,22 +579,23 @@ begin
                 o_hi    => mcycle_hi
             );
 
-        -- A retirada de EX fica pendente por um ciclo, para que um trap tomado em MEM a cancele; uma escrita em
-        -- minstret no mesmo ciclo descarta a retirada da própria instrução de escrita.
+        -- A retirada de EX fica pendente até o ciclo em que o estágio MEM avança, para que um trap tomado em MEM a
+        -- cancele, mesmo depois de ciclos de espera; uma escrita em minstret no mesmo ciclo descarta a retirada da
+        -- própria instrução de escrita.
         p_retire_pending_proc : process (i_clk) is
         begin
 
             if rising_edge(i_clk) then
                 if i_rst = '1' then
                     retire_pending <= '0';
-                else
+                elsif i_retire_hold = '0' then
                     retire_pending <= i_retire and (not (minstret_we_lo or minstret_we_hi));
                 end if;
             end if;
 
         end process p_retire_pending_proc;
 
-        minstret_inc <= retire_pending and (not i_retire_cancel) and (not inhibit_reg(2));
+        minstret_inc <= retire_pending and (not i_retire_cancel) and (not i_retire_hold) and (not inhibit_reg(2));
 
         -- O programa lê minstret já com a retirada pendente somada.
         minstret_rd_lo <= std_logic_vector(unsigned(minstret_lo) +
@@ -643,7 +647,7 @@ begin
 
         gen_time_platform : if time_external generate
             time_tick <= '0';
-            time_lo   <= i_mtime(31 downto 0);
+            time_lo   <= i_mtime(word_t'range);
             time_hi   <= i_mtime(63 downto 32);
         end generate gen_time_platform;
 
@@ -738,7 +742,7 @@ begin
 
     -- Leitura de mcountinhibit: os bits 2 a 0 daqui e os de 3 em diante do banco.
     inhibit_word(2 downto 0)  <= inhibit_reg and (2 downto 0 => is_inhibit_addr);
-    inhibit_word(31 downto 3) <= (others => '0');
+    inhibit_word((XLEN - 1) downto 3) <= (others => '0');
     -- O registrador de saída do banco guarda o valor do endereço anterior; só vale quando o endereço atual é do banco.
     ext_value                 <= (bank_rdata and (word_t'range => is_ext_addr)) or inhibit_word;
 

@@ -3,8 +3,10 @@
 A load or store that traps in MEM discards the instruction behind it in
 EX.
 
-The address exception of a load or store is decided in the MEM stage, so
-the instruction that follows it is already in EX when the trap is taken.
+The address exception of a load or store, and the access fault that the
+external port reports with its error answer, are decided in the MEM
+stage, so the instruction that follows it is already in EX when the trap
+is taken.
 Each case puts one instruction with a visible effect right behind a
 faulting access (a CSR write, a store, a register write or a taken
 branch) and resumes the program past it from the handler. The effect
@@ -31,7 +33,7 @@ from tests.python.unittests.cores.illegal_instruction import (
     csrrs,
     csrrw,
 )
-from tests.python.unittests.cores.misaligned_half import lh, sh
+from tests.python.unittests.cores.misaligned_half import lh, lw, sh
 from tests.python.unittests.cores.sdram_stall import (
     _r,
     addi,
@@ -51,12 +53,22 @@ HANDLER_RETIRES = 9
 LOG_WORDS = 3
 
 # Registers of the program.
-RAM, LOG, FLASH_BASE, PERIPH_BASE = 7, 11, 15, 16
-VALUE, COUNT, RESUME = 9, 10, 27
+RAM, LOG, FLASH_BASE, FLASH_DATA, EXT, EXT_EDGE = 7, 11, 15, 16, 17, 18
+VALUE, COUNT, RESUME, KEPT = 9, 10, 27, 24
+KEPT_VALUE = 0x55
+# An address the external port answers with error: no slave takes it.
+EXT_ADDRESS = 0x90000000
+# The word before it takes the access; the word after it is where the
+# second half of a misaligned load that crosses into the window ends.
+EXT_EDGE_ADDRESS = EXT_ADDRESS - 3
 
 FAULTS = {
     "load": (lh(24, FLASH_BASE, 1), 4, 0x1001),
-    "store": (sh(VALUE, PERIPH_BASE, 1), 6, 0x80000001),
+    "store": (sh(VALUE, FLASH_DATA, 1), 6, 0x2001),
+    "ext_load": (lw(KEPT, EXT, 0), 5, EXT_ADDRESS),
+    "ext_store": (sw(VALUE, EXT, 0), 7, EXT_ADDRESS),
+    "ext_cross_load": (lw(KEPT, EXT, 1), 5, EXT_ADDRESS + 1),
+    "ext_cross_second": (lw(KEPT, EXT_EDGE, 0), 5, EXT_EDGE_ADDRESS),
 }
 
 
@@ -80,7 +92,11 @@ def _prologue():
         lui(LOG, LOG_BASE >> 12),
         addi(LOG, LOG, LOG_BASE & 0xFFF),
         lui(FLASH_BASE, 1),
-        lui(PERIPH_BASE, 0x80000),
+        lui(FLASH_DATA, 2),
+        lui(EXT, EXT_ADDRESS >> 12),
+        lui(EXT_EDGE, EXT_ADDRESS >> 12),
+        addi(EXT_EDGE, EXT_EDGE, -3),
+        addi(KEPT, 0, KEPT_VALUE),
         addi(VALUE, 0, VICTIM_VALUE),
         addi(5, 0, TAKEN_BRANCH_EVENT),
         csrrw(0, MHPMEVENT3, 5),
@@ -130,6 +146,7 @@ def _epilogue():
         csrrs(23, MHPMCOUNTER3, 0),
         sw(23, RAM, 0x204),
         sw(COUNT, RAM, 0x208),
+        sw(KEPT, RAM, 0x20C),
         addi(14, 0, 1),
         sw(14, RAM, DONE_ADDR - RAM_BASE),
         jal_self(),
@@ -148,12 +165,22 @@ def build(fault_name, victim_name):
     return program, access_pc
 
 
-async def _run(dut, fault_name, victim_name):
+async def _run(dut, fault_name, victim_name, stall_for=None):
     """Run one case and check what the faulting access leaves behind."""
     program, access_pc = build(fault_name, victim_name)
     _, cause, address = FAULTS[fault_name]
-    ram = await run_program(dut, program, max_cycles=3000)
+    external = {}
+    ram = await run_program(
+        dut,
+        program,
+        max_cycles=3000,
+        sdram=external,
+        sdram_stall=stall_for,
+        sdram_error=lambda address: address >= EXT_ADDRESS,
+    )
     name = f"{fault_name} then {victim_name}"
+    check_equal(external, {}, f"{name}: the external memory changed")
+    check_equal(ram.get(RAM_BASE + 0x20C), KEPT_VALUE, f"{name}: load result")
     check_equal(ram.get(LOG_BASE), cause, f"{name}: mcause")
     check_equal(ram.get(LOG_BASE + 4), access_pc, f"{name}: mepc")
     check_equal(ram.get(LOG_BASE + 8), address, f"{name}: mtval")
@@ -215,3 +242,78 @@ async def test_store_trap_discards_a_register_write(dut):
 async def test_store_trap_discards_a_taken_branch(dut):
     """Verifica a taken branch behind a trapping store is dropped."""
     await _run(dut, "store", "branch")
+
+
+@cocotb.test()
+async def test_external_load_error_discards_a_csr_write(dut):
+    """Verifica a CSR write behind a load with error is dropped."""
+    await _run(dut, "ext_load", "csr")
+
+
+@cocotb.test()
+async def test_external_load_error_discards_a_store(dut):
+    """Verifica a store behind a load with error does not write."""
+    await _run(dut, "ext_load", "store")
+
+
+@cocotb.test()
+async def test_external_load_error_discards_a_register_write(dut):
+    """Verifica a register write behind a load with error is dropped."""
+    await _run(dut, "ext_load", "register")
+
+
+@cocotb.test()
+async def test_external_load_error_discards_a_taken_branch(dut):
+    """Verifica a taken branch behind a load with error is dropped."""
+    await _run(dut, "ext_load", "branch")
+
+
+@cocotb.test()
+async def test_external_store_error_discards_a_csr_write(dut):
+    """Verifica a CSR write behind a store with error is dropped."""
+    await _run(dut, "ext_store", "csr")
+
+
+@cocotb.test()
+async def test_external_store_error_discards_a_store(dut):
+    """Verifica a store behind a store with error does not write."""
+    await _run(dut, "ext_store", "store")
+
+
+@cocotb.test()
+async def test_external_store_error_discards_a_register_write(dut):
+    """Verifica a register write behind a store with error drops."""
+    await _run(dut, "ext_store", "register")
+
+
+@cocotb.test()
+async def test_external_store_error_discards_a_taken_branch(dut):
+    """Verifica a taken branch behind a store with error is dropped."""
+    await _run(dut, "ext_store", "branch")
+
+
+@cocotb.test()
+async def test_external_error_after_wait_cycles(dut):
+    """Verifica o erro externo chegando depois de ciclos de espera."""
+    for stall in (1, 3, 6):
+        await _run(dut, "ext_load", "register", lambda _n, s=stall: s)
+        await _run(dut, "ext_store", "branch", lambda _n, s=stall: s)
+        await _run(dut, "ext_load", "csr", lambda _n, s=stall: s)
+
+
+@cocotb.test()
+async def test_misaligned_load_with_an_error_in_the_first_word(dut):
+    """Verifica o erro na primeira palavra de um load que cruza."""
+    for victim in ("csr", "store", "register", "branch"):
+        await _run(dut, "ext_cross_load", victim)
+
+
+@cocotb.test()
+async def test_misaligned_load_with_an_error_in_the_second_word(dut):
+    """Verifica o erro na segunda palavra de um load que cruza.
+
+    The first word answers, the second one does not: the load takes the
+    fault with the address of the access and writes no register.
+    """
+    for victim in ("csr", "store", "register", "branch"):
+        await _run(dut, "ext_cross_second", victim)

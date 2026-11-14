@@ -359,7 +359,7 @@ begin
     -- Resultado completo da operação que termina: produto de 64 bits ou o par resto e quociente.
     u_mux_full_lo : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => div_quotient,
@@ -370,7 +370,7 @@ begin
 
     u_mux_full_hi : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => div_remainder,
@@ -400,7 +400,7 @@ begin
     -- No término fundido o resultado completo vem do registro, no lugar das unidades interrompidas.
     u_mux_mul_lo_src : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => mul_lo,
@@ -411,7 +411,7 @@ begin
 
     u_mux_mul_hi_src : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => mul_hi,
@@ -422,7 +422,7 @@ begin
 
     u_mux_div_q_src : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => div_quotient,
@@ -433,7 +433,7 @@ begin
 
     u_mux_div_r_src : entity work.mux_2x1
         generic map (
-            data_width => 32
+            data_width => word_t'length
         )
         port map (
             i_d0  => div_remainder,

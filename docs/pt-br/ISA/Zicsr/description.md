@@ -82,7 +82,7 @@ Todos os CSRs valem zero após o reset, exceto `misa` e a parte fixa de `mstatus
 | Endereço | CSR | Acesso | Definição | Leitura | Escrita |
 | :---: | :--- | :---: | :---: | :--- | :--- |
 | `0x300` | `mstatus` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | `MPP` (bits 12 e 11) fixo em `11`, `MPIE` (bit 7), `MIE` (bit 3); demais bits zero | Só `MIE` e `MPIE` são gravados; os demais bits são ignorados |
-| `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `HAS_M`, `0x40001100` (soma o bit 12, extensão `M`); com `IS_BASE_E` verdadeiro (RV32E), o bit 4 (extensão `E`) substitui o bit 8, e o valor é `0x40000010` ou, com `HAS_M`, `0x40001010` | Ignorada |
+| `0x301` | `misa` | L/E | [2.1.1.1](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#misa) | `0x40000100` (`MXL = 1`, extensão `I`); com `HAS_M`, `0x40001100` (soma o bit 12, extensão `M`); com `IS_E` verdadeiro (RV32E), o bit 4 (extensão `E`) substitui o bit 8, e o valor é `0x40000010` ou, com `HAS_M`, `0x40001010` | Ignorada |
 | `0x304` | `mie` | L/E | [2.1.1.9](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-9-machine-interrupt-mip-and-mie-registers) | Zero; com `HAS_INTERRUPTS`, as máscaras `MSIE`, `MTIE` e `MEIE` (bits 3, 7 e 11) | Com `HAS_INTERRUPTS`, grava os bits 3, 7 e 11; os demais são ignorados |
 | `0x305` | `mtvec` | L/E | [2.1.1.7](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-7-machine-trap-vector-base-address-mtvec-register) | `BASE` nos bits `[31:2]` e `MODE` no bit 0 (`0` direto, `1` vetorado); o bit 1 lê zero. Sem `HAS_INTERRUPTS`, `MODE` lê sempre zero | Grava `BASE` e, com `HAS_INTERRUPTS`, `MODE`; no modo vetorado os bits `[5:2]` de `BASE` são gravados em zero (alinhamento de 64 bytes) |
 | `0x310` | `mstatush` | L/E | [2.1.1.6](https://docs.riscv.org/reference/isa/v20260120/priv/machine.html#2-1-1-6-machine-status-mstatus-and-mstatush-registers) | Zero | Ignorada |
@@ -138,14 +138,14 @@ A `trap_unit` avalia a instrução no estágio EX e sinaliza no máximo uma exce
 | 3 | Breakpoint | `EBREAK` (`funct12 = 0x001`) | Zero |
 | 1 | Falha de acesso de instrução | Busca de instrução fora das regiões executáveis do mapa, com `HAS_ACCESS_FAULTS` (seção 6.7) | PC da instrução |
 | 4 | Endereço de load desalinhado | Load desalinhado que o hardware não executa | Endereço efetivo |
-| 5 | Falha de acesso de load | Load para endereço que o mapa não aceita ler, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
+| 5 | Falha de acesso de load | Load cujo acesso a porta externa termina com erro, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
 | 6 | Endereço de store desalinhado | Store desalinhado que o hardware não executa | Endereço efetivo |
-| 7 | Falha de acesso de store | Store para endereço que o mapa não aceita escrever, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
+| 7 | Falha de acesso de store | Store para a Memória de boot ou a FLASH, ou cujo acesso à porta externa termina com erro, com `HAS_ACCESS_FAULTS` (seção 6.7) | Endereço efetivo |
 | 11 | Chamada de ambiente do modo máquina | `ECALL` (`funct12 = 0x000`) | Zero |
 
 As instruções `ECALL`, `EBREAK`, `MRET` e `WFI` só são reconhecidas com `funct3 = 000`, `rd = x0` e `rs1 = x0`. Qualquer outra instrução `SYSTEM` que não seja de acesso a CSR, inclusive `funct3 = 100`, `SRET` e `SFENCE.VMA`, é ilegal. O decodificador do estágio ID também marca como ilegal um registrador com índice acima de 15 quando o perfil é RV32E.
 
-Um desalinhamento de load ou store é definido pelas regras da extensão `Zicclsm`: o hardware executa o acesso desalinhado dentro da memória principal (RAM interna e SDRAM) quando `HAS_ZICCLSM = true`, e qualquer outro desalinhamento gera as causas 4 e 6. Com `HAS_ZICSR = true`, essas duas causas são verificadas no estágio MEM por uma segunda instância da `trap_unit`, que lê o endereço efetivo já registrado em `EX/MEM`, e a instância do estágio EX não confere o endereço efetivo.
+Um desalinhamento de load ou store é definido pelas regras da extensão `Zicclsm`: o hardware executa o acesso desalinhado dentro da memória principal (tudo o que não é a Memória de boot nem a FLASH direta) quando `HAS_ZICCLSM = true`, e qualquer outro desalinhamento gera as causas 4 e 6. Com `HAS_ZICSR = true`, essas duas causas são verificadas no estágio MEM por uma segunda instância da `trap_unit`, que lê o endereço efetivo já registrado em `EX/MEM`, e a instância do estágio EX não confere o endereço efetivo.
 
 ### 6.2. Prioridade
 
@@ -192,25 +192,32 @@ O PC de redirecionamento é escolhido entre `mepc` (em `MRET`), `PC + 4` (em `FE
 
 A exceção de EX é detectada de forma combinacional no ciclo em que a instrução está em EX e o pipeline avança. Os CSRs e o PC são gravados na borda de clock que encerra esse ciclo, de modo que a primeira instrução do tratador é buscada no ciclo seguinte. Duas instruções mais novas (nos estágios IF e ID) são descartadas, além da própria instrução faltante. A exceção de load ou store é detectada no ciclo em que o acesso chega a MEM, um ciclo depois da instrução ter passado por EX.
 
-A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
+A retirada de uma instrução em EX soma em `minstret` um ciclo depois, e uma exceção de MEM cancela essa soma, de modo que o acesso que falha não conta como retirado. Enquanto o estágio MEM está parado, a soma fica pendente e só se completa no ciclo em que ele avança, para que o erro da porta externa, que chega depois de ciclos de espera, ainda a cancele. Detalhes dos contadores estão em [Zicntr](../Zicntr/description.md) e [Zihpm](../Zihpm/description.md).
 
 ### 6.7. Falhas de Acesso
 
-A constante `HAS_ACCESS_FAULTS` (padrão `false`, exige `HAS_ZICSR`) liga as causas 1, 5 e 7. O mapa válido vem das constantes do mapa de memória do `config_pkg` (`ROM_END`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`) e do generic `periph_slots`, a máscara das janelas do barramento de periféricos que têm periférico (bit $n$ para os endereços de bits `ADDR_BITS-2` a `ADDR_BITS-4` iguais a $n$; com `ADDR_BITS = 32`, os bits 30:28 e janelas de 256 MiB), que o `riscv-tools` escreve no pacote do mapa como `PERIPH_SLOTS`. A janela de periféricos começa em `PERIPH_BASE`, `2**(ADDR_BITS - 1)` por padrão. A constante `STRICT_PERIPH` do `config_pkg` (padrão `true`, desligável por plataforma) decide se uma janela sem periférico é recusada: com ela verdadeira o acesso a uma janela vazia gera a falha 5 ou 7; com ela falsa toda janela aceita o acesso. A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
+A constante `HAS_ACCESS_FAULTS` (padrão `false`, exige `HAS_ZICSR`) liga as causas 1, 5 e 7. O núcleo conhece só a Memória de boot, a FLASH e a RAM (`BOOT_MEMORY_END`, `FLASH_BASE`, `FLASH_END`, `RAM_BASE`, `RAM_END` e `FLASH_ON_BUS`, `RAM_ON_BUS` do `config_pkg`), e não conhece periféricos. Todo endereço fora das três regiões sai pela porta externa, e a falha de load ou de store desses acessos vem da resposta de erro da porta (`i_ext_error`, levantada junto de `i_ext_ready`). A extensão liga-se pelo `extras: [AccessFaults]` do `platform.yaml`.
+
+| Causa | Origem da falha | Quem decide |
+| :---: | :--- | :--- |
+| 1 | Busca fora da Memória de boot, da FLASH e da RAM no barramento | O mapa do núcleo, a partir do PC da instrução em EX |
+| 5 | Load cujo acesso termina com `i_ext_error` | A porta externa, no estágio MEM |
+| 7 | Store à Memória de boot ou à FLASH | O mapa do núcleo, a partir do endereço efetivo |
+| 7 | Store cujo acesso termina com `i_ext_error` | A porta externa, no estágio MEM |
 
 | Região | Leitura | Escrita | Busca |
 | :--- | :---: | :---: | :---: |
-| ROM, de zero a `ROM_END` (BOOT_MEMORY e FLASH) | Sim | Não | Sim |
-| RAM, de `RAM_BASE` a `RAM_END` | Sim | Sim | Sim |
-| Janela externa, de `EXT_BASE` a `PERIPH_BASE` | Sim | Sim | Sim |
-| Janela de periféricos ocupada, a partir de `PERIPH_BASE` | Sim | Sim | Não |
-| Janela de periféricos vazia, com `STRICT_PERIPH` | Não | Não | Não |
-| Janela de periféricos vazia, sem `STRICT_PERIPH` | Sim | Sim | Não |
-| O que sobra (buracos entre as regiões) | Não | Não | Não |
+| Memória de boot | Sim | Não | Sim |
+| FLASH, direta ou no barramento | Sim | Não | Sim |
+| RAM direta | Sim | Sim | Não |
+| RAM no barramento | Sim | Sim | Sim |
+| Fora das três regiões | Pela porta externa | Pela porta externa | Não |
 
-A validade de leitura e de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `HAS_ACCESS_FAULTS = false` as validades valem sempre `1` e nada disso é sintetizado.
+A validade de escrita do endereço efetivo é decidida no estágio EX, a partir do resultado da ULA, junto da classificação do endereço que `reg_ex_mem` já registra, e o estágio MEM só confere o bit registrado. A validade da busca sai do PC da instrução em EX, de um registrador, fora do caminho da ULA. Com `HAS_ACCESS_FAULTS = false` as validades valem sempre `1`, a resposta de erro é ignorada e nada disso é sintetizado.
 
-A falha de busca vem antes da instrução ilegal, na ordem da Tabela 17 do volume privilegiado. O desalinhamento que o hardware não executa (fora da memória principal) mantém a causa 4 ou 6, a ordem opcional da tabela, e o acesso desalinhado que ele executa só passa se o endereço for válido. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
+A falha por erro externo sai do estágio MEM no ciclo em que a porta externa conclui o acesso com `i_ext_error`. Nesse ciclo o estágio MEM gera a causa 5 (load) ou 7 (store) com o endereço efetivo em `mtval`, pelo mesmo caminho da exceção de endereço: a instrução de EX é descartada, o load não escreve registrador, o store não tem efeito no escravo e a retirada em `minstret` do acesso que falha é cancelada, inclusive quando ele esperou ciclos pela porta. Num acesso desalinhado que ocupa duas palavras, o erro de qualquer uma das duas gera a falha do acesso.
+
+A falha de busca vem antes da instrução ilegal, na ordem da Tabela 17 do volume privilegiado. O desalinhamento que o hardware não executa (Memória de boot e FLASH direta) mantém a causa 4 ou 6, a ordem opcional da tabela, e o acesso desalinhado que ele executa só passa se o endereço for válido. Uma falha de load ou store é do endereço da primeira palavra, e o acesso não chega às memórias, como no desalinhamento.
 
 ## 7. Tomada de Interrupção
 
@@ -255,7 +262,7 @@ A tomada espera enquanto o pipeline não avança ou não há instrução válida
 | :--- | :--- |
 | Multiplicação ou divisão | O pipeline fica parado até o término. No ciclo em que o resultado fica pronto a interrupção aborta a instrução, que refaz o cálculo depois do retorno |
 | Acesso desalinhado em duas etapas | As duas etapas terminam antes da tomada |
-| Espera de leitura ou escrita da SDRAM | O acesso termina antes da tomada |
+| Espera de leitura ou escrita da porta externa | O acesso termina antes da tomada |
 | Busca esperando `i_ic_ready` | Não há instrução válida em EX; a interrupção é tomada na primeira instrução válida que chega |
 | Bolha em EX (salto tomado, dependência de load) | A interrupção é tomada na primeira instrução válida que chega |
 | `FENCE.I` em EX | A instrução redireciona o pipeline para a seguinte e completa; a interrupção é tomada nessa seguinte |

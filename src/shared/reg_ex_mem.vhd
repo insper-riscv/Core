@@ -16,16 +16,11 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use work.utils_pkg.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
 
 entity reg_ex_mem is
-    generic (
-        -- Slots do barramento de periféricos que têm periférico (bit n para os endereços de bits 30:28 iguais a n).
-        periph_slots : std_logic_vector(7 downto 0) := (others => '1')
-    );
     port (
         -- Sinal de clock.
         i_clk         : in    std_logic;
@@ -51,7 +46,7 @@ entity reg_ex_mem is
         -- Máscara de habilitação de bytes para escrita na RAM vinda do StoreManager.
         i_byte_mask   : in    byte_mask_t;
         -- Endereço do registrador destino rd.
-        i_rd          : in    reg_field_t;
+        i_rd          : in    reg_t;
         -- Habilita escrita no banco de registradores no estágio WB.
         i_we_reg      : in    std_logic;
         -- Habilita escrita na memória de dados no estágio MEM.
@@ -73,7 +68,7 @@ entity reg_ex_mem is
         -- Máscara de bytes registrada para o estágio MEM.
         o_byte_mask   : out   byte_mask_t;
         -- Endereço de rd registrado para o estágio MEM (e Forwarding Unit).
-        o_rd          : out   reg_field_t;
+        o_rd          : out   reg_t;
         -- Habilitação de escrita em registrador registrada para o estágio MEM.
         o_we_reg      : out   std_logic;
         -- A instrução é válida e escreve em registrador (registrada, para a seleção do adiantamento).
@@ -92,17 +87,18 @@ entity reg_ex_mem is
         o_pc          : out   word_t;
         -- Campo funct3 registrado para o estágio MEM.
         o_funct3      : out   funct3_t;
-        -- O endereço registrado cai na FLASH de dados (decodificado em EX, registrado aqui).
+        -- O endereço registrado é atendido pela porta direta de dados da BOOT_MEMORY e da FLASH (decodificado em EX,
+        -- registrado aqui).
         o_is_flash    : out   std_logic;
-        -- O endereço registrado cai na janela externa, a SDRAM.
+        -- O endereço registrado sai pela porta externa (barramento): a FLASH ou a RAM no barramento e tudo fora das três
+        -- regiões.
         o_is_sdram    : out   std_logic;
         -- O endereço registrado está na memória principal.
         o_in_main     : out   std_logic;
         -- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
         o_same_region : out   std_logic;
-        -- O endereço registrado aceita leitura no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
-        o_ok_rd       : out   std_logic;
-        -- O endereço registrado aceita escrita no mapa (sempre '1' sem HAS_ACCESS_FAULTS).
+        -- O endereço registrado aceita escrita no mapa do núcleo (sempre '1' sem HAS_ACCESS_FAULTS); a BOOT_MEMORY e a
+        -- FLASH são só de leitura.
         o_ok_wr       : out   std_logic
     );
 end entity reg_ex_mem;
@@ -122,7 +118,7 @@ architecture rtl of reg_ex_mem is
     -- Máscara de bytes armazenada.
     signal r_byte_mask  : byte_mask_t  := (others => '0');
     -- Endereço de rd armazenado.
-    signal r_rd         : reg_field_t  := (others => '0');
+    signal r_rd         : reg_t  := (others => '0');
     -- Habilitação de escrita em registrador armazenada.
     signal r_we_reg     : std_logic    := '0';
     -- Validade e escrita em registrador armazenadas juntas.
@@ -137,16 +133,14 @@ architecture rtl of reg_ex_mem is
     signal r_ext_ram_op : ext_ram_op_t := (others => '0');
     -- Seletor de write-back armazenado.
     signal r_wb_sel     : wb_sel_t     := (others => '0');
-    -- O endereço registrado cai na FLASH de dados.
+    -- O endereço registrado é atendido pela porta direta de dados da BOOT_MEMORY e da FLASH.
     signal r_is_flash   : std_logic    := '0';
-    -- O endereço registrado cai na janela externa (SDRAM).
+    -- O endereço registrado sai pela porta externa (barramento).
     signal r_is_sdram   : std_logic    := '0';
     -- O endereço registrado está na memória principal.
     signal r_in_main    : std_logic    := '0';
     -- O endereço está na última palavra de uma região (a seguinte é de outra).
     signal r_last       : std_logic    := '0';
-    -- O endereço registrado aceita leitura no mapa.
-    signal r_ok_rd      : std_logic    := '1';
     -- O endereço registrado aceita escrita no mapa.
     signal r_ok_wr      : std_logic    := '1';
 
@@ -158,36 +152,26 @@ architecture rtl of reg_ex_mem is
     signal in_in_main  : std_logic;
     -- Entrada de r_last, decodificada do resultado da ULA.
     signal in_last     : std_logic;
-    -- Entrada de r_ok_rd, decodificada do resultado da ULA.
-    signal in_ok_rd    : std_logic;
     -- Entrada de r_ok_wr, decodificada do resultado da ULA.
     signal in_ok_wr    : std_logic;
-
-    -- Slots do barramento de periféricos que aceitam acesso: os ocupados (periph_slots) com os periféricos estritos
-    -- (STRICT_PERIPH), todos sem eles, e então um slot sem periférico responde como os demais e não gera falha.
-    constant ACCEPTED_SLOTS : std_logic_vector(7 downto 0) := periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH));
 
 begin
 
     -- A classificação do endereço sai do estágio EX e fica registrada: o estágio MEM parte dela, sem decodificar o
     -- endereço.
-    in_is_flash <= '1' when unsigned(i_ea) < internal_rom_end else '0';
+    in_is_flash <= '1' when is_direct_rom_addr(unsigned(i_ea)) else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
-    in_in_main  <= '1' when (unsigned(i_ea) >= main_mem_base and
-                                unsigned(i_ea) < PERIPH_BASE) else
-                   '0';
+    in_in_main  <= '1' when is_main_addr(unsigned(i_ea)) else '0';
     in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
-    -- A validade do endereço no mapa (leitura e escrita) sai de EX como a classificação, para o estágio MEM só conferir
-    -- o bit.
+    -- A validade do endereço para escrita no mapa do núcleo sai de EX como a classificação, para o estágio MEM só
+    -- conferir o bit. O endereço que nenhuma região atende não é recusado aqui: a porta externa responde erro.
 
     gen_faults : if HAS_ACCESS_FAULTS generate
-        in_ok_rd <= '1' when addr_readable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
-        in_ok_wr <= '1' when addr_writable(unsigned(i_ea), ACCEPTED_SLOTS) else '0';
+        in_ok_wr <= '1' when addr_writable(unsigned(i_ea)) else '0';
     end generate gen_faults;
 
     gen_no_faults : if not HAS_ACCESS_FAULTS generate
-        in_ok_rd <= '1';
         in_ok_wr <= '1';
     end generate gen_no_faults;
 
@@ -214,7 +198,6 @@ begin
                 r_is_sdram   <= '0';
                 r_in_main    <= '0';
                 r_last       <= '0';
-                r_ok_rd      <= '1';
                 r_ok_wr      <= '1';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
@@ -235,7 +218,6 @@ begin
                 r_is_sdram   <= in_is_sdram;
                 r_in_main    <= in_in_main;
                 r_last       <= in_last;
-                r_ok_rd      <= in_ok_rd;
                 r_ok_wr      <= in_ok_wr;
             end if;
         end if;
@@ -262,7 +244,6 @@ begin
     -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não
     -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
     o_same_region <= r_in_main and (not r_last);
-    o_ok_rd       <= r_ok_rd;
     o_ok_wr       <= r_ok_wr;
 
 end architecture rtl;

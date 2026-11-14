@@ -22,27 +22,22 @@ An access that crosses the word occupies the last bytes of a 32-bit word and the
 
 ## 2. When the Hardware Executes the Access
 
-For the purpose of the extension, the Core treats as main memory the data regions between the end of the internal ROM (or the external base, when the ROM is external) and the base of the peripheral window. The limits come from the memory map constants of the `config_pkg` (`ROM_END`, `ROM_EXTERNAL`, `RAM_BASE`, `RAM_END`, `EXT_BASE` and `PERIPH_BASE`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). 
-
-The start of the main memory is `EXT_BASE` when `ROM_EXTERNAL` is true and `ROM_END` is 0, `2 ** BOOT_MEMORY_BITS` (the end of the BOOT_MEMORY, `0x00001000` by default) when `ROM_EXTERNAL` is true and `ROM_END` is greater than 0, and `ROM_END` otherwise. The end is `PERIPH_BASE`, where the peripheral window starts. The intervals below are half-open and hold for any value of the constants.
+For the purpose of the extension, the Core treats as main memory everything that is neither the Boot memory nor the direct FLASH, which are read-only and do not split an access into two reads. The limits come from the memory map constants of the `config_pkg` (`BOOT_MEMORY_END`, `FLASH_BASE`, `FLASH_END`, `FLASH_ON_BUS`, `RAM_BASE`, `RAM_END` and `RAM_ON_BUS`), described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). The intervals below are half-open and hold for any value of the constants.
 
 | Region | Range as a function of the constants | Misaligned access in hardware |
 | :--- | :--- | :--- |
-| Below the main memory (BOOT_MEMORY, internal ROM and unmapped range) | `[0, start)` | No, raises an exception |
-| Main memory | `[start, PERIPH_BASE)` | Yes |
-| Peripherals | `[PERIPH_BASE, 2**ADDR_BITS)` | No, raises an exception |
+| Boot memory | `[0, BOOT_MEMORY_END)` | No, raises an exception |
+| FLASH with `FLASH_ON_BUS` false | `[FLASH_BASE, FLASH_END)` | No, raises an exception |
+| FLASH with `FLASH_ON_BUS` true | `[FLASH_BASE, FLASH_END)` | Yes |
+| RAM, direct or on the bus | `[RAM_BASE, RAM_END)` | Yes |
+| Outside the three regions (bus) | The rest of `[0, 2**ADDR_BITS)` | Yes |
 
-Each platform fixes the constants in its `platform.yaml`. The table shows the two maps used today, with the main memory and the peripherals already converted to addresses.
-
-| Map | `ROM_EXTERNAL` | `ROM_END` | `EXT_BASE` | `PERIPH_BASE` | Main memory | Peripherals |
-| :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| Default, with internal RAM | `false` | `0x00008000` | `0x40000000` | `0x80000000` | `0x00008000` to `0x7FFFFFFF` | `0x80000000` onwards |
-| Platform with external FLASH | `true` | `0x00000000` | `0x20000000` | `0x60000000` | `0x20000000` to `0x5FFFFFFF` | `0x60000000` onwards |
+Each platform fixes the constants in its `platform.yaml`. In the default map (`FLASH_END = 0x00008000`, `RAM_END = 0x40000000`, both memories direct), the main memory starts at `0x00008000`, and what lies above `RAM_END` leaves through the external port, which answers an error if no slave takes the address. With the FLASH on the bus, the main memory includes the FLASH and starts right after the Boot memory.
 
 A misaligned access that fits in one word (`LH`, `LHU` and `SH` with $o = 1$) is executed when the address is in the main memory. An access that crosses the word is executed only when it meets the two conditions below.
 
 1. The address is in the main memory of the map in use.
-2. The address does not belong to the last word of a region. Both words of the access must be in the same region, and the word after the last one of each region belongs to the neighbouring region, even when the addresses are contiguous (for example, `0x3FFFFFFC` in the default map).
+2. The address does not belong to the last word of a region with a path of its own, nor to the top of the address space. Both words of the access must be in the same region, and the word after the last one of each region (`FLASH_END`, `RAM_END`) belongs to the neighbouring region, even when the addresses are contiguous (for example, `0x3FFFFFFC` in the default map).
 
 When a condition fails, or when `HAS_ZICCLSM` is false, the access raises a misaligned address exception. The instruction is cancelled before it reaches the memory, which happens in the MEM stage when the Core has Zicsr and in the EX stage when it does not. With Zicsr enabled, the exception uses `mcause = 4` for a load and `mcause = 6` for a store, and `mtval` receives the effective address. Without Zicsr, the exception is only signalled on the Core outputs, as described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). The combination without Zicsr and without Zicclsm is a valid configuration.
 
@@ -59,7 +54,7 @@ A flip-flop holds the current step. It becomes `1` when step 1 completes and ret
 
 Step 1 completes when two conditions hold in the same cycle.
 
-- The slave is ready. The internal RAM always is, since it answers in one cycle. The external regions (the SDRAM and, in the map with external FLASH, also the FLASH) are ready only when the ready signal arrives.
+- The slave is ready. The internal RAM always is, since it answers in one cycle. The regions on the bus (the FLASH and the RAM on the bus, and everything outside the three regions) are ready only when the ready signal arrives.
 - The memory may advance, that is, the pipeline is not stalled by a multiplication or division or by waiting on an external region.
 
 During step 1 the stall signal of the unit freezes the earlier stages and keeps the instruction in MEM. In step 2 that signal drops, and the instruction leaves MEM when the pipeline advances, like an aligned access. In the internal RAM step 1 completes in the first cycle, so the instruction occupies the MEM stage for two cycles instead of one.

@@ -45,7 +45,7 @@ MATRIX_STRIDE ?= 5
 profile-matrix: check
 	@riscv-tools vhdl-sort $(VHDL) | tr ' ' '\n' > $(WDIR)/order.txt
 	@riscv-tools profiles --spec profiles/matrix.yaml --format generics | awk 'NR % $(MATRIX_STRIDE) == 1' | \
-	  sed -e 's/-ghas_e=/IS_BASE_E=/' -e 's/ -ghas_\([a-z0-9]*\)=/ HAS_\U\1=/g' | \
+	  sed -e 's/-ghas_e=/IS_E=/' -e 's/ -ghas_\([a-z0-9]*\)=/ HAS_\U\1=/g' | \
 	  QUIET=1 xargs -P $$(nproc) -L 1 bash -c 'bash formal/build_profile.sh matrix_$$0 $(WDIR)/matrix/$$0 "$$*" "" $$(cat $(WDIR)/order.txt) || exit 255'
 	@echo "matrix: $$(riscv-tools profiles --spec profiles/matrix.yaml --format names | awk 'NR % $(MATRIX_STRIDE) == 1' | wc -l) profiles build"
 

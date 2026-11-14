@@ -54,8 +54,8 @@ expect() {
   esac
 }
 
-# resolve_gens <name> [ghdl generics]: separates the constants of the config_pkg (-ghas_*, -gstrict_periph and -gbase_e, the names the
-# core had as generics) from the generics that remain. CFG_FILE gets the config_pkg of the
+# resolve_gens <name> [ghdl generics]: separates the constants of the config_pkg (-ghas_* and -gbase_e, the names the core had as
+# generics) from the generics that remain. CFG_FILE gets the config_pkg of the
 # unit (CONFIG_FILE, or the default one, with those constants set, written in the output folder) and GEN_FLAGS the flags
 # for GHDL.
 resolve_gens() {
@@ -65,8 +65,8 @@ resolve_gens() {
   for flag in "$@"; do
     key="${flag#-g}"; key="${key%%=*}"
     case "${key,,}" in
-      has_e|base_e) sets="$sets IS_BASE_E=${flag#*=}" ;;
-      has_*|strict_periph) sets="$sets ${key^^}=${flag#*=}" ;;
+      has_e|base_e) sets="$sets IS_E=${flag#*=}" ;;
+      has_*) sets="$sets ${key^^}=${flag#*=}" ;;
       *) GEN_FLAGS="$GEN_FLAGS $flag" ;;
     esac
   done
@@ -83,6 +83,9 @@ resolve_gens() {
 # its place, so that no entity is defined in two files. Without REPLACES, $1 comes last.
 netlist() {
   local work="$out/work_$3" replaces="${REPLACES:-}" log="$out/$3.ghdl.log" file replaced=0 files=()
+  # The CSR bank is proven with the M extension, as its misa value is (misa 0x40001100), on top of the default package.
+  local CONFIG_FILE="${CONFIG_FILE:-}"
+  [ -n "$CONFIG_FILE" ] || [ "$2" != csr_file ] || CONFIG_FILE="$(config_variant m)"
   mkdir -p "$work"; : > "$log"
   resolve_gens "$3" ${@:4}
   for file in \
@@ -114,6 +117,7 @@ netlist() {
     if [ -n "$replaces" ] && [ "$file" = "$replaces" ]; then file="$1"; replaced=1; fi
     files+=("$file")
   done
+  for file in ${EXTRA_FILES:-}; do files+=("$file"); done
   [ "$replaced" = 1 ] || files+=("$1")
   for file in "${files[@]}"; do
     ghdl -a --std=08 --workdir="$work" "$file" 2>> "$log" || { cat "$log" >&2; return 1; }
@@ -246,15 +250,14 @@ netlist "$trap" trap_unit trap_af "$trap_af_gens"
 expect "fetch fault is cause 1 with the PC and beats everything, a load or store the map refuses is cause 5 or 7 with the address, nothing else raises them (induction)" PASS "$(prove trap_af.v "$trap_af_props" prove 2 '' trap_af_safety)"
 expect "cover: causes 1, 5 and 7, a fetch fault over an illegal instruction and a misaligned load fault are reachable" PASS "$(prove trap_af.v "$trap_af_props" cover 2 '-DCOVER' trap_af_cover)"
 
-echo "reg_ex_mem validity flags on the window of the peripherals"
-exmem="$root/src/shared/reg_ex_mem.vhd"; exmem_props="$root/formal/exmem_periph_props.sv"
-exmem_gens="-ghas_access_faults=true -gperiph_slots=00001001"
-CONFIG_FILE="$(config_variant faults_map)" netlist "$exmem" reg_ex_mem exmem "$exmem_gens"
-expect "strict peripherals: a slot without a peripheral refuses read and write, the occupied slots, the RAM and the ROM follow the map, a bubble refuses nothing (bounded, 6 cycles)" PASS "$(prove exmem.v "$exmem_props" bmc 6 '' exmem_safety)"
-expect "cover: an occupied slot, a refused slot, the RAM, a hole and a bubble are reachable" PASS "$(prove exmem.v "$exmem_props" cover 6 '-DCOVER' exmem_cover)"
-CONFIG_FILE="$(config_variant faults_map)" netlist "$exmem" reg_ex_mem exmem_loose "$exmem_gens -gstrict_periph=false"
-expect "STRICT_PERIPH false: every slot of the window accepts read and write (bounded, 6 cycles)" PASS "$(prove exmem_loose.v "$exmem_props" bmc 6 '-DLOOSE' exmem_loose_safety)"
-expect "cover: with STRICT_PERIPH false a slot without a peripheral is accepted" PASS "$(prove exmem_loose.v "$exmem_props" cover 6 '-DLOOSE -DCOVER' exmem_loose_cover)"
+echo "stage_mem: the error of the external port is a precise access fault"
+mem="$root/src/core/stage_mem.vhd"; mem_props="$root/formal/ext_error_props.sv"
+mem_gens="-ghas_access_faults=true -gflags_registered=true"
+EXTRA_FILES="$trap" netlist "$mem" stage_mem mem_err "$mem_gens"
+expect "an access that ends with ready and error raises cause 5 (load) or 7 (store) with mtval = the address, issued once to the external port and to no other memory; no fault without ready, without error or off the external port (induction)" PASS "$(prove mem_err.v "$mem_props" prove 2 '' mem_err_safety)"
+expect "cover: a load fault, a store fault, a completed access without error, a wait and an ignored error are reachable" PASS "$(prove mem_err.v "$mem_props" cover 2 '-DCOVER' mem_err_cover)"
+EXTRA_FILES="$trap" netlist "$mem" stage_mem mem_err_off "-gflags_registered=true"
+expect "without has_access_faults the error is ignored and cause 5 never occurs (induction)" PASS "$(prove mem_err_off.v "$mem_props" prove 2 '-DNO_FAULTS' mem_err_off_safety)"
 
 echo "muldiv_fusion"
 fus="$root/src/M/muldiv_fusion.vhd"; fus_props="$root/formal/muldiv_fusion_props.sv"
@@ -386,7 +389,7 @@ mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl ge
 }
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0' \+when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1' \+when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
-mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_value(31 downto 2) \& BYTE_OFFSET_0;/new_value;/"
+mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_value((XLEN - 1) downto 2) \& BYTE_OFFSET_0;/new_value;/"
 mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt \+<= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
@@ -396,7 +399,6 @@ mutant "$trap" "$trap_props" trap_unit  ''              illegal_ignored  "s/has_
 mutant "$trap" "$trap_props" trap_unit  ''              misaligned_over_illegal "s/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/CAUSE_MISALIGNED_PC when (i_cf_taken = '1' and not (i_cf_target(1 downto 0) = BYTE_OFFSET_0)) else CAUSE_ILLEGAL_INSTR when any_illegal = '1' else/"
 
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_below_illegal "s/CAUSE_FETCH_FAULT \+when fetch_fault = '1' else/CAUSE_ILLEGAL_INSTR when any_illegal = '1' else CAUSE_FETCH_FAULT   when fetch_fault = '1' else/" "$trap_af_gens"
-mutant "$trap" "$trap_af_props" trap_unit  ''              af_load_uses_write_flag "s/i_opcode = OPCODE_LOAD and i_ea_rd_ok = '0'/i_opcode = OPCODE_LOAD and i_ea_wr_ok = '0'/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fault_before_misaligned ":a;N;\$!ba;s/[[:space:]]\+and[[:space:]]\+st_misal[[:space:]]\+=[[:space:]]\+'0')[[:space:]]\+else[[:space:]]\+'0';/) else '0';/;s/CAUSE_MISALIGNED_ST[[:space:]]\+when st_misal = '1' else/CAUSE_STORE_FAULT   when st_fault = '1' else CAUSE_MISALIGNED_ST when st_misal = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_fetch_tval_ea "s/i_pc \+when fetch_fault = '1' else/i_ea        when fetch_fault = '1' else/" "$trap_af_gens"
 mutant "$trap" "$trap_af_props" trap_unit  ''              af_store_fault_cause_load "s/CAUSE_STORE_FAULT \+when st_fault = '1' else/CAUSE_LOAD_FAULT    when st_fault = '1' else/" "$trap_af_gens"
@@ -416,7 +418,7 @@ mutant "$csr" "$csr_irq_props" csr_file '' irq_cause_timer_first "s/CAUSE_IRQ_EX
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_mode_lost "s/mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';/mtvec_mode_nxt <= '0';/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_unaligned_vector "s/(others => '0') when mtvec_mode_nxt = '1' else new_value(5 downto 2)/new_value(5 downto 2)/" "-ghas_interrupts=true" 6
 mutant "$csr" "$csr_irq_props" csr_file '-DOFF' irq_mtvec_mode_without_interrupts "s/mtvec_mode <= '0';/mtvec_mode <= i_wdata(0);/" "-ghas_interrupts=false" 6
-mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_bit1_reads_mode "s/mtvec_reg(31 downto 2) \& '0' \& mtvec_mode;/mtvec_reg(31 downto 2) \& mtvec_mode \& mtvec_mode;/" "-ghas_interrupts=true" 6
+mutant "$csr" "$csr_irq_props" csr_file '' irq_mtvec_bit1_reads_mode "s/mtvec_reg((XLEN - 1) downto 2) \& '0' \& mtvec_mode;/mtvec_reg((XLEN - 1) downto 2) \& mtvec_mode \& mtvec_mode;/" "-ghas_interrupts=true" 6
 PROBES=""
 
 # Mutants of the interrupt entry in stage_ex, one defect each (the whole tree is analyzed again for each).
@@ -430,7 +432,7 @@ mutant_tree() {  # <name> <sed expression>
 }
 mutant_tree stage_irq_mepc_next "s/i_mem_trap_pc \+when i_mem_trap_take = '1' else i_pc;/i_mem_trap_pc    when i_mem_trap_take = '1' else i_pc4;/"
 mutant_tree stage_irq_vector_ignored "s/irq_vector_pc \+when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/csr_mtvec when (trap_is_irq = '1' and csr_mtvec_vec = '1') else/"
-mutant_tree stage_irq_vector_wrong_bits "s/csr_mtvec(31 downto 6) \& trap_cause(3 downto 0) \& BYTE_OFFSET_0;/csr_mtvec(31 downto 6) \& trap_cause(4 downto 1) \& BYTE_OFFSET_0;/"
+mutant_tree stage_irq_vector_wrong_bits "s/csr_mtvec((XLEN - 1) downto 6) \& trap_cause(3 downto 0) \& BYTE_OFFSET_0;/csr_mtvec((XLEN - 1) downto 6) \& trap_cause(4 downto 1) \& BYTE_OFFSET_0;/"
 mutant_tree stage_irq_vector_for_exceptions "s/(trap_is_irq = '1' and csr_mtvec_vec = '1')/(trap_take_int = '1' and csr_mtvec_vec = '1')/"
 mutant_tree stage_irq_cause_lost "s/i_irq_cause   => irq_cause,/i_irq_cause   => (others => '0'),/"
 
@@ -457,7 +459,9 @@ mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hi_is_lo "s/minstret_rd_hi when
 
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_inhibit_ignored "s/mcycle_inc     <= not inhibit_reg(0);/mcycle_inc     <= '1';/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_inhibit_instret_ignored "s/ and (not inhibit_reg(2));/;/" "-ghas_zicntr=true -gtick_cycles=3" 6
-mutant "$csr" "$csr_cntr_props" csr_file '' cntr_cancel_ignored "s/retire_pending and (not i_retire_cancel) and (not inhibit_reg(2));/retire_pending and (not inhibit_reg(2));/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_cancel_ignored "s/retire_pending and (not i_retire_cancel) and/retire_pending and/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hold_commits "s/(not i_retire_cancel) and (not i_retire_hold) and/(not i_retire_cancel) and/" "-ghas_zicntr=true -gtick_cycles=3" 6
+mutant "$csr" "$csr_cntr_props" csr_file '' cntr_hold_drops_pending "s/elsif i_retire_hold = '0' then/elsif i_retire_hold = '0' or i_retire_hold = '1' then/" "-ghas_zicntr=true -gtick_cycles=3" 6
 mutant "$csr" "$csr_cntr_props" csr_file '' cntr_pending_unseen "s/unsigned'(0 => retire_pending and (not inhibit_reg(2))));/unsigned'(0 => '0'));/" "-ghas_zicntr=true -gtick_cycles=3" 6
 
 # Mutants of the bank of event counters and of the decoding in csr_file (the proofs above, one defect each).
@@ -487,7 +491,7 @@ mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_undefined_index_legal ":a;N;\
 mutant_bank "$csr" "$csr_hpm_props" '-DNHPM=4' hpm_range_overlap "s/in_event_range \+<= '1' when addr_range = RANGE_MHPMEVENT else '0';/in_event_range   <= '1' when addr_range(6 downto 2) = RANGE_MHPMEVENT(6 downto 2) else '0';/" "$hpm4" 6
 # Mutants of the Sscofpmf extension.
 ofp="-DNHPM=2 -DWIDTH=3"
-mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(31 downto 0);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
+mutant_bank "$csr" "$csr_time_props" '' time_halves_swapped "s/time_lo   <= i_mtime(word_t'range);/time_lo   <= i_mtime(63 downto 32);/" "$time_gens" 4
 mutant_bank "$csr" "$csr_time_props" '' time_hi_zero "s/time_hi   <= i_mtime(63 downto 32);/time_hi   <= (others => '0');/" "$time_gens" 4
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_request_ignores_of "s/ovf_req(n)     <= wrap and (not of_q);/ovf_req(n)     <= wrap;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d      <= wrap or i_wdata(31);/of_d      <= i_wdata(31);/" "$ofp_gens" 10
@@ -545,8 +549,12 @@ core_mutant() {  # <name> <sed expression> <mode: bmc|cover> <defines>
 core_mutant take_always "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
 core_mutant take_never  "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
 core_mutant take_with_retire "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
-CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_slots_ignored "s/periph_slots or (7 downto 0 => to_sl(not STRICT_PERIPH))/(others => '1')/" "$exmem_gens" 6
-CONFIG_FILE="$(config_variant faults_map)" mutant "$exmem" "$exmem_props" reg_ex_mem '' exmem_strict_inverted "s/to_sl(not STRICT_PERIPH)/to_sl(STRICT_PERIPH)/" "$exmem_gens" 6
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_ignored "s/sdram_access and i_ext_ready and i_ext_error/sdram_access and i_ext_ready and '0'/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_without_ready "s/sdram_access and i_ext_ready and i_ext_error/sdram_access and i_ext_error/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_off_the_port "s/sdram_access and i_ext_ready and i_ext_error/access_valid and i_ext_ready and i_ext_error/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_load_fault_as_store "s/CAUSE_LOAD_FAULT when ext_fault = '1' else/CAUSE_STORE_FAULT when ext_fault = '1' else/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_fault_tval_alu_out "s/o_trap_tval  <= i_ea when ext_fault = '1'/o_trap_tval  <= i_alu_out when ext_fault = '1'/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_fault_never_waits "s/o_ext_wait    <= sdram_access and (not i_ext_ready);/o_ext_wait    <= '0';/" "$mem_gens" 2
 mutant "$alu" "$alu_props" alu '' alu_sra_fill_ignored   "s/shift_fill \+<= op_inv and i_a(data_width *- *1);/shift_fill   <= '0';/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_slt_wrong_bit      "s/\(else[[:space:]]\+\|^[[:space:]]*\)sum_ext(data_width *- *1);/\1sum_ext(data_width);/" "" 2
 mutant "$alu" "$alu_props" alu '' alu_jalr_keeps_bit0    "s/(sum_ext(0) and not is_jalr)/sum_ext(0)/" "" 2

@@ -22,27 +22,22 @@ Um acesso que cruza a palavra ocupa os bytes finais de uma palavra de 32 bits e 
 
 ## 2. Quando o Hardware Executa o Acesso
 
-O Core trata como memória principal, para efeito da extensão, as regiões de dados que ficam entre o fim da ROM interna (ou a base externa, quando a ROM é externa) e a base da janela de periféricos. Os limites vêm das constantes do mapa de memória do `config_pkg` (`ROM_END`, `ROM_EXTERNAL`, `RAM_BASE`, `RAM_END`, `EXT_BASE` e `PERIPH_BASE`), descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
-
-O início da memória principal é `EXT_BASE` quando `ROM_EXTERNAL` é verdadeiro e `ROM_END` vale 0, `2 ** BOOT_MEMORY_BITS` (o fim da BOOT_MEMORY, `0x00001000` por padrão) quando `ROM_EXTERNAL` é verdadeiro e `ROM_END` é maior que 0, e `ROM_END` nos demais casos. O fim é `PERIPH_BASE`, onde começa a janela de periféricos. Os intervalos abaixo são semiabertos e valem para qualquer valor das constantes.
+Para efeito da extensão, o Core trata como memória principal tudo o que não é a Memória de boot nem a FLASH direta, que são só de leitura e não repartem um acesso em duas leituras. Os limites vêm das constantes do mapa de memória do `config_pkg` (`BOOT_MEMORY_END`, `FLASH_BASE`, `FLASH_END`, `FLASH_ON_BUS`, `RAM_BASE`, `RAM_END` e `RAM_ON_BUS`), descritos em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). Os intervalos abaixo são semiabertos e valem para qualquer valor das constantes.
 
 | Região | Faixa em função das constantes | Acesso desalinhado em hardware |
 | :--- | :--- | :--- |
-| Abaixo da memória principal (BOOT_MEMORY, ROM interna e faixa sem memória) | `[0, início)` | Não, gera exceção |
-| Memória principal | `[início, PERIPH_BASE)` | Sim |
-| Periféricos | `[PERIPH_BASE, 2**ADDR_BITS)` | Não, gera exceção |
+| Memória de boot | `[0, BOOT_MEMORY_END)` | Não, gera exceção |
+| FLASH com `FLASH_ON_BUS` falso | `[FLASH_BASE, FLASH_END)` | Não, gera exceção |
+| FLASH com `FLASH_ON_BUS` verdadeiro | `[FLASH_BASE, FLASH_END)` | Sim |
+| RAM, direta ou no barramento | `[RAM_BASE, RAM_END)` | Sim |
+| Fora das três regiões (barramento) | O restante de `[0, 2**ADDR_BITS)` | Sim |
 
-Cada plataforma fixa as constantes no seu `platform.yaml`. A tabela mostra os dois mapas usados hoje, com a memória principal e os periféricos já convertidos em endereços.
-
-| Mapa | `ROM_EXTERNAL` | `ROM_END` | `EXT_BASE` | `PERIPH_BASE` | Memória principal | Periféricos |
-| :--- | :---: | :---: | :---: | :---: | :--- | :--- |
-| Padrão, com RAM interna | `false` | `0x00008000` | `0x40000000` | `0x80000000` | `0x00008000` a `0x7FFFFFFF` | `0x80000000` em diante |
-| Plataforma com FLASH externa | `true` | `0x00000000` | `0x20000000` | `0x60000000` | `0x20000000` a `0x5FFFFFFF` | `0x60000000` em diante |
+Cada plataforma fixa as constantes no seu `platform.yaml`. No mapa padrão (`FLASH_END = 0x00008000`, `RAM_END = 0x40000000`, as duas memórias diretas), a memória principal começa em `0x00008000`, e o que está acima de `RAM_END` sai pela porta externa, que responde erro se nenhum escravo atende o endereço. Com a FLASH no barramento, a memória principal passa a incluir a FLASH, e começa logo depois da Memória de boot.
 
 Um acesso desalinhado que cabe numa palavra (`LH`, `LHU` e `SH` com $o = 1$) é executado quando o endereço está na memória principal. Um acesso que cruza a palavra é executado apenas quando atende às duas condições abaixo.
 
 1. O endereço está na memória principal do mapa em uso.
-2. O endereço não pertence à última palavra de uma região. As duas palavras do acesso precisam ficar na mesma região, e a palavra seguinte à última de cada região pertence à região vizinha, mesmo quando os endereços são contíguos (por exemplo, `0x3FFFFFFC` no mapa padrão).
+2. O endereço não pertence à última palavra de uma região de caminho próprio, nem ao topo do espaço de endereços. As duas palavras do acesso precisam ficar na mesma região, e a palavra seguinte à última de cada região (`FLASH_END`, `RAM_END`) pertence à região vizinha, mesmo quando os endereços são contíguos (por exemplo, `0x3FFFFFFC` no mapa padrão).
 
 Quando alguma condição falha, ou quando `HAS_ZICCLSM` é falso, o acesso gera exceção de endereço desalinhado. A instrução é anulada antes de acessar a memória, o que ocorre no estágio MEM quando o Core tem Zicsr e no estágio EX quando não tem. Com Zicsr ativo, a exceção usa `mcause = 4` para load e `mcause = 6` para store, e `mtval` recebe o endereço efetivo. Sem Zicsr, a exceção é só sinalizada nas saídas do Core, como descrito em [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md). A combinação sem Zicsr e sem Zicclsm é uma configuração válida.
 
@@ -59,7 +54,7 @@ Um flip-flop indica a etapa corrente. Ele passa a `1` quando a etapa 1 conclui e
 
 A etapa 1 conclui quando duas condições valem no mesmo ciclo.
 
-- O escravo está pronto. A RAM interna sempre está, pois responde em um ciclo. As regiões externas (a SDRAM e, no mapa com FLASH externa, também a FLASH) só estão quando o sinal de pronto chega.
+- O escravo está pronto. A RAM interna sempre está, pois responde em um ciclo. As regiões no barramento (a FLASH e a RAM no barramento e tudo fora das três regiões) só estão quando o sinal de pronto chega.
 - A memória pode avançar, isto é, o pipeline não está parado por multiplicação ou divisão nem por espera de região externa.
 
 Durante a etapa 1 o sinal de parada da unidade congela os estágios anteriores e mantém a instrução em MEM. Na etapa 2 esse sinal desce, e a instrução sai de MEM quando o pipeline avança, como um acesso alinhado. Na RAM interna a etapa 1 conclui no primeiro ciclo, de modo que a instrução ocupa o estágio MEM por dois ciclos em vez de um.

@@ -31,6 +31,7 @@ OPTIONS = {
     "imem",
     "flash_port_value",
     "ic_latency",
+    "sdram_error",
 }
 DATA_PORTS = (
     "i_ext_rdata",
@@ -127,7 +128,9 @@ def _models(dut, program, options):
     sdram = options.get("sdram")
     slave = None
     if sdram is not None:
-        slave = _SdramSlave(dut, sdram, options.get("sdram_stall"))
+        slave = _SdramSlave(
+            dut, sdram, options.get("sdram_stall"), options.get("sdram_error")
+        )
     return imem, memories, slave
 
 
@@ -137,6 +140,7 @@ async def _start(dut, with_sdram):
     for port in DATA_PORTS:
         getattr(dut, port).value = 0
     dut.i_ext_ready.value = 0 if with_sdram else 1
+    dut.i_ext_error.value = 0
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     for _ in range(3):
         await RisingEdge(dut.i_clk)
@@ -167,11 +171,12 @@ async def run_program(dut, program, max_cycles=4000, **options):
     ``i_flash_data`` instead of the instruction, to show that a fetch
     does not use it. ``sdram`` (a dict {address: word}) turns on a slave
     for the SDRAM window; ``sdram_stall(n)`` gives the stall cycles of
-    its n-th access. The slave holds ``i_ext_ready`` until the core
-    advances and commits the read data after that, the way the bridge of
-    the board does. ``ic_latency(n)`` dá os ciclos de espera do n-ésimo
-    endereço novo buscado pela porta da cache de instruções
-    (``i_ic_ready``).
+    its n-th access, and ``sdram_error(address)`` makes an access to
+    that address end with ready and error together. The slave holds
+    ``i_ext_ready`` until the core advances and commits the read data
+    after that, the way the bridge of the board does. ``ic_latency(n)``
+    dá os ciclos de espera do n-ésimo endereço novo buscado pela porta
+    da cache de instruções (``i_ic_ready``).
     """
     imem, memories, slave = _models(dut, program, options)
     monitor = options.get("monitor")

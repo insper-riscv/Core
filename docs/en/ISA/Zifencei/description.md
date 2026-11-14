@@ -23,17 +23,17 @@ Typical cases are a loader that copies a program into memory, code generation at
 
 ## 3. Where the Instruction Has Effect
 
-Only code fetched through the instruction cache is affected. The BOOT_MEMORY is read directly, and the internal ROM and internal RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_MEMORY is external: it belongs to the external window from `EXT_BASE`, to a ROM flagged `ROM_EXTERNAL`, or to a RAM flagged `RAM_EXTERNAL`. The limits come from the constants described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
+Only code fetched through the instruction cache is affected. The BOOT_MEMORY is read directly, and the direct FLASH and direct RAM do not go through the cache either. A fetch goes through the instruction cache when the address outside the BOOT_MEMORY leaves through the bus: it belongs to the FLASH flagged `FLASH_ON_BUS`, to the RAM flagged `RAM_ON_BUS`, or to a range outside the three regions of the core. The limits come from the constants described in [02-barramento-e-memoria.md](../../contracts/02-barramento-e-memoria.md).
 
 | Fetch region | Goes through the instruction cache |
 | :--- | :--- |
 | BOOT_MEMORY | No |
-| ROM with `ROM_EXTERNAL` false | No |
-| ROM with `ROM_EXTERNAL` true | Yes |
-| RAM with `RAM_EXTERNAL` true | Yes |
-| External window from `EXT_BASE` | Yes |
+| FLASH with `FLASH_ON_BUS` false | No |
+| FLASH with `FLASH_ON_BUS` true | Yes |
+| RAM with `RAM_ON_BUS` true | Yes |
+| Outside the three regions | Yes |
 
-In the default map (`ROM_EXTERNAL` false) the ROM is internal and read directly, so only code written to the external window (from `0x40000000`) changes its result with `FENCE.I`. With an external ROM, `FENCE.I` also applies to code written to it.
+In the default map (`FLASH_ON_BUS` and `RAM_ON_BUS` false) the FLASH is direct and read without a cache, so only code written outside the three regions (from `0x40000000`) changes its result with `FENCE.I`. With the FLASH or the RAM on the bus, `FENCE.I` also applies to code written to them.
 
 ## 4. Configuration
 

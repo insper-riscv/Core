@@ -252,8 +252,8 @@ architecture rtl of stage_ex is
     signal jalr_target_bit1 : std_logic;
     -- Bit 1 do alvo do desvio ou salto tomado, disponível cedo.
     signal ex_cf_bit1       : std_logic;
-    -- Bits de 31 a 2 do alvo do desvio ou salto tomado.
-    signal ex_cf_target_hi  : std_logic_vector(31 downto 2);
+    -- Bits de XLEN - 1 a 2 do alvo do desvio ou salto tomado.
+    signal ex_cf_target_hi  : std_logic_vector((XLEN - 1) downto 2);
 
     -- Pulso interno de conclusão de FENCE.I.
     signal fencei_take_int : std_logic;
@@ -357,7 +357,7 @@ begin
     -- Extensão M: Multiplicação e Divisão Inteira (multdiv)
     -- =========================================================================
 
-    gen_m : if HAS_MULDIV generate
+    gen_m : if HAS_MULTIPLICATION generate
 
         u_muldiv : entity work.multdiv
             port map (
@@ -469,7 +469,7 @@ begin
 
         csr_src_zero <= '1' when i_rs1_idx = REG_ZERO else '0';
         csr_wdata    <= ex_fwd_rs1_val when i_funct3(2) = '0' else
-                        (31 downto 5 => '0') & i_rs1_idx;
+                        (XLEN - 1 downto 5 => '0') & i_rs1_idx;
 
         u_csr_file : entity work.csr_file
             generic map (
@@ -497,6 +497,7 @@ begin
                 i_mret_take      => mret_take_int,
                 i_retire         => i_retire,
                 i_retire_cancel  => i_mem_trap_take,
+                i_retire_hold    => not i_base_run,
                 i_events         => i_hpm_events,
                 o_mtvec          => csr_mtvec,
                 o_mepc           => csr_mepc,
@@ -515,7 +516,8 @@ begin
         -- (a soma da ULA) só alimenta mtval, então a causa 0 não espera a ULA.
         jalr_target_bit1 <= ex_alu_op_a(1) xor ex_alu_op_b(1) xor (ex_alu_op_a(0) and ex_alu_op_b(0));
         ex_cf_bit1       <= jalr_target_bit1 when jalr_taken_int = '1' else branch_target_int(1);
-        ex_cf_target_hi  <= ex_alu_result(31 downto 2) when jalr_taken_int = '1' else branch_target_int(31 downto 2);
+        ex_cf_target_hi  <= ex_alu_result((XLEN - 1) downto 2) when jalr_taken_int = '1' else
+                          branch_target_int((XLEN - 1) downto 2);
 
         ex_cf_taken  <= branch_taken_int or jalr_taken_int;
         ex_cf_target <= ex_cf_target_hi & ex_cf_bit1 & '0';
@@ -525,7 +527,7 @@ begin
         sig_tval  <= (others => '0');
         sig_mret  <= '0';
 
-        -- A busca vale se o PC da instrução cai em ROM, RAM ou janela externa; sai de um registrador, fora do caminho
+        -- A busca vale se o PC da instrução cai na BOOT_MEMORY, na FLASH ou na RAM no barramento; sai de um registrador, fora do caminho
         -- da ULA.
         fetch_ok <= '1' when (not HAS_ACCESS_FAULTS) or addr_executable(unsigned(i_pc)) else '0';
 
@@ -613,7 +615,7 @@ begin
 
     -- Uma interrupção no modo vetorado vai a BASE + 4 x causa; a BASE tem 64 bytes de alinhamento nesse modo e a
     -- causa vale no máximo 13, então a soma é a troca dos bits 5 a 2 pelos 4 bits baixos do código da causa.
-    irq_vector_pc <= csr_mtvec(31 downto 6) & trap_cause(3 downto 0) & BYTE_OFFSET_0;
+    irq_vector_pc <= csr_mtvec((XLEN - 1) downto 6) & trap_cause(3 downto 0) & BYTE_OFFSET_0;
 
     o_redirect_pc <= csr_mepc when mret_take_int = '1' else
                      i_pc4 when fencei_take_int = '1' else

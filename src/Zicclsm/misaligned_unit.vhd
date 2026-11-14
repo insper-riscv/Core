@@ -113,11 +113,11 @@ architecture rtl of misaligned_unit is
     -- Máscara de bytes do store sem deslocamento (1111 para SW, 0011 para SH).
     signal raw_mask      : byte_mask_t;
     -- Dado do store posicionado no par de palavras (etapa 2 nos bits [63:32]).
-    signal data64        : std_logic_vector(63 downto 0);
+    signal data64        : std_logic_vector((2 * XLEN) - 1 downto 0);
     -- Máscara do store posicionada no par de palavras (etapa 2 nos bits [7:4]).
     signal mask8         : std_logic_vector(7 downto 0);
     -- Palavra seguinte à do primeiro byte.
-    signal next_word     : unsigned(29 downto 0);
+    signal next_word     : unsigned((XLEN - 3) downto 0);
     -- Palavra lida pela região do acesso, a ser guardada na etapa 2.
     signal region_rdata  : word_t;
 
@@ -167,19 +167,19 @@ begin
         );
 
     raw_data <= i_store_data when i_byte_mask = BYTE_MASK_WORD else
-                std_logic_vector(resize(unsigned(i_store_data(31 downto 16)), raw_data'length));
+                std_logic_vector(resize(unsigned(i_store_data(XLEN / 2 + 15 downto 16)), raw_data'length));
     raw_mask <= BYTE_MASK_WORD when i_byte_mask = BYTE_MASK_WORD else BYTE_MASK_HALF_LOW;
 
     data64 <= std_logic_vector(shift_left(resize(unsigned(raw_data), data64'length),
                                           BYTE_WIDTH * to_integer(unsigned(offset))));
     mask8  <= std_logic_vector(shift_left(resize(unsigned(raw_mask), mask8'length), to_integer(unsigned(offset))));
 
-    next_word <= unsigned(i_addr(31 downto 2)) + 1;
+    next_word <= unsigned(i_addr((XLEN - 1) downto 2)) + 1;
 
     o_cross <= cross;
     o_stall <= cross and (not second);
     o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & BYTE_OFFSET_0;
-    o_data  <= data64(31 downto 0) when second = '0' else data64(63 downto 32);
+    o_data  <= data64(XLEN - 1 downto 0) when second = '0' else data64((2 * XLEN) - 1 downto XLEN);
     o_mask  <= BYTE_MASK_NONE when i_we = '0' else
                mask8(3 downto 0) when second = '0' else
                mask8(7 downto 4);

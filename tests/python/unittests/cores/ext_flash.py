@@ -1,12 +1,13 @@
 """Testes do modulo.
 
-The core with the memory map of the sdram platform: the flash at
-0x20000000 shares the external port with the SDRAM.
+The core with the flash on the bus, in [0x1000, 0x8000): the flash
+shares the external port with the window above the RAM, at 0x40000000,
+which no region of the core covers.
 
-Loads and stores to the flash and to the SDRAM go through the same port,
-a misaligned load across two words of the flash runs in hardware, and
-the internal RAM port (here the result area) keeps working for low
-addresses.
+Loads to the flash and loads and stores to the window go through the
+same port, a misaligned load across two words of the flash or of the
+window runs in hardware, and the internal RAM port (here the result
+area) keeps working for its addresses.
 """
 
 import cocotb
@@ -21,7 +22,8 @@ from tests.python.unittests.cores.sdram_stall import (
     sw,
 )
 
-FLASH_BASE = 0x20000000
+FLASH_BASE = 0x2000
+FLASH_CODE = 0x1000
 SDRAM_BASE = 0x40000000
 RAM_BASE = 0x8000
 W0, W1 = 0x11223344, 0x55667788
@@ -68,7 +70,7 @@ def _check(ram, external):
 
 
 @cocotb.test()
-async def test_flash_and_sdram_share_the_external_port(dut):
+async def test_flash_and_the_window_share_the_external_port(dut):
     """Verifica flash and sdram share the external port."""
     _check(*await _run(dut))
 
@@ -83,12 +85,12 @@ async def test_the_same_result_with_stalls(dut):
 async def test_code_in_the_flash_is_fetched_through_the_instruction_cache(dut):
     """Verifica a busca de código da flash pela cache de instruções.
 
-    The PC moves from the boot memory into 0x20000000; the word comes
+    The PC moves from the boot memory into the flash; the word comes
     from the cache port, not the flash port.
     """
     boot = [
         addi(0, 0, 0),
-        lui(1, FLASH_BASE >> 12),
+        lui(1, FLASH_CODE >> 12),
         _jalr(0, 1, 0),  # jump to the flash
     ]
     flash_code = [
@@ -100,7 +102,7 @@ async def test_code_in_the_flash_is_fetched_through_the_instruction_cache(dut):
         jal_self(),
     ]
     imem = {4 * i: w for i, w in enumerate(boot)}
-    imem.update({FLASH_BASE + 4 * i: w for i, w in enumerate(flash_code)})
+    imem.update({FLASH_CODE + 4 * i: w for i, w in enumerate(flash_code)})
     ram = await run_program(dut, [], imem=imem, flash_port_value=0xFFFFFFFF)
     check_equal(ram[0x8000], 0x55)
 

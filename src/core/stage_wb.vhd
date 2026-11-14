@@ -24,7 +24,7 @@ entity stage_wb is
         -- Resultado da ULA/execução (e bits [1:0] do endereço de load) no estágio WB.
         i_alu_out     : in    word_t;
         -- Índice do registrador destino rd no estágio WB.
-        i_rd_idx      : in    reg_field_t;
+        i_rd_idx      : in    reg_t;
         -- Habilitação de escrita no banco de registradores vinda do registrador MEM/WB.
         i_we_reg      : in    std_logic;
         -- Modo de extensão de leitura da memória de dados vindo do registrador MEM/WB.
@@ -48,7 +48,7 @@ entity stage_wb is
         -- Habilitação final de escrita enviada ao banco de registradores (reg_file).
         o_wb_we       : out   std_logic;
         -- Endereço final do registrador destino rd enviado ao banco de registradores.
-        o_wb_rd       : out   reg_field_t;
+        o_wb_rd       : out   reg_t;
         -- Dado final de 32 bits enviado ao banco de registradores e à malha de forwarding.
         o_wb_data     : out   word_t
     );
@@ -61,7 +61,7 @@ architecture rtl of stage_wb is
     -- Palavra de 32 bits alinhada e estendida pelo módulo extender_ram.
     signal wb_ram_extended : word_t;
     -- Par de palavras do load que cruzou, deslocado até o primeiro byte do dado.
-    signal cross_pair      : std_logic_vector(63 downto 0);
+    signal cross_pair      : std_logic_vector((2 * XLEN) - 1 downto 0);
     -- Palavra baixa do par deslocado: o dado do load alinhado ao byte 0.
     signal cross_word      : word_t;
     -- Palavra entregue ao extensor: a juntada de duas palavras ou a lida da memória.
@@ -77,7 +77,7 @@ begin
 
     cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
                                                8 * to_integer(unsigned(i_alu_out(1 downto 0)))));
-    cross_word <= cross_pair(31 downto 0);
+    cross_word <= cross_pair(XLEN - 1 downto 0);
 
     ext_data   <= cross_word when i_is_cross = '1' else mem_read_data;
     ext_offset <= BYTE_OFFSET_0 when i_is_cross = '1' else i_alu_out(1 downto 0);

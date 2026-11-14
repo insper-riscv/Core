@@ -77,7 +77,7 @@ Exceções síncronas detectadas por `trap_unit` (no máximo uma por instrução
 | `0` | Endereço-alvo de branch ou salto tomado com bits `[1:0] /= "00"` | Endereço-alvo desalinhado (`i_cf_target`) |
 | `2` | Instrução `SYSTEM` não suportada (`funct3 = "100"`, `SRET`, `SFENCE.VMA`, ou `ECALL`/`EBREAK`/`MRET`/`WFI` com `rd /= x0` ou `rs1 /= x0`), acesso CSR ilegal (`i_csr_illegal = '1'`) ou qualquer encoding que o RV32IM não define (`i_illegal = '1'`: opcode reservado, `funct3` ou `funct7` inválido, tudo zero, tudo um, encoding comprimido ou `FENCE.I` com `HAS_ZIFENCEI = false`) | `0x00000000` |
 | `3` | Breakpoint (`EBREAK`, `imm12 = 0x001`) | `0x00000000` |
-| `4` | Endereço efetivo de Load desalinhado que o hardware não executa: fora da memória principal (flash e periféricos), com as duas palavras em regiões diferentes (RAM interna e SDRAM), ou qualquer load desalinhado com `HAS_ZICCLSM = false` | Endereço efetivo (`i_ea`) |
+| `4` | Endereço efetivo de Load desalinhado que o hardware não executa: fora da memória principal (Memória de boot e FLASH direta), com as duas palavras em regiões diferentes (por exemplo, o fim da RAM e a faixa acima dela), ou qualquer load desalinhado com `HAS_ZICCLSM = false` | Endereço efetivo (`i_ea`) |
 | `6` | Endereço efetivo de Store desalinhado que o hardware não executa, nas mesmas condições da causa 4 | Endereço efetivo (`i_ea`) |
 | `11` | Chamada de ambiente do modo máquina (`ECALL`, `imm12 = 0x000`) | `0x00000000` |
 
@@ -90,7 +90,7 @@ Registradores CSR implementados no modo máquina:
 | Endereço | Nome | Acesso | Valor de Reset | Máscara / Campos implementados |
 | :--- | :--- | :--- | :--- | :--- |
 | `0x300` | `mstatus` | Leitura e escrita | `0x00001800` | `MPP` (bits `[12:11]`) fixo em `"11"`; bits `MIE` (bit 3) e `MPIE` (bit 7) graváveis |
-| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `IS_BASE_E` verdadeiro a base é a `E` e o valor é `0x40001010` |
+| `0x301` | `misa` | Somente leitura | `0x40001100` | RV32 (`MXL = 1`) com extensões `I` e `M`; com `IS_E` verdadeiro a base é a `E` e o valor é `0x40001010` |
 | `0x304`, `0x344` | `mie`, `mip` | `mie` RW, `mip` RO | `0x00000000` | Com `HAS_INTERRUPTS`, bits 3, 7 e 11 (`mie` grava, `mip` espelha as linhas); os demais fixos em zero. Sem a constante, todos fixos em zero |
 | `0x305` | `mtvec` | Leitura e escrita | `0x00000000` | `BASE` nos bits `[31:2]` e `MODE` no bit 0, que só grava com `HAS_INTERRUPTS` (vetorado); o bit 1 é fixo em `0`. No modo vetorado os bits `[5:2]` de `BASE` leem zero |
 | `0x723` a `0x73F` | `mhpmevent3h` a `mhpmevent31h` | Leitura e escrita | `0x00000000` | Só com `HAS_SSCOFPMF`: `OF` (bit 31) e `MINH` (bit 30) do contador de mesmo índice; sem a constante o endereço é inexistente. O bit 13 de `mie` e de `mip` é `LCOFIE` e `LCOFIP` ([Sscofpmf](../ISA/Sscofpmf/description.md)) |
@@ -105,7 +105,7 @@ O perfil `rv32im_zicsr_zifencei` habilita `HAS_ZIFENCEI = true`:
 
 | Aspecto | Comportamento |
 | :--- | :--- |
-| Busca de instruções em SDRAM (`>= 0x40000000`) | O estágio IF asserta `o_ic_sel = '1'` e lê `i_ic_data`. Enquanto `i_ic_ready = '0'`, o PC permanece congelado e `o_instr_valid = '0'` injeta bolhas em `reg_if_id`, enquanto EX, MEM e WB continuam avançando |
+| Busca de instruções em região atendida pelo barramento (FLASH com `FLASH_ON_BUS`, RAM com `RAM_ON_BUS` ou fora das três regiões) | O estágio IF asserta `o_ic_sel = '1'` e lê `i_ic_data`. Enquanto `i_ic_ready = '0'`, o PC permanece congelado e `o_instr_valid = '0'` injeta bolhas em `reg_if_id`, enquanto EX, MEM e WB continuam avançando |
 | Execução de `FENCE.I` sem D-cache (`HAS_DCACHE = false`) | Quando `FENCE.I` está válida em EX e `i_base_run = '1'`, `o_take` pulsa por 1 ciclo, acionando `o_ic_inval = '1'`, limpando `IF/ID` e `ID/EX` e redirecionando o PC para $\text{PC} + 4$ |
 | Execução de `FENCE.I` com D-cache write-back (`HAS_DCACHE = true`) | A unidade retém a instrução em EX por um ciclo, para que os stores anteriores deixem MEM e cheguem à cache, emite um pulso em `o_dc_flush` (`o_flush_req`) e mantém `o_busy = '1'` (congelando PC, `IF/ID` e `ID/EX` e injetando bolhas em `EX/MEM`) até receber `i_dc_done = '1'`, que a cache pode levantar no próprio ciclo do pulso em `o_dc_flush` ou em qualquer ciclo depois, momento em que pulsa `o_take = '1'` e invalida a I-cache |
 

@@ -18,8 +18,8 @@ A matriz é a fonte única dos perfis válidos. O comando `riscv-tools profiles 
 
 | Item | Constante | Observação |
 | :--- | :--- | :--- |
-| RV32I | `IS_BASE_E = false` | Base com 32 registradores |
-| RV32E | `IS_BASE_E = true` | Base com 16 registradores |
+| RV32I | `IS_E = false` | Base com 32 registradores |
+| RV32E | `IS_E = true` | Base com 16 registradores |
 | Zicclsm | `HAS_ZICCLSM` | Acessos desalinhados tratados no hardware |
 | Zicsr | `HAS_ZICSR` | Banco de CSRs e traps |
 | Zicntr | `HAS_ZICNTR` | Implica Zicsr |
