@@ -17,11 +17,11 @@ A instrução que está em ID entra em EX na próxima borda, e as três à frent
 
 | Instrução à frente | Escreve em registrador e continua válida depois da borda quando |
 | :--- | :--- |
-| ID/EX (passa a EX/MEM) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{flush}_{EX/MEM}$ |
-| EX/MEM (passa a MEM/WB) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{trap}_{MEM}$ |
+| ID/EX (passa a EX/MEM) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{trap\_sig}$ |
+| EX/MEM (passa a MEM/WB) | $\text{we\_reg} \wedge \text{valid}$ |
 | MEM/WB (passa a WB2) | `wb_we` |
 
-Cada linha reproduz a entrada do flip-flop de validade do registrador que a instrução ocupará, de modo que o seletor registrado em ID/EX é igual ao que EX calculava com as validades já registradas.
+O descarte de uma instrução à frente por `trap_take` ou por exceção de MEM não entra nas condições, porque o mesmo evento zera o `ID/EX` (`flush_id_ex`) e o seletor registrado volta a "00". Só `trap_sig`, o sinal de exceção sem efeito do núcleo sem Zicsr, descarta a instrução de EX sem limpar o `ID/EX`. Assim os sinais tardios do laço de EX não chegam à entrada do seletor, e o seletor registrado é igual ao que EX calculava com as validades já registradas.
 
 ## 3. Verificação
 
