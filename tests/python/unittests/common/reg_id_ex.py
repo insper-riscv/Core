@@ -45,7 +45,7 @@ COPIES = 4
 
 
 def replicate(code):
-    """Repete o código do seletor nas cópias, a cópia i nos bits 2i+1:2i."""
+    """Repete o código do seletor em cada cópia (bits 2i+1:2i)."""
     return sum(code << (2 * copy) for copy in range(COPIES))
 
 
