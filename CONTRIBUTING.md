@@ -235,6 +235,7 @@ make check     # Verifica a sintaxe VHDL-2008 de todos os fontes em ordem topol�
 make profiles  # Compila e elabora cada perfil em profiles/*.yaml no GHDL
 make test      # Executa os testes por entidade (cocotb + GHDL)
 make paths     # Confere os caminhos de paths.yaml e a árvore do repositório (riscv-tools check-tree)
+make test-boot # Monta os fragmentos de boot em todas as combinações e os roda no Spike (toolchain e Spike da imagem ci-elf)
 make formal    # Executa as provas formais (SymbiYosys) com o engine de FORMAL_ENGINE (bitwuzla por padrão)
 ```
 
