@@ -18,7 +18,10 @@
 -- Quando a porta externa conclui o acesso com i_ext_error em '1' (endereço que
 -- nenhum escravo atende), o estágio gera a falha de acesso de load (causa 5) ou
 -- de store (causa 7), com o endereço efetivo em o_trap_tval, pelo mesmo caminho
--- da exceção de endereço; o acesso com erro não tem efeito no processador.
+-- da exceção de endereço; o acesso com erro não tem efeito no processador. O erro
+-- decide a falha sozinho, sem consultar i_ext_ready, porque o escravo só o levanta
+-- junto do ready; assim o ready, que depende do endereço que a própria falha
+-- muda, não volta a entrar na decisão.
 -- =============================================================================
 
 library ieee;
@@ -70,7 +73,7 @@ entity stage_mem is
         -- Sinaliza que o escravo externo concluiu a transação atual.
         i_ext_ready   : in    std_logic;
         -- A porta externa concluiu a transação atual com erro: nenhum escravo atende o endereço; só vale junto de
-        -- i_ext_ready.
+        -- i_ext_ready (o escravo não o levanta sem o ready), e é só ele que decide a falha de acesso.
         i_ext_error   : in    std_logic := '0';
         -- Endereço de leitura enviado à segunda porta da memória FLASH.
         o_flash_addr2 : out   addr_t;
@@ -168,10 +171,11 @@ begin
     access_valid <= i_valid and (not trap_take_int);
 
     -- A resposta de erro da porta externa conclui o acesso que foi emitido neste ciclo e gera a falha de acesso de
-    -- load (causa 5) ou de store (causa 7), com o endereço efetivo em mtval. O erro só vale junto do ready, e só
-    -- existe com falhas de acesso e com a checagem de endereço neste estágio (CSRs); o acesso emitido já passou da
-    -- exceção de endereço (access_valid), então as duas não se somam.
-    ext_fault <= sdram_access and i_ext_ready and i_ext_error
+    -- load (causa 5) ou de store (causa 7), com o endereço efetivo em mtval. O escravo só levanta o erro junto do
+    -- ready, então o erro basta para decidir a falha, e o ready, que o endereço de MEM atravessa, fica fora do
+    -- caminho da exceção. O erro só existe com falhas de acesso e com a checagem de endereço neste estágio (CSRs); o
+    -- acesso emitido já passou da exceção de endereço (access_valid), então as duas não se somam.
+    ext_fault <= sdram_access and i_ext_error
                  when (HAS_ACCESS_FAULTS and check_ea) else '0';
 
     o_trap_take  <= trap_take_int or ext_fault;

@@ -1,14 +1,16 @@
 // Properties of the access fault by external error of stage_mem, checked on the Verilog netlist GHDL synthesizes
 // (stage_mem with the address check on and the classification registered, the way the core instantiates it), with
 // the default map of the config_pkg and has_access_faults on. The external port answers a transaction with ready and,
-// when no slave takes the address, with error. Whatever the access is:
+// when no slave takes the address, with error, and the slave never raises the error without the ready (the contract of
+// the port, which lets the stage decide the fault from the error alone, with no ready in the path). Whatever the
+// access is:
 //  1. an access of a load or a store valid in MEM that leaves by the external port and ends with ready and error,
 //     and that no earlier exception stopped, takes the exception in the same cycle with cause 5 (load) or 7 (store)
 //     and mtval = effective address;
 //  2. the exception is precise: the access was issued exactly once to the external port (read or write strobe), and
 //     no other memory (BOOT_MEMORY, FLASH, RAM) sees it;
-//  3. the error never raises the exception without ready, on an access that does not use the external port, on an
-//     instruction that is not valid, or on a bubble, and cause 5 comes only from the error;
+//  3. the exception comes only with the error (and so with the ready), never on an access that does not use the
+//     external port, on an instruction that is not valid, or on a bubble, and cause 5 comes only from the error;
 //  4. an access that ends with ready and no error takes no exception, and the pipeline waits (o_ext_wait) while the
 //     slave does not answer.
 // With -DNO_FAULTS (has_access_faults off) the error is ignored and the stage never raises cause 5.
@@ -36,6 +38,8 @@ module props (input clk);
   // A load or store never is both, and the classification is one of the three paths.
   always @(*) assume (!(we_ram && re_ram));
   always @(*) assume (flag_flash + flag_sdram <= 1);
+  // The slave answers the error together with the ready.
+  always @(*) assume (!error || ready);
   // Only the word-aligned and byte accesses reach the memory without the address exception, so the fault proof looks at
   // them (the address exception has its own proofs).
   wire aligned = funct3 == 3'b000 || funct3 == 3'b100 || (funct3 == 3'b010 && ea[1:0] == 2'b00);

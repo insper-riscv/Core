@@ -549,9 +549,8 @@ core_mutant() {  # <name> <sed expression> <mode: bmc|cover> <defines>
 core_mutant take_always "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '1';/" bmc ''
 core_mutant take_never  "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= '0';/" cover '-DCOVER'
 core_mutant take_with_retire "s/o_trap_take \+<= any_trap_take or trap_sig;/o_trap_take   <= any_trap_take or trap_sig or retire_pulse;/" bmc ''
-EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_ignored "s/sdram_access and i_ext_ready and i_ext_error/sdram_access and i_ext_ready and '0'/" "$mem_gens" 2
-EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_without_ready "s/sdram_access and i_ext_ready and i_ext_error/sdram_access and i_ext_error/" "$mem_gens" 2
-EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_off_the_port "s/sdram_access and i_ext_ready and i_ext_error/access_valid and i_ext_ready and i_ext_error/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_ignored "s/sdram_access and i_ext_error/sdram_access and '0'/" "$mem_gens" 2
+EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_error_off_the_port "s/sdram_access and i_ext_error/access_valid and i_ext_error/" "$mem_gens" 2
 EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_load_fault_as_store "s/CAUSE_LOAD_FAULT when ext_fault = '1' else/CAUSE_STORE_FAULT when ext_fault = '1' else/" "$mem_gens" 2
 EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_fault_tval_alu_out "s/o_trap_tval  <= i_ea when ext_fault = '1'/o_trap_tval  <= i_alu_out when ext_fault = '1'/" "$mem_gens" 2
 EXTRA_FILES="$trap" mutant "$mem" "$mem_props" stage_mem '' mem_fault_never_waits "s/o_ext_wait    <= sdram_access and (not i_ext_ready);/o_ext_wait    <= '0';/" "$mem_gens" 2
