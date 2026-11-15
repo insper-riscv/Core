@@ -69,4 +69,3 @@ async def test_address_class_is_registered(dut):
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
     check_equal((int(dut.o_is_flash.value), int(dut.o_is_sdram.value)), (0, 0))
-
