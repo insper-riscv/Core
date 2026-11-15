@@ -9,7 +9,7 @@ from tests.python.unittests.common.stage_register import (
 
 FIELDS = {"valid": 1, "pc": 32, "pc4": 32, "inst": 32}
 
-# Só o opcode da instrução é limpo; PC, PC + 4 e o resto da palavra são dados.
+# Só o opcode é limpo; PC, PC + 4 e o resto da instrução são dados.
 KEEP = {"pc": 0xFFFFFFFF, "pc4": 0xFFFFFFFF, "inst": 0xFFFFFF80}
 
 
