@@ -83,7 +83,7 @@ guard_case clean 'assert property warning_count passed' "a name that contains th
 guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating undriven bit props.\clk like $anyseq.' "the clock as an undriven bit, in the abc-bmc3 engine" abc-bmc3
 guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating a total of 7 undriven bits in props like $anyseq.' "the count of undriven bits, in the abc-bmc3 engine" abc-bmc3
 guard_case clean 'SBY 12:00:03 [safety] engine_0: Warning: The last 2 outputs are interpreted as constraints.' "an ABC message about constraints, in the abc-bmc3 engine" abc-bmc3
-for e in yices bitwuzla boolector; do
+for e in yices bitwuzla; do
   guard_case warn  'SBY 12:00:03 [safety] aig: Warning: Treating undriven bit props.\clk like $anyseq.' "the same ABC message in $e" "$e"
 done
 guard_case warn  'SBY 12:00:03 [safety] base: Warning: Wire props.\x is used but has no driver.' "any other warning, in the abc-bmc3 engine" abc-bmc3

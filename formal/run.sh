@@ -3,7 +3,7 @@
 # ghdl, yosys, sby and the engine chosen by FORMAL_ENGINE (all in the ci-vhdl image). Run from the root of the
 # repository:  FORMAL_ENGINE=bitwuzla bash formal/run.sh
 #
-# FORMAL_ENGINE is one of yices, bitwuzla (the default), boolector and abc-bmc3. The first three are SMT solvers
+# FORMAL_ENGINE is one of yices, bitwuzla (the default) and abc-bmc3. The first two are SMT solvers
 # of the smtbmc engine; abc-bmc3 is the bounded model checker of ABC, which has no induction and no cover, so it
 # skips those proofs. FORMAL_TIMEOUT (seconds, 900 by default) bounds each proof.
 #
@@ -27,8 +27,8 @@ rm -rf "$out"; mkdir -p "$out"; cd "$out"
 
 engine="${FORMAL_ENGINE:-bitwuzla}"
 case "$engine" in
-  yices|bitwuzla|boolector|abc-bmc3) ;;
-  *) echo "FORMAL_ENGINE must be yices, bitwuzla, boolector or abc-bmc3, not '$engine'" >&2; exit 2 ;;
+  yices|bitwuzla|abc-bmc3) ;;
+  *) echo "FORMAL_ENGINE must be yices, bitwuzla or abc-bmc3, not '$engine'" >&2; exit 2 ;;
 esac
 timeout_s="${FORMAL_TIMEOUT:-900}"
 results="$out/result-$engine.tsv"; : > "$results"
