@@ -533,10 +533,12 @@ begin
     flush_ex_mem <= trap_take or trap_sig or mem_trap_take or (fencei_busy and base_run);
 
     -- Validade das três instruções à frente depois da borda em que a instrução de ID entra em EX: o adiantamento
-    -- é decidido já com ela e registrado em ID/EX. EX/MEM e MEM/WB são limpos pelos mesmos flushes de lá, e
-    -- WB2 só copia o write-back de WB.
-    fwd_ex_ok  <= ex_we_reg and ex_valid_live and (not flush_ex_mem);
-    fwd_mem_ok <= exmem_we_reg and exmem_valid and (not mem_trap_take);
+    -- é decidido já com ela e registrado em ID/EX. A exceção de EX ou de MEM (trap_take, mem_trap_take) que
+    -- descarta uma delas também limpa o ID/EX (flush_id_ex zera o seletor registrado), então esses termos tardios
+    -- ficam fora da entrada do seletor; só o sinal de exceção sem efeito (trap_sig, sem Zicsr), que não limpa o
+    -- ID/EX, entra aqui. WB2 só copia o write-back de WB.
+    fwd_ex_ok  <= ex_we_reg and ex_valid and (not trap_sig);
+    fwd_mem_ok <= exmem_we_reg and exmem_valid;
 
     -- =========================================================================
     -- 1. Estágio IF (Instruction Fetch) + Registrador IF/ID

@@ -17,11 +17,11 @@ The instruction in ID enters EX on the next edge, and the three ahead of it move
 
 | Instruction ahead | Writes a register and stays valid after the edge when |
 | :--- | :--- |
-| ID/EX (moves to EX/MEM) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{flush}_{EX/MEM}$ |
-| EX/MEM (moves to MEM/WB) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{trap}_{MEM}$ |
+| ID/EX (moves to EX/MEM) | $\text{we\_reg} \wedge \text{valid} \wedge \neg\,\text{trap\_sig}$ |
+| EX/MEM (moves to MEM/WB) | $\text{we\_reg} \wedge \text{valid}$ |
 | MEM/WB (moves to WB2) | `wb_we` |
 
-Each line reproduces the input of the valid flip-flop of the register the instruction will occupy, so the selector registered in ID/EX equals the one EX computed from the already registered valid bits.
+The discard of an instruction ahead by `trap_take` or by a MEM exception is not in the conditions, because the same event clears `ID/EX` (`flush_id_ex`) and the registered selector goes back to "00". Only `trap_sig`, the no-effect exception signal of the core without Zicsr, discards the EX instruction without clearing `ID/EX`. The late signals of the EX loop therefore do not reach the selector input, and the registered selector equals the one EX computed from the already registered valid bits.
 
 ## 3. Verification
 
