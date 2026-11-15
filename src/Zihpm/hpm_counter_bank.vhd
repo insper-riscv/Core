@@ -41,8 +41,10 @@ entity hpm_counter_bank is
         hpm_counters    : natural range 0 to HPM_MAX_COUNTERS := HPM_MAX_COUNTERS;
         -- Largura em bits de cada contador (0 deixa o banco sem contadores reais).
         hpm_width       : natural range 0 to 64               := 64;
-        -- A leitura sai de um registrador: o_rdata mostra, um ciclo depois, o valor do endereço dado em i_idx e nos
-        -- seletores (a leitura dos 29 contadores sai do caminho combinacional do núcleo).
+        -- A leitura é dividida em dois estágios: o multiplexador dos 29 contadores, comandado por i_idx, escreve em
+        -- registradores as palavras de cada faixa, e um ciclo depois o_rdata junta a faixa que os seletores
+        -- (que o chamador mantém) escolhem. A leitura dos 29 contadores sai do caminho combinacional do núcleo e o
+        -- caminho do multiplexador não leva a junção das faixas.
         registered_read : boolean                             := false
     );
     port (
@@ -124,8 +126,14 @@ architecture rtl of hpm_counter_bank is
     signal events_valid : std_logic_vector(EVENT_VECTOR_WIDTH - 1 downto 0);
     -- Valor lido combinacionalmente do contador, do evento ou da inibição selecionado.
     signal rdata_comb   : word_t;
-    -- Valor lido, registrado (com registered_read).
-    signal rdata_q      : word_t := (others => '0');
+    -- Palavra do seletor de evento lida no ciclo anterior (com registered_read).
+    signal event_q      : word_t := (others => '0');
+    -- Metade baixa lida no ciclo anterior (com registered_read).
+    signal lo_q         : word_t := (others => '0');
+    -- Metade alta lida no ciclo anterior (com registered_read).
+    signal hi_q         : word_t := (others => '0');
+    -- Metade alta do seletor de evento lida no ciclo anterior (com registered_read).
+    signal eventh_q     : word_t := (others => '0');
 
 begin
 
@@ -342,16 +350,26 @@ begin
 
     gen_registered_read : if registered_read generate
 
+        -- Primeiro estágio: as palavras das faixas, escolhidas pelo índice, ficam registradas.
+
         p_registered_read_proc : process (i_clk) is
         begin
 
             if rising_edge(i_clk) then
-                rdata_q <= rdata_comb;
+                event_q  <= event_word;
+                lo_q     <= lo_word;
+                hi_q     <= hi_word;
+                eventh_q <= eventh_word;
             end if;
 
         end process p_registered_read_proc;
 
-        o_rdata <= rdata_q;
+        -- Segundo estágio: os seletores escolhem a faixa entre as palavras registradas.
+        o_rdata <= (event_q   and (word_t'range => i_sel_event)) or
+                   (lo_q      and (word_t'range => i_sel_lo)) or
+                   (hi_q      and (word_t'range => i_sel_hi)) or
+                   (eventh_q  and (word_t'range => i_sel_eventh)) or
+                   (inhibit_word and (word_t'range => i_sel_inhibit));
     end generate gen_registered_read;
 
 end architecture rtl;

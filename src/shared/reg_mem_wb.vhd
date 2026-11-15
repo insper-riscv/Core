@@ -5,6 +5,10 @@
 -- estágio MEM (PC + 4, resultado da ULA, endereço de rd e sinais de controle de
 -- write-back), disponibilizando-os ao estágio WB no ciclo seguinte.
 --
+-- Com i_rst ou i_flush em '1' só os bits de controle voltam a zero (validade,
+-- rd, habilitadores de escrita e seletores); o resultado da ULA não é limpo, pois
+-- o estágio WB e o adiantamento só o usam sob o_valid e o_we_ok.
+--
 -- Observação sobre a leitura da memória de dados:
 --   A palavra lida da memória chega diretamente no ciclo WB (leitura síncrona
 --   com 1 ciclo de latência), sendo alinhada e estendida pelo ExtenderRAM com
@@ -105,13 +109,12 @@ begin
                                     i_alu_out(1 downto 0) = BYTE_OFFSET_3)) else
                    '0';
 
-    p_reg_mem_wb_proc : process (i_clk) is
+    p_reg_mem_wb_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
                 r_valid      <= '0';
-                r_alu_out    <= (others => '0');
                 r_rd         <= (others => '0');
                 r_we_reg     <= '0';
                 r_we_ok      <= '0';
@@ -122,7 +125,6 @@ begin
                 r_is_cross   <= '0';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
-                r_alu_out    <= i_alu_out;
                 r_rd         <= i_rd;
                 r_we_reg     <= i_we_reg;
                 r_we_ok      <= i_we_reg and i_valid;
@@ -134,7 +136,18 @@ begin
             end if;
         end if;
 
-    end process p_reg_mem_wb_proc;
+    end process p_reg_mem_wb_ctrl_proc;
+
+    p_reg_mem_wb_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_alu_out <= i_alu_out;
+            end if;
+        end if;
+
+    end process p_reg_mem_wb_data_proc;
 
     o_valid      <= r_valid;
     o_alu_out    <= r_alu_out;

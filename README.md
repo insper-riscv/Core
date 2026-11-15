@@ -28,6 +28,9 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [ISA/Zihpm/conformance.md](docs/pt-br/ISA/Zihpm/conformance.md): cada exigência do Zihpm confrontada com o comportamento do Core, com a evidência de cada linha.
 - [profile/description.md](docs/pt-br/profile/description.md): os arquivos que definem os perfis, as regras que geram a matriz completa e os perfis de referência de `profiles/`.
 - [timing/STALL_REGISTRADO_DO_MULTDIV.md](docs/pt-br/timing/STALL_REGISTRADO_DO_MULTDIV.md): a parada do multiplicador e do divisor vinda de um flip-flop, e o efeito no caminho crítico.
+- [timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md](docs/pt-br/timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md): os registradores de barreira limpam só os bits de controle no descarte.
+- [timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md](docs/pt-br/timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md): a seleção do adiantamento resolvida em ID, registrada e replicada.
+- [timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md](docs/pt-br/timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md): o cruzamento de palavra registrado, a escrita de `mepc`, `mcause` e `mtval` um ciclo depois do trap e a leitura do Zihpm em dois estágios.
 - [ISA/M/instructions.md](docs/pt-br/ISA/M/instructions.md): instruções da extensão `M` conforme o manual do RISC-V (capítulo 11): codificação, divisão, divisão por zero e estouro.
 - [ISA/M/description.md](docs/pt-br/ISA/M/description.md): como o Core executa a `M`: decodificador, divisor não-restaurador, parada do pipeline, fusão de pares e verificação formal.
 - [ISA/Zmmul/instructions.md](docs/pt-br/ISA/Zmmul/instructions.md): instruções da extensão `Zmmul` (só multiplicação, seção 11.1.3 do manual): codificação e semântica.
@@ -111,7 +114,7 @@ make formal         # Execução das provas formais (SymbiYosys) com o engine de
 
 ### 4.2. Execução via Docker
 
-A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, os solvers Yices, Bitwuzla e Boolector, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
+A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, os solvers Yices e Bitwuzla, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \

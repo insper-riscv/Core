@@ -7,10 +7,19 @@
 -- estágio EX no ciclo seguinte.
 --
 -- Prioridade dos controles síncronos:
---   1. i_rst = '1' ou i_flush = '1' -> zera todos os sinais de controle e dados
---                                      e marca o pacote como bolha (o_valid = '0').
+--   1. i_rst = '1' ou i_flush = '1' -> zera os sinais de controle e marca o pacote
+--                                      como bolha (o_valid = '0'); os campos de
+--                                      dados (PC, PC + 4, operandos, imediato e
+--                                      seletores de adiantamento) não são
+--                                      limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
+--
+-- Só os bits de controle têm limpeza síncrona, de modo que o flush de desvio e de
+-- trap, que nasce no laço do estágio EX, alimenta cerca de 40 registradores em
+-- vez de 200. Os campos de dados, entre eles as cópias do seletor de adiantamento,
+-- só têm habilitação: o valor de uma bolha nunca produz efeito, porque o_valid e
+-- os habilitadores de escrita (zerados) travam todo uso dele.
 -- =============================================================================
 
 library ieee;
@@ -20,6 +29,10 @@ use work.pipeline_types.all;
 use work.fwd_consts.all;
 
 entity reg_id_ex is
+    generic (
+        -- Número de cópias registradas do seletor de adiantamento de cada operando.
+        fwd_copies : positive := FWD_COPIES
+    );
     port (
         -- Sinal de clock.
         i_clk           : in    std_logic;
@@ -61,10 +74,10 @@ entity reg_id_ex is
         i_alu_op        : in    alu_op_t;
         -- Seleção one-hot do resultado da ULA, decodificada no estágio ID.
         i_alu_sel       : in    alu_sel_t;
-        -- Casamentos de rs1 com as três instruções à frente, calculados no estágio ID (forwarding_match).
-        i_fwd_match_rs1 : in    fwd_match_t;
-        -- Casamentos de rs2 com as três instruções à frente, calculados no estágio ID.
-        i_fwd_match_rs2 : in    fwd_match_t;
+        -- Seletor do adiantamento de rs1, calculado no estágio ID (forwarding_match e forwarding_unit).
+        i_fwd_rs1       : in    fwd_sel_t;
+        -- Seletor do adiantamento de rs2, calculado no estágio ID.
+        i_fwd_rs2       : in    fwd_sel_t;
         -- Indica instrução pertencente à extensão M (MulDiv).
         i_is_muldiv     : in    std_logic;
         -- Indica instrução pertencente à extensão Zicsr (acesso a registrador CSR).
@@ -113,10 +126,10 @@ entity reg_id_ex is
         o_alu_op        : out   alu_op_t;
         -- Seleção one-hot do resultado da ULA registrada para o estágio EX.
         o_alu_sel       : out   alu_sel_t;
-        -- Casamentos de rs1 registrados para a seleção do adiantamento no estágio EX.
-        o_fwd_match_rs1 : out   fwd_match_t;
-        -- Casamentos de rs2 registrados para a seleção do adiantamento no estágio EX.
-        o_fwd_match_rs2 : out   fwd_match_t;
+        -- Cópias do seletor de adiantamento de rs1 registrado, a cópia i nos bits (2i + 1 downto 2i).
+        o_fwd_rs1       : out   std_logic_vector((2 * fwd_copies) - 1 downto 0);
+        -- Cópias do seletor de adiantamento de rs2 registrado, a cópia i nos bits (2i + 1 downto 2i).
+        o_fwd_rs2       : out   std_logic_vector((2 * fwd_copies) - 1 downto 0);
         -- Indicador de instrução MulDiv registrado para o estágio EX.
         o_is_muldiv     : out   std_logic;
         -- Indicador de instrução CSR registrado para o estágio EX.
@@ -137,6 +150,9 @@ entity reg_id_ex is
 end entity reg_id_ex;
 
 architecture rtl of reg_id_ex is
+
+    -- Atributo do Quartus que mantém registradores replicados em vez de fundi-los.
+    attribute preserve : boolean;
 
     -- Bit de validade armazenado no registrador ID/EX.
     signal r_valid         : std_logic    := '0';
@@ -170,10 +186,10 @@ architecture rtl of reg_id_ex is
     signal r_alu_op        : alu_op_t     := (others => '0');
     -- Seleção one-hot do resultado da ULA armazenada.
     signal r_alu_sel       : alu_sel_t    := (others => '0');
-    -- Casamentos de adiantamento de rs1 armazenados.
-    signal r_fwd_match_rs1 : fwd_match_t  := (others => '0');
-    -- Casamentos de adiantamento de rs2 armazenados.
-    signal r_fwd_match_rs2 : fwd_match_t  := (others => '0');
+    -- Cópias do seletor de adiantamento de rs1 armazenadas; o Quartus não as funde (preserve).
+    signal r_fwd_rs1       : std_logic_vector((2 * fwd_copies) - 1 downto 0) := (others => '0');
+    -- Cópias do seletor de adiantamento de rs2 armazenadas; o Quartus não as funde (preserve).
+    signal r_fwd_rs2       : std_logic_vector((2 * fwd_copies) - 1 downto 0) := (others => '0');
     -- Indicador de instrução MulDiv armazenado.
     signal r_is_muldiv     : std_logic    := '0';
     -- Indicador de instrução CSR armazenado.
@@ -191,21 +207,20 @@ architecture rtl of reg_id_ex is
     -- Campo funct3 armazenado.
     signal r_funct3        : funct3_t     := (others => '0');
 
+    -- As cópias do seletor de adiantamento ficam como registradores distintos, um por fatia do multiplexador.
+    attribute preserve of r_fwd_rs1 : signal is true;
+    attribute preserve of r_fwd_rs2 : signal is true;
+
 begin
 
-    p_reg_id_ex_proc : process (i_clk) is
+    p_reg_id_ex_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
                 r_valid         <= '0';
-                r_pc            <= (others => '0');
-                r_pc4           <= (others => '0');
                 r_rs1           <= (others => '0');
                 r_rd            <= (others => '0');
-                r_rs1_val       <= (others => '0');
-                r_rs2_val       <= (others => '0');
-                r_imm           <= (others => '0');
                 r_sel_pc4_alu   <= '0';
                 r_wb_sel        <= (others => '0');
                 r_we_reg        <= '0';
@@ -214,8 +229,6 @@ begin
                 r_sel_pc_rs1    <= '0';
                 r_alu_op        <= (others => '0');
                 r_alu_sel       <= (others => '0');
-                r_fwd_match_rs1 <= (others => '0');
-                r_fwd_match_rs2 <= (others => '0');
                 r_is_muldiv     <= '0';
                 r_is_csr        <= '0';
                 r_illegal       <= '0';
@@ -226,13 +239,8 @@ begin
                 r_funct3        <= (others => '0');
             elsif i_en = '1' then
                 r_valid         <= i_valid;
-                r_pc            <= i_pc;
-                r_pc4           <= i_pc4;
                 r_rs1           <= i_rs1;
                 r_rd            <= i_rd;
-                r_rs1_val       <= i_rs1_val;
-                r_rs2_val       <= i_rs2_val;
-                r_imm           <= i_imm;
                 r_sel_pc4_alu   <= i_sel_pc4_alu;
                 r_wb_sel        <= i_wb_sel;
                 r_we_reg        <= i_we_reg;
@@ -241,8 +249,6 @@ begin
                 r_sel_pc_rs1    <= i_sel_pc_rs1;
                 r_alu_op        <= i_alu_op;
                 r_alu_sel       <= i_alu_sel;
-                r_fwd_match_rs1 <= i_fwd_match_rs1;
-                r_fwd_match_rs2 <= i_fwd_match_rs2;
                 r_is_muldiv     <= i_is_muldiv;
                 r_is_csr        <= i_is_csr;
                 r_illegal       <= i_illegal;
@@ -254,7 +260,24 @@ begin
             end if;
         end if;
 
-    end process p_reg_id_ex_proc;
+    end process p_reg_id_ex_ctrl_proc;
+
+    p_reg_id_ex_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_pc      <= i_pc;
+                r_pc4     <= i_pc4;
+                r_rs1_val <= i_rs1_val;
+                r_rs2_val <= i_rs2_val;
+                r_imm     <= i_imm;
+                r_fwd_rs1 <= replicate(i_fwd_rs1, fwd_copies);
+                r_fwd_rs2 <= replicate(i_fwd_rs2, fwd_copies);
+            end if;
+        end if;
+
+    end process p_reg_id_ex_data_proc;
 
     o_valid         <= r_valid;
     o_pc            <= r_pc;
@@ -272,8 +295,8 @@ begin
     o_sel_pc_rs1    <= r_sel_pc_rs1;
     o_alu_op        <= r_alu_op;
     o_alu_sel       <= r_alu_sel;
-    o_fwd_match_rs1 <= r_fwd_match_rs1;
-    o_fwd_match_rs2 <= r_fwd_match_rs2;
+    o_fwd_rs1       <= r_fwd_rs1;
+    o_fwd_rs2       <= r_fwd_rs2;
     o_is_muldiv     <= r_is_muldiv;
     o_is_csr        <= r_is_csr;
     o_illegal       <= r_illegal;

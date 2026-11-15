@@ -5,6 +5,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
 from tests.python.unittests.checks import check_equal
+from tests.python.unittests.common.reg_mem_wb import LAST_BYTE, is_cross
 from tests.python.unittests.common.stage_register import (
     StageRegister,
     check_stage_register,
@@ -26,6 +27,15 @@ FIELDS = {
     "wb_sel": 1,
 }
 
+# Campos de dados, que flush e reset não limpam.
+KEEP = {
+    "pc": 0xFFFFFFFF,
+    "funct3": 0b111,
+    "alu_out": 0xFFFFFFFF,
+    "store_data": 0xFFFFFFFF,
+    "byte_mask": 0b1111,
+}
+
 
 def derived(values):
     """Devolve we_ok: a escrita de registrador só vale com validade."""
@@ -35,7 +45,7 @@ def derived(values):
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador EX/MEM."""
-    await check_stage_register(StageRegister(dut, FIELDS, derived))
+    await check_stage_register(StageRegister(dut, FIELDS, derived, KEEP))
 
 
 async def classify(dut, address):
@@ -60,3 +70,47 @@ async def test_address_class_is_registered(dut):
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
     check_equal((int(dut.o_is_flash.value), int(dut.o_is_sdram.value)), (0, 0))
+
+
+# Máscaras de byte dos stores que cruzam a palavra e modos de load.
+MASK_WORD, MASK_HALF_HIGH = 0b1111, 0b1100
+
+
+def crossing(re, we, ext_op, mask, offset):
+    """Modelo de referência do cruzamento da palavra."""
+    load = re and is_cross(ext_op, offset)
+    store = we and (
+        (mask == MASK_WORD and offset != 0)
+        or (mask == MASK_HALF_HIGH and offset == LAST_BYTE)
+    )
+    return int(bool(load or store))
+
+
+async def settle(dut):
+    """Espera uma borda de clock e o assentamento das saídas."""
+    await RisingEdge(dut.i_clk)
+    await Timer(1, unit="ns")
+
+
+@cocotb.test()
+async def test_crossing_is_decided_in_ex_and_registered(dut):
+    """Verifica o cruzamento da palavra registrado junto do EX/MEM."""
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
+    dut.i_rst.value = 0
+    for re, we in ((1, 0), (0, 1), (0, 0)):
+        for ext_op in range(5):
+            for mask in (0, 0b0001, 0b0011, MASK_HALF_HIGH, MASK_WORD):
+                for offset in range(4):
+                    dut.i_re_ram.value = re
+                    dut.i_we_ram.value = we
+                    dut.i_ext_ram_op.value = ext_op
+                    dut.i_byte_mask.value = mask
+                    await classify(dut, 0x100 + offset)
+                    check_equal(
+                        int(dut.o_cross.value),
+                        crossing(re, we, ext_op, mask, offset),
+                        (re, we, ext_op, mask, offset),
+                    )
+    dut.i_flush.value = 1
+    await settle(dut)
+    check_equal(int(dut.o_cross.value), 0, "flush limpa o cruzamento")

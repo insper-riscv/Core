@@ -24,8 +24,8 @@ FIELDS = {
     "sel_pc_rs1": 1,
     "alu_op": 5,
     "alu_sel": 8,
-    "fwd_match_rs1": 3,
-    "fwd_match_rs2": 3,
+    "fwd_rs1": 2,
+    "fwd_rs2": 2,
     "is_muldiv": 1,
     "is_csr": 1,
     "illegal": 1,
@@ -36,8 +36,28 @@ FIELDS = {
     "funct3": 3,
 }
 
+# Campos de dados, que flush e reset não limpam.
+KEEP = dict.fromkeys(("pc", "pc4", "rs1_val", "rs2_val", "imm"), 0xFFFFFFFF)
+KEEP |= {"fwd_rs1": 0xFF, "fwd_rs2": 0xFF}
+
+# Cópias do seletor de adiantamento (FWD_COPIES de fwd_consts).
+COPIES = 4
+
+
+def replicate(code):
+    """Repete o código do seletor em cada cópia (bits 2i+1:2i)."""
+    return sum(code << (2 * copy) for copy in range(COPIES))
+
+
+def derived(values):
+    """Devolve os seletores de adiantamento replicados nas cópias."""
+    return {
+        "fwd_rs1": replicate(values["fwd_rs1"]),
+        "fwd_rs2": replicate(values["fwd_rs2"]),
+    }
+
 
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador ID/EX."""
-    await check_stage_register(StageRegister(dut, FIELDS))
+    await check_stage_register(StageRegister(dut, FIELDS, derived, KEEP))

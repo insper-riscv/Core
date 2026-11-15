@@ -167,7 +167,7 @@ The load or store exception (causes 4, 5, 6 and 7) belongs to an instruction old
 
 When an exception is taken, the CSR file performs the following actions in the same cycle.
 
-1. `mepc` receives the PC of the faulting instruction, with the two low bits cleared.
+1. `mepc` receives the PC of the faulting instruction, with the two low bits cleared, one cycle after the trap is taken, like `mcause` and `mtval`. The instruction in EX in that cycle is a bubble, so no read sees them earlier.
 2. `mcause` receives the cause code and `mtval` receives the associated value.
 3. `mstatus.MPIE` receives `mstatus.MIE`, and `mstatus.MIE` goes to zero.
 4. The PC takes the value of `mtvec`.

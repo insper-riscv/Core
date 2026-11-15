@@ -65,7 +65,7 @@ O estágio ID reúne sete subblocos:
 
 5. **Banco de registradores (`reg_file`):** 32 registradores de 32 bits (`x0` fixo em zero e `x1`..`x31` instanciados com `generic_register`), decodificação de escrita via `onehot_decoder`, leitura combinacional dupla via `mux_tree` e bypass write-through via `mux_2x1` quando `i_enable = '1'` e o endereço lido coincide com `i_rd /= x0`.
 6. **Detecção de hazards (`hazard_detection_unit`) e inserção de bolha (`bubble_mux`):** congela PC e IF/ID (`o_pc_we = '0'`, `o_ifid_we = '0'`) e zera `o_we_reg`, `o_we_ram`, `o_re_ram` e `o_en_ram` (`o_bubble_sel = '1'`) durante conflitos load-use ou stalls multiciclo (`i_pipe_stall = '1'`).
-7. **Comparação do adiantamento (`forwarding_match`):** compara `rs1` e `rs2` da instrução em ID com o destino `rd` das três instruções à frente (ID/EX, EX/MEM e MEM/WB), que no ciclo seguinte estarão em EX/MEM, MEM/WB e WB2. Um destino `x0` ou sem escrita habilitada nunca casa. Os três bits de casamento de cada operando são registrados em ID/EX (`fwd_match_t`, posições `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB` e `FWD_MATCH_WB2` de `src/shared/fwd_consts.vhd`).
+7. **Comparação do adiantamento (`forwarding_match`):** compara `rs1` e `rs2` da instrução em ID com o destino `rd` das três instruções à frente (ID/EX, EX/MEM e MEM/WB), que no ciclo seguinte estarão em EX/MEM, MEM/WB e WB2. Um destino `x0` ou sem escrita válida nunca casa, e a validade de cada instrução à frente já considera o descarte que ela sofre na mesma borda de clock. Os três bits de casamento de cada operando (`fwd_match_t`, posições `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB` e `FWD_MATCH_WB2` de `src/shared/fwd_consts.vhd`) passam pela `forwarding_unit`, que escolhe a fonte mais nova que casa, e o seletor de 2 bits resultante é registrado em ID/EX em `FWD_COPIES` cópias por operando.
 
 ### 2.3. Estágio 3: Execução (`stage_ex`)
 
@@ -75,7 +75,7 @@ O estágio ID reúne sete subblocos:
 
 No estágio EX:
 
-1. **Adiantamento (`forwarding_unit`):** seleciona cada operando (`ex_fwd_rs1_val` e `ex_fwd_rs2_val`) via `mux_4x1` entre o valor vindo de ID/EX (`"00"`), o resultado de EX registrado em MEM/WB (`"01"`), o resultado em EX/MEM (`"10"`) e o dado final de WB registrado em WB2 (`"11"`). A escolha não compara índices de registrador, pois depende só dos bits de casamento registrados em ID/EX e dos bits de validade com escrita registrados em EX/MEM, MEM/WB e WB2, e vale a fonte mais nova que casa e ainda é válida.
+1. **Adiantamento:** seleciona cada operando (`ex_fwd_rs1_val` e `ex_fwd_rs2_val`) via `mux_4x1` entre o valor vindo de ID/EX (`"00"`), o resultado de EX registrado em MEM/WB (`"01"`), o resultado em EX/MEM (`"10"`) e o dado final de WB registrado em WB2 (`"11"`). A escolha já vem resolvida do estágio ID e registrada em ID/EX, e cada uma das `FWD_COPIES` cópias do seletor comanda uma fatia do multiplexador, de modo que EX não compara índices nem validades.
 2. **Seleção de entrada da ULA:** dois multiplexadores `mux_2x1` escolhem o operando A (`i_pc` quando `i_sel_pc_rs1 = '0'`, ou `ex_fwd_rs1_val` quando `'1'`) e o operando B (`ex_fwd_rs2_val` quando `i_sel_rs2_imm = '0'`, ou `i_imm` quando `'1'`).
 3. **ULA (`alu`):** executa a operação definida em `src/shared/alu_consts.vhd`:
 

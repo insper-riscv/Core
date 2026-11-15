@@ -1,6 +1,8 @@
 // Properties of csr_file, checked on the Verilog netlist that GHDL synthesizes from the VHDL.
-// The inputs are free; the only assumption is that the pipeline never commits a CSR operation with
-// op[1:0] = 00 (funct3 = 000 and 100 are not CSR accesses).
+// The inputs are free; the assumptions are that the pipeline never commits a CSR operation with
+// op[1:0] = 00 (funct3 = 000 and 100 are not CSR accesses) and that the cycle after a trap has no commit, trap or
+// MRET: the instruction that enters EX there is a bubble, because the trap flushes ID/EX. The trap writes mepc,
+// mcause and mtval one cycle after it is taken, from the trap registers, while MIE and MPIE change on its own edge.
 module props (input clk);
   (* anyseq *) wire reset, commit, src_zero, trap_take, mret_take;
   (* anyseq *) wire [11:0] addr;
@@ -23,19 +25,27 @@ module props (input clk);
   always @(*) assume (!(trap_take && mret_take));
 `endif
 
-  reg f_past = 0;
+  reg f_past = 0, f_past2 = 0;
   reg [11:0] p_addr = 0; reg [2:0] p_op = 0; reg [31:0] p_rdata = 0, p_wdata = 0;
   reg p_reset = 0, p_commit = 0, p_src_zero = 0, p_trap = 0, p_mret = 0;
   reg [31:0] p_cause = 0, p_pc = 0, p_tval = 0;
+  // Two cycles back: the trap of that cycle lands in mepc, mcause and mtval on the edge into the current cycle.
+  reg pp_trap = 0, pp_reset = 0;
+  reg [31:0] pp_cause = 0, pp_pc = 0, pp_tval = 0;
 
   always @(posedge clk) begin
     f_past <= 1;
+    f_past2 <= f_past;
+    pp_trap <= p_trap; pp_reset <= p_reset; pp_cause <= p_cause; pp_pc <= p_pc; pp_tval <= p_tval;
     p_addr <= addr; p_op <= op; p_rdata <= rdata; p_wdata <= wdata;
     p_reset <= reset; p_commit <= commit; p_src_zero <= src_zero; p_trap <= trap_take; p_mret <= mret_take;
     p_cause <= trap_cause; p_pc <= trap_pc; p_tval <= trap_tval;
   end
 
-  wire p_event = p_reset || p_trap || p_mret || p_commit;
+  // The cycle after a trap carries no commit, trap or MRET (see the header).
+  always @(*) if (p_trap) assume (!commit && !trap_take && !mret_take);
+
+  wire p_event = p_reset || p_trap || pp_trap || p_mret || p_commit;
   wire p_plain_commit = p_commit && !p_reset && !p_trap && !p_mret;
   wire p_write = p_plain_commit && (p_op[1:0] == 2'b01 || !p_src_zero);
   wire [31:0] p_new = p_op[1:0] == 2'b01 ? p_wdata : p_op[1:0] == 2'b10 ? (p_rdata | p_wdata) : (p_rdata & ~p_wdata);
@@ -67,11 +77,11 @@ module props (input clk);
       if (p_addr == 12'h300) assert (rdata[3] == p_new[3] && rdata[7] == p_new[7]);
     end
 
-    // 4. A trap updates mepc, mcause and mtval on the same edge (the trap wins over a commit).
-    if (p_trap && !p_reset) begin
-      if (addr == 12'h341) assert (rdata == {p_pc[31:2], 2'b00});
-      if (addr == 12'h342) assert (rdata == p_cause);
-      if (addr == 12'h343) assert (rdata == p_tval);
+    // 4. A trap updates mepc, mcause and mtval one edge after it is taken (the trap registers hold what it had).
+    if (f_past2 && pp_trap && !pp_reset && !p_reset) begin
+      if (addr == 12'h341) assert (rdata == {pp_pc[31:2], 2'b00});
+      if (addr == 12'h342) assert (rdata == pp_cause);
+      if (addr == 12'h343) assert (rdata == pp_tval);
     end
 
     // 5. A reset clears every writable CSR.

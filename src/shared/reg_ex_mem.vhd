@@ -7,10 +7,17 @@
 -- de memória e write-back, disponibilizando-os ao estágio MEM.
 --
 -- Prioridade dos controles síncronos:
---   1. i_rst = '1' ou i_flush = '1' -> zera todos os controles e dados e marca
---                                      o pacote como bolha (o_valid = '0').
+--   1. i_rst = '1' ou i_flush = '1' -> zera os controles e marca o pacote como
+--                                      bolha (o_valid = '0'); o PC, o resultado,
+--                                      o dado e a máscara de escrita e o funct3
+--                                      não são limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
+--
+-- Só os bits de controle têm limpeza síncrona, de modo que o flush de exceção não
+-- alimenta os campos de dados. O valor de uma bolha nunca produz efeito, porque
+-- o estágio MEM e o adiantamento só o usam sob o_valid, os habilitadores de
+-- memória e o_we_ok, todos zerados.
 -- =============================================================================
 
 library ieee;
@@ -19,6 +26,8 @@ use ieee.numeric_std.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
+use work.byte_mask_consts.all;
+use work.ext_ram_consts.all;
 
 entity reg_ex_mem is
     port (
@@ -99,7 +108,9 @@ entity reg_ex_mem is
         o_same_region : out   std_logic;
         -- O endereço registrado aceita escrita no mapa do núcleo (sempre '1' sem HAS_ACCESS_FAULTS); a BOOT_MEMORY e a
         -- FLASH são só de leitura.
-        o_ok_wr       : out   std_logic
+        o_ok_wr       : out   std_logic;
+        -- O load ou o store registrado cruza a palavra (decidido em EX, registrado aqui; sempre '0' sem HAS_ZICCLSM).
+        o_cross       : out   std_logic
     );
 end entity reg_ex_mem;
 
@@ -143,6 +154,8 @@ architecture rtl of reg_ex_mem is
     signal r_last       : std_logic    := '0';
     -- O endereço registrado aceita escrita no mapa.
     signal r_ok_wr      : std_logic    := '1';
+    -- O acesso registrado cruza a palavra.
+    signal r_cross      : std_logic    := '0';
 
     -- Entrada de r_is_flash, decodificada do resultado da ULA.
     signal in_is_flash : std_logic;
@@ -154,6 +167,8 @@ architecture rtl of reg_ex_mem is
     signal in_last     : std_logic;
     -- Entrada de r_ok_wr, decodificada do resultado da ULA.
     signal in_ok_wr    : std_logic;
+    -- Entrada de r_cross, decidida pelos controles do acesso e pelo byte do endereço efetivo.
+    signal in_cross    : std_logic;
 
 begin
 
@@ -175,17 +190,15 @@ begin
         in_ok_wr <= '1';
     end generate gen_no_faults;
 
-    p_reg_ex_mem_proc : process (i_clk) is
+    -- O cruzamento da palavra também sai de EX e fica registrado: o estágio MEM só confere o bit.
+    in_cross <= is_cross_access(i_re_ram, i_we_ram, i_ext_ram_op, i_byte_mask, i_ea(1 downto 0)) when HAS_ZICCLSM else '0';
+
+    p_reg_ex_mem_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
                 r_valid      <= '0';
-                r_pc         <= (others => '0');
-                r_funct3     <= (others => '0');
-                r_alu_out    <= (others => '0');
-                r_store_data <= (others => '0');
-                r_byte_mask  <= (others => '0');
                 r_rd         <= (others => '0');
                 r_we_reg     <= '0';
                 r_we_ok      <= '0';
@@ -199,13 +212,9 @@ begin
                 r_in_main    <= '0';
                 r_last       <= '0';
                 r_ok_wr      <= '1';
+                r_cross      <= '0';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
-                r_pc         <= i_pc;
-                r_funct3     <= i_funct3;
-                r_alu_out    <= i_alu_out;
-                r_store_data <= i_store_data;
-                r_byte_mask  <= i_byte_mask;
                 r_rd         <= i_rd;
                 r_we_reg     <= i_we_reg;
                 r_we_ok      <= i_we_reg and i_valid;
@@ -219,10 +228,26 @@ begin
                 r_in_main    <= in_in_main;
                 r_last       <= in_last;
                 r_ok_wr      <= in_ok_wr;
+                r_cross      <= in_cross;
             end if;
         end if;
 
-    end process p_reg_ex_mem_proc;
+    end process p_reg_ex_mem_ctrl_proc;
+
+    p_reg_ex_mem_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_pc         <= i_pc;
+                r_funct3     <= i_funct3;
+                r_alu_out    <= i_alu_out;
+                r_store_data <= i_store_data;
+                r_byte_mask  <= i_byte_mask;
+            end if;
+        end if;
+
+    end process p_reg_ex_mem_data_proc;
 
     o_valid       <= r_valid;
     o_pc          <= r_pc;
@@ -245,5 +270,6 @@ begin
     -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
     o_same_region <= r_in_main and (not r_last);
     o_ok_wr       <= r_ok_wr;
+    o_cross       <= r_cross;
 
 end architecture rtl;

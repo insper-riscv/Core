@@ -216,13 +216,18 @@ async def test_unknown_csr_is_illegal(dut):
 
 
 async def take_trap(dut, cause, pc, tval):
-    """Executa take trap."""
+    """Toma um trap e espera o ciclo de bolha que o segue.
+
+    mepc, mcause e mtval gravam um ciclo depois do trap, e a instrução
+    que entra em EX nesse ciclo é uma bolha: sem commit nem leitura.
+    """
     dut.i_trap_cause.value = cause
     dut.i_trap_pc.value = pc
     dut.i_trap_tval.value = tval
     dut.i_trap_take.value = 1
     await RisingEdge(dut.i_clk)
     dut.i_trap_take.value = 0
+    await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
 
 

@@ -195,6 +195,10 @@ async def test_illegal_instructions(dut):
     )
 
 
+# Códigos do seletor do adiantamento (FWD_* de fwd_consts).
+NONE, MEMWB, EXMEM, WB2 = 0, 1, 2, 3
+
+
 @cocotb.test()
 async def test_register_file(dut):
     """O banco guarda o write-back e o x0 lê sempre zero."""
@@ -214,31 +218,27 @@ async def test_register_file(dut):
 
 @cocotb.test()
 async def test_forwarding_matches(dut):
-    """Os casamentos de EX, MEM e WB com rs1 e rs2 (x0 nunca casa)."""
+    """A fonte do adiantamento de rs1 e rs2 (x0 nunca casa)."""
     await start(dut)
     instr = encode_r(OP_OP, (1, 0, 5, 7))
     cases = (
-        ({"ex_rd": 5, "ex_we_reg": 1}, (0b001, 0b000)),
-        ({"mem_rd": 7, "mem_we_reg": 1}, (0b000, 0b010)),
-        ({"memwb_rd": 5, "memwb_we_reg": 1}, (0b100, 0b000)),
-        ({"ex_rd": 5, "ex_we_reg": 0}, (0b000, 0b000)),
+        ({"ex_rd": 5, "ex_we_reg": 1}, (EXMEM, NONE)),
+        ({"mem_rd": 7, "mem_we_reg": 1}, (NONE, MEMWB)),
+        ({"memwb_rd": 5, "memwb_we_reg": 1}, (WB2, NONE)),
+        ({"ex_rd": 5, "ex_we_reg": 0}, (NONE, NONE)),
         (
             {"ex_rd": 5, "ex_we_reg": 1, "mem_rd": 5, "mem_we_reg": 1},
-            (0b011, 0b000),
+            (EXMEM, NONE),
         ),
     )
-    for values, (match1, match2) in cases:
+    for values, (sel1, sel2) in cases:
         await apply(dut, instr, values)
-        seen = read(dut, ("fwd_match_rs1", "fwd_match_rs2"))
-        check_equal(
-            (seen["fwd_match_rs1"], seen["fwd_match_rs2"]),
-            (match1, match2),
-            values,
-        )
+        seen = read(dut, ("fwd_rs1", "fwd_rs2"))
+        check_equal((seen["fwd_rs1"], seen["fwd_rs2"]), (sel1, sel2), values)
     await apply(
         dut, encode_r(OP_OP, (1, 0, 0, 7)), {"ex_rd": 0, "ex_we_reg": 1}
     )
-    check_equal(read(dut, ("fwd_match_rs1",))["fwd_match_rs1"], 0, "x0")
+    check_equal(read(dut, ("fwd_rs1",))["fwd_rs1"], NONE, "x0")
 
 
 @cocotb.test()

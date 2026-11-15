@@ -9,19 +9,22 @@
 //  3. mstatus reads MIE = 0 and MPIE = 1 (the interrupt was taken with MIE = 1);
 //  4. the next PC of cycle t is BASE in the direct mode, and BASE with bits 5:2 replaced by the cause code (3, 7 or
 //     11) in the vectored mode;
-//  5. an aborted CSR access leaves the CSR it addressed as it was: the read of cycle t + 1 equals the read of t;
+//  5. an aborted CSR access leaves the CSR it addressed as it was: the read of cycle t + 2 equals the read of t;
 //  6. an ECALL with no line high traps with cause 11 to BASE, whatever the mode of mtvec (the vector is only for
 //     interrupts).
-// Cycle t + 1 is a CSR read (CSRRS with rs1 = x0) of the address the property asks about; no other
-// instruction is constrained. The properties depend only on the state at t, so they are proven by induction.
+// Cycle t + 1 is a bubble (the trap flushes ID/EX), and cycle t + 2 is a CSR read (CSRRS with rs1 = x0) of the
+// address the property asks about: mepc, mcause and mtval are written one cycle after the trap, from the trap
+// registers of the CSR bank. No other instruction is constrained. The properties depend only on the state at t and
+// t + 1, so they are proven by induction.
 module props (input clk);
   (* anyseq *) wire reset, base_run, pipe_run, valid, valid_raw, retire, sel_pc4_alu, sel_rs2_imm, sel_pc_rs1;
-  (* anyseq *) wire is_muldiv, is_csr, illegal, irq_sw, irq_tm, irq_ex, dc_done, exmem_ok, memwb_ok, wb2_ok;
+  (* anyseq *) wire is_muldiv, is_csr, illegal, irq_sw, irq_tm, irq_ex, dc_done;
   (* anyseq *) wire [31:0] pc, pc4, rs1_val, rs2_val, imm, exmem_alu_out, memwb_alu_out, wb2_data;
   (* anyseq *) wire [4:0] rs1_idx, rd_idx, alu_op;
   (* anyseq *) wire [7:0] alu_sel;
   (* anyseq *) wire [6:0] opcode;
-  (* anyseq *) wire [2:0] funct3, fwd1, fwd2;
+  (* anyseq *) wire [2:0] funct3;
+  (* anyseq *) wire [7:0] fwd1, fwd2;
   wire [31:0] final_result, store_data, branch_target, jalr_target, redirect_pc, sig_cause, sig_pc;
   wire [3:0] store_mask;
   wire branch_taken, jalr_taken, trap_take, trap_sig, mret_take, fencei_take, fencei_inval, fencei_busy, dc_flush;
@@ -33,8 +36,8 @@ module props (input clk);
     .i_pc(pc), .i_pc4(pc4), .i_rs1_idx(rs1_idx), .i_rd_idx(rd_idx), .i_rs1_val(rs1_val), .i_rs2_val(rs2_val),
     .i_imm(imm), .i_sel_pc4_alu(sel_pc4_alu), .i_sel_rs2_imm(sel_rs2_imm), .i_sel_pc_rs1(sel_pc_rs1),
     .i_alu_op(alu_op), .i_alu_sel(alu_sel), .i_is_muldiv(is_muldiv), .i_is_csr(is_csr), .i_illegal(illegal),
-    .i_opcode(opcode), .i_funct3(funct3), .i_fwd_match_rs1(fwd1), .i_fwd_match_rs2(fwd2),
-    .i_exmem_ok(exmem_ok), .i_memwb_ok(memwb_ok), .i_wb2_ok(wb2_ok), .i_exmem_alu_out(exmem_alu_out),
+    .i_opcode(opcode), .i_funct3(funct3), .i_fwd_rs1(fwd1), .i_fwd_rs2(fwd2),
+    .i_exmem_alu_out(exmem_alu_out),
     .i_memwb_alu_out(memwb_alu_out), .i_wb2_data(wb2_data), .i_dc_done(dc_done), .i_valid_raw(valid_raw),
     .i_mem_trap_take(1'b0), .i_mem_trap_cause(32'h0), .i_mem_trap_pc(32'h0), .i_mem_trap_tval(32'h0),
     .o_final_result(final_result), .o_store_data(store_data), .o_store_byte_mask(store_mask),
@@ -58,6 +61,11 @@ module props (input clk);
   reg p_plain = 0, p_csrw = 0, p_ecall = 0;
   reg [31:0] p_pc = 0, p_redirect = 0, p_final = 0;
   reg [11:0] p_addr = 0;
+  // What cycle t was, seen from cycle t + 2.
+  reg pp_reset = 1, pp_take = 0, pp_irq_sw = 0, pp_irq_tm = 0, pp_irq_ex = 0;
+  reg pp_plain = 0, pp_csrw = 0, pp_ecall = 0;
+  reg [31:0] pp_pc = 0, pp_redirect = 0, pp_final = 0;
+  reg [11:0] pp_addr = 0;
 
   wire csr_op = is_csr && opcode == SYSTEM && funct3 != 3'b000 && funct3 != 3'b100;
   wire csr_target = imm[11:0] == 12'h340 || imm[11:0] == 12'h304 || imm[11:0] == 12'h305;
@@ -71,6 +79,9 @@ module props (input clk);
 
   always @(posedge clk) begin
     f_past <= 1;
+    pp_reset <= p_reset; pp_take <= p_take; pp_ecall <= p_ecall; pp_plain <= p_plain; pp_csrw <= p_csrw;
+    pp_irq_sw <= p_irq_sw; pp_irq_tm <= p_irq_tm; pp_irq_ex <= p_irq_ex;
+    pp_pc <= p_pc; pp_redirect <= p_redirect; pp_final <= p_final; pp_addr <= p_addr;
     p_reset <= reset;
     p_ecall <= ecall_now;
     p_take <= trap_take;
@@ -81,10 +92,12 @@ module props (input clk);
   end
 
   // The registers clear while reset is high, so a trap seen in a reset cycle changes nothing.
-  wire live = f_past && !p_reset;
-  wire after_plain = live && p_take && p_plain;
-  wire after_csrw = live && p_take && p_csrw;
-  wire after_ecall = live && p_take && p_ecall;
+  wire live = f_past && !p_reset && !pp_reset;
+  wire after_plain = live && pp_take && pp_plain;
+  wire after_csrw = live && pp_take && pp_csrw;
+  wire after_ecall = live && pp_take && pp_ecall;
+  // Cycle t + 1, the one after a trap, holds a bubble.
+  always @(*) if (p_take) assume (!valid && !valid_raw);
 
   // Cycle t + 1 reads a CSR: the one the aborted access addressed, or one of the four the properties ask about.
   wire read_form = valid && pipe_run && base_run && is_csr && opcode == SYSTEM && funct3 == 3'b010 &&
@@ -92,31 +105,31 @@ module props (input clk);
   wire read_asked = imm[11:0] == 12'h341 || imm[11:0] == 12'h342 || imm[11:0] == 12'h300 || imm[11:0] == 12'h305;
   always @(*) begin
     if (after_plain) assume (read_form && read_asked);
-    if (after_csrw) assume (read_form && imm[11:0] == p_addr);
+    if (after_csrw) assume (read_form && imm[11:0] == pp_addr);
     if (after_ecall) assume (read_form && (imm[11:0] == 12'h305 || imm[11:0] == 12'h342));
   end
 
   wire [3:0] code = final_result[3:0];
 
   always @(*) if (f_past && !reset) begin
-    if (after_plain && imm[11:0] == 12'h341) assert (final_result == {p_pc[31:2], 2'b00});
+    if (after_plain && imm[11:0] == 12'h341) assert (final_result == {pp_pc[31:2], 2'b00});
     if (after_plain && imm[11:0] == 12'h342) begin
       assert (final_result[31] && final_result[30:4] == 27'h0);
       assert (code == 4'd3 || code == 4'd7 || code == 4'd11);
-      if (code == 4'd3) assert (p_irq_sw);
-      if (code == 4'd7) assert (p_irq_tm);
-      if (code == 4'd11) assert (p_irq_ex);
+      if (code == 4'd3) assert (pp_irq_sw);
+      if (code == 4'd7) assert (pp_irq_tm);
+      if (code == 4'd11) assert (pp_irq_ex);
     end
     if (after_plain && imm[11:0] == 12'h300) assert (!final_result[3] && final_result[7]);
     if (after_plain && imm[11:0] == 12'h305) begin
-      if (!final_result[0]) assert (p_redirect == {final_result[31:2], 2'b00});
+      if (!final_result[0]) assert (pp_redirect == {final_result[31:2], 2'b00});
       if (final_result[0]) begin
-        assert (p_redirect[31:6] == final_result[31:6] && p_redirect[1:0] == 2'b00);
-        assert (p_redirect[5:2] == 4'd3 || p_redirect[5:2] == 4'd7 || p_redirect[5:2] == 4'd11);
+        assert (pp_redirect[31:6] == final_result[31:6] && pp_redirect[1:0] == 2'b00);
+        assert (pp_redirect[5:2] == 4'd3 || pp_redirect[5:2] == 4'd7 || pp_redirect[5:2] == 4'd11);
       end
     end
-    if (after_csrw) assert (final_result == p_final);
-    if (after_ecall && imm[11:0] == 12'h305) assert (p_redirect == {final_result[31:2], 2'b00});
+    if (after_csrw) assert (final_result == pp_final);
+    if (after_ecall && imm[11:0] == 12'h305) assert (pp_redirect == {final_result[31:2], 2'b00});
     if (after_ecall && imm[11:0] == 12'h342) assert (final_result == 32'd11);
   end
 
@@ -125,9 +138,9 @@ module props (input clk);
     cover (after_plain && imm[11:0] == 12'h341);
     cover (after_plain && imm[11:0] == 12'h342 && code == 4'd11);
     cover (after_plain && imm[11:0] == 12'h305 && final_result[0]);
-    cover (after_csrw && p_addr == 12'h304);
-    cover (after_csrw && p_addr == 12'h305);
-    cover (after_csrw && p_addr == 12'h340);
+    cover (after_csrw && pp_addr == 12'h304);
+    cover (after_csrw && pp_addr == 12'h305);
+    cover (after_csrw && pp_addr == 12'h340);
     cover (after_ecall && imm[11:0] == 12'h305 && final_result[0]);
     cover (after_ecall && imm[11:0] == 12'h342);
   end
