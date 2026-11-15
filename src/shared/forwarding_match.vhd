@@ -12,8 +12,11 @@
 -- FWD_MATCH_EXMEM para a instrução hoje em ID/EX, FWD_MATCH_MEMWB para a de
 -- hoje em EX/MEM e FWD_MATCH_WB2 para a de hoje em MEM/WB.
 --
--- Um destino x0 nunca casa. A validade das três instruções é conferida no EX,
--- porque uma delas pode ser descartada entre os dois ciclos.
+-- Um destino x0 nunca casa. As habilitações de escrita que o estágio ID entrega
+-- já são as da instrução depois da borda de clock: escrevem em registrador, são
+-- válidas e não são descartadas nessa borda (flush de EX/MEM e de MEM/WB). O
+-- casamento sai assim já condicionado à validade, e a seleção do adiantamento
+-- (forwarding_unit) pode ser registrada em ID/EX sem nova conferência em EX.
 -- =============================================================================
 
 library ieee;
@@ -30,15 +33,15 @@ entity forwarding_match is
         i_rs2       : in    reg_t;
         -- Registrador destino rd da instrução em ID/EX.
         i_ex_rd     : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução em ID/EX.
+        -- A instrução em ID/EX escreverá em registrador e continuará válida em EX/MEM.
         i_ex_we     : in    std_logic;
         -- Registrador destino rd da instrução em EX/MEM.
         i_mem_rd    : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução em EX/MEM.
+        -- A instrução em EX/MEM escreverá em registrador e continuará válida em MEM/WB.
         i_mem_we    : in    std_logic;
         -- Registrador destino rd da instrução em MEM/WB.
         i_wb_rd     : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução em MEM/WB.
+        -- A instrução em MEM/WB escreverá em registrador e continuará válida em WB2.
         i_wb_we     : in    std_logic;
         -- Casamentos de rs1 com as três instruções à frente, nas posições de fwd_match_t.
         o_match_rs1 : out   fwd_match_t;

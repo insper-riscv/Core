@@ -52,11 +52,8 @@ IDLE = {
     "illegal": 0,
     "opcode": OP_OP,
     "funct3": 0,
-    "fwd_match_rs1": 0,
-    "fwd_match_rs2": 0,
-    "exmem_ok": 0,
-    "memwb_ok": 0,
-    "wb2_ok": 0,
+    "fwd_rs1": 0,
+    "fwd_rs2": 0,
     "exmem_alu_out": 0,
     "memwb_alu_out": 0,
     "wb2_data": 0,
@@ -120,16 +117,23 @@ def branch_model(op, a, b):
     )
 
 
-def forward_model(match, oks, sources):
-    """Fonte mais nova que casa e é válida (EX/MEM, MEM/WB, WB2).
+COPIES = 4
+SLICE = 32 // COPIES
 
-    As fontes vêm como (rs, memwb, exmem, wb2) e a primeira é o valor
-    do banco de registradores.
+
+def forward_model(sel_bus, sources):
+    """Fonte que cada cópia do seletor escolhe para a sua fatia.
+
+    As fontes vêm como (rs, memwb, exmem, wb2), indexadas pelo código do
+    seletor, e a primeira é o valor do banco de registradores. A cópia i
+    do seletor ocupa os bits (2i + 1 downto 2i) e comanda a fatia i.
     """
-    for bit, source in ((0, 2), (1, 1), (2, 3)):
-        if (match >> bit) & 1 and oks[bit]:
-            return sources[source]
-    return sources[0]
+    mask = (1 << SLICE) - 1
+    value = 0
+    for copy in range(COPIES):
+        code = (sel_bus >> (2 * copy)) & 0b11
+        value |= ((sources[code] >> (SLICE * copy)) & mask) << (SLICE * copy)
+    return value
 
 
 async def run(dut, values):
@@ -156,10 +160,8 @@ def random_operands(prng):
             "wb2_data",
         )
     }
-    for name in ("fwd_match_rs1", "fwd_match_rs2"):
-        values[name] = prng.getrandbits(3)
-    for name in ("exmem_ok", "memwb_ok", "wb2_ok"):
-        values[name] = prng.getrandbits(1)
+    for name in ("fwd_rs1", "fwd_rs2"):
+        values[name] = prng.getrandbits(2 * COPIES)
     for name in ("sel_pc_rs1", "sel_rs2_imm"):
         values[name] = prng.getrandbits(1)
     values["alu_op"] = prng.choice(list(ALU.values()))
@@ -169,15 +171,10 @@ def random_operands(prng):
 
 def operand_model(values):
     """Devolve os operandos A e B da ULA depois de forwarding e mux."""
-    oks = (values["exmem_ok"], values["memwb_ok"], values["wb2_ok"])
     sources = (values["memwb_alu_out"], values["exmem_alu_out"])
     sources += (values["wb2_data"],)
-    fwd_a = forward_model(
-        values["fwd_match_rs1"], oks, (values["rs1_val"], *sources)
-    )
-    fwd_b = forward_model(
-        values["fwd_match_rs2"], oks, (values["rs2_val"], *sources)
-    )
+    fwd_a = forward_model(values["fwd_rs1"], (values["rs1_val"], *sources))
+    fwd_b = forward_model(values["fwd_rs2"], (values["rs2_val"], *sources))
     op_a = fwd_a if values["sel_pc_rs1"] else values["pc"]
     op_b = values["imm"] if values["sel_rs2_imm"] else fwd_b
     return op_a, op_b
@@ -247,7 +244,7 @@ async def test_store_data_uses_forwarded_rs2(dut):
         (0x44000000, 0b1000),
         "SB no byte 3",
     )
-    forwarded = {"fwd_match_rs2": 0b001, "exmem_ok": 1}
+    forwarded = {"fwd_rs2": 0b10101010}
     forwarded |= {"exmem_alu_out": 0xAABBCCDD, "funct3": 0b010}
     seen = await run(dut, base | forwarded)
     check_equal(seen["store_data"], 0xAABBCCDD, "SW com forwarding")

@@ -16,7 +16,7 @@
 | Registrador | Limpos por `i_flush` e `i_rst` | Só com habilitação |
 | :--- | :--- | :--- |
 | `reg_if_id` | validade, campo `opcode` da instrução | `pc`, `pc4`, bits `[31:7]` da instrução |
-| `reg_id_ex` | validade, índices `rs1` e `rd`, seletores, código e seleção da ULA, casamentos de adiantamento, `we_reg`, `we_ram`, `re_ram`, `en_ram`, `is_csr`, `is_muldiv`, `illegal`, `opcode`, `funct3` | `pc`, `pc4`, `rs1_val`, `rs2_val`, `imm` |
+| `reg_id_ex` | validade, índices `rs1` e `rd`, seletores, código e seleção da ULA, `we_reg`, `we_ram`, `re_ram`, `en_ram`, `is_csr`, `is_muldiv`, `illegal`, `opcode`, `funct3` | `pc`, `pc4`, `rs1_val`, `rs2_val`, `imm`, seletores de adiantamento |
 | `reg_ex_mem` | validade, `rd`, `we_reg`, `we_ok`, habilitadores de memória, modo de extensão, seletor de write-back, classificação do endereço | `pc`, `funct3`, `alu_out`, `store_data`, `byte_mask` |
 | `reg_mem_wb` | validade, `rd`, `we_reg`, `we_ok`, modo de extensão, seletor de write-back, classificação do endereço | `alu_out` |
 
