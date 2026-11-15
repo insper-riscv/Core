@@ -534,9 +534,9 @@ begin
 
     -- Validade das três instruções à frente depois da borda em que a instrução de ID entra em EX: o adiantamento
     -- é decidido já com ela e registrado em ID/EX. A exceção de EX ou de MEM (trap_take, mem_trap_take) que
-    -- descarta uma delas também limpa o ID/EX (flush_id_ex zera o seletor registrado), então esses termos tardios
-    -- ficam fora da entrada do seletor; só o sinal de exceção sem efeito (trap_sig, sem Zicsr), que não limpa o
-    -- ID/EX, entra aqui. WB2 só copia o write-back de WB.
+    -- descarta uma delas também descarta a instrução de ID (flush_id_ex), que vira bolha e não usa o seletor,
+    -- então esses termos tardios ficam fora da entrada do seletor; só o sinal de exceção sem efeito (trap_sig, sem
+    -- Zicsr), que não descarta a de ID, entra aqui. WB2 só copia o write-back de WB.
     fwd_ex_ok  <= ex_we_reg and ex_valid and (not trap_sig);
     fwd_mem_ok <= exmem_we_reg and exmem_valid;
 
