@@ -16,12 +16,13 @@
 // instruction is constrained. The properties depend only on the state at t, so they are proven by induction.
 module props (input clk);
   (* anyseq *) wire reset, base_run, pipe_run, valid, valid_raw, retire, sel_pc4_alu, sel_rs2_imm, sel_pc_rs1;
-  (* anyseq *) wire is_muldiv, is_csr, illegal, irq_sw, irq_tm, irq_ex, dc_done, exmem_ok, memwb_ok, wb2_ok;
+  (* anyseq *) wire is_muldiv, is_csr, illegal, irq_sw, irq_tm, irq_ex, dc_done;
   (* anyseq *) wire [31:0] pc, pc4, rs1_val, rs2_val, imm, exmem_alu_out, memwb_alu_out, wb2_data;
   (* anyseq *) wire [4:0] rs1_idx, rd_idx, alu_op;
   (* anyseq *) wire [7:0] alu_sel;
   (* anyseq *) wire [6:0] opcode;
-  (* anyseq *) wire [2:0] funct3, fwd1, fwd2;
+  (* anyseq *) wire [2:0] funct3;
+  (* anyseq *) wire [7:0] fwd1, fwd2;
   wire [31:0] final_result, store_data, branch_target, jalr_target, redirect_pc, sig_cause, sig_pc;
   wire [3:0] store_mask;
   wire branch_taken, jalr_taken, trap_take, trap_sig, mret_take, fencei_take, fencei_inval, fencei_busy, dc_flush;
@@ -33,8 +34,8 @@ module props (input clk);
     .i_pc(pc), .i_pc4(pc4), .i_rs1_idx(rs1_idx), .i_rd_idx(rd_idx), .i_rs1_val(rs1_val), .i_rs2_val(rs2_val),
     .i_imm(imm), .i_sel_pc4_alu(sel_pc4_alu), .i_sel_rs2_imm(sel_rs2_imm), .i_sel_pc_rs1(sel_pc_rs1),
     .i_alu_op(alu_op), .i_alu_sel(alu_sel), .i_is_muldiv(is_muldiv), .i_is_csr(is_csr), .i_illegal(illegal),
-    .i_opcode(opcode), .i_funct3(funct3), .i_fwd_match_rs1(fwd1), .i_fwd_match_rs2(fwd2),
-    .i_exmem_ok(exmem_ok), .i_memwb_ok(memwb_ok), .i_wb2_ok(wb2_ok), .i_exmem_alu_out(exmem_alu_out),
+    .i_opcode(opcode), .i_funct3(funct3), .i_fwd_rs1(fwd1), .i_fwd_rs2(fwd2),
+    .i_exmem_alu_out(exmem_alu_out),
     .i_memwb_alu_out(memwb_alu_out), .i_wb2_data(wb2_data), .i_dc_done(dc_done), .i_valid_raw(valid_raw),
     .i_mem_trap_take(1'b0), .i_mem_trap_cause(32'h0), .i_mem_trap_pc(32'h0), .i_mem_trap_tval(32'h0),
     .o_final_result(final_result), .o_store_data(store_data), .o_store_byte_mask(store_mask),

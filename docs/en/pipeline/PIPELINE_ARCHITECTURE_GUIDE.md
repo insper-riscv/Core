@@ -65,7 +65,7 @@ The ID stage comprises seven sub-blocks:
 
 5. **Register file (`reg_file`):** 32 32-bit registers (`x0` hardwired to zero and `x1`..`x31` instantiated with `generic_register`), write decoding via `onehot_decoder`, dual combinational read via `mux_tree`, and write-through bypass via `mux_2x1` when `i_enable = '1'` and the read address matches `i_rd /= x0`.
 6. **Hazard detection (`hazard_detection_unit`) and bubble insertion (`bubble_mux`):** freezes PC and IF/ID (`o_pc_we = '0'`, `o_ifid_we = '0'`) and zeroes `o_we_reg`, `o_we_ram`, `o_re_ram`, and `o_en_ram` (`o_bubble_sel = '1'`) during load-use hazards or multi-cycle stalls (`i_pipe_stall = '1'`).
-7. **Forwarding comparison (`forwarding_match`):** compares `rs1` and `rs2` of the instruction in ID with the destination `rd` of the three instructions ahead of it (ID/EX, EX/MEM, and MEM/WB), which will be in EX/MEM, MEM/WB, and WB2 in the next cycle. A destination of `x0`, or one without register write enabled, never matches. The three match bits of each operand are registered in ID/EX (`fwd_match_t`, positions `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB`, and `FWD_MATCH_WB2` of `src/shared/fwd_consts.vhd`).
+7. **Forwarding comparison (`forwarding_match`):** compares `rs1` and `rs2` of the instruction in ID with the destination `rd` of the three instructions ahead of it (ID/EX, EX/MEM, and MEM/WB), which will be in EX/MEM, MEM/WB, and WB2 in the next cycle. A destination of `x0`, or one without a valid register write, never matches, and the validity of each instruction ahead already accounts for the discard it suffers on the same clock edge. The three match bits of each operand (`fwd_match_t`, positions `FWD_MATCH_EXMEM`, `FWD_MATCH_MEMWB`, and `FWD_MATCH_WB2` of `src/shared/fwd_consts.vhd`) go through `forwarding_unit`, which picks the newest source that matches, and the resulting 2-bit selector is registered in ID/EX in `FWD_COPIES` copies per operand.
 
 ### 2.3. Stage 3: Execute (`stage_ex`)
 
@@ -75,7 +75,7 @@ The ID stage comprises seven sub-blocks:
 
 In the EX stage:
 
-1. **Forwarding (`forwarding_unit`):** selects each operand (`ex_fwd_rs1_val` and `ex_fwd_rs2_val`) via `mux_4x1` from the ID/EX value (`"00"`), the EX result registered in MEM/WB (`"01"`), the EX/MEM result (`"10"`), or the final WB datum registered in WB2 (`"11"`). The choice does not compare register indices, because it depends only on the match bits registered in ID/EX and on the valid-and-writes bits registered in EX/MEM, MEM/WB, and WB2, and the newest source that matches and is still valid wins.
+1. **Forwarding:** selects each operand (`ex_fwd_rs1_val` and `ex_fwd_rs2_val`) via `mux_4x1` from the ID/EX value (`"00"`), the EX result registered in MEM/WB (`"01"`), the EX/MEM result (`"10"`), or the final WB datum registered in WB2 (`"11"`). The choice arrives already resolved from the ID stage and registered in ID/EX, and each of the `FWD_COPIES` copies of the selector drives one slice of the multiplexer, so EX compares neither indices nor valid bits.
 2. **ALU input selection:** two `mux_2x1` multiplexers select operand A (`i_pc` when `i_sel_pc_rs1 = '0'`, or `ex_fwd_rs1_val` when `'1'`) and operand B (`ex_fwd_rs2_val` when `i_sel_rs2_imm = '0'`, or `i_imm` when `'1'`).
 3. **ALU (`alu`):** executes the operation defined in `src/shared/alu_consts.vhd`:
 

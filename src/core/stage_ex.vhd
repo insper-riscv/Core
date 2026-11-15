@@ -92,16 +92,10 @@ entity stage_ex is
         i_opcode          : in    opcode_t;
         -- Campo funct3 da instrução no estágio EX.
         i_funct3          : in    funct3_t;
-        -- Casamentos de rs1 com EX/MEM, MEM/WB e WB2, calculados no estágio ID e registrados em ID/EX.
-        i_fwd_match_rs1   : in    fwd_match_t;
-        -- Casamentos de rs2 com EX/MEM, MEM/WB e WB2, calculados no estágio ID e registrados em ID/EX.
-        i_fwd_match_rs2   : in    fwd_match_t;
-        -- A instrução em EX/MEM é válida e escreve em registrador.
-        i_exmem_ok        : in    std_logic;
-        -- A instrução em MEM/WB é válida e escreve em registrador.
-        i_memwb_ok        : in    std_logic;
-        -- A instrução em WB2 escreve em registrador.
-        i_wb2_ok          : in    std_logic;
+        -- Cópias do seletor do adiantamento de rs1, resolvido no estágio ID e registrado em ID/EX.
+        i_fwd_rs1         : in    fwd_sel_bus_t;
+        -- Cópias do seletor do adiantamento de rs2, resolvido no estágio ID e registrado em ID/EX.
+        i_fwd_rs2         : in    fwd_sel_bus_t;
         -- Valor calculado no estágio EX/MEM para adiantamento (forwarding).
         i_exmem_alu_out   : in    word_t;
         -- Resultado do estágio EX da instrução em MEM/WB (registrado), para adiantamento. Um load nunca é adiantado
@@ -169,10 +163,6 @@ end entity stage_ex;
 
 architecture rtl of stage_ex is
 
-    -- Seletor de forwarding de 2 bits para o operando rs1.
-    signal ex_forward_a       : std_logic_vector(1 downto 0);
-    -- Seletor de forwarding de 2 bits para o operando rs2.
-    signal ex_forward_b       : std_logic_vector(1 downto 0);
     -- Valor do operando rs1 após seleção de forwarding.
     signal ex_fwd_rs1_val     : word_t;
     -- Valor do operando rs2 após seleção de forwarding.
@@ -279,44 +269,44 @@ architecture rtl of stage_ex is
 begin
 
     -- =========================================================================
-    -- Unidade de Forwarding e Muxes de Operandos
+    -- Muxes de Operandos com Adiantamento
     -- =========================================================================
-    u_forwarding_unit : entity work.forwarding_unit
-        port map (
-            i_match_rs1 => i_fwd_match_rs1,
-            i_match_rs2 => i_fwd_match_rs2,
-            i_exmem_ok  => i_exmem_ok,
-            i_memwb_ok  => i_memwb_ok,
-            i_wb2_ok    => i_wb2_ok,
-            o_fwd_rs1   => ex_forward_a,
-            o_fwd_rs2   => ex_forward_b
-        );
+    -- Cada cópia do seletor registrado comanda uma fatia dos multiplexadores de operando.
 
-    u_mux_fwd_rs1 : entity work.mux_4x1
-        generic map (
-            data_width => word_t'length
-        )
-        port map (
-            i_d0  => i_rs1_val,
-            i_d1  => i_memwb_alu_out,
-            i_d2  => i_exmem_alu_out,
-            i_d3  => i_wb2_data,
-            i_sel => ex_forward_a,
-            o_d   => ex_fwd_rs1_val
-        );
+    gen_fwd_slices : for i in 0 to FWD_COPIES - 1 generate
+        -- Primeiro bit da fatia do operando.
+        constant SLICE_LO : natural := (i * word_t'length) / FWD_COPIES;
+        -- Último bit da fatia do operando.
+        constant SLICE_HI : natural := (((i + 1) * word_t'length) / FWD_COPIES) - 1;
+    begin
 
-    u_mux_fwd_rs2 : entity work.mux_4x1
-        generic map (
-            data_width => word_t'length
-        )
-        port map (
-            i_d0  => i_rs2_val,
-            i_d1  => i_memwb_alu_out,
-            i_d2  => i_exmem_alu_out,
-            i_d3  => i_wb2_data,
-            i_sel => ex_forward_b,
-            o_d   => ex_fwd_rs2_val
-        );
+        u_mux_fwd_rs1 : entity work.mux_4x1
+            generic map (
+                data_width => SLICE_HI - SLICE_LO + 1
+            )
+            port map (
+                i_d0  => i_rs1_val(SLICE_HI downto SLICE_LO),
+                i_d1  => i_memwb_alu_out(SLICE_HI downto SLICE_LO),
+                i_d2  => i_exmem_alu_out(SLICE_HI downto SLICE_LO),
+                i_d3  => i_wb2_data(SLICE_HI downto SLICE_LO),
+                i_sel => i_fwd_rs1((2 * i) + 1 downto 2 * i),
+                o_d   => ex_fwd_rs1_val(SLICE_HI downto SLICE_LO)
+            );
+
+        u_mux_fwd_rs2 : entity work.mux_4x1
+            generic map (
+                data_width => SLICE_HI - SLICE_LO + 1
+            )
+            port map (
+                i_d0  => i_rs2_val(SLICE_HI downto SLICE_LO),
+                i_d1  => i_memwb_alu_out(SLICE_HI downto SLICE_LO),
+                i_d2  => i_exmem_alu_out(SLICE_HI downto SLICE_LO),
+                i_d3  => i_wb2_data(SLICE_HI downto SLICE_LO),
+                i_sel => i_fwd_rs2((2 * i) + 1 downto 2 * i),
+                o_d   => ex_fwd_rs2_val(SLICE_HI downto SLICE_LO)
+            );
+
+    end generate gen_fwd_slices;
 
     u_mux_alu_a : entity work.mux_2x1
         generic map (

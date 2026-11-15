@@ -8,7 +8,9 @@
 --   2. Extensor de imediatos de 32 bits (extender_imm).
 --   3. Banco de 32 (RV32I) ou 16 (RV32E) registradores de uso geral (reg_file), recebendo a escrita
 --      vinda do estágio WB.
---   4. Unidade de detecção de hazards de load-use e stall de unidades
+--   4. Comparação e seleção do adiantamento (forwarding_match e forwarding_unit), cujo
+--      resultado o ID/EX registra para o estágio EX.
+--   5. Unidade de detecção de hazards de load-use e stall de unidades
 --      multiciclo (hazard_detection_unit) e mux de inserção de bolha (bubble_mux).
 -- =============================================================================
 
@@ -40,17 +42,17 @@ entity stage_id is
         i_wb_data       : in    word_t;
         -- Endereço do registrador destino rd da instrução no estágio MEM (para detecção load-use).
         i_mem_rd        : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução no estágio MEM (para o adiantamento).
+        -- A instrução no estágio MEM escreverá em registrador e continuará válida em MEM/WB (para o adiantamento).
         i_mem_we_reg    : in    std_logic;
         -- Registrador destino rd da instrução no estágio WB (para o adiantamento).
         i_memwb_rd      : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução no estágio WB (para o adiantamento).
+        -- A instrução no estágio WB escreverá em registrador e continuará válida em WB2 (para o adiantamento).
         i_memwb_we_reg  : in    std_logic;
         -- Indica se a instrução no estágio MEM é uma leitura de memória (load).
         i_mem_re_ram    : in    std_logic;
         -- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
         i_ex_rd         : in    reg_t;
-        -- Habilitação de escrita em registrador da instrução no estágio EX (para o adiantamento).
+        -- A instrução no estágio EX escreverá em registrador e continuará válida em EX/MEM (para o adiantamento).
         i_ex_we_reg     : in    std_logic;
         -- Indica se a instrução no estágio EX é uma leitura de memória (load).
         i_ex_re_ram     : in    std_logic;
@@ -90,10 +92,10 @@ entity stage_id is
         o_alu_op        : out   alu_op_t;
         -- Seleção one-hot do resultado de dados da ULA, decodificada do código de operação.
         o_alu_sel       : out   alu_sel_t;
-        -- Casamentos de rs1 com as instruções à frente, para a seleção do adiantamento no estágio EX.
-        o_fwd_match_rs1 : out   fwd_match_t;
-        -- Casamentos de rs2 com as instruções à frente, para a seleção do adiantamento no estágio EX.
-        o_fwd_match_rs2 : out   fwd_match_t;
+        -- Seletor do adiantamento de rs1 no estágio EX, já resolvido pela prioridade entre as instruções à frente.
+        o_fwd_rs1       : out   fwd_sel_t;
+        -- Seletor do adiantamento de rs2 no estágio EX, já resolvido pela prioridade entre as instruções à frente.
+        o_fwd_rs2       : out   fwd_sel_t;
         -- Indica que a instrução pertence à extensão M (multiplicação/divisão).
         o_is_muldiv     : out   std_logic;
         -- Indica que a instrução pertence à extensão Zicsr (acesso a registrador CSR).
@@ -174,6 +176,10 @@ architecture rtl of stage_id is
     signal   cu_we_ram       : std_logic;
     -- Habilitação de leitura na RAM antes do bubble_mux.
     signal   cu_re_ram       : std_logic;
+    -- Casamentos de rs1 com as instruções à frente.
+    signal   id_match_rs1    : fwd_match_t;
+    -- Casamentos de rs2 com as instruções à frente.
+    signal   id_match_rs2    : fwd_match_t;
     -- Índice do registrador rs1 no banco de registradores: os reg_t'length bits baixos do campo da instrução.
     signal   rf_rs1_idx      : reg_t;
     -- Índice do registrador rs2 no banco de registradores.
@@ -364,8 +370,16 @@ begin
             i_mem_we    => i_mem_we_reg,
             i_wb_rd     => i_memwb_rd,
             i_wb_we     => i_memwb_we_reg,
-            o_match_rs1 => o_fwd_match_rs1,
-            o_match_rs2 => o_fwd_match_rs2
+            o_match_rs1 => id_match_rs1,
+            o_match_rs2 => id_match_rs2
+        );
+
+    u_forwarding_unit : entity work.forwarding_unit
+        port map (
+            i_match_rs1 => id_match_rs1,
+            i_match_rs2 => id_match_rs2,
+            o_fwd_rs1   => o_fwd_rs1,
+            o_fwd_rs2   => o_fwd_rs2
         );
 
     id_alu_op <= zimop_alu_op when id_is_zimop = '1' else cu_alu_op;

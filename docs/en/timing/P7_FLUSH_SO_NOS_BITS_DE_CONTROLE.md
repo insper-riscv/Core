@@ -16,7 +16,7 @@
 | Register | Cleared by `i_flush` and `i_rst` | Enable only |
 | :--- | :--- | :--- |
 | `reg_if_id` | valid bit, `opcode` field of the instruction | `pc`, `pc4`, bits `[31:7]` of the instruction |
-| `reg_id_ex` | valid bit, `rs1` and `rd` indices, selectors, ALU code and selection, forwarding matches, `we_reg`, `we_ram`, `re_ram`, `en_ram`, `is_csr`, `is_muldiv`, `illegal`, `opcode`, `funct3` | `pc`, `pc4`, `rs1_val`, `rs2_val`, `imm` |
+| `reg_id_ex` | valid bit, `rs1` and `rd` indices, selectors, ALU code and selection, forwarding selectors, `we_reg`, `we_ram`, `re_ram`, `en_ram`, `is_csr`, `is_muldiv`, `illegal`, `opcode`, `funct3` | `pc`, `pc4`, `rs1_val`, `rs2_val`, `imm` |
 | `reg_ex_mem` | valid bit, `rd`, `we_reg`, `we_ok`, memory enables, extension mode, write-back selector, address classification | `pc`, `funct3`, `alu_out`, `store_data`, `byte_mask` |
 | `reg_mem_wb` | valid bit, `rd`, `we_reg`, `we_ok`, extension mode, write-back selector, address classification | `alu_out` |
 

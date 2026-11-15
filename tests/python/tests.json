@@ -3536,6 +3536,7 @@
             "src/shared/control_unit.vhd",
             "src/shared/bubble_mux.vhd",
             "src/shared/forwarding_match.vhd",
+            "src/shared/forwarding_unit.vhd",
             "src/shared/hazard_detection_unit.vhd",
             "src/M/m_decode.vhd",
             "src/Zicond/zicond_decode.vhd",
