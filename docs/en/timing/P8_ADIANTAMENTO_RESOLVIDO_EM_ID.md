@@ -21,7 +21,7 @@ The instruction in ID enters EX on the next edge, and the three ahead of it move
 | EX/MEM (moves to MEM/WB) | $\text{we\_reg} \wedge \text{valid}$ |
 | MEM/WB (moves to WB2) | `wb_we` |
 
-The discard of an instruction ahead by `trap_take` or by a MEM exception is not in the conditions, because the same event clears `ID/EX` (`flush_id_ex`) and the registered selector goes back to "00". Only `trap_sig`, the no-effect exception signal of the core without Zicsr, discards the EX instruction without clearing `ID/EX`. The late signals of the EX loop therefore do not reach the selector input, and the registered selector equals the one EX computed from the already registered valid bits.
+The discard of an instruction ahead by `trap_take` or by a MEM exception is not in the conditions, because the same event discards the instruction in ID (`flush_id_ex`), which becomes a bubble and does not use the selector. Only `trap_sig`, the no-effect exception signal of the core without Zicsr, discards the EX instruction without discarding the one in ID. The late signals of the EX loop therefore do not reach the selector input, and the registered selector equals the one EX computed from the already registered valid bits.
 
 ## 3. Verification
 

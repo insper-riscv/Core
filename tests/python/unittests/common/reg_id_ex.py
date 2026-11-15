@@ -38,6 +38,7 @@ FIELDS = {
 
 # Campos de dados, que flush e reset não limpam.
 KEEP = dict.fromkeys(("pc", "pc4", "rs1_val", "rs2_val", "imm"), 0xFFFFFFFF)
+KEEP |= {"fwd_rs1": 0xFF, "fwd_rs2": 0xFF}
 
 # Cópias do seletor de adiantamento (FWD_COPIES de fwd_consts).
 COPIES = 4

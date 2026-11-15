@@ -9,16 +9,17 @@
 -- Prioridade dos controles síncronos:
 --   1. i_rst = '1' ou i_flush = '1' -> zera os sinais de controle e marca o pacote
 --                                      como bolha (o_valid = '0'); os campos de
---                                      dados (PC, PC + 4, operandos e imediato)
---                                      não são limpos.
+--                                      dados (PC, PC + 4, operandos, imediato e
+--                                      seletores de adiantamento) não são
+--                                      limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
 --
 -- Só os bits de controle têm limpeza síncrona, de modo que o flush de desvio e de
 -- trap, que nasce no laço do estágio EX, alimenta cerca de 40 registradores em
--- vez de 200. Os campos de dados só têm habilitação: o valor de uma bolha nunca
--- produz efeito, porque o_valid e os habilitadores de escrita (zerados) travam
--- todo uso dele.
+-- vez de 200. Os campos de dados, entre eles as cópias do seletor de adiantamento,
+-- só têm habilitação: o valor de uma bolha nunca produz efeito, porque o_valid e
+-- os habilitadores de escrita (zerados) travam todo uso dele.
 -- =============================================================================
 
 library ieee;
@@ -228,8 +229,6 @@ begin
                 r_sel_pc_rs1    <= '0';
                 r_alu_op        <= (others => '0');
                 r_alu_sel       <= (others => '0');
-                r_fwd_rs1       <= (others => '0');
-                r_fwd_rs2       <= (others => '0');
                 r_is_muldiv     <= '0';
                 r_is_csr        <= '0';
                 r_illegal       <= '0';
@@ -250,8 +249,6 @@ begin
                 r_sel_pc_rs1    <= i_sel_pc_rs1;
                 r_alu_op        <= i_alu_op;
                 r_alu_sel       <= i_alu_sel;
-                r_fwd_rs1       <= replicate(i_fwd_rs1, fwd_copies);
-                r_fwd_rs2       <= replicate(i_fwd_rs2, fwd_copies);
                 r_is_muldiv     <= i_is_muldiv;
                 r_is_csr        <= i_is_csr;
                 r_illegal       <= i_illegal;
@@ -275,6 +272,8 @@ begin
                 r_rs1_val <= i_rs1_val;
                 r_rs2_val <= i_rs2_val;
                 r_imm     <= i_imm;
+                r_fwd_rs1 <= replicate(i_fwd_rs1, fwd_copies);
+                r_fwd_rs2 <= replicate(i_fwd_rs2, fwd_copies);
             end if;
         end if;
 

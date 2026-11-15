@@ -79,6 +79,8 @@ class StageRegister:
         os campos de dados não são conferidos (o simulador pode trazer
         o conteúdo de um teste anterior).
         """
+        if kept is not None:
+            kept = {**kept, **self.derived(kept)}
         names = set(self.fields) | set(self.derived(self.zeros()))
         for name in names:
             mask = self.keep.get(name, 0)

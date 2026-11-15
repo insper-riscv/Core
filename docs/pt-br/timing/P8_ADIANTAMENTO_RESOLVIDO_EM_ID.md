@@ -21,7 +21,7 @@ A instrução que está em ID entra em EX na próxima borda, e as três à frent
 | EX/MEM (passa a MEM/WB) | $\text{we\_reg} \wedge \text{valid}$ |
 | MEM/WB (passa a WB2) | `wb_we` |
 
-O descarte de uma instrução à frente por `trap_take` ou por exceção de MEM não entra nas condições, porque o mesmo evento zera o `ID/EX` (`flush_id_ex`) e o seletor registrado volta a "00". Só `trap_sig`, o sinal de exceção sem efeito do núcleo sem Zicsr, descarta a instrução de EX sem limpar o `ID/EX`. Assim os sinais tardios do laço de EX não chegam à entrada do seletor, e o seletor registrado é igual ao que EX calculava com as validades já registradas.
+O descarte de uma instrução à frente por `trap_take` ou por exceção de MEM não entra nas condições, porque o mesmo evento descarta a instrução de ID (`flush_id_ex`), que vira bolha e não usa o seletor. Só `trap_sig`, o sinal de exceção sem efeito do núcleo sem Zicsr, descarta a instrução de EX sem descartar a de ID. Assim os sinais tardios do laço de EX não chegam à entrada do seletor, e o seletor registrado é igual ao que EX calculava com as validades já registradas.
 
 ## 3. Verificação
 
