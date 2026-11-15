@@ -38,13 +38,14 @@ FIELDS = {
 
 # Campos de dados, que flush e reset não limpam.
 KEEP = dict.fromkeys(("pc", "pc4", "rs1_val", "rs2_val", "imm"), 0xFFFFFFFF)
+KEEP |= {"fwd_rs1": 0xFF, "fwd_rs2": 0xFF}
 
 # Cópias do seletor de adiantamento (FWD_COPIES de fwd_consts).
 COPIES = 4
 
 
 def replicate(code):
-    """Repete o código do seletor em cada cópia (bits 2i+1:2i)."""
+    """Repete o código do seletor nas cópias, a cópia i nos bits 2i+1:2i."""
     return sum(code << (2 * copy) for copy in range(COPIES))
 
 
