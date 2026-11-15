@@ -30,6 +30,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [timing/STALL_REGISTRADO_DO_MULTDIV.md](docs/en/timing/STALL_REGISTRADO_DO_MULTDIV.md): the multiplier and divider stall driven by a flip-flop, and its effect on the critical path.
 - [timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md](docs/en/timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md): the barrier registers clear only the control bits on a discard.
 - [timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md](docs/en/timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md): the forwarding selection resolved in ID, registered and replicated.
+- [timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md](docs/en/timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md): the registered word crossing, the write of `mepc`, `mcause` and `mtval` one cycle after the trap, and the two-stage Zihpm read.
 - [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): instructions of the `M` extension according to the RISC-V manual (chapter 11): encoding, division, division by zero and overflow.
 - [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
 - [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.

@@ -49,6 +49,7 @@ package body fwd_consts is
 
     function replicate (sel : fwd_sel_t; copies : positive) return std_logic_vector is
 
+        -- Cópias do seletor lado a lado.
         variable bus_v : std_logic_vector((2 * copies) - 1 downto 0);
 
     begin

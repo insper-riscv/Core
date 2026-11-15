@@ -167,7 +167,7 @@ A exceção de load ou store (causas 4, 5, 6 e 7) pertence a uma instrução mai
 
 Ao tomar uma exceção, o banco de CSRs executa as seguintes ações no mesmo ciclo.
 
-1. `mepc` recebe o PC da instrução faltante, com os dois bits baixos zerados.
+1. `mepc` recebe o PC da instrução faltante, com os dois bits baixos zerados, um ciclo depois da tomada do trap, como `mcause` e `mtval`. A instrução em EX nesse ciclo é uma bolha, então nenhuma leitura os vê antes.
 2. `mcause` recebe o código da causa e `mtval` recebe o valor associado.
 3. `mstatus.MPIE` recebe `mstatus.MIE`, e `mstatus.MIE` vai a zero.
 4. O PC passa a valer `mtvec`.

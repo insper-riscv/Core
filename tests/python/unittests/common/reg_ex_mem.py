@@ -70,3 +70,49 @@ async def test_address_class_is_registered(dut):
     await Timer(1, unit="ns")
     check_equal((int(dut.o_is_flash.value), int(dut.o_is_sdram.value)), (0, 0))
 
+
+# Máscaras de byte dos stores que cruzam a palavra e modos de load.
+MASK_WORD, MASK_HALF_HIGH = 0b1111, 0b1100
+EXT_LW, EXT_LH, EXT_LHU = 0, 1, 2
+
+
+def crossing(re, we, ext_op, mask, offset):
+    """Modelo de referência do cruzamento da palavra."""
+    load = re and (
+        (ext_op == EXT_LW and offset != 0)
+        or (ext_op in (EXT_LH, EXT_LHU) and offset == 3)
+    )
+    store = we and (
+        (mask == MASK_WORD and offset != 0)
+        or (mask == MASK_HALF_HIGH and offset == 3)
+    )
+    return int(bool(load or store))
+
+
+@cocotb.test()
+async def test_crossing_is_decided_in_ex_and_registered(dut):
+    """Verifica o cruzamento da palavra registrado junto do EX/MEM."""
+    cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
+    dut.i_rst.value = 0
+    dut.i_flush.value = 0
+    dut.i_en.value = 1
+    for re, we in ((1, 0), (0, 1), (0, 0)):
+        for ext_op in range(5):
+            for mask in (0, 0b0001, 0b0011, MASK_HALF_HIGH, MASK_WORD):
+                for offset in range(4):
+                    dut.i_re_ram.value = re
+                    dut.i_we_ram.value = we
+                    dut.i_ext_ram_op.value = ext_op
+                    dut.i_byte_mask.value = mask
+                    dut.i_ea.value = 0x100 + offset
+                    await RisingEdge(dut.i_clk)
+                    await Timer(1, unit="ns")
+                    check_equal(
+                        int(dut.o_cross.value),
+                        crossing(re, we, ext_op, mask, offset),
+                        (re, we, ext_op, mask, offset),
+                    )
+    dut.i_flush.value = 1
+    await RisingEdge(dut.i_clk)
+    await Timer(1, unit="ns")
+    check_equal(int(dut.o_cross.value), 0, "flush limpa o cruzamento")

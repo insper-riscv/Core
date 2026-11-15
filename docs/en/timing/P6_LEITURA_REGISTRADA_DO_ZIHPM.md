@@ -7,7 +7,7 @@
 | | |
 | :--- | :--- |
 | Problem | The read of a Zihpm counter went through a 29-counter multiplexer (nine logic levels, with 1.3 to 1.9 ns of routing between them), went on to the instruction result and, in `csrrs`, `csrrc` and `csrrw`, came back to the write of the destination counter: 12.3 ns of data in a 10 ns period |
-| Change | The bank (`hpm_counter_bank`, generic `registered_read`) registers the value read; the CSR instruction that accesses the bank waits one cycle in EX (`o_csr_wait` of `stage_ex`, added to the pipeline stall), reads the registered value in the next cycle and writes from it |
+| Change | The bank (`hpm_counter_bank`, generic `registered_read`) registers the word of each range (event selector, low and high halves of the counter, high half of the selector) chosen by the index, and the selections of the instruction join the ranges in the next cycle; the CSR instruction that accesses the bank waits one cycle in EX (`o_csr_wait` of `stage_ex`, added to the pipeline stall), reads the value in the next cycle and writes from it |
 | Effect on behavior | The value read is the counter in the wait cycle, in which every older instruction has already been counted and the instruction itself has not; the writes are the same |
 | Effect on cycles per instruction | One more cycle per CSR instruction that accesses `mcountinhibit`, `mhpmeventK`, `mhpmcounterK` or `mhpmcounterKh` (and the mirrors); zero in other programs |
 

@@ -9,8 +9,12 @@
 --     * CSRRC / CSRRCI (bits [1:0] = "11"): clear de bits (new = old and not i_wdata)
 --     Nas operações RS e RC, quando i_src_zero = '1' (rs1 = x0 ou zimm = 0),
 --     nenhuma escrita efetiva é realizada.
---   - Tratamento de Trap (i_trap_take = '1'): grava mepc, mcause e mtval, copia
---     MIE para MPIE e zera MIE.
+--   - Tratamento de Trap (i_trap_take = '1'): copia MIE para MPIE e zera MIE no
+--     mesmo ciclo e guarda a causa, o PC e o valor de falha em registradores de
+--     trap, que gravam mepc, mcause e mtval no ciclo seguinte. A instrução que
+--     entra em EX nesse ciclo é uma bolha, então nenhuma leitura de CSR nem outra
+--     escrita em mepc, mcause ou mtval cai entre os dois ciclos, e a gravação
+--     fica fora do caminho da ULA, de onde vem o valor de falha.
 --   - Retorno de Trap (i_mret_take = '1'): restaura MIE a partir de MPIE e
 --     define MPIE = '1'.
 --   - Endereços de CSR inexistentes ou tentativas de escrita efetiva em CSRs
@@ -323,6 +327,14 @@ architecture rtl of csr_file is
     signal irq_pend_vec   : std_logic_vector(IRQ_COUNT - 1 downto 0);
     -- Habilitação de escrita em mscratch.
     signal mscratch_we    : std_logic;
+    -- Um trap foi tomado no ciclo anterior: mepc, mcause e mtval gravam o que os registradores de trap guardaram.
+    signal trap_q         : std_logic;
+    -- PC da instrução do trap do ciclo anterior.
+    signal trap_pc_q      : word_t;
+    -- Causa do trap do ciclo anterior.
+    signal trap_cause_q   : word_t;
+    -- Valor de falha do trap do ciclo anterior.
+    signal trap_tval_q    : word_t;
     -- Habilitação de escrita em mepc (por trap ou instrução CSR).
     signal mepc_we        : std_logic;
     -- Próximo valor alinhado para escrita em mepc.
@@ -410,21 +422,66 @@ begin
                                 i_mret_take = '0') else
                    '0';
 
-    mepc_we  <= '1' when (i_trap_take = '1' or
+    mepc_we  <= '1' when (trap_q = '1' or
                              (csr_write_valid = '1' and i_addr = ADDR_MEPC and i_mret_take = '0')) else
                 '0';
-    mepc_nxt <= i_trap_pc((XLEN - 1) downto 2) & BYTE_OFFSET_0 when i_trap_take = '1' else
+    mepc_nxt <= trap_pc_q((XLEN - 1) downto 2) & BYTE_OFFSET_0 when trap_q = '1' else
                 new_value((XLEN - 1) downto 2) & BYTE_OFFSET_0;
 
-    mcause_we  <= '1' when (i_trap_take = '1' or
+    mcause_we  <= '1' when (trap_q = '1' or
                                (csr_write_valid = '1' and i_addr = ADDR_MCAUSE and i_mret_take = '0')) else
                   '0';
-    mcause_nxt <= i_trap_cause when i_trap_take = '1' else new_value;
+    mcause_nxt <= trap_cause_q when trap_q = '1' else new_value;
 
-    mtval_we  <= '1' when (i_trap_take = '1' or
+    mtval_we  <= '1' when (trap_q = '1' or
                               (csr_write_valid = '1' and i_addr = ADDR_MTVAL and i_mret_take = '0')) else
                  '0';
-    mtval_nxt <= i_trap_tval when i_trap_take = '1' else new_value;
+    mtval_nxt <= trap_tval_q when trap_q = '1' else new_value;
+
+    u_trap_ff : entity work.flip_flop
+        port map (
+            i_d      => i_trap_take,
+            o_d      => trap_q,
+            i_enable => '1',
+            i_clk    => i_clk,
+            i_rst    => i_rst
+        );
+
+    u_trap_pc_reg : entity work.generic_register
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => '1',
+            i_d      => i_trap_pc,
+            o_d      => trap_pc_q
+        );
+
+    u_trap_cause_reg : entity work.generic_register
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => '1',
+            i_d      => i_trap_cause,
+            o_d      => trap_cause_q
+        );
+
+    u_trap_tval_reg : entity work.generic_register
+        generic map (
+            data_width => word_t'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => '1',
+            i_d      => i_trap_tval,
+            o_d      => trap_tval_q
+        );
 
     -- Interrupções de máquina: mip espelha as portas, mie guarda as máscaras.
     irq_in <= (i_irq_external & i_irq_timer & i_irq_software) when HAS_INTERRUPTS else (others => '0');

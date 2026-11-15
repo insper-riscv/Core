@@ -35,7 +35,8 @@ use work.mem_map_consts.all;
 
 entity misaligned_unit is
     generic (
-        -- A região do endereço vem registrada pela porta i_is_sdram, em vez de ser decodificada de i_addr.
+        -- A região do endereço e o cruzamento da palavra vêm registrados pelas portas i_is_sdram e i_cross_flag, em
+        -- vez de serem decodificados de i_addr e dos controles do acesso.
         flags_registered : boolean := false
     );
     port (
@@ -57,6 +58,8 @@ entity misaligned_unit is
         i_byte_mask  : in    byte_mask_t;
         -- O endereço efetivo cai na janela externa, a SDRAM (com flags_registered).
         i_is_sdram   : in    std_logic := '0';
+        -- O acesso em MEM cruza a palavra, decidido em EX e registrado em EX/MEM (com flags_registered).
+        i_cross_flag : in    std_logic := '0';
         -- Endereço efetivo do acesso em MEM.
         i_addr       : in    word_t;
         -- Dado do store em MEM, como saiu do store_manager.
@@ -90,10 +93,8 @@ architecture rtl of misaligned_unit is
 
     -- Dois bits menos significativos do endereço efetivo: posição do primeiro byte na palavra.
     signal offset        : byte_offset_t;
-    -- Load que ocupa duas palavras (LW fora do offset 0, LH ou LHU no offset 3).
-    signal load_cross    : std_logic;
-    -- Store que ocupa duas palavras (SW fora do offset 0, SH no offset 3).
-    signal store_cross   : std_logic;
+    -- O load ou o store ocupa duas palavras (LW e SW fora do offset 0, LH, LHU e SH no offset 3).
+    signal access_cross  : std_logic;
     -- O acesso cruza a palavra e a unidade está ligada.
     signal cross         : std_logic;
     -- O endereço pertence à janela da SDRAM.
@@ -125,17 +126,10 @@ begin
 
     offset <= i_addr(1 downto 0);
 
-    load_cross <= '1' when (i_re = '1' and
-                               ((i_ext_op = EXT_RAM_LW and offset /= BYTE_OFFSET_0) or
-                                   ((i_ext_op = EXT_RAM_LH or i_ext_op = EXT_RAM_LHU) and offset = BYTE_OFFSET_3))) else
-                  '0';
+    -- Com os flags registrados o cruzamento já vem decidido de EX; sem eles sai dos controles do acesso em MEM.
+    access_cross <= i_cross_flag when flags_registered else is_cross_access(i_re, i_we, i_ext_op, i_byte_mask, offset);
 
-    store_cross <= '1' when (i_we = '1' and
-                                ((i_byte_mask = BYTE_MASK_WORD and offset /= BYTE_OFFSET_0) or
-                                    (i_byte_mask = BYTE_MASK_HALF_HIGH and offset = BYTE_OFFSET_3))) else
-                   '0';
-
-    cross <= (i_valid and i_en and (load_cross or store_cross)) when HAS_ZICCLSM else '0';
+    cross <= (i_valid and i_en and access_cross) when HAS_ZICCLSM else '0';
 
     is_sdram <= i_is_sdram when flags_registered else
                 '1' when is_external_addr(unsigned(i_addr)) else

@@ -339,7 +339,7 @@ echo "stage_ex with interrupts"
 stage_props="$root/formal/stage_ex_irq_props.sv"
 ex_gens="-ghas_zicsr=true -ghas_interrupts=true"
 netlist_tree stage_ex stage_irq $ex_gens
-expect "an interrupt aborts the instruction in EX: mepc is its address, mcause its cause and line, MIE 0 and MPIE 1, the next PC is BASE or the vector, an aborted CSR access changes nothing (induction)" PASS "$(prove stage_irq.v "$stage_props" prove 2 '' stage_irq_safety)"
+expect "an interrupt aborts the instruction in EX: mepc is its address, mcause its cause and line, MIE 0 and MPIE 1, the next PC is BASE or the vector, an aborted CSR access changes nothing (induction)" PASS "$(prove stage_irq.v "$stage_props" prove 4 '' stage_irq_safety)"
 expect "cover: the aborts of an ADDI and of CSR accesses to mscratch, mie and mtvec, and the vectored mode, are reachable" PASS "$(prove stage_irq.v "$stage_props" cover 14 '-DCOVER' stage_irq_cover)"
 
 echo "zicond_unit"
@@ -390,7 +390,7 @@ mutant() {  # <file> <props> <entity> <defines> <name> <sed expression> [ghdl ge
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' trap_keeps_mie  "s/mie_nxt <= '0' \+when i_trap_take = '1'/mie_nxt <= mstatus_mie  when i_trap_take = '1'/"
 mutant "$csr"  "$csr_props"  csr_file  '-DMSTATUS_MODE' mret_no_mpie    "s/'1' \+when i_mret_take = '1'/'0'         when i_mret_take = '1'/"
 mutant "$csr"  "$csr_props"  csr_file  ''               mepc_odd         "s/new_value((XLEN - 1) downto 2) \& BYTE_OFFSET_0;/new_value;/"
-mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt \+<= i_trap_cause when i_trap_take = '1' else new_value;/mcause_nxt  <= mcause_reg   when i_trap_take = '1' else new_value;/"
+mutant "$csr"  "$csr_props"  csr_file  ''               trap_no_mcause   "s/mcause_nxt \+<= trap_cause_q when trap_q = '1' else new_value;/mcause_nxt  <= mcause_reg   when trap_q = '1' else new_value;/"
 mutant "$trap" "$trap_props" trap_unit  ''              load_halfword    "s/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(0) = '1')/((i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) and i_ea(1) = '1')/"
 mutant "$trap" "$trap_props" trap_unit  ''              mret_any_imm     "s/is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET)/is_mret   <= '1' when (is_system = '1' and no_regs = '1')/"
 mutant "$trap" "$trap_props" trap_unit  '-DZICCLSM_ON' crossing_any_region "s/ and same_region = '1'//"
