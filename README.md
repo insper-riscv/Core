@@ -114,7 +114,7 @@ make formal         # Execução das provas formais (SymbiYosys) com o engine de
 
 ### 4.2. Execução via Docker
 
-A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, os solvers Yices, Bitwuzla e Boolector, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
+A imagem `ghcr.io/insper-riscv/ci-vhdl:latest` publicada pelo repositório [insper-riscv/Infra](https://github.com/insper-riscv/Infra) já traz o GHDL (backend LLVM), Yosys, SymbiYosys, os solvers Yices e Bitwuzla, `uv`, Python 3.14 e cocotb 2.1.0 pré-instalados:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \

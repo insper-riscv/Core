@@ -114,7 +114,7 @@ make formal         # Run formal proofs (SymbiYosys) with the engine of FORMAL_E
 
 ### 4.2. Execution via Docker
 
-The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, the Yices, Bitwuzla and Boolector solvers, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
+The `ghcr.io/insper-riscv/ci-vhdl:latest` image published by [insper-riscv/Infra](https://github.com/insper-riscv/Infra) includes GHDL (LLVM backend), Yosys, SymbiYosys, the Yices and Bitwuzla solvers, `uv`, Python 3.14, and cocotb 2.1.0 pre-installed:
 
 ```bash
 docker run --rm -v "$PWD:/workspace" -w /workspace ghcr.io/insper-riscv/ci-vhdl:latest \

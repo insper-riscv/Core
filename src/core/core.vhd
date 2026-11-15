@@ -387,6 +387,8 @@ architecture rtl of core is
     signal exmem_same_region : std_logic;
     -- O endereço efetivo registrado em EX/MEM aceita escrita no mapa do núcleo.
     signal exmem_ok_wr       : std_logic;
+    -- O load ou store registrado em EX/MEM cruza a palavra, decidido em EX.
+    signal exmem_cross       : std_logic;
     -- A instrução em ID/EX escreve em registrador e seguirá válida em EX/MEM (não é descartada na borda de clock).
     signal fwd_ex_ok         : std_logic;
     -- A instrução em EX/MEM escreve em registrador e seguirá válida em MEM/WB.
@@ -813,7 +815,8 @@ begin
             o_is_sdram    => exmem_is_sdram,
             o_in_main     => exmem_in_main,
             o_same_region => exmem_same_region,
-            o_ok_wr       => exmem_ok_wr
+            o_ok_wr       => exmem_ok_wr,
+            o_cross       => exmem_cross
         );
 
     -- =========================================================================
@@ -825,6 +828,7 @@ begin
         )
         port map (
             i_is_sdram   => exmem_is_sdram,
+            i_cross_flag => exmem_cross,
             i_clk        => i_clk,
             i_rst        => i_rst,
             i_valid      => mis_valid,
