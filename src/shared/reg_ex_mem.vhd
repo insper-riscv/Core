@@ -26,6 +26,8 @@ use ieee.numeric_std.all;
 use work.config_pkg.all;
 use work.pipeline_types.all;
 use work.mem_map_consts.all;
+use work.byte_mask_consts.all;
+use work.ext_ram_consts.all;
 
 entity reg_ex_mem is
     port (
@@ -106,7 +108,9 @@ entity reg_ex_mem is
         o_same_region : out   std_logic;
         -- O endereço registrado aceita escrita no mapa do núcleo (sempre '1' sem HAS_ACCESS_FAULTS); a BOOT_MEMORY e a
         -- FLASH são só de leitura.
-        o_ok_wr       : out   std_logic
+        o_ok_wr       : out   std_logic;
+        -- O load ou o store registrado cruza a palavra (decidido em EX, registrado aqui; sempre '0' sem HAS_ZICCLSM).
+        o_cross       : out   std_logic
     );
 end entity reg_ex_mem;
 
@@ -150,6 +154,8 @@ architecture rtl of reg_ex_mem is
     signal r_last       : std_logic    := '0';
     -- O endereço registrado aceita escrita no mapa.
     signal r_ok_wr      : std_logic    := '1';
+    -- O acesso registrado cruza a palavra.
+    signal r_cross      : std_logic    := '0';
 
     -- Entrada de r_is_flash, decodificada do resultado da ULA.
     signal in_is_flash : std_logic;
@@ -161,6 +167,8 @@ architecture rtl of reg_ex_mem is
     signal in_last     : std_logic;
     -- Entrada de r_ok_wr, decodificada do resultado da ULA.
     signal in_ok_wr    : std_logic;
+    -- Entrada de r_cross, decidida pelos controles do acesso e pelo byte do endereço efetivo.
+    signal in_cross    : std_logic;
 
 begin
 
@@ -182,6 +190,9 @@ begin
         in_ok_wr <= '1';
     end generate gen_no_faults;
 
+    -- O cruzamento da palavra também sai de EX e fica registrado: o estágio MEM só confere o bit.
+    in_cross <= is_cross_access(i_re_ram, i_we_ram, i_ext_ram_op, i_byte_mask, i_ea(1 downto 0)) when HAS_ZICCLSM else '0';
+
     p_reg_ex_mem_ctrl_proc : process (i_clk) is
     begin
 
@@ -201,6 +212,7 @@ begin
                 r_in_main    <= '0';
                 r_last       <= '0';
                 r_ok_wr      <= '1';
+                r_cross      <= '0';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
                 r_rd         <= i_rd;
@@ -216,6 +228,7 @@ begin
                 r_in_main    <= in_in_main;
                 r_last       <= in_last;
                 r_ok_wr      <= in_ok_wr;
+                r_cross      <= in_cross;
             end if;
         end if;
 
@@ -257,5 +270,6 @@ begin
     -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
     o_same_region <= r_in_main and (not r_last);
     o_ok_wr       <= r_ok_wr;
+    o_cross       <= r_cross;
 
 end architecture rtl;
