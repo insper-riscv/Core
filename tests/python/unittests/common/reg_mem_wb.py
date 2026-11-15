@@ -23,6 +23,9 @@ EXT_BASE = 1048576 * 1024
 EXT_RAM_LW, EXT_RAM_LH, EXT_RAM_LHU = 0, 1, 2
 LAST_BYTE = 3
 
+# O resultado da ULA é dado: flush e reset não o limpam.
+KEEP = {"alu_out": 0xFFFFFFFF}
+
 
 def is_cross(op, address):
     """Diz se o load cruza a palavra (LW desalinhado, LH no byte 3)."""
@@ -46,13 +49,13 @@ def derived(values):
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador MEM/WB."""
-    await check_stage_register(StageRegister(dut, FIELDS, derived))
+    await check_stage_register(StageRegister(dut, FIELDS, derived, KEEP))
 
 
 @cocotb.test()
 async def test_regions(dut):
     """Varre as fronteiras das regiões, os loads e os deslocamentos."""
-    reg = StageRegister(dut, FIELDS, derived)
+    reg = StageRegister(dut, FIELDS, derived, KEEP)
     await start(reg)
     for base in (0, ROM_END - 4, ROM_END, EXT_BASE - 4, EXT_BASE):
         for op in range(5):

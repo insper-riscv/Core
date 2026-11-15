@@ -6,10 +6,17 @@
 -- ID no ciclo seguinte.
 --
 -- Prioridade dos controles síncronos:
---   1. i_rst = '1' ou i_flush = '1' -> limpa os registradores e marca o pacote
---                                      como bolha inválida (o_valid = '0').
+--   1. i_rst = '1' ou i_flush = '1' -> marca o pacote como bolha inválida
+--                                      (o_valid = '0') e zera o campo opcode da
+--                                      instrução; o PC, o PC + 4 e o restante da
+--                                      palavra não são limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
+--
+-- Só os bits de controle têm limpeza síncrona, de modo que o sinal de flush, que
+-- nasce no laço de desvio do estágio EX, alimenta poucos registradores. Os campos
+-- de dados só têm habilitação: o valor de uma bolha nunca produz efeito, porque
+-- todo uso dele é condicionado a o_valid.
 -- =============================================================================
 
 library ieee;
@@ -49,38 +56,49 @@ end entity reg_if_id;
 architecture rtl of reg_if_id is
 
     -- Bit de validade armazenado no registrador de estágio.
-    signal r_valid : std_logic := '0';
+    signal r_valid  : std_logic    := '0';
     -- Endereço PC armazenado no registrador de estágio.
-    signal r_pc    : word_t    := (others => '0');
+    signal r_pc     : word_t       := (others => '0');
     -- Valor de PC + 4 armazenado no registrador de estágio.
-    signal r_pc4   : word_t    := (others => '0');
-    -- Instrução de 32 bits armazenada no registrador de estágio.
-    signal r_inst  : word_t    := (others => '0');
+    signal r_pc4    : word_t       := (others => '0');
+    -- Campo opcode da instrução armazenada, o único com limpeza síncrona.
+    signal r_opcode : opcode_t     := (others => '0');
+    -- Bits da instrução acima do opcode, armazenados sem limpeza síncrona.
+    signal r_inst_hi : std_logic_vector(31 downto 7) := (others => '0');
 
 begin
 
-    p_reg_if_id_proc : process (i_clk) is
+    p_reg_if_id_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
-                r_valid <= '0';
-                r_pc    <= (others => '0');
-                r_pc4   <= (others => '0');
-                r_inst  <= (others => '0');
+                r_valid  <= '0';
+                r_opcode <= (others => '0');
             elsif i_en = '1' then
-                r_valid <= i_valid;
-                r_pc    <= i_pc;
-                r_pc4   <= i_pc4;
-                r_inst  <= i_inst;
+                r_valid  <= i_valid;
+                r_opcode <= i_inst(6 downto 0);
             end if;
         end if;
 
-    end process p_reg_if_id_proc;
+    end process p_reg_if_id_ctrl_proc;
+
+    p_reg_if_id_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_pc      <= i_pc;
+                r_pc4     <= i_pc4;
+                r_inst_hi <= i_inst(31 downto 7);
+            end if;
+        end if;
+
+    end process p_reg_if_id_data_proc;
 
     o_valid <= r_valid;
     o_pc    <= r_pc;
     o_pc4   <= r_pc4;
-    o_inst  <= r_inst;
+    o_inst  <= r_inst_hi & r_opcode;
 
 end architecture rtl;

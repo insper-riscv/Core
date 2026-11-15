@@ -28,6 +28,7 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [ISA/Zihpm/conformance.md](docs/en/ISA/Zihpm/conformance.md): each Zihpm requirement checked against the behavior of the Core, with the evidence of each line.
 - [profile/description.md](docs/en/profile/description.md): the files that define the profiles, the rules that generate the full matrix and the reference profiles of `profiles/`.
 - [timing/STALL_REGISTRADO_DO_MULTDIV.md](docs/en/timing/STALL_REGISTRADO_DO_MULTDIV.md): the multiplier and divider stall driven by a flip-flop, and its effect on the critical path.
+- [timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md](docs/en/timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md): the barrier registers clear only the control bits on a discard.
 - [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): instructions of the `M` extension according to the RISC-V manual (chapter 11): encoding, division, division by zero and overflow.
 - [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
 - [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.
