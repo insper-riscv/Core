@@ -239,7 +239,7 @@ make test-boot # Assemble the boot fragments in every combination and run them o
 make formal    # Run the formal proofs (SymbiYosys) with the engine of FORMAL_ENGINE (bitwuzla by default)
 ```
 
-The `formal` CI job runs the proofs once per engine (`formal - yices`, `formal - bitwuzla`, `formal - boolector`, and `formal - abc-bmc3`) and the aggregator job `formal` decides from the results: every proof must have an answer, and the engines that answered must agree with each other and with the expected result. The name `formal` is the check the default-branch ruleset requires, so do not rename it; the `formal - <engine>` jobs are not required.
+The `formal` CI job runs the proofs once per engine (`formal - yices`, `formal - bitwuzla`, and `formal - abc-bmc3`) and the aggregator job `formal` decides from the results: every proof must have an answer, and the engines that answered must agree with each other and with the expected result. The name `formal` is the check the default-branch ruleset requires, so do not rename it; the `formal - <engine>` jobs are not required.
 
 A warning in the formal run is an error. The formal flow scans the GHDL output and the Yosys and SymbiYosys logs after every step, including on the mutants, and fails pointing at the file and line of the warning. The fix is always in the code or in the properties, never in an option that hides the warning (`-Wno-*`). The details are in [docs/en/formal/FORMAL.md](docs/en/formal/FORMAL.md).
 

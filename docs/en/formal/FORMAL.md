@@ -32,7 +32,6 @@ The engine is chosen by the `FORMAL_ENGINE` variable.
 | Engine | What it is | Induction | BMC | Cover | Typical time of `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | `bitwuzla` (default) | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 216 s |
-| `boolector` | SMT solver for bit-vectors, through the `smtbmc` engine | yes | yes | yes | 226 s |
 | `yices` | SMT solver, through the `smtbmc` engine | yes | yes | yes | 376 s |
 | `abc-bmc3` | the bounded model checker of ABC, through the `abc bmc3` engine | no | yes | no | 346 s |
 
@@ -91,7 +90,7 @@ The tests of the aggregator run with `bash formal/aggregate_test.sh`.
 
 ## 6. In the CI
 
-The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it. In a push to `main` that reuses the result of a pull request that already passed, the engines and `formal` are skipped together, like the other required checks.
+The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it. In a push to `main` that reuses the result of a pull request that already passed, the engines and `formal` are skipped together, like the other required checks.
 
 ## 7. A warning is an error
 
@@ -99,7 +98,7 @@ Any warning from GHDL, Yosys or SymbiYosys makes `formal/run.sh` fail, in the pr
 
 A warning means code outside the norm or at its limit, so the fix is in the VHDL or in the properties, never in an option that hides the warning (`-Wno-*`). Each mutant is analyzed in the place of the unit it replaces, so no entity is defined in two files.
 
-The `abc-bmc3` engine has one exact exception, only for the messages ABC itself prints when it reads the AIGER file it receives (the count of outputs read as constraints, which are the assumptions and the clock of the `clk2ff` step, and `The network has no constraints.`), and only in the log of that engine. The warnings that the clock is an undriven bit are not accepted: the script of the proof flattens the design and purges the aliases of the clock before the AIGER file is written. One more message, `The network is combinational.`, is accepted only in the proof that the engine refuses for being combinational and that the script records as `skip`. `yices`, `bitwuzla` and `boolector` have no exception, and any other warning of `abc-bmc3` still fails.
+The `abc-bmc3` engine has one exact exception, only for the messages ABC itself prints when it reads the AIGER file it receives (the count of outputs read as constraints, which are the assumptions and the clock of the `clk2ff` step, and `The network has no constraints.`), and only in the log of that engine. The warnings that the clock is an undriven bit are not accepted: the script of the proof flattens the design and purges the aliases of the clock before the AIGER file is written. One more message, `The network is combinational.`, is accepted only in the proof that the engine refuses for being combinational and that the script records as `skip`. `yices` and `bitwuzla` have no exception, and any other warning of `abc-bmc3` still fails.
 
 The tests of the guard run together with those of the aggregator, with `bash formal/aggregate_test.sh`.
 

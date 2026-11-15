@@ -32,7 +32,6 @@ O engine é escolhido pela variável `FORMAL_ENGINE`.
 | Engine | O que é | Indução | BMC | Cover | Tempo típico de `make formal` |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | `bitwuzla` (padrão) | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 216 s |
-| `boolector` | solver SMT para vetores de bits, pelo engine `smtbmc` | sim | sim | sim | 226 s |
 | `yices` | solver SMT, pelo engine `smtbmc` | sim | sim | sim | 376 s |
 | `abc-bmc3` | verificador de modelos limitado do ABC, pelo engine `abc bmc3` | não | sim | não | 346 s |
 
@@ -91,7 +90,7 @@ Os testes do agregador rodam com `bash formal/aggregate_test.sh`.
 
 ## 6. No CI
 
-O workflow tem um job por engine, `formal - <engine>` (`yices`, `bitwuzla`, `boolector` e `abc-bmc3`), que roda `make formal FORMAL_ENGINE=<engine>` e sobe o resultado e os logs como artefato. O job `formal` espera todos eles, baixa os artefatos e roda o agregador. Só o job `formal` é check obrigatório do ruleset da branch padrão, então um engine que quebra não bloqueia o merge enquanto outro decide, e um contraexemplo achado por qualquer engine bloqueia. Num push para a `main` que reaproveita o resultado de um PR já aprovado, os engines e o `formal` são pulados juntos, como os demais checks obrigatórios.
+O workflow tem um job por engine, `formal - <engine>` (`yices`, `bitwuzla` e `abc-bmc3`), que roda `make formal FORMAL_ENGINE=<engine>` e sobe o resultado e os logs como artefato. O job `formal` espera todos eles, baixa os artefatos e roda o agregador. Só o job `formal` é check obrigatório do ruleset da branch padrão, então um engine que quebra não bloqueia o merge enquanto outro decide, e um contraexemplo achado por qualquer engine bloqueia. Num push para a `main` que reaproveita o resultado de um PR já aprovado, os engines e o `formal` são pulados juntos, como os demais checks obrigatórios.
 
 ## 7. Aviso é erro
 
@@ -99,7 +98,7 @@ Qualquer aviso do GHDL, do Yosys ou do SymbiYosys faz o `formal/run.sh` falhar, 
 
 Um aviso indica código fora da norma ou no limite, então a correção é no VHDL ou nas propriedades, nunca em uma opção que esconda o aviso (`-Wno-*`). Cada mutante é analisado no lugar da unidade que substitui, de modo que nenhuma entidade é definida em dois arquivos.
 
-O engine `abc-bmc3` tem uma exceção exata, só para as mensagens que o próprio ABC imprime ao ler o arquivo AIGER recebido (a contagem de saídas lidas como restrições, que são as suposições e o clock do passo `clk2ff`, e `The network has no constraints.`), e só no log desse engine. Os avisos de que o clock é um bit sem driver não são aceitos: o script da prova achata o projeto e elimina os apelidos do clock antes de o arquivo AIGER ser escrito. Uma mensagem a mais, `The network is combinational.`, é aceita apenas na prova que o engine recusa por ser combinacional e que o script registra como `skip`. O `yices`, o `bitwuzla` e o `boolector` não têm exceção, e qualquer outro aviso do `abc-bmc3` continua falhando.
+O engine `abc-bmc3` tem uma exceção exata, só para as mensagens que o próprio ABC imprime ao ler o arquivo AIGER recebido (a contagem de saídas lidas como restrições, que são as suposições e o clock do passo `clk2ff`, e `The network has no constraints.`), e só no log desse engine. Os avisos de que o clock é um bit sem driver não são aceitos: o script da prova achata o projeto e elimina os apelidos do clock antes de o arquivo AIGER ser escrito. Uma mensagem a mais, `The network is combinational.`, é aceita apenas na prova que o engine recusa por ser combinacional e que o script registra como `skip`. O `yices` e o `bitwuzla` não têm exceção, e qualquer outro aviso do `abc-bmc3` continua falhando.
 
 Os testes da guarda rodam junto com os do agregador, em `bash formal/aggregate_test.sh`.
 

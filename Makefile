@@ -50,7 +50,7 @@ profile-matrix: check
 	@echo "matrix: $$(riscv-tools profiles --spec profiles/matrix.yaml --format names | awk 'NR % $(MATRIX_STRIDE) == 1' | wc -l) profiles build"
 
 # Formal proofs of the CSR bank, the trap unit, the counters and the fusion record, with their mutants
-# (SymbiYosys, Yosys and one engine of the CI image: FORMAL_ENGINE is yices, bitwuzla, boolector or abc-bmc3);
+# (SymbiYosys, Yosys and one engine of the CI image: FORMAL_ENGINE is yices, bitwuzla or abc-bmc3);
 # under a minute with bitwuzla. The result of the run is build/formal/result-<engine>.tsv.
 FORMAL_ENGINE ?= bitwuzla
 formal:
