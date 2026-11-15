@@ -7,10 +7,18 @@
 -- estágio EX no ciclo seguinte.
 --
 -- Prioridade dos controles síncronos:
---   1. i_rst = '1' ou i_flush = '1' -> zera todos os sinais de controle e dados
---                                      e marca o pacote como bolha (o_valid = '0').
+--   1. i_rst = '1' ou i_flush = '1' -> zera os sinais de controle e marca o pacote
+--                                      como bolha (o_valid = '0'); os campos de
+--                                      dados (PC, PC + 4, operandos e imediato)
+--                                      não são limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
+--
+-- Só os bits de controle têm limpeza síncrona, de modo que o flush de desvio e de
+-- trap, que nasce no laço do estágio EX, alimenta cerca de 40 registradores em
+-- vez de 200. Os campos de dados só têm habilitação: o valor de uma bolha nunca
+-- produz efeito, porque o_valid e os habilitadores de escrita (zerados) travam
+-- todo uso dele.
 -- =============================================================================
 
 library ieee;
@@ -193,19 +201,14 @@ architecture rtl of reg_id_ex is
 
 begin
 
-    p_reg_id_ex_proc : process (i_clk) is
+    p_reg_id_ex_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
                 r_valid         <= '0';
-                r_pc            <= (others => '0');
-                r_pc4           <= (others => '0');
                 r_rs1           <= (others => '0');
                 r_rd            <= (others => '0');
-                r_rs1_val       <= (others => '0');
-                r_rs2_val       <= (others => '0');
-                r_imm           <= (others => '0');
                 r_sel_pc4_alu   <= '0';
                 r_wb_sel        <= (others => '0');
                 r_we_reg        <= '0';
@@ -226,13 +229,8 @@ begin
                 r_funct3        <= (others => '0');
             elsif i_en = '1' then
                 r_valid         <= i_valid;
-                r_pc            <= i_pc;
-                r_pc4           <= i_pc4;
                 r_rs1           <= i_rs1;
                 r_rd            <= i_rd;
-                r_rs1_val       <= i_rs1_val;
-                r_rs2_val       <= i_rs2_val;
-                r_imm           <= i_imm;
                 r_sel_pc4_alu   <= i_sel_pc4_alu;
                 r_wb_sel        <= i_wb_sel;
                 r_we_reg        <= i_we_reg;
@@ -254,7 +252,22 @@ begin
             end if;
         end if;
 
-    end process p_reg_id_ex_proc;
+    end process p_reg_id_ex_ctrl_proc;
+
+    p_reg_id_ex_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_pc      <= i_pc;
+                r_pc4     <= i_pc4;
+                r_rs1_val <= i_rs1_val;
+                r_rs2_val <= i_rs2_val;
+                r_imm     <= i_imm;
+            end if;
+        end if;
+
+    end process p_reg_id_ex_data_proc;
 
     o_valid         <= r_valid;
     o_pc            <= r_pc;

@@ -36,8 +36,11 @@ FIELDS = {
     "funct3": 3,
 }
 
+# Campos de dados, que flush e reset não limpam.
+KEEP = dict.fromkeys(("pc", "pc4", "rs1_val", "rs2_val", "imm"), 0xFFFFFFFF)
+
 
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador ID/EX."""
-    await check_stage_register(StageRegister(dut, FIELDS))
+    await check_stage_register(StageRegister(dut, FIELDS, keep=KEEP))

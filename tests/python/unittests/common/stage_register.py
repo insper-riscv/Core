@@ -2,7 +2,9 @@
 
 Os registradores IF/ID, ID/EX, EX/MEM e MEM/WB têm o mesmo contrato:
 capturam as entradas na borda de subida quando habilitados, mantêm o
-estado em stall e se limpam com flush ou reset (que têm prioridade).
+estado em stall e limpam os bits de controle com flush ou reset (que têm
+prioridade). Os campos de dados, declarados em `keep`, não são limpos:
+só têm habilitação.
 Cada teste de entidade declara os campos do seu registrador e, se
 houver, as saídas derivadas, e chama check_stage_register.
 """
@@ -26,10 +28,15 @@ class StageRegister:
     derivadas (sem entrada homônima) vêm de uma função das entradas.
     """
 
-    def __init__(self, dut, fields, derived=None):
-        """Guarda o DUT, os campos e as saídas derivadas."""
+    def __init__(self, dut, fields, derived=None, keep=None):
+        """Guarda o DUT, os campos, as saídas derivadas e os dados.
+
+        `keep` mapeia o nome de cada campo de dados à máscara dos bits
+        que flush e reset não limpam.
+        """
         self.dut = dut
         self.fields = fields
+        self.keep = keep or {}
         self.derived = derived or no_derived
         self.prng = Prng(0x5EED)
 
@@ -65,12 +72,21 @@ class StageRegister:
             got = int(getattr(self.dut, f"o_{name}").value)
             check_equal(got, want, f"{message}: o_{name}")
 
-    def expect_clear(self, message):
-        """Confere que todas as saídas estão em zero."""
+    def expect_clear(self, message, kept=None):
+        """Confere os controles em zero e os dados como estavam.
+
+        `kept` traz os valores que os campos de dados devem ter; sem ele
+        os campos de dados não são conferidos (o simulador pode trazer
+        o conteúdo de um teste anterior).
+        """
         names = set(self.fields) | set(self.derived(self.zeros()))
         for name in names:
+            mask = self.keep.get(name, 0)
+            if mask and kept is None:
+                continue
             got = int(getattr(self.dut, f"o_{name}").value)
-            check_equal(got, 0, f"{message}: o_{name}")
+            want = (kept or {}).get(name, 0) & mask
+            check_equal(got, want, f"{message}: o_{name}")
 
 
 async def start(reg):
@@ -99,11 +115,18 @@ async def check_hold(reg, held):
 
 
 async def check_clears(reg):
-    """Flush e reset limpam, com prioridade sobre captura e stall."""
+    """Flush e reset limpam os controles, com prioridade sobre captura.
+
+    Os campos de dados só seguem a habilitação: capturam a entrada
+    quando i_en está alto, mesmo com flush ou reset, e senão mantêm.
+    """
     for controls in ((1, 1, 0), (0, 1, 0), (1, 0, 1), (0, 0, 1)):
-        await reg.step(reg.random_inputs(), (1, 0, 0))
-        await reg.step(reg.random_inputs(), controls)
-        reg.expect_clear(f"limpeza {controls}")
+        before = reg.random_inputs()
+        await reg.step(before, (1, 0, 0))
+        applied = reg.random_inputs()
+        await reg.step(applied, controls)
+        kept = applied if controls[0] else before
+        reg.expect_clear(f"limpeza {controls}", kept)
 
 
 async def check_stage_register(reg):

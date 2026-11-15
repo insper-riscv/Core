@@ -9,8 +9,11 @@ from tests.python.unittests.common.stage_register import (
 
 FIELDS = {"valid": 1, "pc": 32, "pc4": 32, "inst": 32}
 
+# Só o opcode é limpo; PC, PC + 4 e o resto da instrução são dados.
+KEEP = {"pc": 0xFFFFFFFF, "pc4": 0xFFFFFFFF, "inst": 0xFFFFFF80}
+
 
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador IF/ID."""
-    await check_stage_register(StageRegister(dut, FIELDS))
+    await check_stage_register(StageRegister(dut, FIELDS, keep=KEEP))

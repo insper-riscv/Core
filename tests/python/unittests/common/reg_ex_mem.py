@@ -26,6 +26,15 @@ FIELDS = {
     "wb_sel": 1,
 }
 
+# Campos de dados, que flush e reset não limpam.
+KEEP = {
+    "pc": 0xFFFFFFFF,
+    "funct3": 0b111,
+    "alu_out": 0xFFFFFFFF,
+    "store_data": 0xFFFFFFFF,
+    "byte_mask": 0b1111,
+}
+
 
 def derived(values):
     """Devolve we_ok: a escrita de registrador só vale com validade."""
@@ -35,7 +44,7 @@ def derived(values):
 @cocotb.test()
 async def test_stage_register(dut):
     """Verifica o contrato do registrador EX/MEM."""
-    await check_stage_register(StageRegister(dut, FIELDS, derived))
+    await check_stage_register(StageRegister(dut, FIELDS, derived, KEEP))
 
 
 async def classify(dut, address):

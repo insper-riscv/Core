@@ -7,10 +7,17 @@
 -- de memória e write-back, disponibilizando-os ao estágio MEM.
 --
 -- Prioridade dos controles síncronos:
---   1. i_rst = '1' ou i_flush = '1' -> zera todos os controles e dados e marca
---                                      o pacote como bolha (o_valid = '0').
+--   1. i_rst = '1' ou i_flush = '1' -> zera os controles e marca o pacote como
+--                                      bolha (o_valid = '0'); o PC, o resultado,
+--                                      o dado e a máscara de escrita e o funct3
+--                                      não são limpos.
 --   2. i_en = '1'                   -> captura as entradas normalmente.
 --   3. i_en = '0'                   -> mantém o estado atual (stall).
+--
+-- Só os bits de controle têm limpeza síncrona, de modo que o flush de exceção não
+-- alimenta os campos de dados. O valor de uma bolha nunca produz efeito, porque
+-- o estágio MEM e o adiantamento só o usam sob o_valid, os habilitadores de
+-- memória e o_we_ok, todos zerados.
 -- =============================================================================
 
 library ieee;
@@ -175,17 +182,12 @@ begin
         in_ok_wr <= '1';
     end generate gen_no_faults;
 
-    p_reg_ex_mem_proc : process (i_clk) is
+    p_reg_ex_mem_ctrl_proc : process (i_clk) is
     begin
 
         if rising_edge(i_clk) then
             if i_rst = '1' or i_flush = '1' then
                 r_valid      <= '0';
-                r_pc         <= (others => '0');
-                r_funct3     <= (others => '0');
-                r_alu_out    <= (others => '0');
-                r_store_data <= (others => '0');
-                r_byte_mask  <= (others => '0');
                 r_rd         <= (others => '0');
                 r_we_reg     <= '0';
                 r_we_ok      <= '0';
@@ -201,11 +203,6 @@ begin
                 r_ok_wr      <= '1';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
-                r_pc         <= i_pc;
-                r_funct3     <= i_funct3;
-                r_alu_out    <= i_alu_out;
-                r_store_data <= i_store_data;
-                r_byte_mask  <= i_byte_mask;
                 r_rd         <= i_rd;
                 r_we_reg     <= i_we_reg;
                 r_we_ok      <= i_we_reg and i_valid;
@@ -222,7 +219,22 @@ begin
             end if;
         end if;
 
-    end process p_reg_ex_mem_proc;
+    end process p_reg_ex_mem_ctrl_proc;
+
+    p_reg_ex_mem_data_proc : process (i_clk) is
+    begin
+
+        if rising_edge(i_clk) then
+            if i_en = '1' then
+                r_pc         <= i_pc;
+                r_funct3     <= i_funct3;
+                r_alu_out    <= i_alu_out;
+                r_store_data <= i_store_data;
+                r_byte_mask  <= i_byte_mask;
+            end if;
+        end if;
+
+    end process p_reg_ex_mem_data_proc;
 
     o_valid       <= r_valid;
     o_pc          <= r_pc;
