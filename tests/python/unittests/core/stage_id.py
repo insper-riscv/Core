@@ -194,6 +194,7 @@ async def test_illegal_instructions(dut):
         "ADD",
     )
 
+
 # Códigos do seletor do adiantamento (FWD_* de fwd_consts).
 NONE, MEMWB, EXMEM, WB2 = 0, 1, 2, 3
 
@@ -233,9 +234,7 @@ async def test_forwarding_matches(dut):
     for values, (sel1, sel2) in cases:
         await apply(dut, instr, values)
         seen = read(dut, ("fwd_rs1", "fwd_rs2"))
-        check_equal(
-            (seen["fwd_rs1"], seen["fwd_rs2"]), (sel1, sel2), values
-        )
+        check_equal((seen["fwd_rs1"], seen["fwd_rs2"]), (sel1, sel2), values)
     await apply(
         dut, encode_r(OP_OP, (1, 0, 0, 7)), {"ex_rd": 0, "ex_we_reg": 1}
     )
