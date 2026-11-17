@@ -39,7 +39,10 @@ entity stage_mem is
         check_ea         : boolean := true;
         -- A classificação do endereço efetivo (FLASH, SDRAM, memória principal, mesma região) vem registrada do EX/MEM
         -- pelas portas i_flag_*, em vez de ser decodificada do endereço neste estágio.
-        flags_registered : boolean := false
+        flags_registered : boolean := false;
+        -- A exceção de endereço do acesso parte de três bits decididos e registrados no EX/MEM (portas i_flag_xlast,
+        -- i_flag_unal e i_flag_stf), em vez de sair do trap_unit deste estágio; vale com check_ea e flags_registered.
+        ea_ok_registered : boolean := false
     );
     port (
         -- Bit de validade da instrução no estágio MEM.
@@ -58,6 +61,13 @@ entity stage_mem is
         i_flag_same   : in    std_logic := '0';
         -- O endereço efetivo aceita escrita no mapa do núcleo (com HAS_ACCESS_FAULTS).
         i_flag_ok_wr  : in    std_logic := '1';
+        -- O acesso que cruza a palavra é exceção de endereço na última palavra da região da memória principal (com
+        -- ea_ok_registered).
+        i_flag_xlast  : in    std_logic := '0';
+        -- O acesso desalinhado é exceção de endereço fora da memória principal (com ea_ok_registered).
+        i_flag_unal   : in    std_logic := '0';
+        -- O store é exceção de endereço se a região não aceitar escrita (com ea_ok_registered).
+        i_flag_stf    : in    std_logic := '0';
         -- Campo funct3 do load ou store, vindo do registrador EX/MEM.
         i_funct3      : in    funct3_t;
         -- Dado alinhado para escrita em memória vindo do registrador EX/MEM.
@@ -124,6 +134,11 @@ architecture rtl of stage_mem is
     signal sdram_access    : std_logic;
     -- Opcode do acesso em MEM (LOAD, STORE ou zero), reconstruído dos sinais de leitura e escrita.
     signal mem_opcode      : opcode_t;
+    -- Exceção de endereço do acesso, composta dos bits registrados no EX/MEM e da região (com ea_ok_registered).
+    signal ea_trap_reg     : std_logic;
+    -- Exceção de endereço decidida pelo trap_unit deste estágio; com a decisão registrada no EX/MEM só a causa e o
+    -- mtval dela são usados.
+    signal trap_take_unit  : std_logic;
     -- Exceção de endereço do acesso em MEM, antes de qualquer acesso à memória.
     signal trap_take_int   : std_logic;
     -- Causa da exceção de endereço do acesso em MEM.
@@ -162,11 +177,31 @@ begin
             i_cf_target      => (others => '0'),
             i_csr_illegal    => '0',
             i_illegal        => '0',
-            o_take           => trap_take_int,
+            o_take           => trap_take_unit,
             o_mret_take      => open,
             o_cause          => trap_cause_int,
             o_tval           => trap_tval_int
         );
+
+    -- Com a decisão parcial registrada no EX/MEM, a exceção de endereço sai de um único nível de lógica sobre bits
+    -- registrados, sem decodificar o funct3, os controles e o desalinhamento no caminho da escrita das memórias.
+    gen_ea_registered : if (ea_ok_registered and flags_registered and check_ea) generate
+        gen_last : if HAS_ZICCLSM generate
+            ea_trap_reg <= (i_flag_main and (not i_flag_same) and i_flag_xlast) or
+                           ((not i_flag_main) and i_flag_unal) or ((not i_flag_ok_wr) and i_flag_stf);
+        end generate gen_last;
+
+        gen_no_last : if not HAS_ZICCLSM generate
+            ea_trap_reg <= (i_flag_main and i_flag_xlast) or
+                           ((not i_flag_main) and i_flag_unal) or ((not i_flag_ok_wr) and i_flag_stf);
+        end generate gen_no_last;
+
+        trap_take_int <= i_valid and ea_trap_reg;
+    end generate gen_ea_registered;
+
+    gen_ea_decoded : if not (ea_ok_registered and flags_registered and check_ea) generate
+        trap_take_int <= trap_take_unit;
+    end generate gen_ea_decoded;
 
     access_valid <= i_valid and (not trap_take_int);
 

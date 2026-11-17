@@ -387,6 +387,12 @@ architecture rtl of core is
     signal exmem_same_region : std_logic;
     -- O endereço efetivo registrado em EX/MEM aceita escrita no mapa do núcleo.
     signal exmem_ok_wr       : std_logic;
+    -- O load ou store em MEM que cruza a palavra é exceção de endereço na última palavra da região (decidido em EX).
+    signal exmem_ea_xlast    : std_logic;
+    -- O load ou store em MEM é desalinhado, e é exceção de endereço fora da memória principal (decidido em EX).
+    signal exmem_ea_unal     : std_logic;
+    -- O store em MEM é exceção de endereço se a região não aceitar escrita (decidido em EX).
+    signal exmem_ea_stf      : std_logic;
     -- O load ou store registrado em EX/MEM cruza a palavra, decidido em EX.
     signal exmem_cross       : std_logic;
     -- A instrução em ID/EX escreve em registrador e seguirá válida em EX/MEM (não é descartada na borda de clock).
@@ -816,7 +822,10 @@ begin
             o_in_main     => exmem_in_main,
             o_same_region => exmem_same_region,
             o_ok_wr       => exmem_ok_wr,
-            o_cross       => exmem_cross
+            o_cross       => exmem_cross,
+            o_ea_xlast    => exmem_ea_xlast,
+            o_ea_unal     => exmem_ea_unal,
+            o_ea_stf      => exmem_ea_stf
         );
 
     -- =========================================================================
@@ -852,17 +861,23 @@ begin
             o_first_word => mis_first_word
         );
 
-    mem_addr  <= mis_addr when mis_cross = '1' else exmem_alu_out;
+    -- A unidade de acesso desalinhado apresenta o endereço do EX/MEM fora da etapa 2, então o endereço da memória
+    -- sai dela sem selecionar por mis_cross, que depende da exceção de endereço.
+    mem_addr  <= mis_addr;
     mem_wdata <= mis_data when mis_cross = '1' else exmem_store_data;
     mem_mask  <= mis_mask when mis_cross = '1' else exmem_byteena;
 
     u_stage_mem : entity work.stage_mem
         generic map (
             check_ea         => HAS_ZICSR,
-            flags_registered => true
+            flags_registered => true,
+            ea_ok_registered => true
         )
         port map (
             i_flag_ok_wr  => exmem_ok_wr,
+            i_flag_xlast  => exmem_ea_xlast,
+            i_flag_unal   => exmem_ea_unal,
+            i_flag_stf    => exmem_ea_stf,
             i_flag_flash  => exmem_is_flash,
             i_flag_sdram  => exmem_is_sdram,
             i_flag_main   => exmem_in_main,
