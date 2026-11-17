@@ -222,8 +222,10 @@ architecture rtl of csr_file is
     signal minstret_rd_lo : word_t;
     -- Metade alta de minstret como o programa a lê: o contador mais o vai-um da retirada pendente.
     signal minstret_rd_hi : word_t;
-    -- Escrita efetiva de uma instrução CSR no endereço do contador (sem trap nem mret no ciclo).
-    signal cntr_write     : std_logic;
+    -- Escrita de instrução CSR no banco do Zihpm: sem trap nem mret no ciclo e em endereço de leitura e escrita.
+    signal hpm_we         : std_logic;
+    -- Porta tardia de efetivação das escritas nos contadores: instrução válida em EX, sem trap nem mret no ciclo.
+    signal cntr_gate      : std_logic;
     -- Escrita na metade baixa de mcycle.
     signal mcycle_we_lo   : std_logic;
     -- Escrita na metade alta de mcycle.
@@ -598,13 +600,18 @@ begin
     end generate gen_no_mtvec_mode;
 
     -- Contadores da extensão Zicntr.
-    cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
+    -- O banco seleciona o contador, cedo; aqui só se exclui a escrita em endereço somente-leitura.
+    hpm_we <= cntr_gate and has_write_effect and (not is_read_only);
 
     mcycle_inc     <= not inhibit_reg(0);
-    mcycle_we_lo   <= cntr_write and to_sl(i_addr = ADDR_MCYCLE);
-    mcycle_we_hi   <= cntr_write and to_sl(i_addr = ADDR_MCYCLEH);
-    minstret_we_lo <= cntr_write and to_sl(i_addr = ADDR_MINSTRET);
-    minstret_we_hi <= cntr_write and to_sl(i_addr = ADDR_MINSTRETH);
+    -- Os endereços dos contadores de máquina são sempre conhecidos e de leitura e escrita, então a escrita não precisa
+    -- do decodificador geral: a seleção sai só do endereço e do efeito de escrita (registrados, cedo) e a porta de
+    -- efetivação (pipe_run e traps, tardia) entra na última camada, com fanout de quatro.
+    cntr_gate      <= i_commit and (not i_trap_take) and (not i_mret_take);
+    mcycle_we_lo   <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MCYCLE);
+    mcycle_we_hi   <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MCYCLEH);
+    minstret_we_lo <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MINSTRET);
+    minstret_we_hi <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MINSTRETH);
 
     gen_zicntr : if HAS_ZICNTR generate
 
@@ -735,7 +742,7 @@ begin
     -- Bits de mcountinhibit de mcycle e minstret.
 
     gen_inhibit : if HAS_ZICNTR generate
-        inhibit_we  <= cntr_write and is_inhibit_addr;
+        inhibit_we  <= cntr_gate and has_write_effect and is_inhibit_addr;
         inhibit_nxt <= new_value(2 downto 0) and inhibit_mask;
 
         u_inhibit_reg : entity work.generic_register
@@ -778,7 +785,7 @@ begin
                 i_sel_eventh  => in_eventh_range,
                 i_sel_lo      => in_lo_range,
                 i_sel_hi      => in_hi_range,
-                i_we          => cntr_write,
+                i_we          => hpm_we,
                 i_wdata       => new_value,
                 o_rdata       => bank_rdata,
                 o_ovf_irq     => ovf_irq
