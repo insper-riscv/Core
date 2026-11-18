@@ -119,6 +119,8 @@ architecture rtl of misaligned_unit is
     signal mask8         : std_logic_vector(7 downto 0);
     -- Palavra seguinte à do primeiro byte.
     signal next_word     : unsigned((XLEN - 3) downto 0);
+    -- Palavra seguinte à do primeiro byte, registrada no ciclo da etapa 1 para a etapa 2 usá-la sem o somador.
+    signal next_word_q   : std_logic_vector((XLEN - 3) downto 0);
     -- Palavra lida pela região do acesso, a ser guardada na etapa 2.
     signal region_rdata  : word_t;
 
@@ -172,11 +174,25 @@ begin
 
     o_cross <= cross;
     o_stall <= cross and (not second);
-    o_addr  <= i_addr when second = '0' else std_logic_vector(next_word) & BYTE_OFFSET_0;
+    o_addr  <= i_addr when second = '0' else next_word_q & BYTE_OFFSET_0;
     o_data  <= data64(XLEN - 1 downto 0) when second = '0' else data64((2 * XLEN) - 1 downto XLEN);
     o_mask  <= BYTE_MASK_NONE when i_we = '0' else
                mask8(3 downto 0) when second = '0' else
                mask8(7 downto 4);
+
+    -- O endereço do acesso fica estável nos dois ciclos da etapa 1 e da etapa 2, então a palavra seguinte capturada no
+    -- fim da etapa 1 vale durante toda a etapa 2, e o incremento sai do caminho do endereço da memória.
+    u_next_word_reg : entity work.generic_register
+        generic map (
+            data_width => next_word_q'length
+        )
+        port map (
+            i_clk    => i_clk,
+            i_rst    => i_rst,
+            i_enable => '1',
+            i_d      => std_logic_vector(next_word),
+            o_d      => next_word_q
+        );
 
     region_rdata <= i_ext_rdata when is_sdram = '1' else i_ram_rdata;
 

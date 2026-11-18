@@ -31,6 +31,7 @@ Núcleo do processador RISC-V RV32 em VHDL-2008 organizado com uma pipeline de 5
 - [timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md](docs/pt-br/timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md): os registradores de barreira limpam só os bits de controle no descarte.
 - [timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md](docs/pt-br/timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md): a seleção do adiantamento resolvida em ID, registrada e replicada.
 - [timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md](docs/pt-br/timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md): o cruzamento de palavra registrado, a escrita de `mepc`, `mcause` e `mtval` um ciclo depois do trap e a leitura do Zihpm em dois estágios.
+- [timing/P10_EXCECAO_DE_ENDERECO_E_PALAVRA_SEGUINTE_REGISTRADAS.md](docs/pt-br/timing/P10_EXCECAO_DE_ENDERECO_E_PALAVRA_SEGUINTE_REGISTRADAS.md): a exceção de endereço de MEM decidida por bits registrados no EX/MEM e a palavra seguinte do acesso desalinhado registrada.
 - [ISA/M/instructions.md](docs/pt-br/ISA/M/instructions.md): instruções da extensão `M` conforme o manual do RISC-V (capítulo 11): codificação, divisão, divisão por zero e estouro.
 - [ISA/M/description.md](docs/pt-br/ISA/M/description.md): como o Core executa a `M`: decodificador, divisor não-restaurador, parada do pipeline, fusão de pares e verificação formal.
 - [ISA/Zmmul/instructions.md](docs/pt-br/ISA/Zmmul/instructions.md): instruções da extensão `Zmmul` (só multiplicação, seção 11.1.3 do manual): codificação e semântica.
