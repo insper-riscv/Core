@@ -45,6 +45,11 @@ package mem_map_consts is
 
     function is_external_addr (addr : unsigned) return boolean;
 
+    -- O endereço cai numa memória alcançada pelo barramento com ready próprio: a FLASH ou a RAM, quando estão no
+    -- barramento (FLASH_ON_BUS e RAM_ON_BUS).
+
+    function is_bus_mem_addr (addr : unsigned) return boolean;
+
     -- O endereço está na memória principal, a única em que o acesso desalinhado é executado em hardware (Zicclsm): tudo
     -- o que não é a BOOT_MEMORY nem a FLASH direta, que não repartem um acesso em duas leituras.
 
@@ -109,6 +114,13 @@ package body mem_map_consts is
         return not (is_direct_rom_addr(addr) or is_direct_ram_addr(addr));
 
     end function is_external_addr;
+
+    function is_bus_mem_addr (addr : unsigned) return boolean is
+    begin
+
+        return (FLASH_ON_BUS and is_flash_addr(addr)) or (RAM_ON_BUS and is_ram_addr(addr));
+
+    end function is_bus_mem_addr;
 
     function is_main_addr (addr : unsigned) return boolean is
     begin
