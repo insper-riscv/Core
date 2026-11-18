@@ -25,6 +25,7 @@ async def _reset(dut):
     dut.i_wdata.value = 0
     dut.i_src_zero.value = 1
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     dut.i_mret_take.value = 0
     dut.i_rst.value = 1
     for _ in range(2):

@@ -65,7 +65,20 @@ def random_fields(prng):
     for name in ("valid", "we_reg", "wb_sel", "is_flash", "is_sdram"):
         fields[name] = prng.getrandbits(1)
     fields["is_cross"] = prng.getrandbits(1)
+    if fields["is_cross"] and fields["alu_out"] & 3 == 0:
+        # O MEM/WB só marca cruzamento com deslocamento de 1 a 3 bytes.
+        fields["alu_out"] |= prng.randint(1, 3)
     return fields
+
+
+def decoded(fields):
+    """Devolve as entradas que o MEM/WB decodifica do endereço."""
+    offset = fields["alu_out"] & 3
+    cross = fields["is_cross"]
+    return {
+        "ext_off": 0 if cross else offset,
+        "cross_sel": (1 << (offset - 1)) if cross else 0,
+    }
 
 
 @cocotb.test()
@@ -74,7 +87,7 @@ async def test_write_back(dut):
     prng = Prng(0xBACC)
     for index in range(600):
         fields = random_fields(prng)
-        for name, value in fields.items():
+        for name, value in (fields | decoded(fields)).items():
             getattr(dut, f"i_{name}").value = value
         await Timer(1, unit="ns")
         label = (index, fields["ext_ram_op"])

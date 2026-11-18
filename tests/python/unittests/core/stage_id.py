@@ -27,10 +27,10 @@ IDLE = {
     "mem_we_reg": 0,
     "memwb_rd": 0,
     "memwb_we_reg": 0,
-    "mem_re_ram": 0,
+    "mem_ld": 0,
     "ex_rd": 0,
     "ex_we_reg": 0,
-    "ex_re_ram": 0,
+    "ex_ld": 0,
     "pipe_stall": 0,
 }
 CONTROLS = ("we_reg", "we_ram", "re_ram", "en_ram")
@@ -246,14 +246,14 @@ async def test_load_use_hazard_bubble(dut):
     """Load-use, stall externo e IF/ID inválido seguram o estágio."""
     await start(dut)
     instr = encode_r(OP_OP, (1, 0, 5, 7))
-    free = {"ex_rd": 9, "ex_re_ram": 1}
+    free = {"ex_rd": 9, "ex_ld": 1}
     cases = (
         ({}, (1, 1, 1)),
         (free, (1, 1, 1)),
-        ({"ex_rd": 5, "ex_re_ram": 1}, (0, 0, 0)),
-        ({"ex_rd": 7, "ex_re_ram": 1}, (0, 0, 0)),
-        ({"mem_rd": 7, "mem_re_ram": 1}, (0, 0, 0)),
-        ({"ex_rd": 5, "ex_re_ram": 0}, (1, 1, 1)),
+        ({"ex_rd": 5, "ex_ld": 1}, (0, 0, 0)),
+        ({"ex_rd": 7, "ex_ld": 1}, (0, 0, 0)),
+        ({"mem_rd": 7, "mem_ld": 1}, (0, 0, 0)),
+        ({"ex_rd": 5, "ex_ld": 0}, (1, 1, 1)),
         ({"pipe_stall": 1}, (0, 0, 0)),
         ({"ifid_valid": 0}, (1, 1, 0)),
     )

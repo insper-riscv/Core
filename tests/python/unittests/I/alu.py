@@ -85,6 +85,13 @@ async def apply_and_check(dut, op_name, operands, expected):
         expected_branch,
         f"{op_name}: esperado branch={expected_branch}, obtido {got_branch}",
     )
+    if op_name == "ADD":
+        # o_sum é o endereço efetivo de um load ou store
+        check_equal(
+            int(dut.o_sum.value),
+            to_bits(a + b),
+            f"ADD: o_sum de dA={a:#010x} e dB={b:#010x}",
+        )
 
     log_info(
         f"{op_name} OK: "

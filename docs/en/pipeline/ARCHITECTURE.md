@@ -52,7 +52,7 @@ The aligned and extended datum of a load exists only at the end of the WB stage,
 
 ### 2.2. Load-Use Hazard Stall
 
-Because the datum of a load reaches the WB2 register two stages after MEM, an instruction in ID that depends on a load in the EX stage (`i_idex_re_ram = '1'` and `i_idex_rd /= x0`) or in the MEM stage (`i_exmem_re_ram = '1'` and `i_exmem_rd /= x0`) must wait until the load is in WB. That costs two cycles for an immediate dependency and one when an instruction sits between the load and its consumer:
+Because the datum of a load reaches the WB2 register two stages after MEM, an instruction in ID that depends on a load in the EX stage (`i_idex_ld = '1'`, the registered load bit with `rd /= x0`) or in the MEM stage (`i_exmem_ld = '1'`, the same registered bit) must wait until the load is in WB. That costs two cycles for an immediate dependency and one when an instruction sits between the load and its consumer:
 
 1. The hazard detection unit checks the `opcode` of the instruction in ID to determine whether it actually reads `rs1` (`OP`, `OP_IMM`, `LOAD`, `STORE`, `BRANCH`, `JALR`, `SYSTEM`) and whether it actually reads `rs2` (`OP`, `STORE`, `BRANCH`), avoiding false stalls when the `rs2` bit field is part of an immediate.
 2. When the hazard is confirmed, the HDU deasserts `o_pc_we` and `o_ifid_we` (freezing the PC and the IF/ID register) and asserts `o_bubble_sel = '1'`.
