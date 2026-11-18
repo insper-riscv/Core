@@ -30,6 +30,7 @@ async def reset(dut):
     dut.i_wdata.value = 0
     dut.i_src_zero.value = 1
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     dut.i_mret_take.value = 0
     dut.i_retire.value = 0
     dut.i_events.value = 0
@@ -268,8 +269,10 @@ async def test_a_trap_does_not_change_the_counters(dut):
     await write(dut, MHPMEVENT[3], 3)
     await pulses(dut, 3, 3)
     dut.i_trap_take.value = 1
+    dut.i_trap_early.value = 1
     dut.i_trap_cause.value = 4
     await RisingEdge(dut.i_clk)
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     await Timer(1, unit="ns")
     check_equal(await read(dut, MHPMCOUNTER[3]), 3)

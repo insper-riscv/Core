@@ -210,6 +210,10 @@ architecture rtl of stage_ex is
     signal csr_illegal      : std_logic;
     -- Pulso interno de tomada de trap síncrono.
     signal trap_take_int    : std_logic;
+    -- Exceção de EX sem a de desvio ou salto desalinhado.
+    signal trap_take_nocf   : std_logic;
+    -- Exceção de EX ou de MEM sem a de desvio ou salto desalinhado, para o gate dos contadores.
+    signal csr_trap_early   : std_logic;
     -- Exceção detectada sem Zicsr: sinalizada na saída, sem redirecionar o PC.
     signal sig_take         : std_logic;
     -- Causa da exceção sinalizada sem Zicsr.
@@ -441,6 +445,7 @@ begin
     gen_csr : if HAS_ZICSR generate
         -- A exceção do estágio MEM é de uma instrução mais antiga: vale no lugar da deste estágio.
         csr_trap_take  <= trap_take_int or i_mem_trap_take;
+        csr_trap_early <= trap_take_nocf or i_mem_trap_take;
         csr_trap_cause <= i_mem_trap_cause when i_mem_trap_take = '1' else trap_cause;
         csr_trap_pc    <= i_mem_trap_pc when i_mem_trap_take = '1' else i_pc;
         csr_trap_tval  <= i_mem_trap_tval when i_mem_trap_take = '1' else trap_tval;
@@ -486,6 +491,7 @@ begin
                 o_bank_read      => csr_bank_read,
                 o_illegal        => csr_illegal,
                 i_trap_take      => csr_trap_take,
+                i_trap_early     => csr_trap_early,
                 i_trap_cause     => csr_trap_cause,
                 i_trap_pc        => csr_trap_pc,
                 i_trap_tval      => csr_trap_tval,
@@ -548,6 +554,7 @@ begin
                 i_irq_take    => irq_take_pending,
                 i_irq_cause   => irq_cause,
                 o_take        => trap_take_int,
+                o_take_nocf   => trap_take_nocf,
                 o_mret_take   => mret_take_int,
                 o_irq         => trap_is_irq,
                 o_cause       => trap_cause,

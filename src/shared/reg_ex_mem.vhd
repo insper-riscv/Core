@@ -87,6 +87,8 @@ entity reg_ex_mem is
         o_we_ram      : out   std_logic;
         -- Habilitação de leitura da RAM registrada para o estágio MEM.
         o_re_ram      : out   std_logic;
+        -- A instrução em MEM é um load com rd diferente de x0 (para a detecção load-use em ID).
+        o_ld          : out   std_logic;
         -- Habilitação de acesso à RAM registrada para o estágio MEM.
         o_en_ram      : out   std_logic;
         -- Modo de extensão de leitura da RAM registrado para o estágio MEM.
@@ -151,6 +153,10 @@ architecture rtl of reg_ex_mem is
     signal r_we_ram     : std_logic    := '0';
     -- Habilitação de leitura da RAM armazenada.
     signal r_re_ram     : std_logic    := '0';
+    -- Load com rd diferente de x0 armazenado.
+    signal r_ld         : std_logic    := '0';
+    -- Entrada: o registrador destino é diferente de x0.
+    signal in_rd_nz     : std_logic;
     -- Habilitação de acesso à RAM armazenada.
     signal r_en_ram     : std_logic    := '0';
     -- Modo de extensão da RAM armazenado.
@@ -235,6 +241,7 @@ begin
     end generate gen_no_faults;
 
     -- O cruzamento da palavra também sai de EX e fica registrado: o estágio MEM só confere o bit.
+    in_rd_nz <= '1' when i_rd /= REG_IDX_ZERO else '0';
     in_cross <= is_cross_access(i_re_ram, i_we_ram, i_ext_ram_op, i_byte_mask, i_ea(1 downto 0)) when HAS_ZICCLSM else '0';
 
     -- A exceção de endereço do acesso (as causas 4 e 6 do desalinhamento que o hardware não executa e a falha de store
@@ -279,6 +286,7 @@ begin
                 r_we_ok      <= '0';
                 r_we_ram     <= '0';
                 r_re_ram     <= '0';
+                r_ld         <= '0';
                 r_en_ram     <= '0';
                 r_ext_ram_op <= (others => '0');
                 r_wb_sel     <= (others => '0');
@@ -299,6 +307,7 @@ begin
                 r_we_ok      <= i_we_reg and i_valid;
                 r_we_ram     <= i_we_ram;
                 r_re_ram     <= i_re_ram;
+                r_ld         <= i_re_ram and in_rd_nz;
                 r_en_ram     <= i_en_ram;
                 r_ext_ram_op <= i_ext_ram_op;
                 r_wb_sel     <= i_wb_sel;
@@ -343,6 +352,7 @@ begin
     o_we_ok       <= r_we_ok;
     o_we_ram      <= r_we_ram;
     o_re_ram      <= r_re_ram;
+    o_ld          <= r_ld;
     o_en_ram      <= r_en_ram;
     o_ext_ram_op  <= r_ext_ram_op;
     o_wb_sel      <= r_wb_sel;

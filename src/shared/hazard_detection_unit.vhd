@@ -35,12 +35,12 @@ entity hazard_detection_unit is
         i_ifid_opcode  : in    opcode_t;
         -- Endereço do registrador destino rd da instrução no estágio EX.
         i_idex_rd      : in    reg_t;
-        -- Indica que a instrução no estágio EX é uma leitura de memória (load).
-        i_idex_re_ram  : in    std_logic;
+        -- A instrução no estágio EX é um load com registrador destino diferente de x0 (registrado em ID/EX).
+        i_idex_ld      : in    std_logic;
         -- Endereço do registrador destino rd da instrução no estágio MEM.
         i_exmem_rd     : in    reg_t := (others => '0');
-        -- Indica que a instrução no estágio MEM é uma leitura de memória (load).
-        i_exmem_re_ram : in    std_logic   := '0';
+        -- A instrução no estágio MEM é um load com registrador destino diferente de x0 (registrado em EX/MEM).
+        i_exmem_ld     : in    std_logic   := '0';
         -- Parada global do pipeline (MulDiv, espera da memória externa ou FENCE.I).
         i_stall        : in    std_logic;
         -- Habilita a escrita no registrador PC ('1' = avança, '0' = congela).
@@ -86,12 +86,10 @@ begin
     -- Detecta conflito load-use quando a instrução em EX é um load para rd /= x0 usado em ID.
     -- Um load só entrega o dado alinhado ao registrador WB2, dois estágios depois de MEM; o dependente espera
     -- enquanto o load está em EX ou em MEM.
-    load_use_hazard <= '1' when ((i_idex_re_ram = '1' and
-                                     i_idex_rd /= REG_IDX_ZERO and
+    load_use_hazard <= '1' when ((i_idex_ld = '1' and
                                      ((ifid_uses_rs1 = '1' and i_idex_rd = i_ifid_rs1) or
                                          (ifid_uses_rs2 = '1' and i_idex_rd = i_ifid_rs2))) or
-                                    (i_exmem_re_ram = '1' and
-                                        i_exmem_rd /= REG_IDX_ZERO and
+                                    (i_exmem_ld = '1' and
                                         ((ifid_uses_rs1 = '1' and i_exmem_rd = i_ifid_rs1) or
                                             (ifid_uses_rs2 = '1' and i_exmem_rd = i_ifid_rs2)))) else
                        '0';

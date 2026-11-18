@@ -41,6 +41,7 @@ async def _reset(dut):
     dut.i_wdata.value = 0
     dut.i_src_zero.value = 1
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     dut.i_mret_take.value = 0
     _lines(dut)
     dut.i_rst.value = 1
@@ -154,8 +155,10 @@ async def test_a_trap_cycle_does_not_write_mie(dut):
     """Verifica a CSR write in a trap cycle does not land in mie."""
     await _reset(dut)
     dut.i_trap_take.value = 1
+    dut.i_trap_early.value = 1
     await access(dut, MIE, RW, MASK)
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     check_equal(await read(dut, MIE), 0)
 
 

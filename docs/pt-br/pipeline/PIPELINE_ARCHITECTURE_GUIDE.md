@@ -121,7 +121,7 @@ O estágio MEM decodifica o endereço efetivo `i_alu_out` conforme os limites de
 
 ![Estágio WB](../../figuras/wb.svg)
 
-No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_ext_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_alu_out(1 downto 0)` e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
+No estágio WB, a palavra lida no ciclo anterior é selecionada entre `i_flash_data2`, `i_ext_rdata` e `i_ram_rdata` a partir do endereço `i_alu_out`. O módulo `extender_ram` extrai o byte ou meia-palavra segundo `i_ext_off`, a posição que o MEM/WB registra decodificada e aplica o modo de extensão definido em `src/shared/ext_ram_consts.vhd`:
 
 | Constante | Código (`i_ext_ram_op`) | Operação de alinhamento e extensão |
 | :--- | :--- | :--- |

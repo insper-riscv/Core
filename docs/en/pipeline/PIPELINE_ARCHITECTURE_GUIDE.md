@@ -121,7 +121,7 @@ The MEM stage decodes the effective address `i_alu_out` using the bounds in `src
 
 ![WB stage](../../figuras/wb.svg)
 
-In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_ext_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_alu_out(1 downto 0)` and applies the extension mode defined in `src/shared/ext_ram_consts.vhd`:
+In the WB stage, the word read in the previous cycle is selected from `i_flash_data2`, `i_ext_rdata`, or `i_ram_rdata` based on the address `i_alu_out`. The `extender_ram` module extracts the byte or halfword indicated by `i_ext_off`, the position that MEM/WB registers decoded and applies the extension mode defined in `src/shared/ext_ram_consts.vhd`:
 
 | Constant | Code (`i_ext_ram_op`) | Alignment and extension operation |
 | :--- | :--- | :--- |

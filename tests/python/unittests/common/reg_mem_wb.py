@@ -36,13 +36,16 @@ def is_cross(op, address):
 
 
 def derived(values):
-    """Devolve we_ok, a região e o cruzamento do endereço."""
+    """Devolve we_ok, a região, o cruzamento e o deslocamento do endereço."""
     address = values["alu_out"]
+    cross = is_cross(values["ext_ram_op"], address)
     return {
         "we_ok": values["we_reg"] & values["valid"],
         "is_flash": int(address < ROM_END),
         "is_sdram": int(address >= EXT_BASE),
-        "is_cross": int(is_cross(values["ext_ram_op"], address)),
+        "is_cross": int(cross),
+        "ext_off": 0 if cross else address & 3,
+        "cross_sel": (1 << ((address & 3) - 1)) if cross else 0,
     }
 
 

@@ -118,6 +118,9 @@ entity csr_file is
         o_illegal        : out   std_logic;
         -- Pulso que comanda o salvamento de contexto de exceção síncrona no modo máquina.
         i_trap_take      : in    std_logic                                         := '0';
+        -- O mesmo pulso sem a exceção de desvio ou salto desalinhado, que chega tarde: só ele barra as escritas dos
+        -- contadores e dos registradores de CSR, porque uma instrução CSR nunca toma desvio.
+        i_trap_early     : in    std_logic                                         := '0';
         -- Código da causa da exceção a ser gravado em mcause.
         i_trap_cause     : in    word_t                                            := (others => '0');
         -- Endereço PC da instrução que gerou a exceção a ser gravado em mepc.
@@ -410,7 +413,7 @@ begin
                 new_value(7);
 
     -- Controle de atualização dos CSRs de 32 bits.
-    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and
+    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_early = '0' and
                                    i_mret_take = '0') else
                       '0';
     mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';
@@ -418,7 +421,7 @@ begin
     mtvec_nxt      <= new_value((XLEN - 1) downto 6) & mtvec_base_low & BYTE_OFFSET_0;
     mtvec_value    <= mtvec_reg((XLEN - 1) downto 2) & '0' & mtvec_mode;
 
-    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and
+    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_early = '0' and
                                 i_mret_take = '0') else
                    '0';
 
@@ -518,7 +521,7 @@ begin
                      CAUSE_IRQ_TIMER;
 
     gen_irq : if HAS_INTERRUPTS generate
-        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and
+        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_early = '0' and
                                   i_mret_take = '0') else
                      '0';
 
@@ -546,7 +549,7 @@ begin
 
     gen_lcofi : if HAS_SSCOF generate
         lcofip_we  <= ovf_irq or
-                      (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
+                      (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_early) and (not i_mret_take));
         lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
 
         u_lcofip : entity work.flip_flop
@@ -598,7 +601,7 @@ begin
     end generate gen_no_mtvec_mode;
 
     -- Contadores da extensão Zicntr.
-    cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
+    cntr_write <= '1' when (csr_write_valid = '1' and i_trap_early = '0' and i_mret_take = '0') else '0';
 
     mcycle_inc     <= not inhibit_reg(0);
     mcycle_we_lo   <= cntr_write and to_sl(i_addr = ADDR_MCYCLE);

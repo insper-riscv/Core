@@ -498,7 +498,7 @@ mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_overflow_loses_to_write "s/of_d 
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_minh_ignored "s/ and (not minh_q);/;/" "$ofp_gens" 10
 mutant_bank "$bank" "$csr_ofp_props" "$ofp" ofp_of_not_sticky "s/of_en     <= wrap or eventh_we;/of_en     <= eventh_we;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofi_before_timer "s/CAUSE_IRQ_LCOFI \+when (lcofi_pend = '1' and irq_pend_vec(IRQ_IDX_TIMER) = '0') else/CAUSE_IRQ_LCOFI    when lcofi_pend = '1' else/" "$ofp_gens" 10
-mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost ":a;N;\$!ba;s/lcofip_we[[:space:]]\+<=[[:space:]]\+ovf_irq[[:space:]]\+or[[:space:]]\+(csr_write_valid[[:space:]]\+and[[:space:]]\+to_sl(i_addr[[:space:]]\+=[[:space:]]\+ADDR_MIP)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_trap_take)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
+mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofip_write_lost ":a;N;\$!ba;s/lcofip_we[[:space:]]\+<=[[:space:]]\+ovf_irq[[:space:]]\+or[[:space:]]\+(csr_write_valid[[:space:]]\+and[[:space:]]\+to_sl(i_addr[[:space:]]\+=[[:space:]]\+ADDR_MIP)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_trap_early)[[:space:]]\+and[[:space:]]\+(not[[:space:]]\+i_mret_take));/lcofip_we  <= ovf_irq;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_lcofie_ignored "s/lcofi_pend <= lcofip and lcofie;/lcofi_pend <= lcofip;/" "$ofp_gens" 10
 mutant_bank "$csr" "$csr_ofp_props" "$ofp" ofp_eventh_range_alias "s/in_eventh_range \+<= '1' when addr_range = RANGE_MHPMEVENTH else '0';/in_eventh_range  <= '1' when addr_range(5 downto 0) = RANGE_MHPMEVENTH(5 downto 0) else '0';/" "$ofp_gens" 10
 
