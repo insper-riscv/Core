@@ -91,6 +91,8 @@ architecture rtl of stage_if is
     signal pc_src            : pc_src_t;
     -- Habilitação efetiva de escrita no registrador PC.
     signal pc_write_en       : std_logic;
+    -- Desvio ou salto de EX tomado e liberado pelo pipeline.
+    signal late_take         : std_logic;
     -- Indica que o endereço atual do PC aponta para a BOOT_MEMORY.
     signal is_boot_memory_if : std_logic;
     -- Indica que o endereço atual do PC aponta para uma região atendida pelo barramento.
@@ -106,17 +108,17 @@ begin
 
     -- Seleção prioritária da fonte do próximo PC.
     pc_src <= PC_SRC_REDIRECT when (i_trap_take = '1' or i_mret_take = '1' or i_fencei_take = '1') else
-              PC_SRC_JALR when i_ex_jalr_taken = '1' else
-              PC_SRC_BRANCH when i_ex_branch_taken = '1' else
               PC_SRC_PC4;
+
+    -- O desvio ou salto decidido em EX é a última decisão do ciclo: vai direto ao seletor final e à habilitação do PC,
+    -- sem passar por i_pc_src nem por pc_write_en.
+    late_take <= (i_ex_branch_taken or i_ex_jalr_taken) and i_pipe_run;
 
     -- O PC avança quando liberado pela HDU e sem espera de I-cache, ou imediatamente em redirecionamentos.
     -- O PC avança sem esperar a I-cache: a resposta tardia (i_ic_ready) só marca a instrução de IF/ID como sem
     -- resposta, e o PC volta a ela no ciclo seguinte (replay). Assim a saída das RAMs da cache chega só a dois
     -- registradores.
-    pc_write_en <= i_hdu_pc_we or
-                   (((i_ex_branch_taken or i_ex_jalr_taken) and i_pipe_run) or
-                      i_trap_take or i_mret_take or i_fencei_take);
+    pc_write_en <= i_hdu_pc_we;
 
     replay   <= miss_q and i_hdu_pc_we;
     o_replay <= replay;
@@ -145,6 +147,8 @@ begin
             i_redirect_pc   => i_redirect_pc,
             i_replay        => replay,
             i_replay_pc     => i_ifid_pc,
+            i_late_take     => late_take,
+            i_late_jalr     => i_ex_jalr_taken,
             o_pc            => if_pc,
             o_pc4           => o_pc4
         );
