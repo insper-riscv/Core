@@ -3329,6 +3329,7 @@
             "src/common/src/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
+            "src/shared/funct3_consts.vhd",
             "src/shared/ext_ram_consts.vhd",
             "src/shared/mem_map_consts.vhd",
             "src/shared/reg_ex_mem.vhd"
@@ -3348,11 +3349,52 @@
             "build/configs/faults_map_access_faults/config_pkg.vhd",
             "src/shared/pipeline_types.vhd",
             "src/shared/byte_mask_consts.vhd",
+            "src/shared/funct3_consts.vhd",
             "src/shared/ext_ram_consts.vhd",
             "src/shared/mem_map_consts.vhd",
             "src/shared/reg_ex_mem.vhd"
         ],
         "test_module": "tests.python.unittests.common.reg_ex_mem_faults",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "RegExMemAddrOk": {
+        "toplevel": "reg_ex_mem",
+        "sources": [
+            "src/common/src/utils_pkg.vhd",
+            "build/configs/addr_ok/config_pkg.vhd",
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/reg_ex_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_ex_mem_addr_ok",
+        "build_args": [
+            "--std=08"
+        ],
+        "test_args": [
+            "--std=08"
+        ]
+    },
+    "RegExMemAddrOkFlashBus": {
+        "toplevel": "reg_ex_mem",
+        "sources": [
+            "src/common/src/utils_pkg.vhd",
+            "build/configs/addr_ok_flash_bus/config_pkg.vhd",
+            "src/shared/pipeline_types.vhd",
+            "src/shared/byte_mask_consts.vhd",
+            "src/shared/funct3_consts.vhd",
+            "src/shared/ext_ram_consts.vhd",
+            "src/shared/mem_map_consts.vhd",
+            "src/shared/reg_ex_mem.vhd"
+        ],
+        "test_module": "tests.python.unittests.common.reg_ex_mem_addr_ok_flash_bus",
         "build_args": [
             "--std=08"
         ],

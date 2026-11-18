@@ -37,6 +37,10 @@ entity stage_wb is
         i_is_sdram    : in    std_logic;
         -- O load cruza a palavra e usa a primeira palavra retida (decodificado no registrador MEM/WB).
         i_is_cross    : in    std_logic;
+        -- Posição do dado dentro da palavra entregue ao extensor, zero no load que cruza (decodificada no MEM/WB).
+        i_ext_off     : in    byte_offset_t;
+        -- Deslocamento do load que cruza, um bit por byte, em zero fora do cruzamento (decodificado no MEM/WB).
+        i_cross_sel   : in    std_logic_vector(2 downto 0);
         -- Palavra de dados lida da segunda porta da memória FLASH.
         i_flash_data2 : in    word_t;
         -- Palavra de dados lida da memória RAM interna.
@@ -60,14 +64,14 @@ architecture rtl of stage_wb is
     signal mem_read_data   : word_t;
     -- Palavra de 32 bits alinhada e estendida pelo módulo extender_ram.
     signal wb_ram_extended : word_t;
-    -- Par de palavras do load que cruzou, deslocado até o primeiro byte do dado.
-    signal cross_pair      : std_logic_vector((2 * XLEN) - 1 downto 0);
-    -- Palavra baixa do par deslocado: o dado do load alinhado ao byte 0.
-    signal cross_word      : word_t;
+    -- Palavra do load que cruzou, deslocada de um byte: o dado alinhado ao byte 0.
+    signal cross_word1     : word_t;
+    -- Palavra do load que cruzou, deslocada de dois bytes.
+    signal cross_word2     : word_t;
+    -- Palavra do load que cruzou, deslocada de três bytes.
+    signal cross_word3     : word_t;
     -- Palavra entregue ao extensor: a juntada de duas palavras ou a lida da memória.
     signal ext_data        : word_t;
-    -- Posição do dado dentro da palavra entregue ao extensor.
-    signal ext_offset      : byte_offset_t;
 
 begin
 
@@ -75,18 +79,21 @@ begin
                      i_ext_rdata when i_is_sdram = '1' else
                      i_ram_rdata;
 
-    cross_pair <= std_logic_vector(shift_right(unsigned(mem_read_data & i_first_word),
-                                               8 * to_integer(unsigned(i_alu_out(1 downto 0)))));
-    cross_word <= cross_pair(XLEN - 1 downto 0);
+    -- O par (mem_read_data, i_first_word) deslocado de um a três bytes; o deslocamento chega em um bit por byte.
+    cross_word1 <= mem_read_data(7 downto 0) & i_first_word(31 downto 8);
+    cross_word2 <= mem_read_data(15 downto 0) & i_first_word(31 downto 16);
+    cross_word3 <= mem_read_data(23 downto 0) & i_first_word(31 downto 24);
 
-    ext_data   <= cross_word when i_is_cross = '1' else mem_read_data;
-    ext_offset <= BYTE_OFFSET_0 when i_is_cross = '1' else i_alu_out(1 downto 0);
+    ext_data <= (mem_read_data and (word_t'range => not i_is_cross)) or
+                (cross_word1 and (word_t'range => i_cross_sel(0))) or
+                (cross_word2 and (word_t'range => i_cross_sel(1))) or
+                (cross_word3 and (word_t'range => i_cross_sel(2)));
 
     u_extender_ram : entity work.extender_ram
         port map (
             i_data        => ext_data,
             i_op          => i_ext_ram_op,
-            i_byte_offset => ext_offset,
+            i_byte_offset => i_ext_off,
             o_data        => wb_ram_extended
         );
 

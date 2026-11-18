@@ -38,8 +38,11 @@ KEEP = {
 
 
 def derived(values):
-    """Devolve we_ok: a escrita de registrador só vale com validade."""
-    return {"we_ok": values["we_reg"] & values["valid"]}
+    """Devolve we_ok e ld (load com rd diferente de x0)."""
+    return {
+        "we_ok": values["we_reg"] & values["valid"],
+        "ld": int(values["re_ram"] == 1 and values["rd"] != 0),
+    }
 
 
 @cocotb.test()
