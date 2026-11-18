@@ -26,7 +26,7 @@ module props (input clk);
   wire illegal;
 
   csr_file dut (.i_retire_hold(1'b0), .i_clk(clk), .i_rst(reset), .i_commit(commit), .i_addr(addr), .i_op(op), .i_wdata(wdata),
-    .i_src_zero(src_zero), .o_rdata(rdata), .o_illegal(illegal), .i_trap_take(trap_take),
+    .i_src_zero(src_zero), .o_rdata(rdata), .o_illegal(illegal), .i_trap_take(trap_take), .i_trap_early(trap_take),
     .i_mret_take(mret_take), .i_events(events));
 
   // The registers have no initial value: the first clock is a reset, as on the board.

@@ -66,7 +66,11 @@ entity reg_mem_wb is
         -- O endereço do load registrado pertence à janela externa de SDRAM (decodificado na entrada).
         o_is_sdram   : out   std_logic;
         -- O load registrado cruza a palavra e usa a primeira palavra retida (decodificado na entrada).
-        o_is_cross   : out   std_logic
+        o_is_cross   : out   std_logic;
+        -- Posição do dado dentro da palavra entregue ao extensor (zero no load que cruza), decodificada na entrada.
+        o_ext_off    : out   byte_offset_t;
+        -- Deslocamento do load que cruza, um bit por byte (bit 0 um byte, bit 2 três bytes), decodificado na entrada.
+        o_cross_sel  : out   std_logic_vector(2 downto 0)
     );
 end entity reg_mem_wb;
 
@@ -98,6 +102,14 @@ architecture rtl of reg_mem_wb is
     signal in_is_sdram  : std_logic;
     -- Entrada: o load cruza a palavra (LW fora de alinhamento ou meia-palavra no byte 3).
     signal in_is_cross  : std_logic;
+    -- Posição do dado dentro da palavra armazenada.
+    signal r_ext_off    : byte_offset_t := (others => '0');
+    -- Deslocamento do load que cruza armazenado, um bit por byte.
+    signal r_cross_sel  : std_logic_vector(2 downto 0) := (others => '0');
+    -- Entrada: posição do dado dentro da palavra (zero no load que cruza).
+    signal in_ext_off   : byte_offset_t;
+    -- Entrada: deslocamento do load que cruza, um bit por byte.
+    signal in_cross_sel : std_logic_vector(2 downto 0);
 
 begin
 
@@ -108,6 +120,13 @@ begin
                                 ((i_ext_ram_op = EXT_RAM_LH or i_ext_ram_op = EXT_RAM_LHU) and
                                     i_alu_out(1 downto 0) = BYTE_OFFSET_3)) else
                    '0';
+
+    -- O estágio WB recebe a posição e o deslocamento já decodificados, para o endereço registrado não passar por
+    -- um seletor de dois bits com fanout alto antes do extensor.
+    in_ext_off      <= BYTE_OFFSET_0 when in_is_cross = '1' else i_alu_out(1 downto 0);
+    in_cross_sel(0) <= in_is_cross when i_alu_out(1 downto 0) = BYTE_OFFSET_1 else '0';
+    in_cross_sel(1) <= in_is_cross when i_alu_out(1 downto 0) = BYTE_OFFSET_2 else '0';
+    in_cross_sel(2) <= in_is_cross when i_alu_out(1 downto 0) = BYTE_OFFSET_3 else '0';
 
     p_reg_mem_wb_ctrl_proc : process (i_clk) is
     begin
@@ -123,6 +142,8 @@ begin
                 r_is_flash   <= '0';
                 r_is_sdram   <= '0';
                 r_is_cross   <= '0';
+                r_ext_off    <= (others => '0');
+                r_cross_sel  <= (others => '0');
             elsif i_en = '1' then
                 r_valid      <= i_valid;
                 r_rd         <= i_rd;
@@ -133,6 +154,8 @@ begin
                 r_is_flash   <= in_is_flash;
                 r_is_sdram   <= in_is_sdram;
                 r_is_cross   <= in_is_cross;
+                r_ext_off    <= in_ext_off;
+                r_cross_sel  <= in_cross_sel;
             end if;
         end if;
 
@@ -159,5 +182,7 @@ begin
     o_is_flash   <= r_is_flash;
     o_is_sdram   <= r_is_sdram;
     o_is_cross   <= r_is_cross;
+    o_ext_off    <= r_ext_off;
+    o_cross_sel  <= r_cross_sel;
 
 end architecture rtl;

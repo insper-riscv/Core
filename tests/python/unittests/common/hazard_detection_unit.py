@@ -10,11 +10,11 @@ INPUTS = {
     "ifid_rs1": ("i_ifid_rs1", 0x1F),
     "ifid_rs2": ("i_ifid_rs2", 0x1F),
     "idex_rd": ("i_idex_rd", 0x1F),
-    "idex_reram": ("i_idex_re_ram", 0x1),
+    "idex_reram": ("i_idex_ld", 0x1),
     "muldiv_busy": ("i_stall", 0x1),
     "ifid_valid": ("i_ifid_valid", 0x1),
     "exmem_rd": ("i_exmem_rd", 0x1F),
-    "exmem_reram": ("i_exmem_re_ram", 0x1),
+    "exmem_reram": ("i_exmem_ld", 0x1),
 }
 # ifid_opcode "0110011" é R-type (usa rs1 e rs2)
 DEFAULTS = {"ifid_valid": 1, "exmem_rd": 0, "exmem_reram": 0}
@@ -27,6 +27,10 @@ def set_inputs(dut, ifid_opcode: str = "0110011", **inputs: int) -> None:
     unknown = values.keys() - INPUTS.keys()
     if missing or unknown:
         raise TypeError(f"entradas: faltam {missing}, sobram {unknown}")
+    # A porta leva o load com rd diferente de x0 (do registrador).
+    for stage in ("idex", "exmem"):
+        if values[f"{stage}_rd"] & 0x1F == 0:
+            values[f"{stage}_reram"] = 0
     for name, (port, mask) in INPUTS.items():
         getattr(dut, port).value = values[name] & mask
     dut.i_ifid_opcode.value = int(ifid_opcode, 2)

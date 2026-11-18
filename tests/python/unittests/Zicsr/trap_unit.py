@@ -196,6 +196,9 @@ async def test_misaligned_control_flow_target(dut):
     check_equal((await probe(dut, cf_taken=1, cf_target=0x8004))[0], 0)
     # a not-taken branch with a misaligned target does not trap
     check_equal((await probe(dut, cf_taken=0, cf_target=0x8002))[0], 0)
+    # a misaligned target is not in the take without control flow
+    await probe(dut, cf_taken=1, cf_target=0x8002)
+    check_equal(int(dut.o_take_nocf.value), 0)
 
 
 @cocotb.test()

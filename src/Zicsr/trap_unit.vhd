@@ -93,6 +93,8 @@ entity trap_unit is
         i_irq_cause      : in    word_t    := (others => '0');
         -- Pulso que comanda a tomada de trap síncrono no ciclo atual.
         o_take           : out   std_logic;
+        -- Igual a o_take sem a exceção de desvio ou salto desalinhado, que depende da decisão tardia do desvio.
+        o_take_nocf      : out   std_logic;
         -- Pulso que comanda o retorno de trap (instrução MRET) no ciclo atual.
         o_mret_take      : out   std_logic;
         -- A tomada comandada por o_take é a de uma interrupção, e não a de uma exceção síncrona.
@@ -158,6 +160,8 @@ architecture rtl of trap_unit is
 
     -- Sinal agregador que indica ocorrência de qualquer exceção síncrona na instrução atual.
     signal has_exc   : std_logic;
+    -- As exceções síncronas que não dependem do desvio ou salto tomado.
+    signal has_exc_nocf : std_logic;
     -- Indica decodificação da instrução FENCE.I, que redireciona o pipeline e por isso não é abortada.
     signal is_fencei : std_logic;
     -- Indica que a interrupção a tomar é tomada neste ciclo: a instrução em EX é válida, avança e não é FENCE.I.
@@ -237,11 +241,13 @@ begin
 
     has_exc <= fetch_fault or cf_misal or any_illegal or is_ebreak or
                ld_misal or st_misal or st_fault or is_ecall;
+    has_exc_nocf <= fetch_fault or any_illegal or is_ebreak or ld_misal or st_misal or st_fault or is_ecall;
 
     is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
     irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
 
     o_take      <= (has_exc and i_ex_valid and i_run) or irq_go;
+    o_take_nocf <= (has_exc_nocf and i_ex_valid and i_run) or irq_go;
     o_mret_take <= is_mret and i_ex_valid and i_run and (not irq_go);
     o_irq       <= irq_go;
 

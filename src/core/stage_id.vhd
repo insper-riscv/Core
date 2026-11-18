@@ -48,14 +48,14 @@ entity stage_id is
         i_memwb_rd      : in    reg_t;
         -- A instrução no estágio WB escreverá em registrador e continuará válida em WB2 (para o adiantamento).
         i_memwb_we_reg  : in    std_logic;
-        -- Indica se a instrução no estágio MEM é uma leitura de memória (load).
-        i_mem_re_ram    : in    std_logic;
+        -- A instrução no estágio MEM é um load com registrador destino diferente de x0 (registrado em EX/MEM).
+        i_mem_ld        : in    std_logic;
         -- Endereço do registrador destino rd da instrução no estágio EX (para detecção load-use).
         i_ex_rd         : in    reg_t;
         -- A instrução no estágio EX escreverá em registrador e continuará válida em EX/MEM (para o adiantamento).
         i_ex_we_reg     : in    std_logic;
-        -- Indica se a instrução no estágio EX é uma leitura de memória (load).
-        i_ex_re_ram     : in    std_logic;
+        -- A instrução no estágio EX é um load com registrador destino diferente de x0 (registrado em ID/EX).
+        i_ex_ld         : in    std_logic;
         -- Indica stall global vindo dos estágios posteriores (multdiv, SDRAM ou FENCE.I).
         i_pipe_stall    : in    std_logic;
         -- Habilitação de escrita do PC gerada pela HDU para o estágio IF.
@@ -415,9 +415,9 @@ begin
             i_ifid_rs2     => rf_rs2_idx,
             i_ifid_opcode  => id_opcode,
             i_idex_rd      => i_ex_rd,
-            i_idex_re_ram  => i_ex_re_ram,
+            i_idex_ld      => i_ex_ld,
             i_exmem_rd     => i_mem_rd,
-            i_exmem_re_ram => i_mem_re_ram,
+            i_exmem_ld     => i_mem_ld,
             i_stall        => i_pipe_stall,
             o_pc_we        => o_pc_we,
             o_ifid_we      => o_ifid_we,

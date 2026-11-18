@@ -118,6 +118,9 @@ entity csr_file is
         o_illegal        : out   std_logic;
         -- Pulso que comanda o salvamento de contexto de exceção síncrona no modo máquina.
         i_trap_take      : in    std_logic                                         := '0';
+        -- O mesmo pulso sem a exceção de desvio ou salto desalinhado, que chega tarde: só ele barra as escritas dos
+        -- contadores e dos registradores de CSR, porque uma instrução CSR nunca toma desvio.
+        i_trap_early     : in    std_logic                                         := '0';
         -- Código da causa da exceção a ser gravado em mcause.
         i_trap_cause     : in    word_t                                            := (others => '0');
         -- Endereço PC da instrução que gerou a exceção a ser gravado em mepc.
@@ -222,8 +225,10 @@ architecture rtl of csr_file is
     signal minstret_rd_lo : word_t;
     -- Metade alta de minstret como o programa a lê: o contador mais o vai-um da retirada pendente.
     signal minstret_rd_hi : word_t;
-    -- Escrita efetiva de uma instrução CSR no endereço do contador (sem trap nem mret no ciclo).
-    signal cntr_write     : std_logic;
+    -- Escrita de instrução CSR no banco do Zihpm: sem trap nem mret no ciclo e em endereço de leitura e escrita.
+    signal hpm_we         : std_logic;
+    -- Porta tardia de efetivação das escritas nos contadores: instrução válida em EX, sem trap nem mret no ciclo.
+    signal cntr_gate      : std_logic;
     -- Escrita na metade baixa de mcycle.
     signal mcycle_we_lo   : std_logic;
     -- Escrita na metade alta de mcycle.
@@ -410,7 +415,7 @@ begin
                 new_value(7);
 
     -- Controle de atualização dos CSRs de 32 bits.
-    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_take = '0' and
+    mtvec_we       <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MTVEC and i_trap_early = '0' and
                                    i_mret_take = '0') else
                       '0';
     mtvec_mode_nxt <= new_value(0) when HAS_INTERRUPTS else '0';
@@ -418,7 +423,7 @@ begin
     mtvec_nxt      <= new_value((XLEN - 1) downto 6) & mtvec_base_low & BYTE_OFFSET_0;
     mtvec_value    <= mtvec_reg((XLEN - 1) downto 2) & '0' & mtvec_mode;
 
-    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_take = '0' and
+    mscratch_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MSCRATCH and i_trap_early = '0' and
                                 i_mret_take = '0') else
                    '0';
 
@@ -518,7 +523,7 @@ begin
                      CAUSE_IRQ_TIMER;
 
     gen_irq : if HAS_INTERRUPTS generate
-        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_take = '0' and
+        irq_en_we <= '1' when (csr_write_valid = '1' and i_addr = ADDR_MIE and i_trap_early = '0' and
                                   i_mret_take = '0') else
                      '0';
 
@@ -546,7 +551,7 @@ begin
 
     gen_lcofi : if HAS_SSCOF generate
         lcofip_we  <= ovf_irq or
-                      (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_take) and (not i_mret_take));
+                      (csr_write_valid and to_sl(i_addr = ADDR_MIP) and (not i_trap_early) and (not i_mret_take));
         lcofip_nxt <= ovf_irq or new_value(IRQ_BIT_LCOFI);
 
         u_lcofip : entity work.flip_flop
@@ -598,13 +603,18 @@ begin
     end generate gen_no_mtvec_mode;
 
     -- Contadores da extensão Zicntr.
-    cntr_write <= '1' when (csr_write_valid = '1' and i_trap_take = '0' and i_mret_take = '0') else '0';
+    -- O banco seleciona o contador, cedo; aqui só se exclui a escrita em endereço somente-leitura.
+    hpm_we <= cntr_gate and has_write_effect and (not is_read_only);
 
     mcycle_inc     <= not inhibit_reg(0);
-    mcycle_we_lo   <= cntr_write and to_sl(i_addr = ADDR_MCYCLE);
-    mcycle_we_hi   <= cntr_write and to_sl(i_addr = ADDR_MCYCLEH);
-    minstret_we_lo <= cntr_write and to_sl(i_addr = ADDR_MINSTRET);
-    minstret_we_hi <= cntr_write and to_sl(i_addr = ADDR_MINSTRETH);
+    -- Os endereços dos contadores de máquina são sempre conhecidos e de leitura e escrita, então a escrita não precisa
+    -- do decodificador geral: a seleção sai só do endereço e do efeito de escrita (registrados, cedo) e a porta de
+    -- efetivação (pipe_run e traps, tardia) entra na última camada, com fanout de quatro.
+    cntr_gate      <= i_commit and (not i_trap_early) and (not i_mret_take);
+    mcycle_we_lo   <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MCYCLE);
+    mcycle_we_hi   <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MCYCLEH);
+    minstret_we_lo <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MINSTRET);
+    minstret_we_hi <= cntr_gate and has_write_effect and to_sl(i_addr = ADDR_MINSTRETH);
 
     gen_zicntr : if HAS_ZICNTR generate
 
@@ -735,7 +745,7 @@ begin
     -- Bits de mcountinhibit de mcycle e minstret.
 
     gen_inhibit : if HAS_ZICNTR generate
-        inhibit_we  <= cntr_write and is_inhibit_addr;
+        inhibit_we  <= cntr_gate and has_write_effect and is_inhibit_addr;
         inhibit_nxt <= new_value(2 downto 0) and inhibit_mask;
 
         u_inhibit_reg : entity work.generic_register
@@ -778,7 +788,7 @@ begin
                 i_sel_eventh  => in_eventh_range,
                 i_sel_lo      => in_lo_range,
                 i_sel_hi      => in_hi_range,
-                i_we          => cntr_write,
+                i_we          => hpm_we,
                 i_wdata       => new_value,
                 o_rdata       => bank_rdata,
                 o_ovf_irq     => ovf_irq
