@@ -15,6 +15,10 @@ rom_after_boot: FLASH_ON_BUS=true
 faults_map: FLASH_END=0x00001800 RAM_BASE=0x00002000 RAM_END=0x00004000
 # Mapa pequeno das falhas de acesso com as falhas ligadas.
 faults_map_access_faults: FLASH_END=0x00001800 RAM_BASE=0x00002000 RAM_END=0x00004000 HAS_ACCESS_FAULTS=true
+# Mapa pequeno das falhas de acesso com Zicsr e as falhas ligadas, para a exceção de endereço registrada no EX/MEM.
+addr_ok: FLASH_END=0x00001800 RAM_BASE=0x00002000 RAM_END=0x00004000 HAS_ZICSR=true HAS_ACCESS_FAULTS=true
+# Zicsr, Zicclsm e falhas de acesso com a FLASH no barramento logo depois da BOOT_MEMORY, para a exceção de endereço registrada no EX/MEM.
+addr_ok_flash_bus: FLASH_ON_BUS=true HAS_ZICSR=true HAS_ACCESS_FAULTS=true
 # Cache de dados, com a RAM no barramento de 0x8000 a 0x40000000.
 dcache: HAS_DCACHE=true RAM_ON_BUS=true
 

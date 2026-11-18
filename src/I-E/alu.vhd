@@ -48,6 +48,9 @@ entity alu is
         i_b       : in    std_logic_vector((data_width - 1) downto 0);
         -- Resultado de dados da operação.
         o_d       : out   std_logic_vector((data_width - 1) downto 0);
+        -- Soma de A e B direto do somador, sem a seleção do resultado: é o endereço efetivo de um load ou store (a operação
+        -- é a soma), de onde a classificação do endereço sai sem esperar os deslocadores e o E-OU do resultado.
+        o_sum     : out   std_logic_vector((data_width - 1) downto 0);
         -- Condição de desvio avaliada ('1' = desvio tomado); '0' fora dos desvios.
         o_branch  : out   std_logic
     );
@@ -214,6 +217,7 @@ begin
 	            ((data_width - 1 downto 0 => i_res_sel(ALU_SEL_SHR)) and shr_stage(SHIFT_STAGES));
 
     o_d <= fast_out or slow_out;
+    o_sum <= std_logic_vector(sum_ext((data_width - 1) downto 0));
 
     with op_sel select o_branch <=
         is_branch and equal when FUNCT3_BEQ,

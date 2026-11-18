@@ -39,6 +39,11 @@ entity pc_fetch is
         i_replay        : in    std_logic := '0';
         -- Endereço da instrução a repetir (o PC da instrução que está em IF/ID).
         i_replay_pc     : in    word_t    := (others => '0');
+        -- Desvio ou salto decidido no estágio EX e liberado pelo pipeline, a decisão que chega mais tarde no ciclo: carrega o
+        -- alvo e liga a escrita do PC, sem passar pela seleção de i_pc_src, e perde para o redirecionamento.
+        i_late_take     : in    std_logic := '0';
+        -- O alvo de i_late_take é o do JALR (i_jalr_target) em vez do desvio ou JAL (i_branch_target).
+        i_late_jalr     : in    std_logic := '0';
         -- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
         o_pc            : out   word_t;
         -- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
@@ -58,6 +63,12 @@ architecture rtl of pc_fetch is
     signal pc_next  : word_t;
     -- Habilitação efetiva de atualização do registrador PC.
     signal pc_en    : std_logic;
+    -- Alvo do desvio ou salto decidido tarde em EX.
+    signal late_target : word_t;
+    -- O redirecionamento prioritário está selecionado.
+    signal redirect_sel : std_logic;
+    -- Próximo PC sem a decisão tardia de EX.
+    signal early_next : word_t;
 
 begin
 
@@ -85,10 +96,17 @@ begin
             i_d2  => i_jalr_target,
             i_d3  => i_redirect_pc,
             i_sel => i_pc_src,
-            o_d   => pc_next
+            o_d   => early_next
         );
 
-    pc_en <= '1' when (i_pc_we = '1' or i_pc_src = PC_SRC_REDIRECT) else '0';
+    redirect_sel <= '1' when i_pc_src = PC_SRC_REDIRECT else '0';
+    late_target  <= i_jalr_target when i_late_jalr = '1' else i_branch_target;
+
+    -- A decisão de EX é a última a chegar: entra só no seletor final e na habilitação, que não dependem dela nos
+    -- demais termos.
+    pc_next <= late_target when (i_late_take = '1' and redirect_sel = '0') else early_next;
+
+    pc_en <= i_pc_we or redirect_sel or i_late_take;
 
     -- Registrador estrutural de 32 bits do Program Counter.
     u_pc_reg : entity work.generic_register

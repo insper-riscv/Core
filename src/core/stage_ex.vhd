@@ -117,6 +117,8 @@ entity stage_ex is
         i_mem_trap_tval   : in    word_t                        := (others => '0');
         -- Resultado da ULA antes da seleção do resultado final (o endereço efetivo de um load ou store).
         o_alu_result      : out   word_t;
+        -- Endereço efetivo de um load ou store, a soma direta do somador da ULA (sem a seleção do resultado).
+        o_ea              : out   word_t;
         -- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
         o_final_result    : out   word_t;
         -- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
@@ -173,6 +175,8 @@ architecture rtl of stage_ex is
     signal ex_alu_op_b        : word_t;
     -- Resultado calculado pela ULA principal.
     signal ex_alu_result      : word_t;
+    -- Soma direta do somador da ULA, o endereço efetivo de um load ou store.
+    signal ex_sum             : word_t;
     -- Flag de condição de desvio calculada pela ULA principal.
     signal ex_alu_branch_flag : std_logic;
     -- Resultado de 32 bits produzido pela unidade multdiv.
@@ -206,6 +210,10 @@ architecture rtl of stage_ex is
     signal csr_illegal      : std_logic;
     -- Pulso interno de tomada de trap síncrono.
     signal trap_take_int    : std_logic;
+    -- Exceção de EX sem a de desvio ou salto desalinhado.
+    signal trap_take_nocf   : std_logic;
+    -- Exceção de EX ou de MEM sem a de desvio ou salto desalinhado, para o gate dos contadores.
+    signal csr_trap_early   : std_logic;
     -- Exceção detectada sem Zicsr: sinalizada na saída, sem redirecionar o PC.
     signal sig_take         : std_logic;
     -- Causa da exceção sinalizada sem Zicsr.
@@ -340,6 +348,7 @@ begin
             i_a       => ex_alu_op_a,
             i_b       => ex_alu_op_b,
             o_d       => ex_alu_result,
+            o_sum     => ex_sum,
             o_branch  => ex_alu_branch_flag
         );
 
@@ -436,6 +445,7 @@ begin
     gen_csr : if HAS_ZICSR generate
         -- A exceção do estágio MEM é de uma instrução mais antiga: vale no lugar da deste estágio.
         csr_trap_take  <= trap_take_int or i_mem_trap_take;
+        csr_trap_early <= trap_take_nocf or i_mem_trap_take;
         csr_trap_cause <= i_mem_trap_cause when i_mem_trap_take = '1' else trap_cause;
         csr_trap_pc    <= i_mem_trap_pc when i_mem_trap_take = '1' else i_pc;
         csr_trap_tval  <= i_mem_trap_tval when i_mem_trap_take = '1' else trap_tval;
@@ -481,6 +491,7 @@ begin
                 o_bank_read      => csr_bank_read,
                 o_illegal        => csr_illegal,
                 i_trap_take      => csr_trap_take,
+                i_trap_early     => csr_trap_early,
                 i_trap_cause     => csr_trap_cause,
                 i_trap_pc        => csr_trap_pc,
                 i_trap_tval      => csr_trap_tval,
@@ -543,6 +554,7 @@ begin
                 i_irq_take    => irq_take_pending,
                 i_irq_cause   => irq_cause,
                 o_take        => trap_take_int,
+                o_take_nocf   => trap_take_nocf,
                 o_mret_take   => mret_take_int,
                 o_irq         => trap_is_irq,
                 o_cause       => trap_cause,
@@ -651,6 +663,7 @@ begin
     o_branch_target <= branch_target_int;
     o_jalr_target   <= ex_alu_result;
     o_alu_result    <= ex_alu_result;
+    o_ea            <= ex_sum;
     o_branch_taken  <= branch_taken_int;
     o_jalr_taken    <= jalr_taken_int;
 
@@ -658,7 +671,7 @@ begin
         port map (
             i_opcode      => i_opcode,
             i_funct3      => i_funct3,
-            i_byte_offset => ex_alu_result(1 downto 0),
+            i_byte_offset => ex_sum(1 downto 0),
             i_rs2_data    => ex_fwd_rs2_val,
             o_data        => o_store_data,
             o_byte_mask   => o_store_byte_mask

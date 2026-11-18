@@ -52,7 +52,7 @@ O dado alinhado e estendido de um load só existe no fim do estágio WB, então 
 
 ### 2.2. Stall por Conflito Load-Use
 
-Como o dado de um load só chega ao registrador WB2 dois estágios depois de MEM, uma instrução em ID que dependa de um load nos estágios EX (`i_idex_re_ram = '1'` e `i_idex_rd /= x0`) ou MEM (`i_exmem_re_ram = '1'` e `i_exmem_rd /= x0`) precisa aguardar até o load chegar a WB. Isso custa dois ciclos quando a dependência é imediata e um quando há uma instrução entre o load e o dependente:
+Como o dado de um load só chega ao registrador WB2 dois estágios depois de MEM, uma instrução em ID que dependa de um load nos estágios EX (`i_idex_ld = '1'`, o bit registrado de load com `rd /= x0`) ou MEM (`i_exmem_ld = '1'`, o mesmo bit registrado) precisa aguardar até o load chegar a WB. Isso custa dois ciclos quando a dependência é imediata e um quando há uma instrução entre o load e o dependente:
 
 1. A unidade de detecção de hazards verifica pelo `opcode` da instrução em ID se ela efetivamente lê `rs1` (`OP`, `OP_IMM`, `LOAD`, `STORE`, `BRANCH`, `JALR`, `SYSTEM`) e se efetivamente lê `rs2` (`OP`, `STORE`, `BRANCH`), evitando paradas falsas quando os bits de `rs2` fazem parte do imediato.
 2. Quando o conflito é confirmado, a HDU desativa `o_pc_we` e `o_ifid_we` (congelando o PC e o registrador IF/ID) e ativa `o_bubble_sel = '1'`.
