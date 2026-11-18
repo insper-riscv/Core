@@ -26,4 +26,5 @@ LAST_WORDS = {0x0FFC, 0x7FFC, 0x3FFFFFFC, 0xFFFFFFFC}
 @cocotb.test()
 async def test_address_exception_with_the_flash_on_the_bus(dut):
     """Confere a exceção de endereço com a FLASH só de leitura."""
-    await check_map(dut, Map(0x1000, 0x8000, LAST_WORDS, WORDS, ((0x1000, 0x8000),)))
+    memory = Map(0x1000, 0x8000, LAST_WORDS, WORDS, ((0x1000, 0x8000),))
+    await check_map(dut, memory)

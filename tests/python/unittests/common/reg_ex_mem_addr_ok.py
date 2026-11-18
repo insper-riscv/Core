@@ -99,7 +99,8 @@ def registered_ok(dut):
 
 
 def expected_bus_mem(address, memory):
-    """Modelo da classificação de memória do barramento: as janelas da FLASH e da RAM que estão no barramento."""
+    """Modelo da classificação de memória do barramento."""
+    # as janelas da FLASH e da RAM que estão no barramento
     return int(any(low <= address < high for low, high in memory.bus_mem))
 
 
@@ -140,7 +141,9 @@ async def check_map(dut, memory):
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
     check_equal(registered_ok(dut), 1, "a bolha não gera exceção")
-    check_equal(int(dut.o_is_bus_mem.value), 0, "a bolha não é acesso ao barramento")
+    check_equal(
+        int(dut.o_is_bus_mem.value), 0, "a bolha não é acesso ao barramento"
+    )
 
 
 @cocotb.test()
