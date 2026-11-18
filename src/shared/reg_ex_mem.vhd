@@ -103,6 +103,9 @@ entity reg_ex_mem is
         -- O endereço registrado sai pela porta externa (barramento): a FLASH ou a RAM no barramento e tudo fora das três
         -- regiões.
         o_is_sdram    : out   std_logic;
+        -- O endereço registrado cai numa memória do barramento com ready próprio (a FLASH ou a RAM no barramento), a mesma
+        -- classificação que o interconector faria sobre o endereço; decidida em EX, registrada aqui.
+        o_is_bus_mem  : out   std_logic;
         -- O endereço registrado está na memória principal.
         o_in_main     : out   std_logic;
         -- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
@@ -158,6 +161,8 @@ architecture rtl of reg_ex_mem is
     signal r_is_flash   : std_logic    := '0';
     -- O endereço registrado sai pela porta externa (barramento).
     signal r_is_sdram   : std_logic    := '0';
+    -- O endereço registrado cai numa memória do barramento com ready próprio.
+    signal r_is_bus_mem : std_logic    := '0';
     -- O endereço registrado está na memória principal.
     signal r_in_main    : std_logic    := '0';
     -- O endereço está na última palavra de uma região (a seguinte é de outra).
@@ -177,6 +182,8 @@ architecture rtl of reg_ex_mem is
     signal in_is_flash : std_logic;
     -- Entrada de r_is_sdram, decodificada do resultado da ULA.
     signal in_is_sdram : std_logic;
+    -- Entrada de r_is_bus_mem, decodificada do resultado da ULA.
+    signal in_is_bus_mem : std_logic;
     -- Entrada de r_in_main, decodificada do resultado da ULA.
     signal in_in_main  : std_logic;
     -- Entrada de r_last, decodificada do resultado da ULA.
@@ -212,6 +219,7 @@ begin
     -- endereço.
     in_is_flash <= '1' when is_direct_rom_addr(unsigned(i_ea)) else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
+    in_is_bus_mem <= '1' when is_bus_mem_addr(unsigned(i_ea)) else '0';
     in_in_main  <= '1' when is_main_addr(unsigned(i_ea)) else '0';
     in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
@@ -276,6 +284,7 @@ begin
                 r_wb_sel     <= (others => '0');
                 r_is_flash   <= '0';
                 r_is_sdram   <= '0';
+                r_is_bus_mem <= '0';
                 r_in_main    <= '0';
                 r_last       <= '0';
                 r_ok_wr      <= '1';
@@ -295,6 +304,7 @@ begin
                 r_wb_sel     <= i_wb_sel;
                 r_is_flash   <= in_is_flash;
                 r_is_sdram   <= in_is_sdram;
+                r_is_bus_mem <= in_is_bus_mem;
                 r_in_main    <= in_in_main;
                 r_last       <= in_last;
                 r_ok_wr      <= in_ok_wr;
@@ -338,6 +348,7 @@ begin
     o_wb_sel      <= r_wb_sel;
     o_is_flash    <= r_is_flash;
     o_is_sdram    <= r_is_sdram;
+    o_is_bus_mem  <= r_is_bus_mem;
     o_in_main     <= r_in_main;
     -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não
     -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.

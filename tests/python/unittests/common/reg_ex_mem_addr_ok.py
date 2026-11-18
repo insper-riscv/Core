@@ -49,6 +49,7 @@ class Map(NamedTuple):
     write_base: int
     last_words: set[int]
     words: list[int]
+    bus_mem: tuple[tuple[int, int], ...] = ()
 
 
 def is_unaligned(address, funct3, controls):
@@ -97,6 +98,12 @@ def registered_ok(dut):
     return int(not (at_last or outside or read_only))
 
 
+def expected_bus_mem(address, memory):
+    """Modelo da classificação de memória do barramento."""
+    # as janelas da FLASH e da RAM que estão no barramento
+    return int(any(low <= address < high for low, high in memory.bus_mem))
+
+
 async def apply(dut, address, funct3, controls):
     """Aplica um acesso e espera o registrador capturá-lo."""
     dut.i_ea.value = address
@@ -124,11 +131,19 @@ async def check_map(dut, memory):
                         expected_ok(address, funct3, controls, memory),
                         (hex(address), funct3, controls),
                     )
+                    check_equal(
+                        int(dut.o_is_bus_mem.value),
+                        expected_bus_mem(address, memory),
+                        (hex(address), "bus_mem"),
+                    )
     await apply(dut, OFFSET_3, FUNCT3_WORD, (1, 0))
     dut.i_flush.value = 1
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
     check_equal(registered_ok(dut), 1, "a bolha não gera exceção")
+    check_equal(
+        int(dut.o_is_bus_mem.value), 0, "a bolha não é acesso ao barramento"
+    )
 
 
 @cocotb.test()
