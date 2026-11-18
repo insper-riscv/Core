@@ -27,7 +27,7 @@ def set_inputs(dut, ifid_opcode: str = "0110011", **inputs: int) -> None:
     unknown = values.keys() - INPUTS.keys()
     if missing or unknown:
         raise TypeError(f"entradas: faltam {missing}, sobram {unknown}")
-    # A porta leva o load com rd diferente de x0 (decodificado no registrador).
+    # A porta leva o load com rd diferente de x0 (do registrador).
     for stage in ("idex", "exmem"):
         if values[f"{stage}_rd"] & 0x1F == 0:
             values[f"{stage}_reram"] = 0

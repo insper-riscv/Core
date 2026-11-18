@@ -36,7 +36,7 @@ def is_cross(op, address):
 
 
 def derived(values):
-    """Devolve we_ok, a região, o cruzamento e o deslocamento do endereço."""
+    """Devolve we_ok, a região, o cruzamento e o deslocamento."""
     address = values["alu_out"]
     cross = is_cross(values["ext_ram_op"], address)
     return {

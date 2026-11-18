@@ -50,7 +50,7 @@ def replicate(code):
 
 
 def derived(values):
-    """Devolve os seletores replicados e ld (load com rd diferente de x0)."""
+    """Devolve os seletores replicados e o bit ld do load."""
     return {
         "ld": int(values["re_ram"] == 1 and values["rd"] != 0),
         "fwd_rs1": replicate(values["fwd_rs1"]),
