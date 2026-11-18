@@ -28,6 +28,7 @@ use work.pipeline_types.all;
 use work.mem_map_consts.all;
 use work.byte_mask_consts.all;
 use work.ext_ram_consts.all;
+use work.funct3_consts.all;
 
 entity reg_ex_mem is
     port (
@@ -102,6 +103,9 @@ entity reg_ex_mem is
         -- O endereço registrado sai pela porta externa (barramento): a FLASH ou a RAM no barramento e tudo fora das três
         -- regiões.
         o_is_sdram    : out   std_logic;
+        -- O endereço registrado cai numa memória do barramento com ready próprio (a FLASH ou a RAM no barramento), a mesma
+        -- classificação que o interconector faria sobre o endereço; decidida em EX, registrada aqui.
+        o_is_bus_mem  : out   std_logic;
         -- O endereço registrado está na memória principal.
         o_in_main     : out   std_logic;
         -- As duas palavras de um acesso que cruza o endereço registrado ficam na mesma região da memória principal.
@@ -110,7 +114,16 @@ entity reg_ex_mem is
         -- FLASH são só de leitura.
         o_ok_wr       : out   std_logic;
         -- O load ou o store registrado cruza a palavra (decidido em EX, registrado aqui; sempre '0' sem HAS_ZICCLSM).
-        o_cross       : out   std_logic
+        o_cross       : out   std_logic;
+        -- O load ou store registrado é exceção de endereço quando está na última palavra da região da memória principal
+        -- (cruza a palavra com Zicclsm, ou desalinhado sem ele); decidido em EX, sempre '0' sem HAS_ZICSR.
+        o_ea_xlast    : out   std_logic;
+        -- O load ou store registrado é desalinhado, e é exceção de endereço se estiver fora da memória principal;
+        -- decidido em EX, sempre '0' sem HAS_ZICSR.
+        o_ea_unal     : out   std_logic;
+        -- O store registrado é exceção de endereço se a região não aceitar escrita; decidido em EX, sempre '0' sem
+        -- HAS_ACCESS_FAULTS.
+        o_ea_stf      : out   std_logic
     );
 end entity reg_ex_mem;
 
@@ -148,6 +161,8 @@ architecture rtl of reg_ex_mem is
     signal r_is_flash   : std_logic    := '0';
     -- O endereço registrado sai pela porta externa (barramento).
     signal r_is_sdram   : std_logic    := '0';
+    -- O endereço registrado cai numa memória do barramento com ready próprio.
+    signal r_is_bus_mem : std_logic    := '0';
     -- O endereço registrado está na memória principal.
     signal r_in_main    : std_logic    := '0';
     -- O endereço está na última palavra de uma região (a seguinte é de outra).
@@ -156,11 +171,19 @@ architecture rtl of reg_ex_mem is
     signal r_ok_wr      : std_logic    := '1';
     -- O acesso registrado cruza a palavra.
     signal r_cross      : std_logic    := '0';
+    -- O acesso registrado é exceção de endereço se estiver na última palavra da região da memória principal.
+    signal r_ea_xlast   : std_logic    := '0';
+    -- O acesso registrado é desalinhado e é exceção de endereço se estiver fora da memória principal.
+    signal r_ea_unal    : std_logic    := '0';
+    -- O acesso registrado é store e é exceção de endereço se a região não aceitar escrita (com HAS_ACCESS_FAULTS).
+    signal r_ea_stf     : std_logic    := '0';
 
     -- Entrada de r_is_flash, decodificada do resultado da ULA.
     signal in_is_flash : std_logic;
     -- Entrada de r_is_sdram, decodificada do resultado da ULA.
     signal in_is_sdram : std_logic;
+    -- Entrada de r_is_bus_mem, decodificada do resultado da ULA.
+    signal in_is_bus_mem : std_logic;
     -- Entrada de r_in_main, decodificada do resultado da ULA.
     signal in_in_main  : std_logic;
     -- Entrada de r_last, decodificada do resultado da ULA.
@@ -169,6 +192,26 @@ architecture rtl of reg_ex_mem is
     signal in_ok_wr    : std_logic;
     -- Entrada de r_cross, decidida pelos controles do acesso e pelo byte do endereço efetivo.
     signal in_cross    : std_logic;
+    -- Entrada de r_ea_xlast, decidida pelo funct3, pelos controles e pelos dois bits baixos do endereço efetivo.
+    signal in_ea_xlast : std_logic;
+    -- Entrada de r_ea_unal, decidida pelo funct3, pelos controles e pelos dois bits baixos do endereço efetivo.
+    signal in_ea_unal  : std_logic;
+    -- Entrada de r_ea_stf, decidida pelos controles e por HAS_ACCESS_FAULTS.
+    signal in_ea_stf   : std_logic;
+    -- O acesso é um load; quando os dois controles sobem, o load tem prioridade sobre o store.
+    signal in_is_load  : std_logic;
+    -- O acesso é um store.
+    signal in_is_store : std_logic;
+    -- O acesso é de meia palavra (LH, LHU ou SH).
+    signal in_is_half  : std_logic;
+    -- O acesso é de palavra (LW ou SW).
+    signal in_is_word  : std_logic;
+    -- O acesso é de meia palavra de store (SH).
+    signal in_is_sh    : std_logic;
+    -- O acesso é desalinhado, executado ou não pelo hardware.
+    signal in_unaligned : std_logic;
+    -- O acesso ocupa duas palavras.
+    signal in_crossing : std_logic;
 
 begin
 
@@ -176,6 +219,7 @@ begin
     -- endereço.
     in_is_flash <= '1' when is_direct_rom_addr(unsigned(i_ea)) else '0';
     in_is_sdram <= '1' when is_external_addr(unsigned(i_ea)) else '0';
+    in_is_bus_mem <= '1' when is_bus_mem_addr(unsigned(i_ea)) else '0';
     in_in_main  <= '1' when is_main_addr(unsigned(i_ea)) else '0';
     in_last     <= '1' when is_last_word(unsigned(i_ea)) else '0';
 
@@ -193,6 +237,37 @@ begin
     -- O cruzamento da palavra também sai de EX e fica registrado: o estágio MEM só confere o bit.
     in_cross <= is_cross_access(i_re_ram, i_we_ram, i_ext_ram_op, i_byte_mask, i_ea(1 downto 0)) when HAS_ZICCLSM else '0';
 
+    -- A exceção de endereço do acesso (as causas 4 e 6 do desalinhamento que o hardware não executa e a falha de store
+    -- da causa 7 em região só de leitura) é decidida em MEM por três bits que saem de EX só do funct3, dos controles e
+    -- dos dois bits baixos do endereço, que o somador da ULA entrega cedo, combinados com a região registrada. Na
+    -- memória principal com Zicclsm o hardware executa o desalinhamento, e só o acesso que cruza a palavra e está na
+    -- última palavra da região é exceção; sem Zicclsm todo desalinhado o é. Fora da memória principal, todo
+    -- desalinhado é exceção. O store a região que não aceita escrita é exceção com HAS_ACCESS_FAULTS. O load tem
+    -- prioridade sobre o store quando os dois controles sobem.
+    in_is_load  <= i_re_ram;
+    in_is_store <= i_we_ram and (not i_re_ram);
+    in_is_half  <= '1' when (i_funct3 = FUNCT3_LH or i_funct3 = FUNCT3_LHU) else '0';
+    in_is_word  <= '1' when i_funct3 = FUNCT3_LW else '0';
+    in_is_sh    <= '1' when i_funct3 = FUNCT3_SH else '0';
+
+    in_unaligned <= (in_is_load and ((in_is_word and (i_ea(1) or i_ea(0))) or (in_is_half and i_ea(0)))) or
+                    (in_is_store and ((in_is_word and (i_ea(1) or i_ea(0))) or (in_is_sh and i_ea(0))));
+
+    in_crossing <= (in_is_load and ((in_is_word and (i_ea(1) or i_ea(0))) or (in_is_half and i_ea(1) and i_ea(0)))) or
+                   (in_is_store and ((in_is_word and (i_ea(1) or i_ea(0))) or (in_is_sh and i_ea(1) and i_ea(0))));
+
+    gen_ea_trap : if HAS_ZICSR generate
+        in_ea_xlast <= in_crossing when HAS_ZICCLSM else in_unaligned;
+        in_ea_unal  <= in_unaligned;
+        in_ea_stf   <= in_is_store when HAS_ACCESS_FAULTS else '0';
+    end generate gen_ea_trap;
+
+    gen_no_ea_trap : if not HAS_ZICSR generate
+        in_ea_xlast <= '0';
+        in_ea_unal  <= '0';
+        in_ea_stf   <= '0';
+    end generate gen_no_ea_trap;
+
     p_reg_ex_mem_ctrl_proc : process (i_clk) is
     begin
 
@@ -209,10 +284,14 @@ begin
                 r_wb_sel     <= (others => '0');
                 r_is_flash   <= '0';
                 r_is_sdram   <= '0';
+                r_is_bus_mem <= '0';
                 r_in_main    <= '0';
                 r_last       <= '0';
                 r_ok_wr      <= '1';
                 r_cross      <= '0';
+                r_ea_xlast   <= '0';
+                r_ea_unal    <= '0';
+                r_ea_stf     <= '0';
             elsif i_en = '1' then
                 r_valid      <= i_valid;
                 r_rd         <= i_rd;
@@ -225,10 +304,14 @@ begin
                 r_wb_sel     <= i_wb_sel;
                 r_is_flash   <= in_is_flash;
                 r_is_sdram   <= in_is_sdram;
+                r_is_bus_mem <= in_is_bus_mem;
                 r_in_main    <= in_in_main;
                 r_last       <= in_last;
                 r_ok_wr      <= in_ok_wr;
                 r_cross      <= in_cross;
+                r_ea_xlast   <= in_ea_xlast;
+                r_ea_unal    <= in_ea_unal;
+                r_ea_stf     <= in_ea_stf;
             end if;
         end if;
 
@@ -265,11 +348,15 @@ begin
     o_wb_sel      <= r_wb_sel;
     o_is_flash    <= r_is_flash;
     o_is_sdram    <= r_is_sdram;
+    o_is_bus_mem  <= r_is_bus_mem;
     o_in_main     <= r_in_main;
     -- As duas palavras de um acesso que cruza ficam na mesma região quando o endereço está na memória principal e não
     -- na última palavra dela; a combinação sai em MEM, um nível depois dos registradores.
     o_same_region <= r_in_main and (not r_last);
     o_ok_wr       <= r_ok_wr;
     o_cross       <= r_cross;
+    o_ea_xlast    <= r_ea_xlast;
+    o_ea_unal     <= r_ea_unal;
+    o_ea_stf      <= r_ea_stf;
 
 end architecture rtl;

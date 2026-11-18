@@ -31,6 +31,8 @@ RISC-V RV32 processor in VHDL-2008 organized as an in-order 5-stage pipeline (IF
 - [timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md](docs/en/timing/P7_FLUSH_SO_NOS_BITS_DE_CONTROLE.md): the barrier registers clear only the control bits on a discard.
 - [timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md](docs/en/timing/P8_ADIANTAMENTO_RESOLVIDO_EM_ID.md): the forwarding selection resolved in ID, registered and replicated.
 - [timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md](docs/en/timing/P9_SEGUNDO_PATAMAR_DO_PERFIL_COMPLETO.md): the registered word crossing, the write of `mepc`, `mcause` and `mtval` one cycle after the trap, and the two-stage Zihpm read.
+- [timing/P10_EXCECAO_DE_ENDERECO_E_PALAVRA_SEGUINTE_REGISTRADAS.md](docs/en/timing/P10_EXCECAO_DE_ENDERECO_E_PALAVRA_SEGUINTE_REGISTRADAS.md): the MEM address exception decided from bits registered in EX/MEM and the registered next word of the misaligned access.
+- [timing/P11_CLASSIFICACAO_DO_BARRAMENTO_REGISTRADA_E_ENDERECO_DO_SOMADOR.md](docs/en/timing/P11_CLASSIFICACAO_DO_BARRAMENTO_REGISTRADA_E_ENDERECO_DO_SOMADOR.md): the classification of the access as a bus memory registered in EX/MEM and the effective address taken straight from the ALU adder.
 - [ISA/M/instructions.md](docs/en/ISA/M/instructions.md): instructions of the `M` extension according to the RISC-V manual (chapter 11): encoding, division, division by zero and overflow.
 - [ISA/M/description.md](docs/en/ISA/M/description.md): how the Core executes `M`: decoder, non-restoring divider, pipeline stall, pair fusion and formal verification.
 - [ISA/Zmmul/instructions.md](docs/en/ISA/Zmmul/instructions.md): instructions of the `Zmmul` extension (multiplication only, section 11.1.3 of the manual): encoding and semantics.

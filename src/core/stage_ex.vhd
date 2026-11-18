@@ -117,6 +117,8 @@ entity stage_ex is
         i_mem_trap_tval   : in    word_t                        := (others => '0');
         -- Resultado da ULA antes da seleção do resultado final (o endereço efetivo de um load ou store).
         o_alu_result      : out   word_t;
+        -- Endereço efetivo de um load ou store, a soma direta do somador da ULA (sem a seleção do resultado).
+        o_ea              : out   word_t;
         -- Resultado final de 32 bits do estágio EX (enviado ao registrador EX/MEM).
         o_final_result    : out   word_t;
         -- Dado alinhado para escrita em memória (enviado ao registrador EX/MEM).
@@ -173,6 +175,8 @@ architecture rtl of stage_ex is
     signal ex_alu_op_b        : word_t;
     -- Resultado calculado pela ULA principal.
     signal ex_alu_result      : word_t;
+    -- Soma direta do somador da ULA, o endereço efetivo de um load ou store.
+    signal ex_sum             : word_t;
     -- Flag de condição de desvio calculada pela ULA principal.
     signal ex_alu_branch_flag : std_logic;
     -- Resultado de 32 bits produzido pela unidade multdiv.
@@ -340,6 +344,7 @@ begin
             i_a       => ex_alu_op_a,
             i_b       => ex_alu_op_b,
             o_d       => ex_alu_result,
+            o_sum     => ex_sum,
             o_branch  => ex_alu_branch_flag
         );
 
@@ -651,6 +656,7 @@ begin
     o_branch_target <= branch_target_int;
     o_jalr_target   <= ex_alu_result;
     o_alu_result    <= ex_alu_result;
+    o_ea            <= ex_sum;
     o_branch_taken  <= branch_taken_int;
     o_jalr_taken    <= jalr_taken_int;
 
@@ -658,7 +664,7 @@ begin
         port map (
             i_opcode      => i_opcode,
             i_funct3      => i_funct3,
-            i_byte_offset => ex_alu_result(1 downto 0),
+            i_byte_offset => ex_sum(1 downto 0),
             i_rs2_data    => ex_fwd_rs2_val,
             o_data        => o_store_data,
             o_byte_mask   => o_store_byte_mask
