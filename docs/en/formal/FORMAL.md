@@ -92,6 +92,8 @@ The tests of the aggregator run with `bash formal/aggregate_test.sh`.
 
 The workflow has one job per engine, `formal - <engine>` (`yices`, `bitwuzla` and `abc-bmc3`), which runs `make formal FORMAL_ENGINE=<engine>` and uploads the result and the logs as an artifact. The `formal` job waits for all of them, downloads the artifacts and runs the aggregator. Only the `formal` job is a required check of the default-branch ruleset, so an engine that breaks does not block the merge while another one decides, and a counterexample found by any engine blocks it. In a push to `main` that reuses the result of a pull request that already passed, the engines and `formal` are skipped together, like the other required checks.
 
+The three `formal - <engine>` jobs run by default on the self-hosted runners labelled `formal`, inside the `ci-vhdl` image container. The repository variable `RUNNERS_FORMAL` picks the runner of the engine jobs: absent or any value other than `hosted` uses the self-hosted one, and `hosted` uses `ubuntu-26.04`. A pull request from a fork always runs on the hosted runner, whatever the variable. The limit of each job is 120 minutes.
+
 ## 7. A warning is an error
 
 Any warning from GHDL, Yosys or SymbiYosys makes `formal/run.sh` fail, in the proofs and in the mutants. The guard lives in `formal/warnings.sh`: the script scans the output of each tool after it ends and, for every line with the word `warning` (case-insensitive, whole word or plural), prints `formal: WARNING treated as error: <file>:<line>:<text>` and fails the run at the end. Names such as `warning_count` and the Yosys summary `Warnings: 0` do not count.
