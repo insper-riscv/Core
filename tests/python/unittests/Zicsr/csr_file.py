@@ -32,6 +32,7 @@ async def _reset(dut):
     dut.i_wdata.value = 0
     dut.i_src_zero.value = 1
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     dut.i_trap_cause.value = 0
     dut.i_trap_pc.value = 0
     dut.i_trap_tval.value = 0
@@ -225,8 +226,10 @@ async def take_trap(dut, cause, pc, tval):
     dut.i_trap_pc.value = pc
     dut.i_trap_tval.value = tval
     dut.i_trap_take.value = 1
+    dut.i_trap_early.value = 1
     await RisingEdge(dut.i_clk)
     dut.i_trap_take.value = 0
+    dut.i_trap_early.value = 0
     await RisingEdge(dut.i_clk)
     await Timer(1, unit="ns")
 

@@ -80,6 +80,9 @@ entity core is
         o_ext_rden    : out   std_logic;
         -- Habilitação de escrita na porta externa (estágio MEM).
         o_ext_wren    : out   std_logic;
+        -- O acesso de MEM cai numa memória do barramento com ready próprio (a FLASH ou a RAM no barramento), decidido em
+        -- EX e registrado no EX/MEM; o interconector o usa no lugar de decodificar o endereço (vale com o acesso).
+        o_ext_is_mem  : out   std_logic;
         -- Palavra de dados lida da porta externa.
         i_ext_rdata   : in    word_t    := (others => '0');
         -- Sinaliza que o escravo externo concluiu a transação atual.
@@ -189,6 +192,10 @@ architecture rtl of core is
     signal memwb_is_sdram : std_logic;
     -- Cruzamento de palavra do load em WB, decodificado na entrada do registrador MEM/WB.
     signal memwb_is_cross : std_logic;
+    -- Posição do dado do load em WB, decodificada na entrada do registrador MEM/WB.
+    signal memwb_ext_off  : std_logic_vector(1 downto 0);
+    -- Deslocamento do load que cruza em WB, um bit por byte, decodificado na entrada do registrador MEM/WB.
+    signal memwb_cross_sel : std_logic_vector(2 downto 0);
     -- Endereço que o estágio MEM de fato apresenta às memórias.
     signal mem_addr       : word_t;
     -- Dado de escrita que o estágio MEM de fato apresenta às memórias.
@@ -329,6 +336,8 @@ architecture rtl of core is
     signal ex_we_ram        : std_logic;
     -- Habilitação de leitura na memória registrada em ID/EX.
     signal ex_re_ram        : std_logic;
+    -- A instrução em EX é um load com rd diferente de x0, registrado em ID/EX.
+    signal ex_ld            : std_logic;
     -- Habilitação geral da memória registrada em ID/EX.
     signal ex_en_ram        : std_logic;
     -- Campo opcode registrado em ID/EX.
@@ -379,14 +388,24 @@ architecture rtl of core is
     signal exmem_is_flash    : std_logic;
     -- Resultado da ULA em EX (o endereço efetivo de um load ou store).
     signal ex_alu_result     : word_t;
+    -- Endereço efetivo de um load ou store em EX, direto do somador da ULA.
+    signal ex_ea             : word_t;
     -- O endereço em MEM sai pela porta externa, registrado em EX/MEM.
     signal exmem_is_sdram    : std_logic;
+    -- O endereço de MEM cai numa memória do barramento com ready próprio.
+    signal exmem_is_bus_mem  : std_logic;
     -- O endereço em MEM está na memória principal, registrado em EX/MEM.
     signal exmem_in_main     : std_logic;
     -- As duas palavras de um acesso que cruza o endereço em MEM ficam na mesma região, registrado em EX/MEM.
     signal exmem_same_region : std_logic;
     -- O endereço efetivo registrado em EX/MEM aceita escrita no mapa do núcleo.
     signal exmem_ok_wr       : std_logic;
+    -- O load ou store em MEM que cruza a palavra é exceção de endereço na última palavra da região (decidido em EX).
+    signal exmem_ea_xlast    : std_logic;
+    -- O load ou store em MEM é desalinhado, e é exceção de endereço fora da memória principal (decidido em EX).
+    signal exmem_ea_unal     : std_logic;
+    -- O store em MEM é exceção de endereço se a região não aceitar escrita (decidido em EX).
+    signal exmem_ea_stf      : std_logic;
     -- O load ou store registrado em EX/MEM cruza a palavra, decidido em EX.
     signal exmem_cross       : std_logic;
     -- A instrução em ID/EX escreve em registrador e seguirá válida em EX/MEM (não é descartada na borda de clock).
@@ -421,6 +440,8 @@ architecture rtl of core is
     signal exmem_we_ram     : std_logic;
     -- Habilitação de leitura na memória registrada em EX/MEM.
     signal exmem_re_ram     : std_logic;
+    -- A instrução em MEM é um load com rd diferente de x0, registrado em EX/MEM.
+    signal exmem_ld         : std_logic;
     -- Habilitação geral da memória registrada em EX/MEM.
     signal exmem_en_ram     : std_logic;
     -- Modo de extensão de leitura da memória registrado em EX/MEM.
@@ -476,6 +497,7 @@ begin
     pipe_stall    <= muldiv_stall or sdram_wait or csr_wait or fencei_busy or mis_stall;
     pipe_run      <= base_run and (not fencei_busy);
     o_mem_advance <= mem_run;
+    o_ext_is_mem  <= exmem_is_bus_mem;
     -- Com CSRs, a exceção de endereço do load ou store é tomada em MEM (mem_trap_take): é de uma instrução mais
     -- antiga que a de EX, então redireciona o pipeline e descarta a instrução de EX. Sem CSRs, o endereço é
     -- conferido em EX junto das demais causas, que só são sinalizadas, e mem_trap_take fica em zero.
@@ -610,10 +632,10 @@ begin
             i_mem_we_reg    => fwd_mem_ok,
             i_memwb_rd      => memwb_rd_idx,
             i_memwb_we_reg  => wb_we,
-            i_mem_re_ram    => exmem_re_ram,
+            i_mem_ld        => exmem_ld,
             i_ex_rd         => ex_rd_idx(reg_t'range),
             i_ex_we_reg     => fwd_ex_ok,
-            i_ex_re_ram     => ex_re_ram,
+            i_ex_ld         => ex_ld,
             i_pipe_stall    => pipe_stall,
             o_pc_we         => id_pc_we,
             o_ifid_we       => ifid_write_en,
@@ -699,6 +721,7 @@ begin
             o_illegal       => ex_illegal,
             o_we_ram        => ex_we_ram,
             o_re_ram        => ex_re_ram,
+            o_ld            => ex_ld,
             o_en_ram        => ex_en_ram,
             o_opcode        => ex_opcode,
             o_funct3        => ex_funct3
@@ -755,6 +778,7 @@ begin
             i_wb2_data        => wb2_data,
             i_dc_done         => i_dc_done,
             o_alu_result      => ex_alu_result,
+            o_ea              => ex_ea,
             o_final_result    => ex_final_result,
             o_store_data      => ex_store_data,
             o_store_byte_mask => ex_store_byteena,
@@ -787,7 +811,7 @@ begin
             i_pc          => ex_pc,
             i_funct3      => ex_funct3,
             i_alu_out     => ex_final_result,
-            i_ea          => ex_alu_result,
+            i_ea          => ex_ea,
             i_store_data  => ex_store_data,
             i_byte_mask   => ex_store_byteena,
             i_rd          => ex_rd_idx(reg_t'range),
@@ -806,6 +830,7 @@ begin
             o_we_ok       => open,
             o_we_ram      => exmem_we_ram,
             o_re_ram      => exmem_re_ram,
+            o_ld          => exmem_ld,
             o_en_ram      => exmem_en_ram,
             o_ext_ram_op  => exmem_ext_ram_op,
             o_wb_sel      => exmem_wb_sel,
@@ -813,10 +838,14 @@ begin
             o_funct3      => exmem_funct3,
             o_is_flash    => exmem_is_flash,
             o_is_sdram    => exmem_is_sdram,
+            o_is_bus_mem  => exmem_is_bus_mem,
             o_in_main     => exmem_in_main,
             o_same_region => exmem_same_region,
             o_ok_wr       => exmem_ok_wr,
-            o_cross       => exmem_cross
+            o_cross       => exmem_cross,
+            o_ea_xlast    => exmem_ea_xlast,
+            o_ea_unal     => exmem_ea_unal,
+            o_ea_stf      => exmem_ea_stf
         );
 
     -- =========================================================================
@@ -852,17 +881,23 @@ begin
             o_first_word => mis_first_word
         );
 
-    mem_addr  <= mis_addr when mis_cross = '1' else exmem_alu_out;
+    -- A unidade de acesso desalinhado apresenta o endereço do EX/MEM fora da etapa 2, então o endereço da memória
+    -- sai dela sem selecionar por mis_cross, que depende da exceção de endereço.
+    mem_addr  <= mis_addr;
     mem_wdata <= mis_data when mis_cross = '1' else exmem_store_data;
     mem_mask  <= mis_mask when mis_cross = '1' else exmem_byteena;
 
     u_stage_mem : entity work.stage_mem
         generic map (
             check_ea         => HAS_ZICSR,
-            flags_registered => true
+            flags_registered => true,
+            ea_ok_registered => true
         )
         port map (
             i_flag_ok_wr  => exmem_ok_wr,
+            i_flag_xlast  => exmem_ea_xlast,
+            i_flag_unal   => exmem_ea_unal,
+            i_flag_stf    => exmem_ea_stf,
             i_flag_flash  => exmem_is_flash,
             i_flag_sdram  => exmem_is_sdram,
             i_flag_main   => exmem_in_main,
@@ -918,7 +953,9 @@ begin
             o_wb_sel     => memwb_wb_sel,
             o_is_flash   => memwb_is_flash,
             o_is_sdram   => memwb_is_sdram,
-            o_is_cross   => memwb_is_cross
+            o_is_cross   => memwb_is_cross,
+            o_ext_off    => memwb_ext_off,
+            o_cross_sel  => memwb_cross_sel
         );
 
     -- =========================================================================
@@ -935,6 +972,8 @@ begin
             i_is_flash    => memwb_is_flash,
             i_is_sdram    => memwb_is_sdram,
             i_is_cross    => memwb_is_cross,
+            i_ext_off     => memwb_ext_off,
+            i_cross_sel   => memwb_cross_sel,
             i_flash_data2 => i_flash_data2,
             i_ram_rdata   => i_ram_rdata,
             i_first_word  => mis_first_word,

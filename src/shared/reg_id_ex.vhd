@@ -140,6 +140,8 @@ entity reg_id_ex is
         o_we_ram        : out   std_logic;
         -- Habilitação de leitura da RAM registrada para o estágio EX.
         o_re_ram        : out   std_logic;
+        -- A instrução em EX é um load com rd diferente de x0 (para a detecção load-use em ID).
+        o_ld            : out   std_logic;
         -- Habilitação de acesso à RAM registrada para o estágio EX.
         o_en_ram        : out   std_logic;
         -- Campo opcode registrado para o estágio EX.
@@ -200,6 +202,10 @@ architecture rtl of reg_id_ex is
     signal r_we_ram        : std_logic    := '0';
     -- Habilitação de leitura da RAM armazenada.
     signal r_re_ram        : std_logic    := '0';
+    -- Load com rd diferente de x0 armazenado.
+    signal r_ld            : std_logic    := '0';
+    -- Entrada: o registrador destino é diferente de x0.
+    signal in_rd_nz        : std_logic;
     -- Habilitação de acesso à RAM armazenada.
     signal r_en_ram        : std_logic    := '0';
     -- Campo opcode armazenado.
@@ -212,6 +218,8 @@ architecture rtl of reg_id_ex is
     attribute preserve of r_fwd_rs2 : signal is true;
 
 begin
+
+    in_rd_nz <= '1' when i_rd(reg_t'range) /= REG_IDX_ZERO else '0';
 
     p_reg_id_ex_ctrl_proc : process (i_clk) is
     begin
@@ -234,6 +242,7 @@ begin
                 r_illegal       <= '0';
                 r_we_ram        <= '0';
                 r_re_ram        <= '0';
+                r_ld            <= '0';
                 r_en_ram        <= '0';
                 r_opcode        <= (others => '0');
                 r_funct3        <= (others => '0');
@@ -254,6 +263,7 @@ begin
                 r_illegal       <= i_illegal;
                 r_we_ram        <= i_we_ram;
                 r_re_ram        <= i_re_ram;
+                r_ld            <= i_re_ram and in_rd_nz;
                 r_en_ram        <= i_en_ram;
                 r_opcode        <= i_opcode;
                 r_funct3        <= i_funct3;
@@ -302,6 +312,7 @@ begin
     o_illegal       <= r_illegal;
     o_we_ram        <= r_we_ram;
     o_re_ram        <= r_re_ram;
+    o_ld            <= r_ld;
     o_en_ram        <= r_en_ram;
     o_opcode        <= r_opcode;
     o_funct3        <= r_funct3;

@@ -75,3 +75,26 @@ async def test_stall_and_redirect_priority(dut):
         check_equal(held, 0x1000, f"stall com fonte {source}")
     pc, _ = await step(dut, 0, REDIRECT, (0x4000, 0x5000, 0x6000))
     check_equal(pc, 0x6000, "redirecionamento em stall")
+
+
+@cocotb.test()
+async def test_late_take(dut):
+    """A decisão tardia de EX carrega o alvo e liga a escrita do PC."""
+    await start(dut)
+    prng = Prng(0x1A7E)
+    for index in range(32):
+        targets = tuple(prng.getrandbits(32) for _ in range(3))
+        for jalr in (0, 1):
+            dut.i_late_take.value = 1
+            dut.i_late_jalr.value = jalr
+            pc, pc4 = await step(dut, 0, PC4, targets)
+            check_equal(pc, targets[jalr], (index, "tomado", jalr))
+            check_equal(pc4, (pc + 4) & MASK32, (index, "pc4", jalr))
+        # O redirecionamento tem prioridade sobre a decisão tardia.
+        pc, _ = await step(dut, 0, REDIRECT, targets)
+        check_equal(pc, targets[2], (index, "redirecionamento"))
+        # Sem a decisão tardia e sem escrita, o PC congela.
+        dut.i_late_take.value = 0
+        held, _ = await step(dut, 0, PC4, targets)
+        check_equal(held, targets[2], (index, "congelado"))
+    dut.i_late_take.value = 0
