@@ -19,6 +19,13 @@ use work.pc_src_consts.all;
 use work.word_consts.all;
 
 entity pc_fetch is
+    generic (
+        -- Endereço adiantado das memórias de instrução: o_addr_nx traz o endereço que o PC terá no ciclo seguinte, sem
+        -- a decisão tardia de EX (desvio, salto, exceção, MRET, FENCE.I), e a busca da instrução do alvo toma um ciclo
+        -- a mais (o PC fica parado no alvo um ciclo, enquanto as memórias leem o endereço novo). Com false, o_addr_nx é o
+        -- próprio PC e nada muda.
+        early_addr      : boolean := false
+    );
     port (
         -- Sinal de clock.
         i_clk           : in    std_logic;
@@ -47,7 +54,13 @@ entity pc_fetch is
         -- Valor atual do PC enviado ao barramento de busca e ao registrador IF/ID.
         o_pc            : out   word_t;
         -- Valor de PC + 4 enviado ao registrador de estágio IF/ID.
-        o_pc4           : out   word_t
+        o_pc4           : out   word_t;
+        -- Endereço que as memórias de instrução leem na borda deste ciclo, o PC do ciclo seguinte (com early_addr), ou o
+        -- PC atual (sem ele).
+        o_addr_nx       : out   word_t;
+        -- O PC foi carregado com um alvo de EX na borda anterior: as memórias leram o endereço sequencial, a instrução
+        -- deste ciclo não vale e o PC fica parado (com early_addr; sempre '0' sem ele).
+        o_late_q        : out   std_logic
     );
 end entity pc_fetch;
 
@@ -69,6 +82,12 @@ architecture rtl of pc_fetch is
     signal redirect_sel : std_logic;
     -- Próximo PC sem a decisão tardia de EX.
     signal early_next : word_t;
+    -- O PC foi carregado com um alvo de EX na borda anterior.
+    signal late_q     : std_logic := '0';
+    -- Habilitação de avanço do PC, sem o ciclo parado depois de um alvo de EX.
+    signal pc_we_eff  : std_logic;
+    -- Endereço sequencial do ciclo seguinte (PC + 4, a repetição ou o PC parado).
+    signal addr_seq   : word_t;
 
 begin
 
@@ -106,7 +125,41 @@ begin
     -- demais termos.
     pc_next <= late_target when (i_late_take = '1' and redirect_sel = '0') else early_next;
 
-    pc_en <= i_pc_we or redirect_sel or i_late_take;
+    -- Com o endereço adiantado, o ciclo depois de um alvo de EX leu o endereço sequencial (a decisão chegou tarde
+    -- demais para o endereço das RAMs): o PC fica parado no alvo e as RAMs o leem de novo.
+    pc_we_eff <= i_pc_we and (not late_q);
+    pc_en     <= pc_we_eff or redirect_sel or i_late_take;
+
+    gen_late : if early_addr generate
+    begin
+
+        p_late : process (i_clk) is
+        begin
+
+            if rising_edge(i_clk) then
+                if i_rst = '1' then
+                    -- a primeira instrução depois do reset também espera: as memórias leram PC + 4
+                    late_q <= '1';
+                else
+                    late_q <= i_late_take or redirect_sel;
+                end if;
+            end if;
+
+        end process p_late;
+
+    end generate gen_late;
+
+    gen_no_late : if not early_addr generate
+    begin
+
+        late_q <= '0';
+
+    end generate gen_no_late;
+
+    -- O que o PC vira sem a decisão de EX: parado, a repetição ou PC + 4.
+    addr_seq  <= seq_next when pc_we_eff = '1' else pc_reg;
+    o_addr_nx <= addr_seq when early_addr else pc_reg;
+    o_late_q  <= late_q;
 
     -- Registrador estrutural de 32 bits do Program Counter.
     u_pc_reg : entity work.generic_register

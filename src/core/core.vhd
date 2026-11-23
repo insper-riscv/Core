@@ -30,7 +30,10 @@ entity core is
         -- zero.
         hpm_counters  : natural range 0 to 29        := 29;
         -- Largura em bits de cada contador de eventos real, de 0 a 64.
-        hpm_width     : natural range 0 to 64        := 64
+        hpm_width     : natural range 0 to 64        := 64;
+        -- Endereço adiantado às memórias de instrução (o_if_addr_nx traz o PC do ciclo seguinte e a instrução do alvo de
+        -- um desvio chega um ciclo depois): as memórias de instrução têm o mesmo clock do núcleo.
+        early_addr    : boolean                      := false
     );
     port (
         -- Sinal de clock principal do processador.
@@ -40,6 +43,8 @@ entity core is
 
         -- Endereço de busca de instrução (PC atual no estágio IF).
         o_if_addr          : out   addr_t;
+        -- Endereço que as memórias de instrução leem na borda deste ciclo (o PC do ciclo seguinte, com early_addr).
+        o_if_addr_nx       : out   addr_t;
         -- Habilitação de leitura da memória de instruções no estágio IF.
         o_if_rden          : out   std_logic;
         -- Palavra de instrução retornada pela BOOT_MEMORY.
@@ -583,6 +588,9 @@ begin
     -- 1. Estágio IF (Instruction Fetch) + Registrador IF/ID
     -- =========================================================================
     u_stage_if : entity work.stage_if
+        generic map (
+            early_addr => early_addr
+        )
         port map (
             i_clk              => i_clk,
             i_rst              => i_rst,
@@ -609,6 +617,7 @@ begin
             o_instr            => if_instr,
             o_instr_valid      => if_instr_valid,
             o_if_addr          => o_if_addr,
+            o_if_addr_nx       => o_if_addr_nx,
             o_if_rden          => o_if_rden,
             o_ic_sel           => o_ic_sel,
             o_ic_inval         => o_ic_inval,
