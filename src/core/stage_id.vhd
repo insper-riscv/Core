@@ -21,6 +21,7 @@ use work.pipeline_types.all;
 use work.ext_imm_consts.all;
 use work.opcode_consts.all;
 use work.funct3_consts.all;
+use work.trap_consts.all;
 use work.alu_consts.all;
 use work.fwd_consts.all;
 
@@ -100,6 +101,9 @@ entity stage_id is
         o_is_muldiv     : out   std_logic;
         -- Indica que a instrução pertence à extensão Zicsr (acesso a registrador CSR).
         o_is_csr        : out   std_logic;
+        -- Classes da instrução SYSTEM decodificadas em ID, para o estágio EX não decodificar: bit 0 ECALL, 1 EBREAK, 2 MRET,
+        -- 3 WFI e 4 instrução SYSTEM ilegal.
+        o_sysf          : out   std_logic_vector(5 downto 0);
         -- Habilitação de escrita na memória de dados (filtrada pelo bubble_mux).
         o_we_ram        : out   std_logic;
         -- Habilitação de leitura na memória de dados (filtrada pelo bubble_mux).
@@ -119,6 +123,27 @@ architecture rtl of stage_id is
 
     -- Alias para o campo opcode (bits [6:0]) da instrução em IF/ID.
     alias id_opcode  : opcode_t is i_instr(6 downto 0);
+    -- Classes da instrução SYSTEM decodificadas em ID (ver o_sysf).
+    -- Opcode que o ID entrega ao EX: o da instrução, ou o que o Zimop põe no lugar.
+    signal eff_opcode    : opcode_t;
+    -- Indicador de instrução do opcode SYSTEM.
+    signal sys_is_system : std_logic;
+    -- Indicador de instrução CSR (SYSTEM com funct3 que não é de privilégio nem reservado).
+    signal sys_is_csr    : std_logic;
+    -- Indicador de SYSTEM que não usa registradores de origem.
+    signal sys_no_regs   : std_logic;
+    -- Indicador de ECALL.
+    signal sys_ecall     : std_logic;
+    -- Indicador de FENCE.I.
+    signal sys_fencei    : std_logic;
+    -- Indicador de EBREAK.
+    signal sys_ebreak    : std_logic;
+    -- Indicador de MRET.
+    signal sys_mret      : std_logic;
+    -- Indicador de WFI.
+    signal sys_wfi       : std_logic;
+    -- Indicador de instrução SYSTEM ilegal.
+    signal sys_illegal   : std_logic;
     -- Alias para o campo do registrador destino rd (bits [11:7]), de 5 bits.
     alias id_rd_idx  : reg_field_t is i_instr(11 downto 7);
     -- Alias para o campo do registrador fonte rs1 (bits [19:15]), de 5 bits.
@@ -348,6 +373,22 @@ begin
                                       (id_uses_rs1 = '1' and id_rs1_idx(4) = '1') or
                                       (id_uses_rs2 = '1' and id_rs2_idx(4) = '1'))) else
                      '0';
+    -- Classes da instrução SYSTEM, com as mesmas equações que a unidade de trap usaria em EX a partir dos campos da
+    -- instrução: a decodificação sai do estágio EX e entra no ID/EX já pronta
+    sys_is_system <= '1' when eff_opcode = OPCODE_SYSTEM else '0';
+    sys_is_csr    <= '1' when (sys_is_system = '1' and i_instr(14 downto 12) /= FUNCT3_PRIV and
+                               i_instr(14 downto 12) /= FUNCT3_SYSTEM_RESERVED) else '0';
+    sys_no_regs   <= '1' when (i_instr(14 downto 12) = FUNCT3_PRIV and id_rd_idx = REG_ZERO and
+                               id_rs1_idx = REG_ZERO) else '0';
+    sys_ecall     <= '1' when (sys_is_system = '1' and sys_no_regs = '1' and i_instr(31 downto 20) = IMM12_ECALL) else '0';
+    sys_ebreak    <= '1' when (sys_is_system = '1' and sys_no_regs = '1' and i_instr(31 downto 20) = IMM12_EBREAK) else '0';
+    sys_mret      <= '1' when (sys_is_system = '1' and sys_no_regs = '1' and i_instr(31 downto 20) = IMM12_MRET) else '0';
+    sys_wfi       <= '1' when (sys_is_system = '1' and sys_no_regs = '1' and i_instr(31 downto 20) = IMM12_WFI) else '0';
+    sys_illegal   <= '1' when (sys_is_system = '1' and sys_is_csr = '0' and sys_ecall = '0' and sys_ebreak = '0' and
+                               sys_mret = '0' and sys_wfi = '0') else '0';
+    sys_fencei    <= '1' when (eff_opcode = OPCODE_MISC_MEM and i_instr(14 downto 12) = FUNCT3_FENCE_I) else '0';
+    o_sysf        <= sys_fencei & sys_illegal & sys_wfi & sys_mret & sys_ebreak & sys_ecall;
+
     o_illegal     <= (cu_illegal and (not id_is_muldiv) and (not id_is_fencei) and (not id_is_zicond)) or id_bad_reg;
     cu_we_reg     <= (base_we_reg or m_we_reg or csr_we_reg or zimop_we_reg or zc_we_reg) and (not id_is_hint);
     o_sel_pc_rs1  <= base_sel_pc_rs1 or m_sel_pc_rs1 or zc_sel_pc_rs1;
@@ -383,7 +424,8 @@ begin
         );
 
     id_alu_op <= zimop_alu_op when id_is_zimop = '1' else cu_alu_op;
-    o_opcode  <= zimop_opcode when id_is_zimop = '1' else cu_opcode;
+    eff_opcode <= zimop_opcode when id_is_zimop = '1' else cu_opcode;
+    o_opcode   <= eff_opcode;
     o_alu_op  <= zc_alu_op when id_is_zicond = '1' else id_alu_op;
     o_alu_sel <= alu_result_select(id_alu_op);
 

@@ -176,11 +176,12 @@ async def test_back_to_back(dut):
 async def test_stall_length(dut):
     """Verifica stall length.
 
-    The stall is 35 cycles for a multiplication and 37 for a division
+    The stall is 4 cycles for a multiplication (3 cycles of the DSP
+    multiplier plus the capture) and 37 for a division
     (operands never repeat).
     """
     await _reset(dut)
-    for i, (funct3, want) in enumerate(((0, 35), (3, 35), (4, 37), (7, 37))):
+    for i, (funct3, want) in enumerate(((0, 4), (3, 4), (4, 37), (7, 37))):
         _, stalled = await execute(dut, funct3, 12345 + i, 678)
         check_equal(
             stalled,
@@ -218,7 +219,7 @@ def full_stall(funct3, a, b):
     or an overflow is short.
     """
     if is_mult(funct3):
-        return 35
+        return 4
     special = b == 0 or (
         funct3 in SIGNED_DIV_FUNCT3 and a == INT_MIN and b == ALL_ONES
     )

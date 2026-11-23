@@ -3,7 +3,7 @@
 --
 -- Coordena a execução das 8 instruções da extensão M no estágio EX (com
 -- HAS_M falso, só as 4 multiplicações da extensão Zmmul, sem o divisor):
---   - Multiplicação (33 ciclos via booth_multiplier_rv32):
+--   - Multiplicação (3 ciclos via dsp_multiplier_rv32, ou 33 via booth_multiplier_rv32 com FAST_MULTIPLIER falso):
 --     MUL (32 bits baixos), MULH (32 bits altos signed x signed),
 --     MULHSU (32 bits altos signed x unsigned) e MULHU (32 bits altos unsigned x unsigned).
 --   - Divisão e Resto (35 ciclos via non_restoring_divider_rv32):
@@ -41,6 +41,10 @@ use work.funct3_consts.all;
 use work.muldiv_consts.all;
 
 entity multdiv is
+    generic (
+        -- Verdadeiro: o produto sai do multiplicador de bloco DSP (3 ciclos); falso: do Booth radix-2 (33 ciclos).
+        FAST_MULTIPLIER : boolean := true
+    );
     port (
         -- Sinal de clock do sistema.
         i_clk       : in    std_logic;
@@ -237,20 +241,42 @@ begin
     o_stall <= stall_int;
     o_fused <= fuse_q;
 
-    -- Instância única do multiplicador de Booth radix-2 de 32 bits.
-    u_booth_multiplier : entity work.booth_multiplier_rv32
-        port map (
-            i_clk          => i_clk,
-            i_rst          => i_rst,
-            i_start        => start_mul,
-            i_abort        => fuse_q,
-            i_multiplicand => i_a,
-            i_multiplier   => i_b,
-            o_result_lo    => mul_lo,
-            o_result_hi    => mul_hi,
-            o_done         => mult_done,
-            o_busy         => mult_busy
-        );
+    -- Instância única do multiplicador: o de bloco DSP (3 ciclos) ou o de Booth radix-2 de 32 bits (33 ciclos).
+    gen_fast_mul : if FAST_MULTIPLIER generate
+
+        u_dsp_multiplier : entity work.dsp_multiplier_rv32
+            port map (
+                i_clk          => i_clk,
+                i_rst          => i_rst,
+                i_start        => start_mul,
+                i_abort        => fuse_q,
+                i_multiplicand => i_a,
+                i_multiplier   => i_b,
+                o_result_lo    => mul_lo,
+                o_result_hi    => mul_hi,
+                o_done         => mult_done,
+                o_busy         => mult_busy
+            );
+
+    end generate gen_fast_mul;
+
+    gen_booth_mul : if not FAST_MULTIPLIER generate
+
+        u_booth_multiplier : entity work.booth_multiplier_rv32
+            port map (
+                i_clk          => i_clk,
+                i_rst          => i_rst,
+                i_start        => start_mul,
+                i_abort        => fuse_q,
+                i_multiplicand => i_a,
+                i_multiplier   => i_b,
+                o_result_lo    => mul_lo,
+                o_result_hi    => mul_hi,
+                o_done         => mult_done,
+                o_busy         => mult_busy
+            );
+
+    end generate gen_booth_mul;
 
     -- Instância única do divisor não-restaurador de 32 bits (atende signed e unsigned).
 

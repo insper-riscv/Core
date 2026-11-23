@@ -82,6 +82,8 @@ entity reg_id_ex is
         i_is_muldiv     : in    std_logic;
         -- Indica instrução pertencente à extensão Zicsr (acesso a registrador CSR).
         i_is_csr        : in    std_logic := '0';
+        -- Classes SYSTEM decodificadas em ID (ECALL, EBREAK, MRET, WFI, SYSTEM ilegal).
+        i_sysf          : in    std_logic_vector(5 downto 0) := (others => '0');
         -- Indica instrução inexistente (gera exceção de instrução ilegal no estágio EX).
         i_illegal       : in    std_logic := '0';
         -- Habilita escrita na memória de dados (pós-bubble_mux).
@@ -134,6 +136,8 @@ entity reg_id_ex is
         o_is_muldiv     : out   std_logic;
         -- Indicador de instrução CSR registrado para o estágio EX.
         o_is_csr        : out   std_logic;
+        -- Classes SYSTEM registradas.
+        o_sysf          : out   std_logic_vector(5 downto 0);
         -- Indica instrução ilegal registrada em ID/EX.
         o_illegal       : out   std_logic;
         -- Habilitação de escrita na RAM registrada para o estágio EX.
@@ -210,6 +214,8 @@ architecture rtl of reg_id_ex is
     signal r_en_ram        : std_logic    := '0';
     -- Campo opcode armazenado.
     signal r_opcode        : opcode_t     := (others => '0');
+    -- Classes SYSTEM armazenadas (o_sysf de ID).
+    signal r_sysf          : std_logic_vector(5 downto 0) := (others => '0');
     -- Campo funct3 armazenado.
     signal r_funct3        : funct3_t     := (others => '0');
 
@@ -239,6 +245,7 @@ begin
                 r_alu_sel       <= (others => '0');
                 r_is_muldiv     <= '0';
                 r_is_csr        <= '0';
+                r_sysf          <= (others => '0');
                 r_illegal       <= '0';
                 r_we_ram        <= '0';
                 r_re_ram        <= '0';
@@ -260,6 +267,7 @@ begin
                 r_alu_sel       <= i_alu_sel;
                 r_is_muldiv     <= i_is_muldiv;
                 r_is_csr        <= i_is_csr;
+                r_sysf          <= i_sysf;
                 r_illegal       <= i_illegal;
                 r_we_ram        <= i_we_ram;
                 r_re_ram        <= i_re_ram;
@@ -309,6 +317,7 @@ begin
     o_fwd_rs2       <= r_fwd_rs2;
     o_is_muldiv     <= r_is_muldiv;
     o_is_csr        <= r_is_csr;
+    o_sysf          <= r_sysf;
     o_illegal       <= r_illegal;
     o_we_ram        <= r_we_ram;
     o_re_ram        <= r_re_ram;

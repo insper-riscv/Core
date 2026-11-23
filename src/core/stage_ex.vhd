@@ -86,6 +86,8 @@ entity stage_ex is
         i_is_muldiv       : in    std_logic;
         -- Indica que a instrução em EX pertence à extensão Zicsr (decodificado no ID).
         i_is_csr          : in    std_logic;
+        -- Classes SYSTEM decodificadas em ID (ECALL, EBREAK, MRET, WFI, SYSTEM ilegal).
+        i_sysf            : in    std_logic_vector(5 downto 0) := (others => '0');
         -- Indica instrução inexistente em EX ('1' = ilegal; só gera exceção com HAS_ZICSR).
         i_illegal         : in    std_logic;
         -- Campo opcode da instrução no estágio EX.
@@ -477,7 +479,8 @@ begin
                 hpm_counters        => hpm_counters,
                 hpm_width           => hpm_width,
                 time_external       => time_external,
-                hpm_registered_read => true
+                hpm_registered_read => true,
+                hpm_registered_events => true
             )
             port map (
                 i_clk            => i_clk,
@@ -534,7 +537,8 @@ begin
 
         u_trap_unit : entity work.trap_unit
             generic map (
-                check_ea => false
+                check_ea    => false,
+                predecoded  => true
             )
             port map (
                 i_fetch_ok    => fetch_ok,
@@ -546,6 +550,7 @@ begin
                 i_rd_idx      => i_rd_idx,
                 i_rs1_idx     => i_rs1_idx,
                 i_imm12       => i_imm(11 downto 0),
+                i_sysf        => i_sysf,
                 i_ea          => (others => '0'),
                 i_cf_taken    => ex_cf_taken,
                 i_cf_target   => ex_cf_target,
@@ -565,9 +570,11 @@ begin
         -- Sem CSRs o detector só sinaliza: qualquer instrução CSR é ilegal e um desvio desalinhado não é checado.
         u_trap_detect : entity work.trap_unit
             generic map (
-                check_ea => true
+                check_ea    => true,
+                predecoded  => true
             )
             port map (
+                i_sysf        => i_sysf,
                 i_ex_valid    => i_valid,
                 i_run         => i_pipe_run,
                 i_opcode      => i_opcode,

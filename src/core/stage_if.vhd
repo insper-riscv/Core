@@ -21,6 +21,11 @@ use work.pc_src_consts.all;
 use work.mem_map_consts.all;
 
 entity stage_if is
+    generic (
+        -- Endereço adiantado às memórias de instrução (ver pc_fetch): o_if_addr_nx traz o PC do ciclo seguinte, e a
+        -- instrução do alvo de um desvio, salto ou exceção chega um ciclo depois.
+        early_addr         : boolean := false
+    );
     port (
         -- Sinal de clock principal do processador.
         i_clk              : in    std_logic;
@@ -72,6 +77,8 @@ entity stage_if is
         o_instr_valid      : out   std_logic;
         -- Endereço de busca enviado às memórias de instrução externas.
         o_if_addr          : out   addr_t;
+        -- Endereço que as memórias de instrução leem na borda deste ciclo, o PC do ciclo seguinte (com early_addr).
+        o_if_addr_nx       : out   addr_t;
         -- Habilitação de leitura das memórias de instrução externas.
         o_if_rden          : out   std_logic;
         -- Indica que o endereço de busca pertence à região atendida pela I-cache (barramento).
@@ -103,6 +110,10 @@ architecture rtl of stage_if is
     signal miss_q            : std_logic := '0';
     -- Repetição da busca neste ciclo.
     signal replay            : std_logic;
+    -- O PC acaba de ser carregado com um alvo de EX e as memórias leram o endereço sequencial (com early_addr).
+    signal late_q            : std_logic;
+    -- O endereço adiantado completo do PC.
+    signal addr_nx           : word_t;
 
 begin
 
@@ -137,6 +148,9 @@ begin
     end process p_miss_proc;
 
     u_pc_fetch : entity work.pc_fetch
+        generic map (
+            early_addr => early_addr
+        )
         port map (
             i_clk           => i_clk,
             i_rst           => i_rst,
@@ -150,14 +164,18 @@ begin
             i_late_take     => late_take,
             i_late_jalr     => i_ex_jalr_taken,
             o_pc            => if_pc,
-            o_pc4           => o_pc4
+            o_pc4           => o_pc4,
+            o_addr_nx       => addr_nx,
+            o_late_q        => late_q
         );
 
     is_boot_memory_if <= '1' when is_boot_addr(unsigned(if_pc)) else '0';
     if_in_sdram       <= '1' when (is_boot_memory_if = '0' and
                                       is_external_addr(unsigned(if_pc))) else
                          '0';
-    if_wait           <= if_in_sdram and (not i_ic_ready);
+    -- No ciclo depois de um alvo de EX a leitura é a do endereço sequencial: a instrução não vale, e não é falta da cache
+    -- (nenhuma repetição): vira bolha e o PC fica parado, para as memórias lerem o alvo.
+    if_wait           <= if_in_sdram and (not i_ic_ready) and (not late_q);
 
     o_instr <= i_boot_memory_data when is_boot_memory_if = '1' else
                i_ic_data when if_in_sdram = '1' else
@@ -165,8 +183,9 @@ begin
 
     o_pc          <= if_pc;
     o_if_addr     <= if_pc(addr_t'range);
+    o_if_addr_nx  <= addr_nx(addr_t'range);
     o_if_rden     <= '1';
-    o_instr_valid <= not if_wait;
+    o_instr_valid <= (not if_wait) and (not late_q);
     o_ic_sel      <= if_in_sdram;
     o_ic_inval    <= i_ic_inval;
 

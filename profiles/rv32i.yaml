@@ -54,6 +54,7 @@ sources:
   - src/shared/hazard_detection_unit.vhd
   - src/M/m_decode.vhd
   - src/M/booth_multiplier_rv32.vhd
+  - src/M/dsp_multiplier_rv32.vhd
   - src/M/non_restoring_divider_rv32.vhd
   - src/M/muldiv_fusion.vhd
   - src/M/multdiv.vhd

@@ -30,13 +30,26 @@ module props (input clk);
   wire branch_taken, jalr_taken, trap_take, trap_sig, mret_take, fencei_take, fencei_inval, fencei_busy, dc_flush;
   wire muldiv_stall, muldiv_fused;
 
+  // The SYSTEM classes the ID stage decodes and registers (ECALL, EBREAK, MRET, WFI, SYSTEM illegal): the decode of the
+  // fields of the instruction, as stage_id writes it, so the proof sees the flags the pipeline would hand to EX.
+  wire sys_system = opcode == 7'b1110011;
+  wire sys_csr = sys_system && funct3 != 3'b000 && funct3 != 3'b100;
+  wire sys_no_regs = funct3 == 3'b000 && rd_idx == 5'd0 && rs1_idx == 5'd0;
+  wire sys_ecall = sys_system && sys_no_regs && imm[11:0] == 12'h000;
+  wire sys_ebreak = sys_system && sys_no_regs && imm[11:0] == 12'h001;
+  wire sys_mret = sys_system && sys_no_regs && imm[11:0] == 12'h302;
+  wire sys_wfi = sys_system && sys_no_regs && imm[11:0] == 12'h105;
+  wire sys_illegal = sys_system && !sys_csr && !sys_ecall && !sys_ebreak && !sys_mret && !sys_wfi;
+  wire sys_fencei = opcode == 7'b0001111 && funct3 == 3'b001;
+  wire [5:0] sysf = {sys_fencei, sys_illegal, sys_wfi, sys_mret, sys_ebreak, sys_ecall};
+
   stage_ex dut (
     .i_hpm_events(16'h0), .i_irq_software(irq_sw), .i_irq_timer(irq_tm), .i_irq_external(irq_ex),
     .i_clk(clk), .i_rst(reset), .i_base_run(base_run), .i_pipe_run(pipe_run), .i_valid(valid), .i_retire(retire),
     .i_pc(pc), .i_pc4(pc4), .i_rs1_idx(rs1_idx), .i_rd_idx(rd_idx), .i_rs1_val(rs1_val), .i_rs2_val(rs2_val),
     .i_imm(imm), .i_sel_pc4_alu(sel_pc4_alu), .i_sel_rs2_imm(sel_rs2_imm), .i_sel_pc_rs1(sel_pc_rs1),
     .i_alu_op(alu_op), .i_alu_sel(alu_sel), .i_is_muldiv(is_muldiv), .i_is_csr(is_csr), .i_illegal(illegal),
-    .i_opcode(opcode), .i_funct3(funct3), .i_fwd_rs1(fwd1), .i_fwd_rs2(fwd2),
+    .i_opcode(opcode), .i_funct3(funct3), .i_sysf(sysf), .i_fwd_rs1(fwd1), .i_fwd_rs2(fwd2),
     .i_exmem_alu_out(exmem_alu_out),
     .i_memwb_alu_out(memwb_alu_out), .i_wb2_data(wb2_data), .i_dc_done(dc_done), .i_valid_raw(valid_raw),
     .i_mem_trap_take(1'b0), .i_mem_trap_cause(32'h0), .i_mem_trap_pc(32'h0), .i_mem_trap_tval(32'h0),
