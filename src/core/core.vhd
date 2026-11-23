@@ -346,6 +346,7 @@ architecture rtl of core is
     signal ex_is_csr        : std_logic;
     -- Classes SYSTEM decodificadas em ID, em ID e em EX.
     signal id_sysf : std_logic_vector(5 downto 0);
+    -- Classes SYSTEM registradas em ID/EX.
     signal ex_sysf : std_logic_vector(5 downto 0);
     -- Indicador de instrução inexistente registrado em ID/EX.
     signal ex_illegal       : std_logic;

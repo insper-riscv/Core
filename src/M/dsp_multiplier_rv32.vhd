@@ -50,6 +50,7 @@ architecture rtl of dsp_multiplier_rv32 is
     signal start_ok    : std_logic;
     -- Primeira e segunda fases do cálculo: o produto sendo calculado e o produto seguindo para o registrador de saída.
     signal ph1_q       : std_logic;
+    -- Segunda fase do cálculo: o produto seguindo para o registrador de saída.
     signal ph2_q       : std_logic;
     -- Ocupado durante os ciclos de cálculo.
     signal busy_q      : std_logic;
@@ -59,17 +60,23 @@ architecture rtl of dsp_multiplier_rv32 is
     signal done_q      : std_logic;
     -- Próximos valores dos sinais de controle.
     signal ph1_d       : std_logic;
+    -- Próximo valor de ph2_q.
     signal ph2_d       : std_logic;
+    -- Próximo valor de busy_q.
     signal busy_d      : std_logic;
+    -- Próximo valor de inhibit_q.
     signal inhibit_d   : std_logic;
+    -- Próximo valor de done_q.
     signal done_d      : std_logic;
     -- Operandos registrados.
     signal a_q         : word_t;
+    -- Segundo operando registrado.
     signal b_q         : word_t;
     -- Produto de 64 bits antes do primeiro registrador.
     signal product     : std_logic_vector(2 * XLEN - 1 downto 0);
     -- Produto de 64 bits do primeiro registrador e do registrador de saída.
     signal p1_q        : std_logic_vector(2 * XLEN - 1 downto 0);
+    -- Produto de 64 bits do registrador de saída.
     signal p2_q        : std_logic_vector(2 * XLEN - 1 downto 0);
 
 begin

@@ -1,8 +1,10 @@
 """Testes de stage_if com o endereço adiantado às memórias de instrução.
 
-As memórias leem, na borda do clock do núcleo, o endereço que o PC terá no ciclo seguinte (o_if_addr_nx), sem a decisão
-tardia de EX. Depois de um desvio, salto ou exceção, o PC carrega o alvo, a leitura daquele ciclo foi do endereço
-sequencial (a instrução não vale, vira bolha e não é falta da cache) e o PC fica parado um ciclo, enquanto as memórias
+As memórias leem, na borda do clock do núcleo, o endereço que o PC terá
+no ciclo seguinte (o_if_addr_nx), sem a decisão tardia de EX. Depois de
+um desvio, salto ou exceção, o PC carrega o alvo, a leitura daquele
+ciclo foi do endereço sequencial (a instrução não vale, vira bolha e
+não é falta da cache) e o PC fica parado um ciclo, enquanto as memórias
 leem o alvo.
 """
 
@@ -44,7 +46,10 @@ async def apply(dut, values):
 
 
 async def step(dut, values):
-    """Aplica as entradas, avança uma borda e devolve (PC novo, endereço lido na borda)."""
+    """Aplica as entradas e avança uma borda.
+
+    Devolve (PC novo, endereço lido na borda).
+    """
     await apply(dut, values)
     read = int(dut.o_if_addr_nx.value)
     await RisingEdge(dut.i_clk)
@@ -53,7 +58,7 @@ async def step(dut, values):
 
 
 async def start(dut):
-    """Liga o clock, aplica reset e leva o PC ao início da região da cache."""
+    """Liga o clock, aplica reset e leva o PC à região da cache."""
     cocotb.start_soon(Clock(dut.i_clk, 10, unit="ns").start())
     await apply(dut, {"rst": 1})
     await RisingEdge(dut.i_clk)
@@ -66,7 +71,7 @@ async def start(dut):
 
 @cocotb.test()
 async def test_read_address_is_the_next_pc(dut):
-    """Sem decisão de EX, o endereço lido é o PC da borda seguinte."""
+    """Sem decisão de EX, o endereço lido é o PC seguinte."""
     await start(dut)
     for index in range(1, 6):
         pc, read = await step(dut, {})
@@ -86,10 +91,11 @@ async def test_stall_reads_the_same_address(dut):
 
 @cocotb.test()
 async def test_branch_target_costs_one_cycle(dut):
-    """O alvo de um desvio chega à leitura um ciclo depois e o PC espera."""
+    """O alvo de um desvio chega à leitura um ciclo depois."""
     await start(dut)
     await step(dut, {})
-    # EX decide o desvio nesta borda: as memórias leem PC + 4, o PC vira o alvo
+    # EX decide o desvio nesta borda: as memórias leem PC + 4 e o PC
+    # vira o alvo
     pc, read = await step(dut, {"ex_branch_taken": 1})
     check_equal(pc, SDRAM + 0x100, "PC é o alvo")
     check_equal(read, SDRAM + 8, "leitura sequencial, decisão tardia")
@@ -110,7 +116,7 @@ async def test_branch_target_costs_one_cycle(dut):
 
 @cocotb.test()
 async def test_redirect_and_jalr_cost_one_cycle(dut):
-    """Salto indireto e redirecionamento seguem o mesmo ciclo de espera."""
+    """Salto indireto e redirecionamento esperam o mesmo ciclo."""
     await start(dut)
     for values, target in (
         ({"ex_jalr_taken": 1}, SDRAM + 0x200),
@@ -130,7 +136,7 @@ async def test_redirect_and_jalr_cost_one_cycle(dut):
 
 @cocotb.test()
 async def test_new_decision_in_the_wait_cycle(dut):
-    """Uma exceção no ciclo de espera carrega o PC de novo e espera de novo."""
+    """Uma exceção no ciclo de espera carrega o PC e espera de novo."""
     await start(dut)
     await step(dut, {"ex_branch_taken": 1})
     pc, _ = await step(dut, {"trap_take": 1})

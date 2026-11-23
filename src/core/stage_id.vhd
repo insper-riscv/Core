@@ -126,14 +126,23 @@ architecture rtl of stage_id is
     -- Classes da instrução SYSTEM decodificadas em ID (ver o_sysf).
     -- Opcode que o ID entrega ao EX: o da instrução, ou o que o Zimop põe no lugar.
     signal eff_opcode    : opcode_t;
+    -- Indicador de instrução do opcode SYSTEM.
     signal sys_is_system : std_logic;
+    -- Indicador de instrução CSR (SYSTEM com funct3 que não é de privilégio nem reservado).
     signal sys_is_csr    : std_logic;
+    -- Indicador de SYSTEM que não usa registradores de origem.
     signal sys_no_regs   : std_logic;
+    -- Indicador de ECALL.
     signal sys_ecall     : std_logic;
+    -- Indicador de FENCE.I.
     signal sys_fencei    : std_logic;
+    -- Indicador de EBREAK.
     signal sys_ebreak    : std_logic;
+    -- Indicador de MRET.
     signal sys_mret      : std_logic;
+    -- Indicador de WFI.
     signal sys_wfi       : std_logic;
+    -- Indicador de instrução SYSTEM ilegal.
     signal sys_illegal   : std_logic;
     -- Alias para o campo do registrador destino rd (bits [11:7]), de 5 bits.
     alias id_rd_idx  : reg_field_t is i_instr(11 downto 7);

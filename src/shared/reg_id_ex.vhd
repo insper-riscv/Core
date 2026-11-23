@@ -214,6 +214,7 @@ architecture rtl of reg_id_ex is
     signal r_en_ram        : std_logic    := '0';
     -- Campo opcode armazenado.
     signal r_opcode        : opcode_t     := (others => '0');
+    -- Classes SYSTEM armazenadas (o_sysf de ID).
     signal r_sysf          : std_logic_vector(5 downto 0) := (others => '0');
     -- Campo funct3 armazenado.
     signal r_funct3        : funct3_t     := (others => '0');
