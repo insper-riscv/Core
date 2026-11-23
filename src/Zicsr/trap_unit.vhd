@@ -45,6 +45,9 @@ use work.trap_consts.all;
 
 entity trap_unit is
     generic (
+        -- As classes da instrução SYSTEM (ECALL, EBREAK, MRET, WFI e SYSTEM ilegal) vêm decodificadas e registradas do ID
+        -- por i_sysf, em vez de decodificadas aqui dos campos da instrução: tira essa decodificação do estágio EX.
+        predecoded        : boolean := false;
         -- Confere o endereço efetivo de loads e stores (causas 4 e 6); '0' ignora i_ea, para a instância que não o
         -- conhece.
         check_ea          : boolean := true;
@@ -67,6 +70,8 @@ entity trap_unit is
         i_rs1_idx        : in    reg_field_t;
         -- Campo imediato de 12 bits (bits [31:20] da instrução) no estágio EX.
         i_imm12          : in    std_logic_vector(11 downto 0);
+        -- Classes SYSTEM já decodificadas em ID (ECALL, EBREAK, MRET, WFI, SYSTEM ilegal); valem com predecoded.
+        i_sysf           : in    std_logic_vector(5 downto 0) := (others => '0');
         -- Endereço efetivo de memória calculado pela ULA no estágio EX.
         i_ea             : in    word_t;
         -- O endereço efetivo está na memória principal (com ea_flags_external).
@@ -173,15 +178,31 @@ begin
     is_csr    <= '1' when (is_system = '1' and i_funct3 /= FUNCT3_PRIV and i_funct3 /= FUNCT3_SYSTEM_RESERVED) else '0';
     no_regs   <= '1' when (i_funct3 = FUNCT3_PRIV and i_rd_idx = REG_ZERO and i_rs1_idx = REG_ZERO) else '0';
 
-    is_ecall  <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_ECALL) else '0';
-    is_ebreak <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_EBREAK) else '0';
-    is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET) else '0';
-    is_wfi    <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_WFI) else '0';
+    gen_sys_decode : if not predecoded generate
+        is_ecall  <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_ECALL) else '0';
+        is_ebreak <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_EBREAK) else '0';
+        is_mret   <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_MRET) else '0';
+        is_wfi    <= '1' when (is_system = '1' and no_regs = '1' and i_imm12 = IMM12_WFI) else '0';
+    end generate gen_sys_decode;
 
-    sys_illegal <= '1' when (is_system = '1' and is_csr = '0' and
-                                is_ecall = '0' and is_ebreak = '0' and
-                                is_mret = '0' and is_wfi = '0') else
-                   '0';
+    -- predecoded: as classes vêm registradas do ID, e o EX não as decodifica
+    gen_sys_predecoded : if predecoded generate
+        is_ecall  <= i_sysf(0);
+        is_ebreak <= i_sysf(1);
+        is_mret   <= i_sysf(2);
+        is_wfi    <= i_sysf(3);
+    end generate gen_sys_predecoded;
+
+    gen_sys_illegal_decode : if not predecoded generate
+        sys_illegal <= '1' when (is_system = '1' and is_csr = '0' and
+                                    is_ecall = '0' and is_ebreak = '0' and
+                                    is_mret = '0' and is_wfi = '0') else
+                       '0';
+    end generate gen_sys_illegal_decode;
+
+    gen_sys_illegal_predecoded : if predecoded generate
+        sys_illegal <= i_sysf(4);
+    end generate gen_sys_illegal_predecoded;
 
     ld_unaligned <= '1' when (i_opcode = OPCODE_LOAD and
                                  ((i_funct3 = FUNCT3_LW and i_ea(1 downto 0) /= BYTE_OFFSET_0) or
@@ -243,7 +264,14 @@ begin
                ld_misal or st_misal or st_fault or is_ecall;
     has_exc_nocf <= fetch_fault or any_illegal or is_ebreak or ld_misal or st_misal or st_fault or is_ecall;
 
-    is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
+    gen_fencei_decode : if not predecoded generate
+        is_fencei <= '1' when (i_opcode = OPCODE_MISC_MEM and i_funct3 = FUNCT3_FENCE_I) else '0';
+    end generate gen_fencei_decode;
+
+    gen_fencei_predecoded : if predecoded generate
+        is_fencei <= i_sysf(5);
+    end generate gen_fencei_predecoded;
+
     irq_go    <= i_irq_take and i_ex_valid and i_run and (not is_fencei);
 
     o_take      <= (has_exc and i_ex_valid and i_run) or irq_go;

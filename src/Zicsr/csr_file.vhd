@@ -93,7 +93,9 @@ entity csr_file is
         time_external       : boolean                             := false;
         -- A leitura do banco do Zihpm sai de um registrador: o_bank_read avisa que o endereço é do banco e que o valor
         -- lido só vale um ciclo depois de o endereço aparecer.
-        hpm_registered_read : boolean                             := false
+        hpm_registered_read : boolean                             := false;
+        -- O vetor de eventos do Zihpm é registrado: a contagem chega um ciclo depois do evento.
+        hpm_registered_events : boolean                           := false
     );
     port (
         -- Sinal de clock do sistema.
@@ -776,7 +778,8 @@ begin
             generic map (
                 hpm_counters    => hpm_counters,
                 hpm_width       => hpm_width,
-                registered_read => hpm_registered_read
+                registered_read => hpm_registered_read,
+                registered_events => hpm_registered_events
             )
             port map (
                 i_clk         => i_clk,

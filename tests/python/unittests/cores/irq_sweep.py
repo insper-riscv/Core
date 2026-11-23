@@ -25,7 +25,7 @@ from tests.python.unittests.cores.irq_common import (
     run_sweep,
 )
 
-GAPS = (7, 9, 13, 8, 21, 11, 6, 17, 10, 29, 7, 15)
+GAPS = (8, 9, 14, 8, 22, 11, 7, 17, 10, 30, 7, 16)
 GAPS_FAST = (0, 1, 2, 0, 3, 1, 0, 5)
 SEEDS = (0x1D2C3B4A, 0x0BADF00D, 0x600DCAFE)
 ALL_KINDS = {"inc", "mul", "div", "mis", "mem", "csr", "br"}

@@ -45,7 +45,11 @@ entity hpm_counter_bank is
         -- registradores as palavras de cada faixa, e um ciclo depois o_rdata junta a faixa que os seletores
         -- (que o chamador mantém) escolhem. A leitura dos 29 contadores sai do caminho combinacional do núcleo e o
         -- caminho do multiplexador não leva a junção das faixas.
-        registered_read : boolean                             := false
+        registered_read : boolean                             := false;
+        -- O vetor de eventos entra num registrador: um evento do ciclo t soma 1 aos contadores no ciclo t + 1. Tira dos
+        -- caminhos combinacionais do núcleo (load-use, traps, ready da memória) a escolha do evento de cada um dos 29
+        -- contadores, que é o que limitava o clock; a contagem total não muda, só chega um ciclo depois.
+        registered_events : boolean                           := false
     );
     port (
         -- Sinal de clock do sistema.
@@ -137,7 +141,25 @@ architecture rtl of hpm_counter_bank is
 
 begin
 
-    events_valid <= i_events and EVENT_TABLE_MASK;
+    gen_events_direct : if not registered_events generate
+        events_valid <= i_events and EVENT_TABLE_MASK;
+    end generate gen_events_direct;
+
+    gen_events_registered : if registered_events generate
+
+        u_events : entity work.generic_register
+            generic map (
+                data_width => EVENT_VECTOR_WIDTH
+            )
+            port map (
+                i_clk    => i_clk,
+                i_rst    => i_rst,
+                i_enable => '1',
+                i_d      => i_events and EVENT_TABLE_MASK,
+                o_d      => events_valid
+            );
+
+    end generate gen_events_registered;
 
     -- mcountinhibit: os bits de 0 a 2 não pertencem ao banco e leem zero aqui.
     inhibit_word(2 downto 0)  <= (others => '0');

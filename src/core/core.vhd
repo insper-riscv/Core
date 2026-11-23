@@ -83,6 +83,15 @@ entity core is
         -- O acesso de MEM cai numa memória do barramento com ready próprio (a FLASH ou a RAM no barramento), decidido em
         -- EX e registrado no EX/MEM; o interconector o usa no lugar de decodificar o endereço (vale com o acesso).
         o_ext_is_mem  : out   std_logic;
+        -- Endereço efetivo do acesso que está no estágio EX (a saída do somador da ULA), que chega a MEM no próximo avanço
+        -- do pipeline. Uma cache atrás da porta externa pode ler as suas RAMs com ele um ciclo antes do acesso.
+        o_ex_ea       : out   addr_t;
+        -- O acesso em MEM cruza o limite de uma palavra e usa dois endereços de memória; só o primeiro é o de EX, então uma
+        -- cache que leu adiantado com o_ex_ea não pode usar essa leitura para ele.
+        o_ext_cross   : out   std_logic;
+        -- O acesso em MEM é um store (o bit do EX/MEM, sem o bloqueio do trap): uma cache decide o ready com ele, sem
+        -- esperar a decisão do trap, que bloqueia só o pedido de escrita.
+        o_ext_store   : out   std_logic;
         -- Palavra de dados lida da porta externa.
         i_ext_rdata   : in    word_t    := (others => '0');
         -- Sinaliza que o escravo externo concluiu a transação atual.
@@ -330,6 +339,9 @@ architecture rtl of core is
     signal ex_is_muldiv     : std_logic;
     -- Indicador de instrução da extensão Zicsr registrado em ID/EX.
     signal ex_is_csr        : std_logic;
+    -- Classes SYSTEM decodificadas em ID, em ID e em EX.
+    signal id_sysf : std_logic_vector(5 downto 0);
+    signal ex_sysf : std_logic_vector(5 downto 0);
     -- Indicador de instrução inexistente registrado em ID/EX.
     signal ex_illegal       : std_logic;
     -- Habilitação de escrita na memória registrada em ID/EX.
@@ -498,6 +510,9 @@ begin
     pipe_run      <= base_run and (not fencei_busy);
     o_mem_advance <= mem_run;
     o_ext_is_mem  <= exmem_is_bus_mem;
+    o_ex_ea       <= ex_ea(addr_t'range);
+    o_ext_cross   <= mis_cross;
+    o_ext_store   <= exmem_we_ram;
     -- Com CSRs, a exceção de endereço do load ou store é tomada em MEM (mem_trap_take): é de uma instrução mais
     -- antiga que a de EX, então redireciona o pipeline e descarta a instrução de EX. Sem CSRs, o endereço é
     -- conferido em EX junto das demais causas, que só são sinalizadas, e mem_trap_take fica em zero.
@@ -658,6 +673,7 @@ begin
             o_fwd_rs2       => id_fwd_rs2,
             o_is_muldiv     => id_is_muldiv,
             o_is_csr        => id_is_csr,
+            o_sysf          => id_sysf,
             o_illegal       => id_illegal,
             o_we_ram        => id_we_ram,
             o_re_ram        => id_re_ram,
@@ -692,6 +708,7 @@ begin
             i_fwd_rs2       => id_fwd_rs2,
             i_is_muldiv     => id_is_muldiv,
             i_is_csr        => id_is_csr,
+            i_sysf          => id_sysf,
             i_illegal       => id_illegal,
             i_we_ram        => id_we_ram,
             i_re_ram        => id_re_ram,
@@ -718,6 +735,7 @@ begin
             o_fwd_rs2       => ex_fwd_rs2,
             o_is_muldiv     => ex_is_muldiv,
             o_is_csr        => ex_is_csr,
+            o_sysf          => ex_sysf,
             o_illegal       => ex_illegal,
             o_we_ram        => ex_we_ram,
             o_re_ram        => ex_re_ram,
@@ -768,6 +786,7 @@ begin
             i_alu_sel         => ex_alu_sel,
             i_is_muldiv       => ex_is_muldiv,
             i_is_csr          => ex_is_csr,
+            i_sysf            => ex_sysf,
             i_illegal         => ex_illegal,
             i_opcode          => ex_opcode,
             i_funct3          => ex_funct3,
